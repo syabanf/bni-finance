@@ -133,7 +133,7 @@ export const supabaseMemberRepository: MemberRepository = {
     const { error: delError } = await supabase
       .from('members')
       .delete()
-      .not('id', 'in', `(${activeIds.join(',')})`)
+      .not('id', 'in', activeIds)
     if (delError) throw new Error(delError.message)
 
     return { count: memberRows.length, syncedAt: now }
