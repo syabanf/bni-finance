@@ -8,6 +8,26 @@ import type {
 import { daysUntil } from '@/lib/date'
 import { delay, nextId, nowISO, store } from './store'
 
+/** Mark sent invoices past their due date as overdue. Called lazily before reads. */
+function syncOverdueStatus() {
+  const today = new Date().toISOString().slice(0, 10)
+  for (const inv of store.invoices) {
+    if (inv.status === 'sent' && inv.dueDate < today) {
+      inv.status = 'overdue'
+      inv.updatedAt = nowISO()
+      pushAudit({
+        invoiceId: inv.id,
+        action: 'overdue',
+        oldStatus: 'sent',
+        newStatus: 'overdue',
+        actorId: 'system',
+        actorName: 'Sistem',
+        notes: 'Jatuh tempo terlewati — status otomatis diubah ke overdue',
+      })
+    }
+  }
+}
+
 function relations(invoice: Invoice): InvoiceWithRelations {
   return {
     ...invoice,
@@ -32,6 +52,7 @@ function nextInvoiceNumber(): string {
 
 export const mockInvoiceRepository: InvoiceRepository = {
   async list(filters) {
+    syncOverdueStatus()
     let result = store.invoices.map(relations)
 
     if (filters?.status && filters.status !== 'all') {
@@ -128,6 +149,32 @@ export const mockInvoiceRepository: InvoiceRepository = {
       notes: 'Dikirim ke Paper.id — link pembayaran dibuat',
     })
     return delay(invoice, 800)
+  },
+
+  async resend(id) {
+    const invoice = store.invoices.find((i) => i.id === id)
+    if (!invoice) throw new Error('Invoice tidak ditemukan.')
+    if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
+      throw new Error('Hanya invoice outstanding/overdue yang bisa di-resend.')
+    }
+    // Refresh Paper.id payment link
+    const ref = invoice.paperIdInvoiceId ?? nextId('PPR').toUpperCase()
+    invoice.paperIdInvoiceId = ref
+    invoice.paperIdInvoiceUrl = `https://app.paper.id/invoice/${ref}`
+    invoice.paperIdPaymentUrl = `https://pay.paper.id/${ref}`
+    invoice.paperIdSentAt = nowISO()
+    invoice.updatedAt = nowISO()
+
+    pushAudit({
+      invoiceId: id,
+      action: 'sent',
+      oldStatus: invoice.status,
+      newStatus: invoice.status,
+      actorId: 'admin-national',
+      actorName: 'Admin Nasional',
+      notes: 'Dikirim ulang ke Paper.id — link pembayaran diperbarui',
+    })
+    return delay(invoice, 600)
   },
 
   async cancel(id, reason) {

@@ -129,36 +129,67 @@ export function MemberDetailPage() {
           {!invoices || invoices.length === 0 ? (
             <EmptyState title="Belum ada invoice" description="Member ini belum memiliki invoice." />
           ) : (
-            <Table>
-              <THead>
-                <Tr>
-                  <Th>No. Invoice</Th>
-                  <Th>Tipe</Th>
-                  <Th>Nominal</Th>
-                  <Th>Status</Th>
-                  <Th>Periode</Th>
-                </Tr>
-              </THead>
-              <TBody>
+            <>
+              {/* Mobile cards */}
+              <div className="divide-y divide-ink-100 lg:hidden">
                 {invoices.map((inv) => (
-                  <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
-                    <Td>
-                      <span className="font-mono text-[13px] text-ink-700">{inv.number}</span>
-                    </Td>
-                    <Td>
-                      <InvoiceTypeBadge type={inv.type} />
-                    </Td>
-                    <Td className="font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
-                    <Td>
-                      <InvoiceStatusBadge status={inv.status} />
-                    </Td>
-                    <Td className="whitespace-nowrap text-xs text-ink-500">
-                      {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
-                    </Td>
-                  </Tr>
+                  <div
+                    key={inv.id}
+                    onClick={() => navigate(`/invoices/${inv.id}`)}
+                    className="flex items-start gap-3 px-4 py-3.5 active:bg-ink-50"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-[13px] text-ink-700">{inv.number}</span>
+                        <div className="shrink-0 text-right">
+                          <div className="font-semibold text-ink-900 text-sm">{formatCurrency(inv.amount)}</div>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <InvoiceStatusBadge status={inv.status} />
+                        <InvoiceTypeBadge type={inv.type} />
+                      </div>
+                      <div className="mt-1 text-xs text-ink-400">
+                        {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </TBody>
-            </Table>
+              </div>
+              {/* Desktop table */}
+              <div className="hidden lg:block">
+                <Table>
+                  <THead>
+                    <Tr>
+                      <Th>No. Invoice</Th>
+                      <Th>Tipe</Th>
+                      <Th>Nominal</Th>
+                      <Th>Status</Th>
+                      <Th>Periode</Th>
+                    </Tr>
+                  </THead>
+                  <TBody>
+                    {invoices.map((inv) => (
+                      <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
+                        <Td>
+                          <span className="font-mono text-[13px] text-ink-700">{inv.number}</span>
+                        </Td>
+                        <Td>
+                          <InvoiceTypeBadge type={inv.type} />
+                        </Td>
+                        <Td className="font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
+                        <Td>
+                          <InvoiceStatusBadge status={inv.status} />
+                        </Td>
+                        <Td className="whitespace-nowrap text-xs text-ink-500">
+                          {formatDate(inv.periodStart)} – {formatDate(inv.periodEnd)}
+                        </Td>
+                      </Tr>
+                    ))}
+                  </TBody>
+                </Table>
+              </div>
+            </>
           )}
         </Card>
       </div>

@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { FileText, LayoutGrid, MoreHorizontal, Plus, Users } from 'lucide-react'
+import { AlertTriangle, FileText, LayoutGrid, MoreHorizontal, Plus, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 const tab = (active: boolean) =>
@@ -17,6 +17,7 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
   const { pathname } = useLocation()
   const moreActive =
     pathname !== '/dashboard' &&
+    !pathname.startsWith('/urgent') &&
     !pathname.startsWith('/invoices') &&
     !pathname.startsWith('/members')
 
@@ -32,11 +33,11 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
           )}
         </NavLink>
 
-        <NavLink to="/invoices" className={({ isActive }) => tab(isActive)}>
+        <NavLink to="/urgent" className={({ isActive }) => tab(isActive)}>
           {({ isActive }) => (
             <>
-              <FileText className="h-5 w-5" strokeWidth={isActive ? 2.4 : 2} />
-              Invoice
+              <AlertTriangle className="h-5 w-5" strokeWidth={isActive ? 2.4 : 2} />
+              Tindakan
             </>
           )}
         </NavLink>

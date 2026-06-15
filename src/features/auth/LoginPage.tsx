@@ -4,11 +4,13 @@ import { ArrowRight, Lock, Mail, ShieldCheck } from 'lucide-react'
 import { Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
 
+const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+
 export function LoginPage() {
   const { login, user } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('admin@bni-finance.com')
-  const [password, setPassword] = useState('admin123')
+  const [email, setEmail] = useState(useMock ? 'admin@bni-finance.com' : '')
+  const [password, setPassword] = useState(useMock ? 'admin123' : '')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -115,10 +117,12 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-3 text-xs text-ink-500">
-            <span className="font-semibold text-ink-700">Demo:</span> gunakan kredensial apa pun —
-            data berjalan di atas mock repository.
-          </div>
+          {useMock && (
+            <div className="mt-6 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-3 text-xs text-ink-500">
+              <span className="font-semibold text-ink-700">Demo:</span> gunakan kredensial apa pun —
+              data berjalan di atas mock repository.
+            </div>
+          )}
         </div>
       </div>
     </div>

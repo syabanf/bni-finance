@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, Search, Users } from 'lucide-react'
+import { ArrowRight, Download, Eye, Search, Users } from 'lucide-react'
 import type { Chapter, MemberWithChapter } from '@/types'
 import {
   Avatar,
+  Button,
   Card,
   EmptyState,
   Input,
@@ -21,6 +22,16 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDate } from '@/lib/format'
+
+function downloadCsv(filename: string, headers: string[], rows: string[][]) {
+  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+  const lines = [headers, ...rows].map((r) => r.map(escape).join(','))
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 
 export function MemberListPage() {
   const navigate = useNavigate()
@@ -46,6 +57,29 @@ export function MemberListPage() {
       <PageHeader
         title="Member"
         description="Data member hasil sinkronisasi dari BNI Visitor Management."
+        action={
+          <Button
+            variant="outline"
+            onClick={() =>
+              downloadCsv(
+                'member.csv',
+                ['Nama', 'ID', 'Chapter', 'Email', 'Telepon', 'Status', 'Bergabung'],
+                filtered.map((m) => [
+                  m.name,
+                  m.id,
+                  m.chapter?.displayName ?? '',
+                  m.email ?? '',
+                  m.phone ?? '',
+                  m.status,
+                  formatDate(m.joinedDate),
+                ]),
+              )
+            }
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        }
       />
 
       <Card>
@@ -75,51 +109,83 @@ export function MemberListPage() {
           <EmptyState icon={Users} title="Tidak ada member" description="Tidak ada member yang cocok dengan filter." />
         ) : (
           <>
-            <Table>
-              <THead>
-                <Tr>
-                  <Th>Member</Th>
-                  <Th>Chapter</Th>
-                  <Th>Email</Th>
-                  <Th>Status</Th>
-                  <Th>Bergabung</Th>
-                  <Th className="text-right">Aksi</Th>
-                </Tr>
-              </THead>
-              <TBody>
-                {filtered.map((m) => (
-                  <Tr key={m.id} onClick={() => navigate(`/members/${m.id}`)}>
-                    <Td>
-                      <div className="flex items-center gap-3">
-                        <Avatar name={m.name} size="sm" />
-                        <div className="leading-tight">
-                          <div className="font-medium text-ink-900">{m.name}</div>
-                          <div className="text-xs text-ink-400">{m.id}</div>
-                        </div>
+            {/* Mobile card list */}
+            <div className="divide-y divide-ink-100 lg:hidden">
+              {filtered.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => navigate(`/members/${m.id}`)}
+                  className="flex items-center gap-3 px-4 py-3.5 active:bg-ink-50"
+                >
+                  <Avatar name={m.name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-ink-900 text-sm">{m.name}</div>
+                        <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}</div>
                       </div>
-                    </Td>
-                    <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
-                    <Td className="text-ink-600">{m.email ?? '—'}</Td>
-                    <Td>
-                      <MemberStatusBadge status={m.status} />
-                    </Td>
-                    <Td className="whitespace-nowrap text-ink-600">{formatDate(m.joinedDate)}</Td>
-                    <Td className="text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/members/${m.id}`)
-                        }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-100 hover:text-brand-500"
-                        aria-label="Lihat detail"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                    </Td>
+                      <div className="shrink-0 text-right">
+                        <MemberStatusBadge status={m.status} />
+                        <div className="text-xs text-ink-400 mt-1">{formatDate(m.joinedDate)}</div>
+                      </div>
+                    </div>
+                    {m.email && (
+                      <div className="mt-1 truncate text-xs text-ink-400">{m.email}</div>
+                    )}
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-ink-300" />
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden lg:block">
+              <Table>
+                <THead>
+                  <Tr>
+                    <Th>Member</Th>
+                    <Th>Chapter</Th>
+                    <Th>Email</Th>
+                    <Th>Status</Th>
+                    <Th>Bergabung</Th>
+                    <Th className="text-right">Aksi</Th>
                   </Tr>
-                ))}
-              </TBody>
-            </Table>
+                </THead>
+                <TBody>
+                  {filtered.map((m) => (
+                    <Tr key={m.id} onClick={() => navigate(`/members/${m.id}`)}>
+                      <Td>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={m.name} size="sm" />
+                          <div className="leading-tight">
+                            <div className="font-medium text-ink-900">{m.name}</div>
+                            <div className="text-xs text-ink-400">{m.id}</div>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
+                      <Td className="text-ink-600">{m.email ?? '—'}</Td>
+                      <Td>
+                        <MemberStatusBadge status={m.status} />
+                      </Td>
+                      <Td className="whitespace-nowrap text-ink-600">{formatDate(m.joinedDate)}</Td>
+                      <Td className="text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/members/${m.id}`)
+                          }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-100 hover:text-brand-500"
+                          aria-label="Lihat detail"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </Td>
+                    </Tr>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
             <div className="px-5 py-3 text-xs text-ink-400">
               Menampilkan {filtered.length} dari {members?.length ?? 0} member
             </div>

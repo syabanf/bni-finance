@@ -14,6 +14,7 @@ import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { SyncPage } from '@/features/settings/SyncPage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
+import { UrgentPage } from '@/features/urgent/UrgentPage'
 
 export const router = createBrowserRouter([
   {
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/', element: <Navigate to="/dashboard" replace /> },
           { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/urgent', element: <UrgentPage /> },
 
           // Invoices — order matters: static segments before the :id param.
           { path: '/invoices', element: <InvoiceListPage /> },

@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   ArrowUpRight,
   CalendarClock,
   CheckCircle2,
@@ -8,7 +9,7 @@ import {
   TriangleAlert,
   Wallet,
 } from 'lucide-react'
-import type { DashboardSummary, InvoiceStatus, InvoiceWithRelations } from '@/types'
+import type { ChapterStat, DashboardSummary, InvoiceStatus, InvoiceWithRelations } from '@/types'
 import {
   Button,
   Card,
@@ -22,8 +23,76 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { dashboardService, invoiceService } from '@/services'
-import { formatCurrencyCompact } from '@/lib/format'
+import { formatCurrency, formatCurrencyCompact } from '@/lib/format'
 import { InvoiceTable } from '@/features/invoices/components/InvoiceTable'
+import { cn } from '@/lib/cn'
+
+function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
+  return (
+    <Card>
+      <CardHeader
+        title="Statistik per Chapter"
+        subtitle="Ringkasan invoice aktif, outstanding, dan overdue setiap chapter."
+      />
+      {/* Mobile cards */}
+      <div className="divide-y divide-ink-100 lg:hidden">
+        {stats.map((s) => (
+          <div key={s.chapterId} className="px-4 py-3.5">
+            <div className="flex items-center justify-between">
+              <div className="font-medium text-ink-900 text-sm">{s.chapterName}</div>
+              <div className="text-sm font-semibold text-ink-900">{formatCurrencyCompact(s.totalAmount)}</div>
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-xs">
+              <span className="text-ink-500">{s.total} invoice</span>
+              {s.overdue > 0 && (
+                <span className="font-semibold text-red-600">{s.overdue} overdue</span>
+              )}
+              {s.outstanding > 0 && (
+                <span className="font-semibold text-amber-600">{s.outstanding} outstanding</span>
+              )}
+              <span className="text-emerald-600">{s.paid} lunas</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Desktop table */}
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-ink-100 text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
+              <th className="px-5 py-3">Chapter</th>
+              <th className="px-3 py-3 text-center">Total</th>
+              <th className="px-3 py-3 text-center">Overdue</th>
+              <th className="px-3 py-3 text-center">Outstanding</th>
+              <th className="px-3 py-3 text-center">Lunas</th>
+              <th className="px-5 py-3 text-right">Total Nilai</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ink-50">
+            {stats.map((s) => (
+              <tr key={s.chapterId} className="hover:bg-ink-50/50">
+                <td className="px-5 py-3 font-medium text-ink-900">{s.chapterName}</td>
+                <td className="px-3 py-3 text-center text-ink-600">{s.total}</td>
+                <td className="px-3 py-3 text-center">
+                  <span className={cn('font-semibold', s.overdue > 0 ? 'text-red-600' : 'text-ink-300')}>
+                    {s.overdue}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <span className={cn('font-semibold', s.outstanding > 0 ? 'text-amber-600' : 'text-ink-300')}>
+                    {s.outstanding}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-center text-emerald-600 font-semibold">{s.paid}</td>
+                <td className="px-5 py-3 text-right font-medium text-ink-900">{formatCurrency(s.totalAmount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
 
 const STATUS_META: Record<InvoiceStatus, { label: string; color: string }> = {
   paid: { label: 'Lunas', color: '#10b981' },
@@ -61,6 +130,28 @@ export function DashboardPage() {
           </Button>
         }
       />
+
+      {/* Urgent banner */}
+      {summary && (summary.overdue.count > 0 || summary.renewalDue.count > 0) && (
+        <button
+          onClick={() => navigate('/urgent')}
+          className="mb-4 flex w-full items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left transition-colors hover:bg-red-100"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-500" />
+          <div className="flex-1 text-sm">
+            <span className="font-semibold text-red-700">Perlu tindakan segera: </span>
+            <span className="text-red-600">
+              {[
+                summary.overdue.count > 0 && `${summary.overdue.count} invoice overdue`,
+                summary.renewalDue.count > 0 && `${summary.renewalDue.count} member akan renewal`,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+          </div>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-red-400" />
+        </button>
+      )}
 
       {/* KPI cards */}
       {loading || !summary ? (
@@ -107,6 +198,13 @@ export function DashboardPage() {
             trend={{ value: summary.overdue.trend, format: 'absolute', intent: 'bad' }}
             onClick={() => navigate('/invoices?status=overdue')}
           />
+        </div>
+      )}
+
+      {/* Chapter stats */}
+      {summary && summary.chapterStats.length > 0 && (
+        <div className="mt-5">
+          <ChapterStatsCard stats={summary.chapterStats} />
         </div>
       )}
 

@@ -6,6 +6,7 @@ import {
   Building2,
   Settings,
   RefreshCw,
+  AlertTriangle,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -18,23 +19,15 @@ export interface NavLeaf {
 
 export type NavNode =
   | { kind: 'section'; label: string }
-  | { kind: 'item'; to: string; label: string; icon: LucideIcon; end?: boolean }
+  | { kind: 'item'; to: string; label: string; icon: LucideIcon; end?: boolean; urgent?: boolean }
   | { kind: 'group'; label: string; icon: LucideIcon; children: NavLeaf[] }
 
 export const NAV: NavNode[] = [
   { kind: 'item', to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
+  { kind: 'item', to: '/urgent', label: 'Perlu Tindakan', icon: AlertTriangle, urgent: true },
 
   { kind: 'section', label: 'Keuangan' },
-  {
-    kind: 'group',
-    label: 'Invoice',
-    icon: FileText,
-    children: [
-      { to: '/invoices', label: 'Semua Invoice', end: true },
-      { to: '/invoices/new', label: 'Buat Invoice' },
-      { to: '/invoices/renewal-due', label: 'Renewal Due' },
-    ],
-  },
+  { kind: 'item', to: '/invoices', label: 'Semua Invoice', icon: FileText },
   { kind: 'item', to: '/payments', label: 'Pembayaran', icon: Wallet },
 
   { kind: 'section', label: 'Data Member' },

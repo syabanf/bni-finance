@@ -51,6 +51,8 @@ export interface InvoiceRepository {
   create(input: CreateInvoiceInput): Promise<Invoice>
   /** Push to Paper.id and move the invoice to `sent`. */
   send(id: string): Promise<Invoice>
+  /** Re-send an already-sent/overdue invoice to Paper.id (refreshes payment link). */
+  resend(id: string): Promise<Invoice>
   cancel(id: string, reason: string): Promise<Invoice>
   /** Simulate a Paper.id "payment.success" webhook for a sent invoice. */
   markPaid(id: string): Promise<Invoice>
@@ -76,6 +78,13 @@ export interface SettingsRepository {
 
 export interface PaymentRepository {
   list(): Promise<PaymentWithInvoice[]>
+  listByInvoice(invoiceId: string): Promise<PaymentWithInvoice[]>
+}
+
+export interface UrgentCount {
+  overdue: number
+  renewalDue: number
+  total: number
 }
 
 export interface DashboardRepository {

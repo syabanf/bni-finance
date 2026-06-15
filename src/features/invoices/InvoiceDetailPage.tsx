@@ -8,14 +8,16 @@ import {
   CreditCard,
   ExternalLink,
   FilePlus2,
+  MessageCircle,
   Pencil,
   Send,
   TriangleAlert,
   XCircle,
 } from 'lucide-react'
-import type { AuditAction, AuditLogEntry, InvoiceWithRelations } from '@/types'
+import type { AuditAction, AuditLogEntry, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
 import {
   Avatar,
+  Badge,
   Button,
   Card,
   CardBody,
@@ -30,7 +32,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { invoiceService } from '@/services'
+import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 
@@ -67,6 +69,10 @@ export function InvoiceDetailPage() {
     () => invoiceService.getAuditLog(id),
     [id],
   )
+  const { data: payments, reload: reloadPayments } = useAsync<PaymentWithInvoice[]>(
+    () => paymentService.listByInvoice(id),
+    [id],
+  )
 
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -85,6 +91,7 @@ export function InvoiceDetailPage() {
   const refresh = () => {
     reload()
     reloadAudit()
+    reloadPayments()
   }
 
   const runAction = async (fn: () => Promise<unknown>, message: string) => {
@@ -106,6 +113,26 @@ export function InvoiceDetailPage() {
     if (!invoice.paperIdPaymentUrl) return
     await navigator.clipboard.writeText(invoice.paperIdPaymentUrl)
     toast('Link pembayaran disalin.')
+  }
+
+  const shareViaWhatsApp = () => {
+    if (!invoice.paperIdPaymentUrl) return
+    const memberName = invoice.member?.name ?? 'Bapak/Ibu'
+    const type = invoice.type === 'registration' ? 'Pendaftaran Member' : 'Renewal Keanggotaan'
+    const msg = [
+      `Halo ${memberName},`,
+      ``,
+      `Berikut tagihan *${type}* BNI Grow dari kami:`,
+      `📋 No. Invoice: *${invoice.number}*`,
+      `💰 Nominal: *${formatCurrency(invoice.amount)}*`,
+      `📅 Jatuh Tempo: *${formatDate(invoice.dueDate)}*`,
+      ``,
+      `Silakan lakukan pembayaran melalui link berikut:`,
+      invoice.paperIdPaymentUrl,
+      ``,
+      `Terima kasih. 🙏`,
+    ].join('\n')
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
   const { status } = invoice
@@ -234,8 +261,15 @@ export function InvoiceDetailPage() {
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </div>
+                    <button
+                      onClick={shareViaWhatsApp}
+                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Kirim via WhatsApp
+                    </button>
                     <p className="mt-1.5 text-xs text-ink-400">
-                      Bagikan link ini ke member (mis. via WhatsApp) untuk melakukan pembayaran.
+                      Pesan akan disiapkan otomatis, pilih kontak member di WhatsApp.
                     </p>
                   </div>
                 </div>
@@ -279,6 +313,29 @@ export function InvoiceDetailPage() {
               </div>
             </CardBody>
           </Card>
+
+          {payments && payments.length > 0 && (
+            <Card>
+              <CardHeader title="Pembayaran Diterima" />
+              <CardBody>
+                <div className="space-y-3">
+                  {payments.map((p) => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
+                      <div>
+                        <div className="text-sm font-semibold text-emerald-700">
+                          {formatCurrency(p.amount)}
+                        </div>
+                        <div className="mt-0.5 text-xs text-ink-500">
+                          {p.paymentMethod?.replace(/_/g, ' ') ?? '—'} · {formatDateTime(p.paidAt)}
+                        </div>
+                      </div>
+                      <Badge tone="green">Lunas</Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          )}
 
           <Card>
             <CardHeader title="Riwayat" subtitle="Audit trail perubahan status" />

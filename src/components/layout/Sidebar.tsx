@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Avatar } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useUrgentCount } from '@/hooks/useUrgentCount'
 import { NAV, type NavLeaf } from './nav'
 
 const itemBase =
@@ -57,6 +58,7 @@ function NavGroup({ label, icon: Icon, children }: Extract<(typeof NAV)[number],
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth()
+  const urgentCount = useUrgentCount()
   return (
     <div className="flex h-full flex-col bg-white">
       {/* Brand */}
@@ -90,6 +92,31 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             return <NavGroup key={node.label} {...node} />
           }
           const Icon = node.icon
+          if (node.urgent) {
+            return (
+              <NavLink
+                key={node.to}
+                to={node.to}
+                end={node.end}
+                className={({ isActive }) =>
+                  cn(
+                    itemBase,
+                    isActive
+                      ? 'bg-red-500 text-white shadow-sm shadow-red-500/30'
+                      : 'bg-red-50 text-red-600 hover:bg-red-100',
+                  )
+                }
+              >
+                <Icon className="h-[18px] w-[18px]" />
+                <span className="flex-1">{node.label}</span>
+                {urgentCount.total > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">
+                    {urgentCount.total}
+                  </span>
+                )}
+              </NavLink>
+            )
+          }
           return (
             <NavLink
               key={node.to}

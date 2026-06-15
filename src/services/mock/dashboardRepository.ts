@@ -1,5 +1,5 @@
 import type { DashboardRepository } from '@/services/types'
-import type { DashboardSummary, Invoice, InvoiceStatus } from '@/types'
+import type { ChapterStat, DashboardSummary, Invoice, InvoiceStatus } from '@/types'
 import { daysUntil, monthKey } from '@/lib/date'
 import { delay, store } from './store'
 
@@ -73,6 +73,26 @@ export const mockDashboardRepository: DashboardRepository = {
       monthly.push({ month: label, issued, paid })
     }
 
+    // Per-chapter stats
+    const chapterMap = new Map<string, ChapterStat>()
+    for (const inv of all) {
+      if (inv.status === 'cancelled') continue
+      const chapter = store.chapters.find((c) => c.id === inv.chapterId)
+      if (!chapter) continue
+      const existing = chapterMap.get(inv.chapterId) ?? {
+        chapterId: inv.chapterId,
+        chapterName: chapter.displayName,
+        total: 0, paid: 0, outstanding: 0, overdue: 0, totalAmount: 0,
+      }
+      existing.total++
+      existing.totalAmount += inv.amount
+      if (inv.status === 'paid') existing.paid++
+      if (inv.status === 'sent') existing.outstanding++
+      if (inv.status === 'overdue') existing.overdue++
+      chapterMap.set(inv.chapterId, existing)
+    }
+    const chapterStats = [...chapterMap.values()].sort((a, b) => b.overdue - a.overdue || b.outstanding - a.outstanding)
+
     const summary: DashboardSummary = {
       total: {
         count: active.length,
@@ -100,6 +120,7 @@ export const mockDashboardRepository: DashboardRepository = {
       },
       statusBreakdown,
       monthly,
+      chapterStats,
     }
 
     return delay(summary, 350)

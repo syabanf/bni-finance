@@ -159,6 +159,16 @@ export interface AuditLogEntry {
 // Dashboard aggregates
 // ---------------------------------------------------------------------------
 
+export interface ChapterStat {
+  chapterId: string
+  chapterName: string
+  total: number
+  paid: number
+  outstanding: number
+  overdue: number
+  totalAmount: number
+}
+
 export interface DashboardSummary {
   /** All invoices (excluding cancelled) — count + total value. */
   total: { count: number; amount: number; trend: number }
@@ -172,6 +182,8 @@ export interface DashboardSummary {
   statusBreakdown: { status: InvoiceStatus; count: number }[]
   /** Last 6 months of issued vs. paid totals. */
   monthly: { month: string; issued: number; paid: number }[]
+  /** Per-chapter breakdown. */
+  chapterStats: ChapterStat[]
 }
 
 // ---------------------------------------------------------------------------

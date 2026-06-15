@@ -129,57 +129,93 @@ export function RenewalDuePage() {
             description="Semua member masih dalam masa keanggotaan aktif untuk 30 hari ke depan."
           />
         ) : (
-          <Table>
-            <THead>
-              <Tr>
-                <Th className="w-10">
+          <>
+            {/* Mobile cards */}
+            <div className="divide-y divide-ink-100 lg:hidden">
+              {members.map((m) => (
+                <div
+                  key={m.id}
+                  onClick={() => toggle(m.id)}
+                  className={`flex items-center gap-3 px-4 py-3.5 active:bg-ink-50 ${selected.has(m.id) ? 'bg-brand-50/50' : ''}`}
+                >
                   <input
                     type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
+                    checked={selected.has(m.id)}
+                    onChange={() => toggle(m.id)}
+                    onClick={(e) => e.stopPropagation()}
                     className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
                   />
-                </Th>
-                <Th>Member</Th>
-                <Th>Chapter</Th>
-                <Th>Berakhir</Th>
-                <Th>Status</Th>
-                <Th>Invoice Terakhir</Th>
-              </Tr>
-            </THead>
-            <TBody>
-              {members.map((m) => (
-                <Tr key={m.id} onClick={() => toggle(m.id)} className={selected.has(m.id) ? 'bg-brand-50/40' : ''}>
-                  <Td>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(m.id)}
-                      onChange={() => toggle(m.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-                    />
-                  </Td>
-                  <Td>
-                    <div className="flex items-center gap-3">
-                      <Avatar name={m.name} size="sm" />
-                      <div className="leading-tight">
-                        <div className="font-medium text-ink-900">{m.name}</div>
-                        <div className="text-xs text-ink-400">{m.id}</div>
+                  <Avatar name={m.name} size="sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-ink-900 text-sm">{m.name}</div>
+                        <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <DueBadge days={m.daysUntilDue} />
+                        <div className="text-xs text-ink-400 mt-1">Berakhir {formatDate(m.lastInvoice.periodEnd)}</div>
                       </div>
                     </div>
-                  </Td>
-                  <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
-                  <Td className="whitespace-nowrap text-ink-600">{formatDate(m.lastInvoice.periodEnd)}</Td>
-                  <Td>
-                    <DueBadge days={m.daysUntilDue} />
-                  </Td>
-                  <Td>
-                    <span className="font-mono text-[13px] text-ink-500">{m.lastInvoice.number}</span>
-                  </Td>
-                </Tr>
+                  </div>
+                </div>
               ))}
-            </TBody>
-          </Table>
+            </div>
+            {/* Desktop table */}
+            <div className="hidden lg:block">
+              <Table>
+                <THead>
+                  <Tr>
+                    <Th className="w-10">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleAll}
+                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                      />
+                    </Th>
+                    <Th>Member</Th>
+                    <Th>Chapter</Th>
+                    <Th>Berakhir</Th>
+                    <Th>Status</Th>
+                    <Th>Invoice Terakhir</Th>
+                  </Tr>
+                </THead>
+                <TBody>
+                  {members.map((m) => (
+                    <Tr key={m.id} onClick={() => toggle(m.id)} className={selected.has(m.id) ? 'bg-brand-50/40' : ''}>
+                      <Td>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(m.id)}
+                          onChange={() => toggle(m.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                        />
+                      </Td>
+                      <Td>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={m.name} size="sm" />
+                          <div className="leading-tight">
+                            <div className="font-medium text-ink-900">{m.name}</div>
+                            <div className="text-xs text-ink-400">{m.id}</div>
+                          </div>
+                        </div>
+                      </Td>
+                      <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
+                      <Td className="whitespace-nowrap text-ink-600">{formatDate(m.lastInvoice.periodEnd)}</Td>
+                      <Td>
+                        <DueBadge days={m.daysUntilDue} />
+                      </Td>
+                      <Td>
+                        <span className="font-mono text-[13px] text-ink-500">{m.lastInvoice.number}</span>
+                      </Td>
+                    </Tr>
+                  ))}
+                </TBody>
+              </Table>
+            </div>
+          </>
         )}
       </Card>
     </div>
