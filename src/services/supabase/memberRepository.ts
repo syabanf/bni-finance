@@ -72,8 +72,50 @@ export const supabaseMemberRepository: MemberRepository = {
   },
 
   async sync() {
-    const { count, error } = await supabase.from('members').select('id', { count: 'exact', head: true })
+    const BNI_VM_URL = import.meta.env.VITE_BNI_VM_URL as string
+    const BNI_VM_TOKEN = import.meta.env.VITE_BNI_VM_TOKEN as string
+
+    let allMembers: Record<string, unknown>[] = []
+    let offset = 0
+    const limit = 200
+    while (true) {
+      const res = await fetch(`${BNI_VM_URL}/members?limit=${limit}&offset=${offset}`, {
+        headers: { Authorization: `Bearer ${BNI_VM_TOKEN}` },
+      })
+      if (!res.ok) throw new Error(`BNI VM API error: ${res.status}`)
+      const json = await res.json() as { data: Record<string, unknown>[]; pagination: { hasMore: boolean } }
+      allMembers = allMembers.concat(json.data)
+      if (!json.pagination.hasMore) break
+      offset += limit
+    }
+
+    const now = new Date().toISOString()
+
+    // Upsert chapters first
+    const chaptersMap: Record<string, string> = {}
+    for (const m of allMembers) {
+      const id = m.chapter_id as string
+      if (!chaptersMap[id]) chaptersMap[id] = m.chapter as string
+    }
+    const chapterRows = Object.entries(chaptersMap).map(([id, name]) => ({
+      id, name, display_name: name, synced_at: now,
+    }))
+    await supabase.from('chapters').upsert(chapterRows, { onConflict: 'id' })
+
+    // Upsert members
+    const memberRows = allMembers.map(m => ({
+      id: m.id as string,
+      chapter_id: m.chapter_id as string,
+      name: m.name as string,
+      email: m.email as string | null,
+      phone: m.phone as string | null,
+      status: (m.status as string) || 'active',
+      joined_date: m.joined_date as string,
+      synced_at: now,
+    }))
+
+    const { error } = await supabase.from('members').upsert(memberRows, { onConflict: 'id' })
     if (error) throw new Error(error.message)
-    return { count: count ?? 0, syncedAt: new Date().toISOString() }
+    return { count: memberRows.length, syncedAt: now }
   },
 }
