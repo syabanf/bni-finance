@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Download, Eye, Search, Users } from 'lucide-react'
 import type { Chapter, MemberWithChapter } from '@/types'
 import {
@@ -38,8 +38,9 @@ export function MemberListPage() {
   const { data: members, loading } = useAsync<MemberWithChapter[]>(() => memberService.list())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
+  const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
-  const [chapterId, setChapterId] = useState('all')
+  const [chapterId, setChapterId] = useState(searchParams.get('chapter') ?? 'all')
 
   const filtered = useMemo(() => {
     if (!members) return []
