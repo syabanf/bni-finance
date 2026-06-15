@@ -2,6 +2,19 @@ import { supabase } from '@/lib/supabase'
 import type { SettingsRepository } from '@/services/types'
 import type { FeeSettings } from '@/types'
 
+// ---------------------------------------------------------------------------
+// app_settings helpers — used by sync functions to read/write BNI VM token
+// ---------------------------------------------------------------------------
+
+export async function getAppSetting(key: string): Promise<string | null> {
+  const { data } = await supabase.from('app_settings').select('value').eq('key', key).maybeSingle()
+  return data ? (data as Record<string, unknown>).value as string : null
+}
+
+export async function setAppSetting(key: string, value: string): Promise<void> {
+  await supabase.from('app_settings').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+}
+
 function rowToFees(r: Record<string, unknown>): FeeSettings {
   return {
     id: r.id as string,

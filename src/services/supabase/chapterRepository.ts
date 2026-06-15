@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getAppSetting } from './settingsRepository'
 import type { ChapterRepository } from '@/services/types'
 import type { Chapter } from '@/types'
 
@@ -27,8 +28,9 @@ export const supabaseChapterRepository: ChapterRepository = {
   },
 
   async sync() {
-    const BNI_VM_URL = import.meta.env.VITE_BNI_VM_URL as string
-    const BNI_VM_TOKEN = import.meta.env.VITE_BNI_VM_TOKEN as string
+    const BNI_VM_URL = (await getAppSetting('bni_vm_url')) ?? import.meta.env.VITE_BNI_VM_URL as string
+    const BNI_VM_TOKEN = (await getAppSetting('bni_vm_token')) ?? import.meta.env.VITE_BNI_VM_TOKEN as string
+    if (!BNI_VM_TOKEN) throw new Error('Token BNI VM belum dikonfigurasi')
 
     // Fetch members to extract unique chapters (no dedicated /chapters endpoint)
     let allMembers: Record<string, unknown>[] = []

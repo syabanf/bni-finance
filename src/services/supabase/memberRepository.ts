@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getAppSetting } from './settingsRepository'
 import type { MemberRepository } from '@/services/types'
 import type { Chapter, Member, MemberStatus, MemberWithChapter } from '@/types'
 
@@ -74,8 +75,9 @@ export const supabaseMemberRepository: MemberRepository = {
   },
 
   async sync() {
-    const BNI_VM_URL = import.meta.env.VITE_BNI_VM_URL as string
-    const BNI_VM_TOKEN = import.meta.env.VITE_BNI_VM_TOKEN as string
+    const BNI_VM_URL = (await getAppSetting('bni_vm_url')) ?? import.meta.env.VITE_BNI_VM_URL as string
+    const BNI_VM_TOKEN = (await getAppSetting('bni_vm_token')) ?? import.meta.env.VITE_BNI_VM_TOKEN as string
+    if (!BNI_VM_TOKEN) throw new Error('Token BNI VM belum dikonfigurasi')
 
     let allMembers: Record<string, unknown>[] = []
     let offset = 0

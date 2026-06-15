@@ -1,11 +1,13 @@
-import { useState } from 'react'
-import { Building2, Database, RefreshCw, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Building2, Database, Eye, EyeOff, Key, RefreshCw, Save, Users } from 'lucide-react'
 import type { Chapter, MemberWithChapter } from '@/types'
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
+  Field,
+  Input,
   PageHeader,
   Skeleton,
   useToast,
@@ -13,6 +15,9 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDateTime } from '@/lib/format'
+import { getAppSetting, setAppSetting } from '@/services/supabase/settingsRepository'
+
+const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
 interface SyncCardState {
   count: number
@@ -27,6 +32,31 @@ export function SyncPage() {
   const [memberState, setMemberState] = useState<SyncCardState | null>(null)
   const [chapterState, setChapterState] = useState<SyncCardState | null>(null)
   const [syncing, setSyncing] = useState<'members' | 'chapters' | null>(null)
+
+  // Token config
+  const [token, setToken] = useState('')
+  const [apiUrl, setApiUrl] = useState('')
+  const [showToken, setShowToken] = useState(false)
+  const [savingToken, setSavingToken] = useState(false)
+
+  useEffect(() => {
+    if (useMock) return
+    getAppSetting('bni_vm_token').then(v => setToken(v ?? ''))
+    getAppSetting('bni_vm_url').then(v => setApiUrl(v ?? ''))
+  }, [])
+
+  const saveToken = async () => {
+    setSavingToken(true)
+    try {
+      await setAppSetting('bni_vm_token', token.trim())
+      await setAppSetting('bni_vm_url', apiUrl.trim())
+      toast('Konfigurasi API BNI VM berhasil disimpan.')
+    } catch {
+      toast('Gagal menyimpan konfigurasi.', 'error')
+    } finally {
+      setSavingToken(false)
+    }
+  }
 
   const memberInfo =
     memberState ??
@@ -81,7 +111,7 @@ export function SyncPage() {
           <div className="flex-1">
             <div className="font-semibold text-ink-900">BNI Visitor Management</div>
             <div className="text-sm text-ink-500">
-              Sumber data · <span className="font-mono text-[13px]">bni-vh.com/api/finance/*</span>
+              Sumber data · <span className="font-mono text-[13px]">{apiUrl || 'bni-vh.com/api/external/v1'}</span>
             </div>
           </div>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600">
@@ -90,6 +120,54 @@ export function SyncPage() {
           </span>
         </CardBody>
       </Card>
+
+      {/* Token config */}
+      {!useMock && (
+        <Card className="mb-5">
+          <CardHeader
+            title={
+              <span className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-500">
+                  <Key className="h-5 w-5" />
+                </span>
+                Konfigurasi API Token
+              </span>
+            }
+          />
+          <CardBody className="space-y-4">
+            <Field label="Base URL">
+              <Input
+                value={apiUrl}
+                onChange={e => setApiUrl(e.target.value)}
+                placeholder="https://www.bni-vh.com/api/external/v1"
+                className="font-mono text-sm"
+              />
+            </Field>
+            <Field label="API Token">
+              <div className="relative">
+                <Input
+                  type={showToken ? 'text' : 'password'}
+                  value={token}
+                  onChange={e => setToken(e.target.value)}
+                  placeholder="bnifin_..."
+                  className="pr-10 font-mono text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600"
+                >
+                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </Field>
+            <Button onClick={saveToken} loading={savingToken} className="w-full sm:w-auto">
+              {!savingToken && <Save className="h-4 w-4" />}
+              Simpan Konfigurasi
+            </Button>
+          </CardBody>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <SyncCard
