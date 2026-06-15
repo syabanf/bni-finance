@@ -6,10 +6,18 @@ const supabase = createClient(
 )
 
 Deno.serve(async () => {
-  // Tanggal H+30 dari hari ini = renewal_date yang akan jatuh tempo 30 hari lagi
+  // Baca konfigurasi timing dari app_settings
+  const { data: settingRow } = await supabase
+    .from('app_settings')
+    .select('key, value')
+    .in('key', ['invoice_draft_days_before'])
+  const settingsMap: Record<string, string> = {}
+  for (const r of settingRow ?? []) settingsMap[r.key] = r.value
+  const draftDaysBefore = Number(settingsMap['invoice_draft_days_before'] ?? 30)
+
   const today = new Date()
   const target = new Date(today)
-  target.setDate(target.getDate() + 30)
+  target.setDate(target.getDate() + draftDaysBefore)
   const targetDate = target.toISOString().slice(0, 10)
 
   // Ambil semua member yang renewal_date-nya tepat 30 hari dari sekarang

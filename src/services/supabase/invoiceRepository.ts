@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { getAppSetting } from './settingsRepository'
 import type { CreateInvoiceInput, InvoiceRepository } from '@/services/types'
 import type {
   AuditAction,
@@ -234,10 +235,12 @@ export const supabaseInvoiceRepository: InvoiceRepository = {
     const inv = rowToInvoice(existing as Record<string, unknown>)
     if (inv.status !== 'draft') throw new Error('Hanya invoice draft yang bisa dikirim')
 
-    // due_date = hari pengiriman + 30 hari
+    // due_date = hari pengiriman + N hari (dari app_settings, default 30)
+    const dueDaysAfterSetting = await getAppSetting('invoice_due_days_after')
+    const dueDaysAfter = Number(dueDaysAfterSetting ?? 30)
     const sentAt = new Date()
     const dueDate = new Date(sentAt)
-    dueDate.setDate(dueDate.getDate() + 30)
+    dueDate.setDate(dueDate.getDate() + dueDaysAfter)
     const dueDateStr = dueDate.toISOString().slice(0, 10)
 
     // Simulate Paper.id: generate a fake payment URL

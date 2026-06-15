@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, UserPlus, RefreshCw, Info } from 'lucide-react'
+import { Save, UserPlus, RefreshCw, Info, Clock } from 'lucide-react'
 import type { FeeSettings } from '@/types'
 import {
   Button,
@@ -15,7 +15,10 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
+import { getAppSetting, setAppSetting } from '@/services/supabase/settingsRepository'
 import { formatCurrency, formatDateTime } from '@/lib/format'
+
+const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
 export function SettingsPage() {
   const { toast } = useToast()
@@ -25,6 +28,30 @@ export function SettingsPage() {
   const [renewalFee, setRenewalFee] = useState(0)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Invoice timing
+  const [draftDaysBefore, setDraftDaysBefore] = useState(30)
+  const [dueDaysAfter, setDueDaysAfter] = useState(30)
+  const [savingTiming, setSavingTiming] = useState(false)
+
+  useEffect(() => {
+    if (useMock) return
+    getAppSetting('invoice_draft_days_before').then(v => { if (v) setDraftDaysBefore(Number(v)) })
+    getAppSetting('invoice_due_days_after').then(v => { if (v) setDueDaysAfter(Number(v)) })
+  }, [])
+
+  const saveTiming = async () => {
+    setSavingTiming(true)
+    try {
+      await setAppSetting('invoice_draft_days_before', String(draftDaysBefore))
+      await setAppSetting('invoice_due_days_after', String(dueDaysAfter))
+      toast('Konfigurasi timing invoice berhasil disimpan.')
+    } catch {
+      toast('Gagal menyimpan konfigurasi timing.', 'error')
+    } finally {
+      setSavingTiming(false)
+    }
+  }
 
   useEffect(() => {
     if (fees) {
@@ -101,7 +128,68 @@ export function SettingsPage() {
           </Card>
         </div>
 
-        {/* Preview */}
+        {/* Invoice Timing */}
+        {!useMock && (
+          <Card className="lg:col-span-2">
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-500">
+                    <Clock className="h-5 w-5" />
+                  </span>
+                  Konfigurasi Timing Invoice
+                </span>
+              }
+              subtitle="Atur kapan draft dibuat dan berapa lama jatuh tempo setelah invoice dikirim."
+            />
+            <CardBody className="space-y-5">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="rounded-xl border border-ink-200 p-4">
+                  <div className="mb-1 text-sm font-semibold text-ink-900">Buat Draft Sebelum Renewal</div>
+                  <div className="mb-3 text-xs text-ink-400">Invoice draft otomatis dibuat N hari sebelum renewal date member</div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={draftDaysBefore}
+                      onChange={e => setDraftDaysBefore(Math.max(1, Number(e.target.value)))}
+                      min={1}
+                      max={90}
+                      className="w-24 text-center font-semibold"
+                    />
+                    <span className="text-sm text-ink-500">hari sebelum renewal</span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-ink-200 p-4">
+                  <div className="mb-1 text-sm font-semibold text-ink-900">Jatuh Tempo Setelah Dikirim</div>
+                  <div className="mb-3 text-xs text-ink-400">Due date invoice = tanggal kirim + N hari</div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={dueDaysAfter}
+                      onChange={e => setDueDaysAfter(Math.max(1, Number(e.target.value)))}
+                      min={1}
+                      max={90}
+                      className="w-24 text-center font-semibold"
+                    />
+                    <span className="text-sm text-ink-500">hari setelah dikirim</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-start gap-2 rounded-xl bg-violet-50 p-3 text-xs text-violet-700">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                Perubahan hanya berlaku untuk invoice yang dibuat setelah disimpan. Invoice yang sudah terbit tidak berubah.
+              </div>
+              <div className="flex justify-end border-t border-ink-100 pt-4">
+                <Button onClick={saveTiming} loading={savingTiming}>
+                  <Save className="h-4 w-4" />
+                  Simpan Timing
+                </Button>
+              </div>
+            </CardBody>
+          </Card>
+        )}
+
+      {/* Preview */}
         <Card className="h-fit">
           <CardHeader title="Pratinjau" />
           <CardBody className="space-y-3">
