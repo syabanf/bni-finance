@@ -216,6 +216,8 @@ export function InvoiceDetailPage() {
               <DetailItem label="Mata Uang" value={invoice.currency} />
               <DetailItem label="Awal Periode" value={formatDate(invoice.periodStart)} />
               <DetailItem label="Akhir Periode" value={formatDate(invoice.periodEnd)} />
+              <DetailItem label="Tanggal Dibuat" value={formatDateTime(invoice.createdAt)} />
+              <DetailItem label="Terakhir Diperbarui" value={formatDateTime(invoice.updatedAt)} />
             </div>
             {invoice.notes && (
               <div className="border-t border-ink-100 px-5 py-4">
