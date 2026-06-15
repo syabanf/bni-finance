@@ -41,17 +41,19 @@ export function MemberListPage() {
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [chapterId, setChapterId] = useState(searchParams.get('chapter') ?? 'all')
+  const [hideNoDueDate, setHideNoDueDate] = useState(false)
 
   const filtered = useMemo(() => {
     if (!members) return []
     const q = search.trim().toLowerCase()
     return members.filter((m) => {
       if (chapterId !== 'all' && m.chapterId !== chapterId) return false
+      if (hideNoDueDate && !m.renewalDate) return false
       if (q && !m.name.toLowerCase().includes(q) && !m.id.toLowerCase().includes(q) && !(m.email ?? '').toLowerCase().includes(q))
         return false
       return true
     })
-  }, [members, search, chapterId])
+  }, [members, search, chapterId, hideNoDueDate])
 
   return (
     <div>
@@ -102,6 +104,15 @@ export function MemberListPage() {
               </option>
             ))}
           </Select>
+          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-600">
+            <input
+              type="checkbox"
+              checked={hideNoDueDate}
+              onChange={(e) => setHideNoDueDate(e.target.checked)}
+              className="h-4 w-4 rounded border-ink-300 accent-brand-500"
+            />
+            Ada due date
+          </label>
         </div>
 
         {loading ? (
