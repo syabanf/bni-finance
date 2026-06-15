@@ -12,8 +12,10 @@ import {
   Th,
   THead,
   Tr,
+  WhatsAppIcon,
 } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { buildInvoiceWhatsAppUrl } from '@/lib/whatsapp'
 import { cn } from '@/lib/cn'
 
 type SortKey = 'number' | 'member' | 'amount' | 'dueDate' | 'status'
@@ -24,6 +26,34 @@ interface InvoiceTableProps {
   compact?: boolean
   selected?: Set<string>
   onSelectChange?: (s: Set<string>) => void
+}
+
+/** Opens wa.me in a new tab with a prefilled invoice message. */
+function WhatsAppAction({
+  url,
+  size = 'md',
+}: {
+  url: string
+  size?: 'sm' | 'md'
+}) {
+  const dim = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8'
+  const icon = size === 'sm' ? 'h-[18px] w-[18px]' : 'h-4 w-4'
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        'inline-flex items-center justify-center rounded-lg text-emerald-600 transition-colors hover:bg-emerald-50',
+        dim,
+      )}
+      aria-label="Kirim WhatsApp"
+      title="Kirim invoice via WhatsApp"
+    >
+      <WhatsAppIcon className={icon} />
+    </a>
+  )
 }
 
 export function InvoiceTable({ invoices, compact = false, selected, onSelectChange }: InvoiceTableProps) {
@@ -109,46 +139,52 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
             <span className="text-xs text-ink-500">Pilih semua</span>
           </div>
         )}
-        {sorted.map((inv) => (
-          <div
-            key={inv.id}
-            onClick={() => selectable ? toggleOne(inv.id) : navigate(`/invoices/${inv.id}`)}
-            className={cn(
-              'flex items-start gap-3 px-4 py-3.5 active:bg-ink-50',
-              selectable && selected?.has(inv.id) ? 'bg-brand-50/50' : '',
-            )}
-          >
-            {selectable && (
-              <input
-                type="checkbox"
-                checked={selected?.has(inv.id) ?? false}
-                onChange={() => toggleOne(inv.id)}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-              />
-            )}
-            <Avatar name={inv.member?.name ?? '?'} size="sm" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate font-medium text-ink-900 text-sm">{inv.member?.name ?? '—'}</div>
-                  <div className="text-xs text-ink-400">{inv.chapter?.displayName ?? '—'} · {inv.number}</div>
+        {sorted.map((inv) => {
+          const waUrl = buildInvoiceWhatsAppUrl(inv)
+          return (
+            <div
+              key={inv.id}
+              onClick={() => (selectable ? toggleOne(inv.id) : navigate(`/invoices/${inv.id}`))}
+              className={cn(
+                'flex items-start gap-3 px-4 py-3.5 active:bg-ink-50',
+                selectable && selected?.has(inv.id) ? 'bg-brand-50/50' : '',
+              )}
+            >
+              {selectable && (
+                <input
+                  type="checkbox"
+                  checked={selected?.has(inv.id) ?? false}
+                  onChange={() => toggleOne(inv.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-0.5 h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                />
+              )}
+              <Avatar name={inv.member?.name ?? '?'} size="sm" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium text-ink-900 text-sm">{inv.member?.name ?? '—'}</div>
+                    <div className="text-xs text-ink-400">{inv.chapter?.displayName ?? '—'} · {inv.number}</div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <div className="font-semibold text-ink-900 text-sm">{formatCurrency(inv.amount)}</div>
+                    <div className="text-xs text-ink-400 mt-0.5">{formatDate(inv.dueDate)}</div>
+                  </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  <div className="font-semibold text-ink-900 text-sm">{formatCurrency(inv.amount)}</div>
-                  <div className="text-xs text-ink-400 mt-0.5">{formatDate(inv.dueDate)}</div>
+                <div className="mt-2 flex items-center gap-2">
+                  <InvoiceStatusBadge status={inv.status} />
+                  <InvoiceTypeBadge type={inv.type} />
+                  {waUrl && (
+                    <span className="ml-auto">
+                      <WhatsAppAction url={waUrl} size="sm" />
+                    </span>
+                  )}
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <InvoiceStatusBadge status={inv.status} />
-                <InvoiceTypeBadge type={inv.type} />
-              </div>
+              {!selectable && <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-ink-300" />}
             </div>
-            {!selectable && (
-              <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-ink-300" />
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Desktop table */}
@@ -177,64 +213,70 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
             </Tr>
           </THead>
           <TBody>
-            {sorted.map((inv) => (
-              <Tr
-                key={inv.id}
-                onClick={() => selectable ? toggleOne(inv.id) : navigate(`/invoices/${inv.id}`)}
-                className={selectable && selected?.has(inv.id) ? 'bg-brand-50/40' : ''}
-              >
-                {selectable && (
+            {sorted.map((inv) => {
+              const waUrl = buildInvoiceWhatsAppUrl(inv)
+              return (
+                <Tr
+                  key={inv.id}
+                  onClick={() => (selectable ? toggleOne(inv.id) : navigate(`/invoices/${inv.id}`))}
+                  className={selectable && selected?.has(inv.id) ? 'bg-brand-50/40' : ''}
+                >
+                  {selectable && (
+                    <Td>
+                      <input
+                        type="checkbox"
+                        checked={selected?.has(inv.id) ?? false}
+                        onChange={() => toggleOne(inv.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                      />
+                    </Td>
+                  )}
                   <Td>
-                    <input
-                      type="checkbox"
-                      checked={selected?.has(inv.id) ?? false}
-                      onChange={() => toggleOne(inv.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-                    />
-                  </Td>
-                )}
-                <Td>
-                  <div className="flex items-center gap-3">
-                    <Avatar name={inv.member?.name ?? '?'} size="sm" />
-                    <div className="leading-tight">
-                      <div className="font-medium text-ink-900">{inv.member?.name ?? '—'}</div>
-                      <div className="text-xs text-ink-400">{inv.number}</div>
+                    <div className="flex items-center gap-3">
+                      <Avatar name={inv.member?.name ?? '?'} size="sm" />
+                      <div className="leading-tight">
+                        <div className="font-medium text-ink-900">{inv.member?.name ?? '—'}</div>
+                        <div className="text-xs text-ink-400">{inv.number}</div>
+                      </div>
                     </div>
-                  </div>
-                </Td>
-                <Td className="text-ink-600">{inv.chapter?.displayName ?? '—'}</Td>
-                {!compact && (
+                  </Td>
+                  <Td className="text-ink-600">{inv.chapter?.displayName ?? '—'}</Td>
+                  {!compact && (
+                    <Td>
+                      <span className="font-mono text-[13px] text-ink-600">{inv.number}</span>
+                    </Td>
+                  )}
+                  {!compact && (
+                    <Td>
+                      <InvoiceTypeBadge type={inv.type} />
+                    </Td>
+                  )}
+                  <Td className="font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
                   <Td>
-                    <span className="font-mono text-[13px] text-ink-600">{inv.number}</span>
+                    <InvoiceStatusBadge status={inv.status} />
                   </Td>
-                )}
-                {!compact && (
-                  <Td>
-                    <InvoiceTypeBadge type={inv.type} />
-                  </Td>
-                )}
-                <Td className="font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
-                <Td>
-                  <InvoiceStatusBadge status={inv.status} />
-                </Td>
-                <Td className="whitespace-nowrap text-ink-600">{formatDate(inv.dueDate)}</Td>
-                {!compact && (
-                  <Td className="text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        navigate(`/invoices/${inv.id}`)
-                      }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-100 hover:text-brand-500"
-                      aria-label="Lihat detail"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                  </Td>
-                )}
-              </Tr>
-            ))}
+                  <Td className="whitespace-nowrap text-ink-600">{formatDate(inv.dueDate)}</Td>
+                  {!compact && (
+                    <Td className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {waUrl && <WhatsAppAction url={waUrl} />}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/invoices/${inv.id}`)
+                          }}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-100 hover:text-brand-500"
+                          aria-label="Lihat detail"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </Td>
+                  )}
+                </Tr>
+              )
+            })}
           </TBody>
         </Table>
       </div>
