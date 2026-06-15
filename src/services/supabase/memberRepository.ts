@@ -44,7 +44,26 @@ export const supabaseMemberRepository: MemberRepository = {
     if (params?.search) q = q.ilike('name', `%${params.search}%`)
     const { data, error } = await q
     if (error) throw new Error(error.message)
-    return (data ?? []).map(withChapter)
+
+    // Fetch latest renewal due date per member
+    const { data: renewals } = await supabase
+      .from('invoices')
+      .select('member_id, due_date')
+      .eq('type', 'renewal')
+      .in('status', ['sent', 'overdue', 'paid'])
+      .order('due_date', { ascending: false })
+
+    const renewalMap: Record<string, string> = {}
+    for (const r of renewals ?? []) {
+      const row = r as Record<string, unknown>
+      const memberId = row.member_id as string
+      if (!renewalMap[memberId]) renewalMap[memberId] = row.due_date as string
+    }
+
+    return (data ?? []).map(r => ({
+      ...withChapter(r),
+      renewalDueDate: renewalMap[(r as Record<string, unknown>).id as string],
+    }))
   },
 
   async getById(id) {

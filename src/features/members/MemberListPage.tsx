@@ -64,7 +64,7 @@ export function MemberListPage() {
             onClick={() =>
               downloadCsv(
                 'member.csv',
-                ['Nama', 'ID', 'Chapter', 'Email', 'Telepon', 'Status', 'Bergabung'],
+                ['Nama', 'ID', 'Chapter', 'Email', 'Telepon', 'Status', 'Due Date'],
                 filtered.map((m) => [
                   m.name,
                   m.id,
@@ -72,7 +72,7 @@ export function MemberListPage() {
                   m.email ?? '',
                   m.phone ?? '',
                   m.status,
-                  formatDate(m.joinedDate),
+                  m.renewalDueDate ? formatDate(m.renewalDueDate) : '',
                 ]),
               )
             }
@@ -131,7 +131,9 @@ export function MemberListPage() {
                       </div>
                       <div className="shrink-0 text-right">
                         <MemberStatusBadge status={m.status} />
-                        <div className="text-xs text-ink-400 mt-1">{formatDate(m.joinedDate)}</div>
+                        <div className="text-xs text-ink-400 mt-1">
+                          {m.renewalDueDate ? formatDate(m.renewalDueDate) : '—'}
+                        </div>
                       </div>
                     </div>
                     {m.email && (
@@ -152,7 +154,7 @@ export function MemberListPage() {
                     <Th>Chapter</Th>
                     <Th>Email</Th>
                     <Th>Status</Th>
-                    <Th>Bergabung</Th>
+                    <Th>Due Date</Th>
                     <Th className="text-right">Aksi</Th>
                   </Tr>
                 </THead>
@@ -177,7 +179,9 @@ export function MemberListPage() {
                       <Td>
                         <MemberStatusBadge status={m.status} />
                       </Td>
-                      <Td className="whitespace-nowrap text-ink-600">{formatDate(m.joinedDate)}</Td>
+                      <Td className="whitespace-nowrap text-ink-600">
+                        {m.renewalDueDate ? formatDate(m.renewalDueDate) : '—'}
+                      </Td>
                       <Td className="text-right">
                         <button
                           onClick={(e) => {
