@@ -151,6 +151,7 @@ export function buildSeedData(): BuiltData {
       phone: phoneFor(idx),
       status: seed.status ?? (seed.history.includes('overdue') ? 'pending' : 'active'),
       joinedDate: seed.joined,
+      renewalDate: null,
       syncedAt: SYNCED_AT,
     }
     members.push(member)

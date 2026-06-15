@@ -89,7 +89,7 @@ export function MemberDetailPage() {
             <div className="space-y-3 border-t border-ink-100 px-5 py-4 text-sm">
               <InfoRow icon={Mail} value={member.email ?? '—'} />
               <InfoRow icon={Phone} value={member.phone ?? '—'} />
-              <InfoRow icon={Calendar} value={`Bergabung ${formatDate(member.joinedDate)}`} />
+              {member.joinedDate && <InfoRow icon={Calendar} value={`Bergabung ${formatDate(member.joinedDate)}`} />}
             </div>
             <div className="border-t border-ink-100 px-5 py-4">
               <div className="text-xs font-medium uppercase tracking-wide text-ink-400">Chapter</div>

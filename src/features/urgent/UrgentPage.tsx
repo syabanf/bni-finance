@@ -640,7 +640,7 @@ function RegistrationSection({
                 <Avatar name={m.name} size="sm" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-ink-900 text-sm">{m.name}</div>
-                  <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'} · Bergabung {formatDate(m.joinedDate)}</div>
+                  <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}{m.joinedDate ? ` · Bergabung ${formatDate(m.joinedDate)}` : ''}</div>
                   {m.email && <div className="truncate text-xs text-ink-400">{m.email}</div>}
                 </div>
                 <button
@@ -694,7 +694,7 @@ function RegistrationSection({
                       </div>
                     </Td>
                     <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
-                    <Td className="whitespace-nowrap text-ink-600">{formatDate(m.joinedDate)}</Td>
+                    <Td className="whitespace-nowrap text-ink-600">{m.joinedDate ? formatDate(m.joinedDate) : '—'}</Td>
                     <Td className="text-right">
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/members/${m.id}`) }}

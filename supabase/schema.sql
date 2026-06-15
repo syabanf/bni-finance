@@ -33,7 +33,8 @@ create table if not exists members (
   company       text,
   business_field text,
   status        member_status not null default 'active',
-  joined_date date not null,
+  joined_date date,
+  renewal_date date,
   synced_at   timestamptz not null default now()
 );
 create index if not exists members_chapter_id_idx on members(chapter_id);

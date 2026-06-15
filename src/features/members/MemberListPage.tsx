@@ -72,7 +72,7 @@ export function MemberListPage() {
                   m.email ?? '',
                   m.phone ?? '',
                   m.status,
-                  m.renewalDueDate ? formatDate(m.renewalDueDate) : '',
+                  m.renewalDate ? formatDate(m.renewalDate) : '',
                 ]),
               )
             }
@@ -132,7 +132,7 @@ export function MemberListPage() {
                       <div className="shrink-0 text-right">
                         <MemberStatusBadge status={m.status} />
                         <div className="text-xs text-ink-400 mt-1">
-                          {m.renewalDueDate ? formatDate(m.renewalDueDate) : '—'}
+                          {m.renewalDate ? formatDate(m.renewalDate) : '—'}
                         </div>
                       </div>
                     </div>
@@ -180,7 +180,7 @@ export function MemberListPage() {
                         <MemberStatusBadge status={m.status} />
                       </Td>
                       <Td className="whitespace-nowrap text-ink-600">
-                        {m.renewalDueDate ? formatDate(m.renewalDueDate) : '—'}
+                        {m.renewalDate ? formatDate(m.renewalDate) : '—'}
                       </Td>
                       <Td className="text-right">
                         <button

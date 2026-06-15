@@ -40,14 +40,14 @@ export interface Member {
   company?: string
   businessField?: string
   status: MemberStatus
-  joinedDate: string // ISO date
+  joinedDate: string | null
+  renewalDate: string | null
   syncedAt: string
 }
 
 /** Member enriched with its chapter — convenience for list/detail views. */
 export interface MemberWithChapter extends Member {
   chapter: Chapter | null
-  renewalDueDate?: string // due_date dari invoice renewal terbaru
 }
 
 // ---------------------------------------------------------------------------

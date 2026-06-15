@@ -56,7 +56,8 @@ function rowToMember(r: Record<string, unknown>): Member {
     email: r.email as string | undefined,
     phone: r.phone as string | undefined,
     status: r.status as MemberStatus,
-    joinedDate: r.joined_date as string,
+    joinedDate: r.joined_date as string | null,
+    renewalDate: r.renewal_date as string | null,
     syncedAt: r.synced_at as string,
   }
 }

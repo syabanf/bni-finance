@@ -13,7 +13,8 @@ function rowToMember(r: Record<string, unknown>): Member {
     company: r.company as string | undefined,
     businessField: r.business_field as string | undefined,
     status: r.status as MemberStatus,
-    joinedDate: r.joined_date as string,
+    joinedDate: r.joined_date as string | null,
+    renewalDate: r.renewal_date as string | null,
     syncedAt: r.synced_at as string,
   }
 }
@@ -44,26 +45,7 @@ export const supabaseMemberRepository: MemberRepository = {
     if (params?.search) q = q.ilike('name', `%${params.search}%`)
     const { data, error } = await q
     if (error) throw new Error(error.message)
-
-    // Fetch latest renewal due date per member
-    const { data: renewals } = await supabase
-      .from('invoices')
-      .select('member_id, due_date')
-      .eq('type', 'renewal')
-      .in('status', ['sent', 'overdue', 'paid'])
-      .order('due_date', { ascending: false })
-
-    const renewalMap: Record<string, string> = {}
-    for (const r of renewals ?? []) {
-      const row = r as Record<string, unknown>
-      const memberId = row.member_id as string
-      if (!renewalMap[memberId]) renewalMap[memberId] = row.due_date as string
-    }
-
-    return (data ?? []).map(r => ({
-      ...withChapter(r),
-      renewalDueDate: renewalMap[(r as Record<string, unknown>).id as string],
-    }))
+    return (data ?? []).map(withChapter)
   },
 
   async getById(id) {
@@ -138,7 +120,8 @@ export const supabaseMemberRepository: MemberRepository = {
       company: m.company as string | null,
       business_field: m.business_field as string | null,
       status: (m.status as string) || 'active',
-      joined_date: m.joined_date as string,
+      joined_date: (m.joined_date as string | null) ?? null,
+      renewal_date: (m.renewal_date as string | null) ?? null,
       synced_at: now,
     }))
 
