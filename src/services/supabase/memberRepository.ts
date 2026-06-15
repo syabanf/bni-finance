@@ -130,11 +130,14 @@ export const supabaseMemberRepository: MemberRepository = {
 
     // Hapus member yang sudah tidak ada di BNI VM
     const activeIds = memberRows.map(m => m.id)
-    const { error: delError } = await supabase
-      .from('members')
-      .delete()
-      .not('id', 'in', activeIds)
-    if (delError) throw new Error(delError.message)
+    const { data: existing } = await supabase.from('members').select('id')
+    const toDelete = (existing ?? [])
+      .map((r: Record<string, unknown>) => r.id as string)
+      .filter(id => !activeIds.includes(id))
+    if (toDelete.length > 0) {
+      const { error: delError } = await supabase.from('members').delete().in('id', toDelete)
+      if (delError) throw new Error(delError.message)
+    }
 
     return { count: memberRows.length, syncedAt: now }
   },
