@@ -48,5 +48,12 @@ export default defineConfig({
   },
   server: {
     port: process.env.PORT ? Number(process.env.PORT) : 5173,
+    proxy: {
+      '/api/bni-vm': {
+        target: 'https://www.bni-vh.com/api/external/v1',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/bni-vm/, ''),
+      },
+    },
   },
 })

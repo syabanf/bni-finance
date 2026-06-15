@@ -75,15 +75,18 @@ export const supabaseMemberRepository: MemberRepository = {
   },
 
   async sync() {
-    const BNI_VM_URL = (await getAppSetting('bni_vm_url')) ?? import.meta.env.VITE_BNI_VM_URL as string
     const BNI_VM_TOKEN = (await getAppSetting('bni_vm_token')) ?? import.meta.env.VITE_BNI_VM_TOKEN as string
     if (!BNI_VM_TOKEN) throw new Error('Token BNI VM belum dikonfigurasi')
+
+    // Gunakan Vite proxy /api/bni-vm → https://www.bni-vh.com/api/external/v1
+    // agar tidak terkena CORS di browser
+    const FETCH_BASE = '/api/bni-vm'
 
     let allMembers: Record<string, unknown>[] = []
     let offset = 0
     const limit = 200
     while (true) {
-      const res = await fetch(`${BNI_VM_URL}/members?limit=${limit}&offset=${offset}`, {
+      const res = await fetch(`${FETCH_BASE}/members?limit=${limit}&offset=${offset}`, {
         headers: { Authorization: `Bearer ${BNI_VM_TOKEN}` },
       })
       if (!res.ok) throw new Error(`BNI VM API error: ${res.status}`)
