@@ -4,6 +4,7 @@ import { cn } from '@/lib/cn'
 import { useAuth } from '@/features/auth/AuthContext'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+import { BottomNav } from './BottomNav'
 
 export function AppLayout() {
   const { user } = useAuth()
@@ -47,13 +48,16 @@ export function AppLayout() {
 
       {/* Main column */}
       <div className="flex min-h-screen flex-col lg:pl-[264px]">
-        <Topbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">
+        <Topbar />
+        <main className="flex-1 px-4 py-6 pb-28 lg:px-8 lg:py-8 lg:pb-8">
           <div className="mx-auto max-w-[1400px] animate-fade-in">
             <Outlet />
           </div>
         </main>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <BottomNav onMore={() => setMobileOpen(true)} />
     </div>
   )
 }
