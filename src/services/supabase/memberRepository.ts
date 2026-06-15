@@ -127,6 +127,15 @@ export const supabaseMemberRepository: MemberRepository = {
 
     const { error } = await supabase.from('members').upsert(memberRows, { onConflict: 'id' })
     if (error) throw new Error(error.message)
+
+    // Hapus member yang sudah tidak ada di BNI VM
+    const activeIds = memberRows.map(m => m.id)
+    const { error: delError } = await supabase
+      .from('members')
+      .delete()
+      .not('id', 'in', `(${activeIds.join(',')})`)
+    if (delError) throw new Error(delError.message)
+
     return { count: memberRows.length, syncedAt: now }
   },
 }
