@@ -28,9 +28,11 @@ create table if not exists members (
   id          text primary key,
   chapter_id  text not null references chapters(id),
   name        text not null,
-  email       text,
-  phone       text,
-  status      member_status not null default 'active',
+  email         text,
+  phone         text,
+  company       text,
+  business_field text,
+  status        member_status not null default 'active',
   joined_date date not null,
   synced_at   timestamptz not null default now()
 );

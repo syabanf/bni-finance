@@ -7,9 +7,11 @@ import { Topbar } from './Topbar'
 import { BottomNav } from './BottomNav'
 
 export function AppLayout() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  if (loading) return null
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />

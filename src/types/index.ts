@@ -37,6 +37,8 @@ export interface Member {
   name: string
   email?: string
   phone?: string
+  company?: string
+  businessField?: string
   status: MemberStatus
   joinedDate: string // ISO date
   syncedAt: string

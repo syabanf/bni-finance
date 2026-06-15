@@ -7,14 +7,14 @@ import { useAuth } from './AuthContext'
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
 export function LoginPage() {
-  const { login, user } = useAuth()
+  const { login, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState(useMock ? 'admin@bni-finance.com' : '')
   const [password, setPassword] = useState(useMock ? 'admin123' : '')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  if (user) {
+  if (!authLoading && user) {
     navigate('/dashboard', { replace: true })
   }
 
