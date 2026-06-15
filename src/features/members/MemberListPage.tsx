@@ -122,7 +122,11 @@ export function MemberListPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="truncate font-medium text-ink-900 text-sm">{m.name}</div>
-                        <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}</div>
+                        <div className="text-xs text-ink-400 truncate">
+                          {m.company && m.businessField
+                            ? `${m.company} · ${m.businessField}`
+                            : m.company ?? m.businessField ?? m.chapter?.displayName ?? '—'}
+                        </div>
                       </div>
                       <div className="shrink-0 text-right">
                         <MemberStatusBadge status={m.status} />
@@ -159,7 +163,11 @@ export function MemberListPage() {
                           <Avatar name={m.name} size="sm" />
                           <div className="leading-tight">
                             <div className="font-medium text-ink-900">{m.name}</div>
-                            <div className="text-xs text-ink-400">{m.id}</div>
+                            <div className="text-xs text-ink-400">
+                              {m.company && m.businessField
+                                ? `${m.company} · ${m.businessField}`
+                                : m.company ?? m.businessField ?? '—'}
+                            </div>
                           </div>
                         </div>
                       </Td>
