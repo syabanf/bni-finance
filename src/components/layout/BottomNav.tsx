@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom'
-import { AlertTriangle, FileText, LayoutGrid, MoreHorizontal, Plus, Users } from 'lucide-react'
+import { AlertTriangle, LayoutGrid, MoreHorizontal, Plus, Users } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 const tab = (active: boolean) =>
