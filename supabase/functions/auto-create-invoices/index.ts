@@ -16,15 +16,18 @@ Deno.serve(async () => {
   const draftDaysBefore = Number(settingsMap['invoice_draft_days_before'] ?? 30)
 
   const today = new Date()
+  const todayStr = today.toISOString().slice(0, 10)
   const target = new Date(today)
   target.setDate(target.getDate() + draftDaysBefore)
   const targetDate = target.toISOString().slice(0, 10)
 
-  // Ambil semua member yang renewal_date-nya tepat 30 hari dari sekarang
+  // Ambil semua member yang renewal_date-nya antara hari ini s/d H+N
+  // (gunakan <= agar tidak terlewat jika cron sempat tidak jalan)
   const { data: members, error: mErr } = await supabase
     .from('members')
     .select('id, name, chapter_id, renewal_date')
-    .eq('renewal_date', targetDate)
+    .gte('renewal_date', todayStr)
+    .lte('renewal_date', targetDate)
     .eq('status', 'active')
 
   if (mErr) return new Response(JSON.stringify({ error: mErr.message }), { status: 500 })
@@ -52,17 +55,33 @@ Deno.serve(async () => {
   // Buat invoice draft untuk member yang belum punya
   const toCreate = members.filter((m: Record<string, unknown>) => !alreadyHas.has(m.id))
 
-  const invoiceRows = toCreate.map((m: Record<string, unknown>) => ({
-    member_id: m.id,
-    chapter_id: m.chapter_id,
-    type: 'renewal',
-    status: 'draft',
-    amount: renewalFee,
-    currency: 'IDR',
-    // due_date diset saat invoice dikirim (hari kirim + 30)
-    due_date: targetDate, // placeholder, akan dioverride saat send
-    notes: `Renewal otomatis — renewal date ${m.renewal_date}`,
-  }))
+  // Generate nomor invoice berurutan
+  const year = new Date().getFullYear()
+  const { count: invoiceCount } = await supabase
+    .from('invoices')
+    .select('id', { count: 'exact', head: true })
+  const baseSeq = (invoiceCount ?? 0) + 1
+
+  const invoiceRows = toCreate.map((m: Record<string, unknown>, i: number) => {
+    const renewalDate = m.renewal_date as string
+    // period = renewal_date s/d renewal_date + 1 tahun
+    const periodStart = renewalDate
+    const periodEnd = new Date(renewalDate)
+    periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+    return {
+      number: `INV-${year}-${String(baseSeq + i).padStart(3, '0')}`,
+      member_id: m.id,
+      chapter_id: m.chapter_id,
+      type: 'renewal',
+      status: 'draft',
+      amount: renewalFee,
+      currency: 'IDR',
+      period_start: periodStart,
+      period_end: periodEnd.toISOString().slice(0, 10),
+      due_date: targetDate, // placeholder, dioverride saat send
+      notes: `Renewal otomatis — renewal date ${renewalDate}`,
+    }
+  })
 
   if (invoiceRows.length === 0) {
     return new Response(JSON.stringify({ created: 0, message: 'Semua member sudah punya invoice renewal aktif' }), { status: 200 })
