@@ -234,16 +234,23 @@ export const supabaseInvoiceRepository: InvoiceRepository = {
     const inv = rowToInvoice(existing as Record<string, unknown>)
     if (inv.status !== 'draft') throw new Error('Hanya invoice draft yang bisa dikirim')
 
+    // due_date = hari pengiriman + 30 hari
+    const sentAt = new Date()
+    const dueDate = new Date(sentAt)
+    dueDate.setDate(dueDate.getDate() + 30)
+    const dueDateStr = dueDate.toISOString().slice(0, 10)
+
     // Simulate Paper.id: generate a fake payment URL
     const fakeId = `paperid-${id.slice(0, 8)}`
     const { data, error } = await supabase
       .from('invoices')
       .update({
         status: 'sent',
+        due_date: dueDateStr,
         paper_id_invoice_id: fakeId,
         paper_id_invoice_url: `https://paper.id/invoice/${fakeId}`,
         paper_id_payment_url: `https://paper.id/pay/${fakeId}`,
-        paper_id_sent_at: new Date().toISOString(),
+        paper_id_sent_at: sentAt.toISOString(),
       })
       .eq('id', id)
       .select('*')
