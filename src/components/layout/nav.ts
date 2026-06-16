@@ -7,6 +7,7 @@ import {
   Settings,
   RefreshCw,
   AlertTriangle,
+  CreditCard,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -36,5 +37,6 @@ export const NAV: NavNode[] = [
 
   { kind: 'section', label: 'Sistem' },
   { kind: 'item', to: '/settings', label: 'Pengaturan Biaya', icon: Settings, end: true },
+  { kind: 'item', to: '/settings/payment', label: 'Metode Pembayaran', icon: CreditCard },
   { kind: 'item', to: '/settings/sync', label: 'Sinkronisasi Data', icon: RefreshCw },
 ]

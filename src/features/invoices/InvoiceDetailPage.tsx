@@ -3,11 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Ban,
+  Check,
   CheckCircle2,
+  Copy,
   CreditCard,
   Download,
   Eye,
   FilePlus2,
+  Link2,
   Pencil,
   Send,
   TriangleAlert,
@@ -29,6 +32,7 @@ import {
   PageHeader,
   Textarea,
   useToast,
+  WhatsAppIcon,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, paymentService } from '@/services'
@@ -81,6 +85,7 @@ export function InvoiceDetailPage() {
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [cancelReason, setCancelReason] = useState('')
   const [busy, setBusy] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
 
   if (loading) return <LoadingState label="Memuat invoice…" />
   if (!invoice)
@@ -114,6 +119,28 @@ export function InvoiceDetailPage() {
   }
 
   const handleDownload = () => downloadInvoice(invoice)
+
+  const payUrl = `${window.location.origin}/pay/${invoice.id}`
+
+  const copyPayLink = () => {
+    navigator.clipboard.writeText(payUrl)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 1500)
+  }
+
+  const sendPayLinkWa = () => {
+    const name = invoice.member?.name ?? 'Bapak/Ibu'
+    const msg = [
+      `Halo ${name},`,
+      ``,
+      `Berikut tagihan BNI Anda *${invoice.number}* sebesar *${formatCurrency(invoice.amount)}*.`,
+      `Silakan lihat invoice & lakukan pembayaran melalui tautan berikut:`,
+      payUrl,
+      ``,
+      `Terima kasih. 🙏`,
+    ].join('\n')
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  }
 
   const { status } = invoice
   const canSend = status === 'draft'
@@ -241,6 +268,32 @@ export function InvoiceDetailPage() {
               </p>
             </CardBody>
           </Card>
+
+          {/* Link pembayaran untuk member — aktif setelah invoice diterbitkan */}
+          {canPay && (
+            <Card>
+              <CardHeader
+                title="Link Pembayaran"
+                subtitle="Kirim tautan ini ke member untuk melihat invoice & membayar sendiri."
+              />
+              <CardBody className="space-y-3">
+                <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5">
+                  <Link2 className="h-4 w-4 flex-shrink-0 text-ink-400" />
+                  <span className="truncate text-sm text-ink-600">{payUrl}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={copyPayLink}>
+                    {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copiedLink ? 'Tersalin' : 'Salin Link'}
+                  </Button>
+                  <Button onClick={sendPayLinkWa}>
+                    <WhatsAppIcon className="h-4 w-4" />
+                    Kirim via WhatsApp
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          )}
         </div>
 
         {/* Right: member + audit */}

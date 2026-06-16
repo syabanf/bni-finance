@@ -251,19 +251,35 @@ export const supabaseInvoiceRepository: InvoiceRepository = {
     dueDate.setDate(dueDate.getDate() + dueDaysAfter)
     const dueDateStr = dueDate.toISOString().slice(0, 10)
 
+    // Self Payment Mode ON  → bayar mandiri via Xendit (tanpa Paper.id)
+    // Self Payment Mode OFF → integrasi Paper.id (simulasi link pembayaran)
+    const selfPayment = (await getAppSetting('self_payment_mode')) === 'true'
+
+    const updatePayload: Record<string, unknown> = {
+      status: 'sent',
+      due_date: dueDateStr,
+    }
+    let auditNote = `Invoice diterbitkan — jatuh tempo ${dueDateStr}`
+
+    if (!selfPayment) {
+      const fakeId = `paperid-${id.slice(0, 8)}`
+      updatePayload.paper_id_invoice_id = fakeId
+      updatePayload.paper_id_invoice_url = `https://paper.id/invoice/${fakeId}`
+      updatePayload.paper_id_payment_url = `https://paper.id/pay/${fakeId}`
+      updatePayload.paper_id_sent_at = sentAt.toISOString()
+      auditNote = 'Dikirim ke Paper.id'
+    }
+
     const { data, error } = await supabase
       .from('invoices')
-      .update({
-        status: 'sent',
-        due_date: dueDateStr,
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select('*')
       .single()
     if (error) throw new Error(error.message)
 
     const updated = rowToInvoice(data as Record<string, unknown>)
-    await pushAudit(id, 'sent', 'draft', 'sent', `Invoice diterbitkan — jatuh tempo ${dueDateStr}`)
+    await pushAudit(id, 'sent', 'draft', 'sent', auditNote)
     return updated
   },
 

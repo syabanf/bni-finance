@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Save, UserPlus, RefreshCw, Info, Clock, Wallet } from 'lucide-react'
+import { Save, UserPlus, RefreshCw, Info, Clock } from 'lucide-react'
 import type { FeeSettings } from '@/types'
 import {
   Button,
@@ -34,31 +34,11 @@ export function SettingsPage() {
   const [dueDaysAfter, setDueDaysAfter] = useState(30)
   const [savingTiming, setSavingTiming] = useState(false)
 
-  // Self Payment Mode (Xendit)
-  const [selfPayment, setSelfPayment] = useState(false)
-  const [savingSelfPayment, setSavingSelfPayment] = useState(false)
-
   useEffect(() => {
     if (useMock) return
     getAppSetting('invoice_draft_days_before').then(v => { if (v) setDraftDaysBefore(Number(v)) })
     getAppSetting('invoice_due_days_after').then(v => { if (v) setDueDaysAfter(Number(v)) })
-    getAppSetting('self_payment_mode').then(v => setSelfPayment(v === 'true'))
   }, [])
-
-  const toggleSelfPayment = async () => {
-    const next = !selfPayment
-    setSelfPayment(next)
-    setSavingSelfPayment(true)
-    try {
-      await setAppSetting('self_payment_mode', String(next))
-      toast(next ? 'Self Payment Mode diaktifkan (Xendit).' : 'Self Payment Mode dimatikan.')
-    } catch {
-      setSelfPayment(!next) // rollback
-      toast('Gagal menyimpan Self Payment Mode.', 'error')
-    } finally {
-      setSavingSelfPayment(false)
-    }
-  }
 
   const saveTiming = async () => {
     setSavingTiming(true)
@@ -204,56 +184,6 @@ export function SettingsPage() {
                   <Save className="h-4 w-4" />
                   Simpan Timing
                 </Button>
-              </div>
-            </CardBody>
-          </Card>
-        )}
-
-        {/* Self Payment Mode */}
-        {!useMock && (
-          <Card className="lg:col-span-2">
-            <CardHeader
-              title={
-                <span className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
-                    <Wallet className="h-5 w-5" />
-                  </span>
-                  Self Payment Mode
-                </span>
-              }
-              subtitle="Aktifkan pembayaran mandiri via Xendit (Virtual Account & QRIS) langsung di aplikasi."
-            />
-            <CardBody className="space-y-4">
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-ink-200 p-4">
-                <div className="leading-snug">
-                  <div className="text-sm font-semibold text-ink-900">
-                    {selfPayment ? 'Aktif — pembayaran via Xendit' : 'Nonaktif — penandaan lunas manual'}
-                  </div>
-                  <div className="text-xs text-ink-400">
-                    {selfPayment
-                      ? 'Member dapat membayar sendiri lewat VA (BCA, BNI, Mandiri, BRI) atau QRIS.'
-                      : 'Invoice Outstanding ditandai lunas manual oleh admin.'}
-                  </div>
-                </div>
-                <button
-                  role="switch"
-                  aria-checked={selfPayment}
-                  disabled={savingSelfPayment}
-                  onClick={toggleSelfPayment}
-                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-                    selfPayment ? 'bg-emerald-500' : 'bg-ink-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                      selfPayment ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-              <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-xs text-emerald-700">
-                <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                Pastikan Secret Key & Callback Token Xendit sudah dikonfigurasi di server (Supabase secrets) agar pembayaran berfungsi.
               </div>
             </CardBody>
           </Card>

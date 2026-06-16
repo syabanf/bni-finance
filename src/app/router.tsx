@@ -15,12 +15,15 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { SyncPage } from '@/features/settings/SyncPage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
 import { UrgentPage } from '@/features/urgent/UrgentPage'
+import { PaymentModePage } from '@/features/settings/PaymentModePage'
+import { PublicPaymentPage } from '@/features/pay/PublicPaymentPage'
 
 export const router = createBrowserRouter([
   {
     element: <Providers />,
     children: [
       { path: '/login', element: <LoginPage /> },
+      { path: '/pay/:id', element: <PublicPaymentPage /> },
       {
         element: <AppLayout />,
         children: [
@@ -41,6 +44,7 @@ export const router = createBrowserRouter([
           { path: '/payments', element: <PaymentListPage /> },
 
           { path: '/settings', element: <SettingsPage /> },
+          { path: '/settings/payment', element: <PaymentModePage /> },
           { path: '/settings/sync', element: <SyncPage /> },
 
           { path: '*', element: <NotFoundPage /> },

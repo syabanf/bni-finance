@@ -9,13 +9,15 @@ import { createXenditPayment, VA_BANKS, type VaBank } from '@/services/supabase/
 interface Props {
   invoice: InvoiceWithRelations
   onUpdated: () => void
+  /** Halaman member publik: sembunyikan aksi khusus admin (kirim WA). */
+  publicMode?: boolean
 }
 
 const BANK_LABEL: Record<string, string> = {
   BCA: 'BCA', BNI: 'BNI', MANDIRI: 'Mandiri', BRI: 'BRI',
 }
 
-export function PaymentPanel({ invoice, onUpdated }: Props) {
+export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) {
   const { toast } = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -121,9 +123,11 @@ export function PaymentPanel({ invoice, onUpdated }: Props) {
             )}
 
             <div className="flex flex-wrap gap-2 border-t border-ink-100 pt-3">
-              <Button variant="outline" size="sm" onClick={sendWa}>
-                <WhatsAppIcon className="h-4 w-4" /> Kirim via WhatsApp
-              </Button>
+              {!publicMode && (
+                <Button variant="outline" size="sm" onClick={sendWa}>
+                  <WhatsAppIcon className="h-4 w-4" /> Kirim via WhatsApp
+                </Button>
+              )}
               {!(invoice.xenditPaymentMethod === 'va' && qrisDisabled) && (
                 <Button variant="ghost" size="sm" onClick={() => create(invoice.xenditPaymentMethod === 'va' ? 'qris' : 'va', invoice.xenditPaymentMethod === 'va' ? undefined : 'BCA')}>
                   Ganti metode
