@@ -35,7 +35,9 @@ import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
+import { PaymentPanel } from './components/PaymentPanel'
 import { downloadInvoice } from './lib/invoiceDocument'
+import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
 
 const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> = {
   created: { icon: FilePlus2, tone: 'bg-ink-100 text-ink-500' },
@@ -74,6 +76,7 @@ export function InvoiceDetailPage() {
     () => paymentService.listByInvoice(id),
     [id],
   )
+  const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode(), [id])
 
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -265,6 +268,10 @@ export function InvoiceDetailPage() {
               </div>
             </CardBody>
           </Card>
+
+          {selfPayment && (status === 'sent' || status === 'overdue') && (
+            <PaymentPanel invoice={invoice} onUpdated={refresh} />
+          )}
 
           {payments && payments.length > 0 && (
             <Card>

@@ -73,6 +73,15 @@ create table if not exists invoices (
   paper_id_invoice_url  text,
   paper_id_payment_url  text,
   paper_id_sent_at      timestamptz,
+  payment_provider      text,         -- 'xendit' | null
+  xendit_external_id    text,
+  xendit_payment_id     text,
+  xendit_payment_method text,         -- 'va' | 'qris'
+  xendit_va_bank        text,
+  xendit_va_number      text,
+  xendit_qris_string    text,
+  xendit_payment_status text,         -- PENDING | PAID | EXPIRED
+  xendit_expires_at     timestamptz,
   paid_at               timestamptz,
   paid_amount           integer,
   notes                 text,
@@ -99,6 +108,8 @@ create table if not exists payments (
   payment_method      text,
   paper_id_payment_id text,
   paper_id_status     text,
+  xendit_payment_id   text,
+  xendit_status       text,
   created_at          timestamptz not null default now()
 );
 create index if not exists payments_invoice_id_idx on payments(invoice_id);

@@ -93,6 +93,16 @@ export interface Invoice {
   paperIdPaymentUrl?: string
   paperIdSentAt?: string
 
+  // Xendit (Self Payment Mode) — native VA / QRIS
+  paymentProvider?: string // 'xendit' | undefined
+  xenditPaymentId?: string
+  xenditPaymentMethod?: 'va' | 'qris'
+  xenditVaBank?: string
+  xenditVaNumber?: string
+  xenditQrisString?: string
+  xenditPaymentStatus?: string // PENDING | PAID | EXPIRED
+  xenditExpiresAt?: string
+
   // Payment
   paidAt?: string
   paidAmount?: number
