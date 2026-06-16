@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bell, ChevronDown, LogOut, Search, UserCircle2 } from 'lucide-react'
-import { Avatar } from '@/components/ui'
+import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { cn } from '@/lib/cn'
 
@@ -29,10 +29,8 @@ export function Topbar() {
       <div className="flex h-16 items-center gap-3 px-4 lg:px-6">
         {/* Mobile brand (sidebar logo is hidden on mobile) */}
         <Link to="/dashboard" className="flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-extrabold text-white">
-            B
-          </div>
-          <span className="text-[15px] font-bold text-ink-900">Finance Hub</span>
+          <BniLogo className="h-7 w-auto" />
+          <span className="border-l border-ink-100 pl-2.5 text-[15px] font-bold text-ink-900">Finance Hub</span>
         </Link>
 
         {/* Search */}

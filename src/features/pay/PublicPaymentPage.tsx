@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, CreditCard, ExternalLink, FileText, XCircle } from 'lucide-react'
 import type { InvoiceWithRelations } from '@/types'
-import { Button, Card, CardBody, CardHeader, LoadingState } from '@/components/ui'
+import { BniLogo, Button, Card, CardBody, CardHeader, LoadingState } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService } from '@/services'
 import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
@@ -136,8 +136,10 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-ink-50">
       <header className="bg-gradient-to-r from-brand-600 to-brand-700 px-4 py-5 text-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 font-bold">B</span>
+        <div className="mx-auto flex max-w-3xl items-center gap-3">
+          <span className="flex items-center rounded-lg bg-white px-3 py-1.5">
+            <BniLogo className="h-6 w-auto" />
+          </span>
           <div className="leading-tight">
             <div className="text-sm font-bold">BNI Indonesia</div>
             <div className="text-[11px] opacity-80">Payment Platform</div>

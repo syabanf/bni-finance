@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { Avatar } from '@/components/ui'
+import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUrgentCount } from '@/hooks/useUrgentCount'
 import { NAV, type NavLeaf } from './nav'
@@ -63,13 +63,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col bg-white">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-lg font-extrabold text-white shadow-sm">
-          B
-        </div>
-        <div className="leading-tight">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-brand-500">
-            BNI Indonesia
-          </div>
+        <BniLogo className="h-8 w-auto" />
+        <div className="border-l border-ink-100 pl-3 leading-tight">
           <div className="text-[15px] font-bold text-ink-900">Finance Hub</div>
           <div className="text-[11px] text-ink-400">Payment Platform</div>
         </div>

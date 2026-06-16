@@ -55,8 +55,13 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
     <div style="background:linear-gradient(135deg,${BRAND} 0%,#9d1200 100%);padding:36px 48px;color:#fff;
                 display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;">BNI Indonesia</div>
-        <div style="font-size:12px;opacity:.85;margin-top:2px;letter-spacing:.4px;">PAYMENT PLATFORM</div>
+        <div style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:9px 14px;">
+          <svg width="70" height="25" viewBox="0 0 112 40" xmlns="http://www.w3.org/2000/svg">
+            <text x="0" y="33" font-family="'Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="40" letter-spacing="-3" fill="#E2231A">BNI</text>
+            <text x="100" y="13" font-family="Arial, sans-serif" font-size="10" fill="#E2231A">&#174;</text>
+          </svg>
+        </div>
+        <div style="font-size:12px;opacity:.85;margin-top:8px;letter-spacing:.4px;">PAYMENT PLATFORM</div>
       </div>
       <div style="text-align:right;">
         <div style="font-size:30px;font-weight:800;letter-spacing:1px;line-height:1;">INVOICE</div>
