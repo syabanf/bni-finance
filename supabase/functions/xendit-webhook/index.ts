@@ -43,13 +43,25 @@ Deno.serve(async (req) => {
     (data.reference_id as string) ??
     (data.external_id as string) ??
     null
-  const xenditPaymentId =
-    (body.payment_id as string) ??
-    (data.payment_id as string) ??
-    (body.id as string) ??
-    (data.id as string) ??
-    null
+  const realPaymentId =
+    (body.payment_id as string) ?? (data.payment_id as string) ?? null
+  const xenditPaymentId = realPaymentId ?? (body.id as string) ?? (data.id as string) ?? null
   const paidAmount = Number((body.amount as number) ?? (data.amount as number) ?? 0)
+
+  // Hanya proses event PEMBAYARAN nyata — abaikan callback "FVA created" / non-payment.
+  // FVA paid punya payment_id; QR payment punya status sukses / event qr.payment.
+  const status = String((body.status as string) ?? (data.status as string) ?? '').toUpperCase()
+  const eventName = String((body.event as string) ?? '').toLowerCase()
+  const isPaymentEvent =
+    Boolean(realPaymentId) ||
+    eventName.includes('payment') ||
+    status === 'PAID' ||
+    status === 'SUCCEEDED' ||
+    status === 'COMPLETED' ||
+    status === 'ACTIVE' && paidAmount > 0
+  if (!isPaymentEvent) {
+    return json({ received: true, skipped: 'bukan event pembayaran (mis. FVA created)' })
+  }
 
   if (!externalId && !xenditPaymentId) {
     return json({ received: true, skipped: 'tidak ada external_id/payment_id' })
