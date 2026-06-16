@@ -5,6 +5,7 @@ import type { InvoiceWithRelations } from '@/types'
 import { Badge, Button, CardBody, CardHeader, Card, useToast, WhatsAppIcon } from '@/components/ui'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { createXenditPayment, VA_BANKS, type VaBank } from '@/services/supabase/paymentGateway'
+import { BankLogo } from './BankLogo'
 
 interface Props {
   invoice: InvoiceWithRelations
@@ -95,7 +96,10 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
 
             {invoice.xenditPaymentMethod === 'va' ? (
               <div className="rounded-xl border border-ink-200 p-4">
-                <div className="text-xs text-ink-400">Virtual Account {BANK_LABEL[invoice.xenditVaBank ?? ''] ?? invoice.xenditVaBank}</div>
+                <div className="flex items-center gap-2 text-xs text-ink-400">
+                  Virtual Account
+                  <BankLogo bank={invoice.xenditVaBank ?? ''} className="text-sm" />
+                </div>
                 <div className="mt-1 flex items-center justify-between gap-3">
                   <span className="font-mono text-lg font-bold tracking-wide text-ink-900">{invoice.xenditVaNumber}</span>
                   <Button variant="outline" size="sm" onClick={copyVa}>
@@ -143,15 +147,16 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {VA_BANKS.map((bank) => (
-                  <Button
+                  <button
                     key={bank}
-                    variant="outline"
-                    size="sm"
-                    loading={busy === bank}
+                    disabled={busy === bank}
                     onClick={() => create('va', bank)}
+                    className="flex h-12 items-center justify-center rounded-xl border border-ink-200 bg-white transition hover:border-brand-300 hover:bg-brand-50/40 disabled:opacity-50"
                   >
-                    {BANK_LABEL[bank]}
-                  </Button>
+                    {busy === bank
+                      ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-300 border-t-transparent" />
+                      : <BankLogo bank={bank} className="text-base" />}
+                  </button>
                 ))}
               </div>
             </div>

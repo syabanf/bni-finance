@@ -94,5 +94,24 @@ Deno.serve(async (req) => {
     notes: `Pembayaran ${inv.xendit_payment_method?.toUpperCase() ?? ''} diterima via Xendit`,
   })
 
-  return json({ received: true, invoiceId: inv.id, status: 'paid' })
+  // Renewal otomatis: majukan renewal_date member ke akhir periode invoice ini (+1 tahun).
+  let newRenewalDate: string | null = null
+  if (inv.member_id) {
+    if (inv.period_end) {
+      newRenewalDate = inv.period_end as string
+    } else {
+      const { data: mem } = await supabase
+        .from('members')
+        .select('renewal_date')
+        .eq('id', inv.member_id)
+        .maybeSingle()
+      const base = (mem?.renewal_date as string) ?? now.slice(0, 10)
+      const d = new Date(base)
+      d.setFullYear(d.getFullYear() + 1)
+      newRenewalDate = d.toISOString().slice(0, 10)
+    }
+    await supabase.from('members').update({ renewal_date: newRenewalDate }).eq('id', inv.member_id)
+  }
+
+  return json({ received: true, invoiceId: inv.id, status: 'paid', renewalDate: newRenewalDate })
 })
