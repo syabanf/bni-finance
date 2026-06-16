@@ -5,8 +5,8 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCircle2,
+  Download,
   MessageCircle,
-  Send,
   UserPlus,
 } from 'lucide-react'
 import type { Chapter, FeeSettings, InvoiceWithRelations, MemberWithChapter, RenewalDueMember } from '@/types'
@@ -33,6 +33,7 @@ import { chapterService, invoiceService, memberService, settingsService } from '
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { downloadInvoice } from '@/features/invoices/lib/invoiceDocument'
 
 function DaysOverdueBadge({ dueDate }: { dueDate: string }) {
   const days = Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
@@ -72,37 +73,6 @@ function sendOverdueWa(inv: InvoiceWithRelations) {
 
 function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[] | null; loading: boolean }) {
   const navigate = useNavigate()
-  const { toast } = useToast()
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [sending, setSending] = useState(false)
-
-  const toggle = (id: string) => setSelected((prev) => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    return next
-  })
-
-  const allIds = invoices?.map((i) => i.id) ?? []
-  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id))
-
-  const handleBulkSend = async () => {
-    if (!invoices || selected.size === 0) return
-    setSending(true)
-    let sent = 0
-    try {
-      const targets = invoices.filter((i) => selected.has(i.id))
-      for (const inv of targets) {
-        await invoiceService.resend(inv.id)
-        sent++
-      }
-      toast(`${sent} invoice berhasil dikirim ulang ke Paper.id.`)
-      setSelected(new Set())
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal mengirim.', 'error')
-    } finally {
-      setSending(false)
-    }
-  }
 
   return (
     <Card>
@@ -126,20 +96,6 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
         }
       />
 
-      {/* Bulk action bar */}
-      {selected.size > 0 && (
-        <div className="flex flex-col gap-3 border-b border-ink-100 bg-red-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm font-medium text-ink-700">{selected.size} invoice dipilih</div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>Batal</Button>
-            <Button size="sm" loading={sending} onClick={handleBulkSend}>
-              <Send className="h-4 w-4" />
-              Kirim {selected.size} ke Paper.id
-            </Button>
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <TableSkeleton rows={4} cols={5} />
       ) : !invoices || invoices.length === 0 ? (
@@ -155,16 +111,8 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
             {invoices.map((inv) => (
               <div
                 key={inv.id}
-                onClick={() => toggle(inv.id)}
-                className={cn('flex items-center gap-3 px-4 py-3.5 active:bg-ink-50', selected.has(inv.id) && 'bg-red-50/50')}
+                className="flex items-center gap-3 px-4 py-3.5"
               >
-                <input
-                  type="checkbox"
-                  checked={selected.has(inv.id)}
-                  onChange={() => toggle(inv.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-                />
                 <Avatar name={inv.member?.name ?? '?'} size="sm" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
@@ -180,11 +128,18 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                   <div className="mt-2 flex items-center gap-2">
                     <DaysOverdueBadge dueDate={inv.dueDate} />
                     <button
+                      onClick={(e) => { e.stopPropagation(); downloadInvoice(inv) }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600"
+                    >
+                      <Download className="h-3 w-3" />
+                      Invoice
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); sendOverdueWa(inv) }}
                       className="inline-flex items-center gap-1 rounded-lg bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#128C7E]"
                     >
                       <MessageCircle className="h-3 w-3" />
-                      Kirim WA
+                      WA
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${inv.id}`) }}
@@ -202,14 +157,6 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
             <Table>
               <THead>
                 <Tr>
-                  <Th className="w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={() => setSelected(allSelected ? new Set() : new Set(allIds))}
-                      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-                    />
-                  </Th>
                   <Th>Member</Th>
                   <Th>Chapter</Th>
                   <Th>Nominal</Th>
@@ -220,16 +167,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
               </THead>
               <TBody>
                 {invoices.map((inv) => (
-                  <Tr key={inv.id} onClick={() => toggle(inv.id)} className={cn(selected.has(inv.id) && 'bg-red-50/40')}>
-                    <Td>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(inv.id)}
-                        onChange={() => toggle(inv.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-                      />
-                    </Td>
+                  <Tr key={inv.id}>
                     <Td>
                       <div className="flex items-center gap-3">
                         <Avatar name={inv.member?.name ?? '?'} size="sm" />
@@ -248,6 +186,13 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          onClick={(e) => { e.stopPropagation(); downloadInvoice(inv) }}
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100"
+                        >
+                          <Download className="h-3 w-3" />
+                          Invoice
+                        </button>
+                        <button
                           onClick={(e) => { e.stopPropagation(); sendOverdueWa(inv) }}
                           className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#128C7E] bg-[#25D366]/10 hover:bg-[#25D366]/20"
                         >
@@ -258,7 +203,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                           onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${inv.id}`) }}
                           className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-brand-500 hover:bg-brand-50"
                         >
-                          Lihat Detail <ArrowRight className="h-3 w-3" />
+                          Detail <ArrowRight className="h-3 w-3" />
                         </button>
                       </div>
                     </Td>

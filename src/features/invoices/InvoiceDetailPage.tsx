@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -35,6 +35,7 @@ import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
+import { downloadInvoice } from './lib/invoiceDocument'
 
 const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> = {
   created: { icon: FilePlus2, tone: 'bg-ink-100 text-ink-500' },
@@ -60,7 +61,6 @@ export function InvoiceDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const printRef = useRef<HTMLDivElement>(null)
 
   const { data: invoice, loading, reload } = useAsync<InvoiceWithRelations | null>(
     () => invoiceService.getById(id),
@@ -110,30 +110,7 @@ export function InvoiceDetailPage() {
     }
   }
 
-  const handlePrint = () => {
-    const content = printRef.current
-    if (!content) return
-    const win = window.open('', '_blank', 'width=900,height=700')
-    if (!win) return
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${invoice.number}</title>
-          <meta charset="utf-8"/>
-          <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; }
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: white; }
-            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-          </style>
-        </head>
-        <body>${content.innerHTML}</body>
-      </html>
-    `)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { win.print() }, 300)
-  }
+  const handleDownload = () => downloadInvoice(invoice)
 
   const { status } = invoice
   const canSend = status === 'draft'
@@ -164,6 +141,10 @@ export function InvoiceDetailPage() {
             <Button variant="outline" onClick={() => setDialog('preview')}>
               <Eye className="h-4 w-4" />
               Preview
+            </Button>
+            <Button variant="outline" onClick={handleDownload}>
+              <Download className="h-4 w-4" />
+              Download Invoice
             </Button>
             {canSend && (
               <Button onClick={() => setDialog('send')}>
@@ -248,12 +229,12 @@ export function InvoiceDetailPage() {
                 <Eye className="h-4 w-4" />
                 Preview Invoice
               </Button>
-              <Button variant="outline" onClick={handlePrint}>
+              <Button onClick={handleDownload}>
                 <Download className="h-4 w-4" />
-                Simpan PDF
+                Download PDF
               </Button>
               <p className="text-xs text-ink-400">
-                Gunakan "Save as PDF" di dialog cetak browser.
+                Pilih "Save as PDF" pada dialog cetak yang muncul.
               </p>
             </CardBody>
           </Card>
@@ -339,27 +320,23 @@ export function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* Hidden print target */}
-      <div className="hidden">
-        <InvoicePreview ref={printRef} invoice={invoice} />
-      </div>
-
       {/* Preview modal */}
       <Modal
         open={dialog === 'preview'}
         onClose={() => setDialog(null)}
+        size="xl"
         title={`Preview — ${invoice.number}`}
         footer={
           <div className="flex w-full items-center justify-between">
             <Button variant="outline" onClick={() => setDialog(null)}>Tutup</Button>
-            <Button onClick={handlePrint}>
+            <Button onClick={handleDownload}>
               <Download className="h-4 w-4" />
-              Simpan PDF
+              Download PDF
             </Button>
           </div>
         }
       >
-        <div className="overflow-auto rounded-xl border border-ink-100 bg-gray-50 p-2">
+        <div className="rounded-xl bg-gray-100 p-3 sm:p-5">
           <InvoicePreview invoice={invoice} />
         </div>
       </Modal>

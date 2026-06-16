@@ -10,13 +10,14 @@ interface ModalProps {
   description?: ReactNode
   children?: ReactNode
   footer?: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
 }
 
 const sizes = {
   sm: 'max-w-md',
   md: 'max-w-lg',
   lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
 }
 
 export function Modal({ open, onClose, title, description, children, footer, size = 'md' }: ModalProps) {
@@ -43,7 +44,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         role="dialog"
         aria-modal="true"
         className={cn(
-          'relative w-full rounded-2xl bg-white shadow-card-hover animate-fade-in',
+          'relative flex max-h-[90vh] w-full flex-col rounded-2xl bg-white shadow-card-hover animate-fade-in',
           sizes[size],
         )}
       >
@@ -59,9 +60,9 @@ export function Modal({ open, onClose, title, description, children, footer, siz
             <X className="h-5 w-5" />
           </button>
         </div>
-        {children && <div className="px-5 py-4">{children}</div>}
+        {children && <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>}
         {footer && (
-          <div className="flex items-center justify-end gap-2 border-t border-ink-100 px-5 py-4">
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-ink-100 px-5 py-4">
             {footer}
           </div>
         )}
