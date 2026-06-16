@@ -33,7 +33,9 @@ export function PublicPaymentPage() {
     return () => clearInterval(t)
   }, [isPayable, isPaid, reload])
 
-  if (loading) return <Shell><Centered><LoadingState label="Memuat invoice…" /></Centered></Shell>
+  // Hanya tampilkan loader penuh saat load pertama (belum ada data).
+  // Poll status 7 detik berjalan diam-diam di background tanpa mengedipkan halaman.
+  if (loading && !invoice) return <Shell><Centered><LoadingState label="Memuat invoice…" /></Centered></Shell>
 
   if (!invoice) {
     return (
