@@ -22,11 +22,18 @@ const STATUS_STYLE: Record<string, { label: string; bg: string; fg: string }> = 
   cancelled: { label: 'DIBATALKAN', bg: '#f1f5f9', fg: '#64748b' },
 }
 
+/** Escape DB/user-controlled values before inlining into invoice HTML (anti-XSS). */
+function esc(s: unknown): string {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
+  )
+}
+
 function metaRow(label: string, value: string): string {
   return `
     <div style="display:flex;justify-content:space-between;gap:24px;padding:7px 0;border-bottom:1px solid ${LINE};">
-      <span style="color:${MUTED};font-size:13px;">${label}</span>
-      <span style="color:${INK};font-size:13px;font-weight:600;text-align:right;">${value}</span>
+      <span style="color:${MUTED};font-size:13px;">${esc(label)}</span>
+      <span style="color:${INK};font-size:13px;font-weight:600;text-align:right;">${esc(value)}</span>
     </div>`
 }
 
@@ -54,7 +61,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
       <div style="text-align:right;">
         <div style="font-size:30px;font-weight:800;letter-spacing:1px;line-height:1;">INVOICE</div>
         <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;opacity:.9;margin-top:8px;">
-          ${inv.number}
+          ${esc(inv.number)}
         </div>
         <div style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);
                     padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.6px;">
@@ -72,11 +79,11 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
           <div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:${MUTED};margin-bottom:10px;">
             DITAGIHKAN KEPADA
           </div>
-          <div style="font-size:17px;font-weight:700;color:${INK};">${m?.name ?? '—'}</div>
-          ${m?.email ? `<div style="font-size:13px;color:${MUTED};margin-top:5px;">${m.email}</div>` : ''}
-          ${m?.phone ? `<div style="font-size:13px;color:${MUTED};margin-top:2px;">${m.phone}</div>` : ''}
+          <div style="font-size:17px;font-weight:700;color:${INK};">${esc(m?.name ?? '—')}</div>
+          ${m?.email ? `<div style="font-size:13px;color:${MUTED};margin-top:5px;">${esc(m.email)}</div>` : ''}
+          ${m?.phone ? `<div style="font-size:13px;color:${MUTED};margin-top:2px;">${esc(m.phone)}</div>` : ''}
           ${ch ? `<div style="display:inline-block;margin-top:10px;background:#f8fafc;border:1px solid ${LINE};
-                  padding:4px 11px;border-radius:8px;font-size:12px;color:${INK};font-weight:600;">${ch.displayName}</div>` : ''}
+                  padding:4px 11px;border-radius:8px;font-size:12px;color:${INK};font-weight:600;">${esc(ch.displayName)}</div>` : ''}
         </div>
         <div style="width:280px;">
           ${metaRow('Tipe', inv.type === 'registration' ? 'Pendaftaran' : 'Renewal')}
@@ -103,7 +110,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
             <td style="padding:18px;vertical-align:top;">
               <div style="font-size:15px;font-weight:600;color:${INK};">${itemTitle}</div>
               <div style="font-size:12px;color:${MUTED};margin-top:4px;">${itemSub}</div>
-              ${inv.notes ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic;">${inv.notes}</div>` : ''}
+              ${inv.notes ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic;">${esc(inv.notes)}</div>` : ''}
             </td>
             <td style="padding:18px;text-align:right;font-size:15px;font-weight:600;color:${INK};white-space:nowrap;vertical-align:top;">
               ${formatCurrency(inv.amount)}
@@ -160,7 +167,7 @@ export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${inv.number}</title>
+  <title>${esc(inv.number)}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{background:#f1f5f9;padding:32px 16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}

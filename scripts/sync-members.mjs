@@ -1,16 +1,19 @@
 /**
  * Sync members & chapters dari BNI VM ke Supabase.
- * Jalankan: node scripts/sync-members.mjs
  *
- * Ganti SUPABASE_URL dan SERVICE_KEY sesuai project tujuan.
+ * Secrets are read from env — NEVER hardcode them (this file is committed):
+ *   BNI_VM_TOKEN=...  SUPABASE_URL=...  SUPABASE_SERVICE_KEY=...  node scripts/sync-members.mjs
  */
 
-const BNI_VM_URL   = 'https://www.bni-vh.com/api/external/v1'
-const BNI_VM_TOKEN = 'bnifin_40QTOfCWSxULfKFpEUi9_BBP0JRu3XW5gdYhsoJ5u80'
+const BNI_VM_URL   = process.env.BNI_VM_URL || 'https://www.bni-vh.com/api/external/v1'
+const BNI_VM_TOKEN = process.env.BNI_VM_TOKEN
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY
 
-// ← Ganti ke project yang butuh data
-const SUPABASE_URL = 'https://smahzchoqpeoxotbmmel.supabase.co'
-const SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtYWh6Y2hvcXBlb3hvdGJtbWVsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTQ3MzI2MiwiZXhwIjoyMDk3MDQ5MjYyfQ.xwO_M9G6tkK9rLKqo5K0QnCpAlFd7j9WqthktHE7NWY'
+if (!BNI_VM_TOKEN || !SUPABASE_URL || !SERVICE_KEY) {
+  console.error('Missing env: set BNI_VM_TOKEN, SUPABASE_URL, and SUPABASE_SERVICE_KEY before running.')
+  process.exit(1)
+}
 
 const headers = {
   'Content-Type': 'application/json',

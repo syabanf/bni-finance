@@ -36,3 +36,6 @@ dev-dist
 
 # Claude Code local config (keep launch.json, ignore personal settings)
 .claude/settings.local.json
+
+# Supabase CLI local artifacts (project-ref, pooler-url, versions — not for git)
+supabase/.temp/
