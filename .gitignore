@@ -39,3 +39,4 @@ dev-dist
 
 # Supabase CLI local artifacts (project-ref, pooler-url, versions — not for git)
 supabase/.temp/
+.vercel

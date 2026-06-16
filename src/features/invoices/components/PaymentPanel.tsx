@@ -22,11 +22,14 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
   const { toast } = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [reselect, setReselect] = useState(false)
 
   const hasPayment =
     invoice.xenditPaymentMethod &&
     (invoice.xenditVaNumber || invoice.xenditQrisString) &&
     invoice.xenditPaymentStatus !== 'EXPIRED'
+
+  const showPicker = !hasPayment || reselect
 
   // QRIS Xendit dibatasi maks Rp 10.000.000 per transaksi
   const QRIS_MAX = 10_000_000
@@ -37,6 +40,7 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
     try {
       await createXenditPayment(invoice.id, method, bank)
       toast('Detail pembayaran dibuat.')
+      setReselect(false)
       onUpdated()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membuat pembayaran.', 'error')
@@ -80,7 +84,7 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
         subtitle="Buat Virtual Account atau QRIS, member dapat membayar sendiri."
       />
       <CardBody className="space-y-4">
-        {hasPayment ? (
+        {!showPicker ? (
           <>
             <div className="flex items-center justify-between">
               <Badge tone={invoice.xenditPaymentStatus === 'PAID' ? 'green' : 'amber'}>
@@ -132,15 +136,24 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
                   <WhatsAppIcon className="h-4 w-4" /> Kirim via WhatsApp
                 </Button>
               )}
-              {!(invoice.xenditPaymentMethod === 'va' && qrisDisabled) && (
-                <Button variant="ghost" size="sm" onClick={() => create(invoice.xenditPaymentMethod === 'va' ? 'qris' : 'va', invoice.xenditPaymentMethod === 'va' ? undefined : 'BCA')}>
-                  Ganti metode
-                </Button>
-              )}
+              <Button variant="ghost" size="sm" onClick={() => setReselect(true)}>
+                Ganti metode / bank
+              </Button>
             </div>
           </>
         ) : (
           <>
+            {reselect && hasPayment && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-ink-500">Pilih metode pembayaran</span>
+                <button
+                  onClick={() => setReselect(false)}
+                  className="text-xs font-medium text-ink-500 hover:text-ink-800"
+                >
+                  Batal
+                </button>
+              </div>
+            )}
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
                 <Landmark className="h-4 w-4" /> Virtual Account
