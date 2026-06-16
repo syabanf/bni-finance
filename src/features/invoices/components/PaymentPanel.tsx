@@ -136,7 +136,12 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
                   <WhatsAppIcon className="h-4 w-4" /> Kirim via WhatsApp
                 </Button>
               )}
-              <Button variant="ghost" size="sm" onClick={() => setReselect(true)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReselect(true)}
+                className="text-brand-600 hover:bg-brand-50 hover:text-brand-700"
+              >
                 Ganti metode / bank
               </Button>
             </div>
