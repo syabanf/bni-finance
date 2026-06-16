@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, CreditCard, ExternalLink, FileText, XCircle } from 'lucide-react'
+import { CheckCircle2, CreditCard, Download, ExternalLink, FileText, XCircle } from 'lucide-react'
 import type { InvoiceWithRelations } from '@/types'
 import { BniLogo, Button, Card, CardBody, CardHeader, LoadingState } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
@@ -9,6 +9,7 @@ import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { InvoicePreview } from '@/features/invoices/components/InvoicePreview'
 import { PaymentPanel } from '@/features/invoices/components/PaymentPanel'
+import { downloadInvoice } from '@/features/invoices/lib/invoiceDocument'
 
 export function PublicPaymentPage() {
   const { id = '' } = useParams()
@@ -100,6 +101,20 @@ export function PublicPaymentPage() {
           </div>
         )}
 
+        {/* 1. Informasi Invoice */}
+        <div className="overflow-hidden rounded-2xl">
+          <InvoicePreview invoice={invoice} />
+        </div>
+
+        {/* 2. Download PDF */}
+        <div className="flex justify-center">
+          <Button variant="outline" onClick={() => downloadInvoice(invoice)}>
+            <Download className="h-4 w-4" />
+            Download Invoice (PDF)
+          </Button>
+        </div>
+
+        {/* 3. Metode Pembayaran */}
         {isPayable && (
           selfPayment ? (
             <PaymentPanel invoice={invoice} onUpdated={reload} publicMode />
@@ -123,10 +138,6 @@ export function PublicPaymentPage() {
             </Card>
           )
         )}
-
-        <div className="overflow-hidden rounded-2xl">
-          <InvoicePreview invoice={invoice} />
-        </div>
       </main>
     </Shell>
   )
