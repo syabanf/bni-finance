@@ -1,14 +1,13 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
   Ban,
   CheckCircle2,
-  Copy,
   CreditCard,
-  ExternalLink,
+  Download,
+  Eye,
   FilePlus2,
-  MessageCircle,
   Pencil,
   Send,
   TriangleAlert,
@@ -35,6 +34,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { InvoicePreview } from './components/InvoicePreview'
 
 const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> = {
   created: { icon: FilePlus2, tone: 'bg-ink-100 text-ink-500' },
@@ -47,19 +47,20 @@ const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> 
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
   created: 'Invoice dibuat',
-  sent: 'Dikirim ke Paper.id',
+  sent: 'Invoice diterbitkan',
   paid: 'Pembayaran diterima',
   overdue: 'Jatuh tempo terlewati',
   cancelled: 'Invoice dibatalkan',
   updated: 'Invoice diperbarui',
 }
 
-type DialogKind = 'send' | 'paid' | 'cancel' | null
+type DialogKind = 'send' | 'preview' | 'paid' | 'cancel' | null
 
 export function InvoiceDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const printRef = useRef<HTMLDivElement>(null)
 
   const { data: invoice, loading, reload } = useAsync<InvoiceWithRelations | null>(
     () => invoiceService.getById(id),
@@ -109,30 +110,29 @@ export function InvoiceDetailPage() {
     }
   }
 
-  const copyLink = async () => {
-    if (!invoice.paperIdPaymentUrl) return
-    await navigator.clipboard.writeText(invoice.paperIdPaymentUrl)
-    toast('Link pembayaran disalin.')
-  }
-
-  const shareViaWhatsApp = () => {
-    if (!invoice.paperIdPaymentUrl) return
-    const memberName = invoice.member?.name ?? 'Bapak/Ibu'
-    const type = invoice.type === 'registration' ? 'Pendaftaran Member' : 'Renewal Keanggotaan'
-    const msg = [
-      `Halo ${memberName},`,
-      ``,
-      `Berikut tagihan *${type}* BNI Grow dari kami:`,
-      `📋 No. Invoice: *${invoice.number}*`,
-      `💰 Nominal: *${formatCurrency(invoice.amount)}*`,
-      `📅 Jatuh Tempo: *${formatDate(invoice.dueDate)}*`,
-      ``,
-      `Silakan lakukan pembayaran melalui link berikut:`,
-      invoice.paperIdPaymentUrl,
-      ``,
-      `Terima kasih. 🙏`,
-    ].join('\n')
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  const handlePrint = () => {
+    const content = printRef.current
+    if (!content) return
+    const win = window.open('', '_blank', 'width=900,height=700')
+    if (!win) return
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${invoice.number}</title>
+          <meta charset="utf-8"/>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: white; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>${content.innerHTML}</body>
+      </html>
+    `)
+    win.document.close()
+    win.focus()
+    setTimeout(() => { win.print() }, 300)
   }
 
   const { status } = invoice
@@ -160,11 +160,15 @@ export function InvoiceDetailPage() {
           </span>
         }
         action={
-          <>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setDialog('preview')}>
+              <Eye className="h-4 w-4" />
+              Preview
+            </Button>
             {canSend && (
               <Button onClick={() => setDialog('send')}>
                 <Send className="h-4 w-4" />
-                Kirim ke Paper.id
+                Terbitkan Invoice
               </Button>
             )}
             {canPay && (
@@ -179,7 +183,7 @@ export function InvoiceDetailPage() {
                 Batalkan
               </Button>
             )}
-          </>
+          </div>
         }
       />
 
@@ -212,7 +216,7 @@ export function InvoiceDetailPage() {
             <div className="grid grid-cols-1 gap-px overflow-hidden rounded-b-2xl bg-ink-100 sm:grid-cols-2">
               <DetailItem label="Nomor Invoice" value={invoice.number} mono />
               <DetailItem label="Tipe" value={invoice.type === 'registration' ? 'Pendaftaran' : 'Renewal'} />
-              <DetailItem label="Tanggal Terbit" value={formatDate(invoice.dueDate)} />
+              <DetailItem label="Jatuh Tempo" value={invoice.dueDate ? formatDate(invoice.dueDate) : '—'} />
               <DetailItem label="Mata Uang" value={invoice.currency} />
               <DetailItem label="Awal Periode" value={formatDate(invoice.periodStart)} />
               <DetailItem label="Akhir Periode" value={formatDate(invoice.periodEnd)} />
@@ -233,59 +237,24 @@ export function InvoiceDetailPage() {
             )}
           </Card>
 
-          {/* Paper.id */}
+          {/* Preview & PDF */}
           <Card>
-            <CardHeader title="Integrasi Paper.id" />
-            <CardBody>
-              {invoice.paperIdPaymentUrl ? (
-                <div className="space-y-3">
-                  <DetailRow label="Paper.id Invoice ID" value={invoice.paperIdInvoiceId ?? '—'} mono />
-                  <div>
-                    <div className="mb-1.5 text-[13px] font-medium text-ink-700">Link Pembayaran</div>
-                    <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2">
-                      <span className="flex-1 truncate font-mono text-[13px] text-ink-600">
-                        {invoice.paperIdPaymentUrl}
-                      </span>
-                      <button
-                        onClick={copyLink}
-                        className="rounded-lg p-1.5 text-ink-500 hover:bg-white hover:text-brand-500"
-                        aria-label="Salin link"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                      <a
-                        href={invoice.paperIdPaymentUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-lg p-1.5 text-ink-500 hover:bg-white hover:text-brand-500"
-                        aria-label="Buka link"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
-                    </div>
-                    <button
-                      onClick={shareViaWhatsApp}
-                      className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Kirim via WhatsApp
-                    </button>
-                    <p className="mt-1.5 text-xs text-ink-400">
-                      Pesan akan disiapkan otomatis, pilih kontak member di WhatsApp.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-ink-200 p-5 text-sm text-ink-500">
-                  <p>Invoice ini belum dikirim ke Paper.id. Kirim untuk menghasilkan link pembayaran.</p>
-                  {canSend && (
-                    <Button size="sm" onClick={() => setDialog('send')}>
-                      <Send className="h-4 w-4" />
-                      Kirim sekarang
-                    </Button>
-                  )}
-                </div>
-              )}
+            <CardHeader
+              title="Dokumen Invoice"
+              subtitle="Preview dan unduh invoice sebagai PDF."
+            />
+            <CardBody className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+              <Button variant="outline" onClick={() => setDialog('preview')}>
+                <Eye className="h-4 w-4" />
+                Preview Invoice
+              </Button>
+              <Button variant="outline" onClick={handlePrint}>
+                <Download className="h-4 w-4" />
+                Simpan PDF
+              </Button>
+              <p className="text-xs text-ink-400">
+                Gunakan "Save as PDF" di dialog cetak browser.
+              </p>
             </CardBody>
           </Card>
         </div>
@@ -370,23 +339,46 @@ export function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* Dialogs */}
+      {/* Hidden print target */}
+      <div className="hidden">
+        <InvoicePreview ref={printRef} invoice={invoice} />
+      </div>
+
+      {/* Preview modal */}
+      <Modal
+        open={dialog === 'preview'}
+        onClose={() => setDialog(null)}
+        title={`Preview — ${invoice.number}`}
+        footer={
+          <div className="flex w-full items-center justify-between">
+            <Button variant="outline" onClick={() => setDialog(null)}>Tutup</Button>
+            <Button onClick={handlePrint}>
+              <Download className="h-4 w-4" />
+              Simpan PDF
+            </Button>
+          </div>
+        }
+      >
+        <div className="overflow-auto rounded-xl border border-ink-100 bg-gray-50 p-2">
+          <InvoicePreview invoice={invoice} />
+        </div>
+      </Modal>
+
+      {/* Send dialog */}
       <Modal
         open={dialog === 'send'}
         onClose={() => setDialog(null)}
-        title="Kirim ke Paper.id?"
-        description="Invoice akan dikirim ke Paper.id dan link pembayaran akan dibuat. Status menjadi 'Terkirim'."
+        title="Terbitkan Invoice?"
+        description="Invoice akan berubah status menjadi Outstanding dan jatuh tempo dihitung mulai hari ini + 30 hari."
         footer={
           <>
-            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>
-              Batal
-            </Button>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
             <Button
               loading={busy}
-              onClick={() => runAction(() => invoiceService.send(invoice.id), 'Invoice dikirim ke Paper.id.')}
+              onClick={() => runAction(() => invoiceService.send(invoice.id), 'Invoice diterbitkan — status Outstanding.')}
             >
               <Send className="h-4 w-4" />
-              Kirim
+              Terbitkan
             </Button>
           </>
         }
@@ -396,12 +388,10 @@ export function InvoiceDetailPage() {
         open={dialog === 'paid'}
         onClose={() => setDialog(null)}
         title="Tandai sebagai lunas?"
-        description="Mensimulasikan webhook 'payment.success' dari Paper.id — pembayaran akan dicatat dan status menjadi 'Lunas'."
+        description="Pembayaran akan dicatat dan status invoice berubah menjadi Lunas."
         footer={
           <>
-            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>
-              Batal
-            </Button>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
             <Button
               loading={busy}
               onClick={() => runAction(() => invoiceService.markPaid(invoice.id), 'Pembayaran dicatat — invoice lunas.')}
@@ -417,12 +407,10 @@ export function InvoiceDetailPage() {
         open={dialog === 'cancel'}
         onClose={() => setDialog(null)}
         title="Batalkan invoice?"
-        description="Invoice yang dibatalkan tidak dapat dikembalikan. Berikan alasan pembatalan."
+        description="Invoice yang dibatalkan tidak dapat dikembalikan."
         footer={
           <>
-            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>
-              Batal
-            </Button>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
             <Button
               variant="danger"
               loading={busy}

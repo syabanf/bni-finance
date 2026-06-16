@@ -243,17 +243,11 @@ export const supabaseInvoiceRepository: InvoiceRepository = {
     dueDate.setDate(dueDate.getDate() + dueDaysAfter)
     const dueDateStr = dueDate.toISOString().slice(0, 10)
 
-    // Simulate Paper.id: generate a fake payment URL
-    const fakeId = `paperid-${id.slice(0, 8)}`
     const { data, error } = await supabase
       .from('invoices')
       .update({
         status: 'sent',
         due_date: dueDateStr,
-        paper_id_invoice_id: fakeId,
-        paper_id_invoice_url: `https://paper.id/invoice/${fakeId}`,
-        paper_id_payment_url: `https://paper.id/pay/${fakeId}`,
-        paper_id_sent_at: sentAt.toISOString(),
       })
       .eq('id', id)
       .select('*')
@@ -261,7 +255,7 @@ export const supabaseInvoiceRepository: InvoiceRepository = {
     if (error) throw new Error(error.message)
 
     const updated = rowToInvoice(data as Record<string, unknown>)
-    await pushAudit(id, 'sent', 'draft', 'sent', 'Dikirim ke Paper.id')
+    await pushAudit(id, 'sent', 'draft', 'sent', `Invoice diterbitkan — jatuh tempo ${dueDateStr}`)
     return updated
   },
 
