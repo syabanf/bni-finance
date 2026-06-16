@@ -48,7 +48,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
     <div style="background:linear-gradient(135deg,${BRAND} 0%,#9d1200 100%);padding:36px 48px;color:#fff;
                 display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
-        <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;">BNI Finance Hub</div>
+        <div style="font-size:22px;font-weight:800;letter-spacing:-.4px;">BNI Indonesia</div>
         <div style="font-size:12px;opacity:.85;margin-top:2px;letter-spacing:.4px;">PAYMENT PLATFORM</div>
       </div>
       <div style="text-align:right;">
@@ -147,7 +147,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
 
     <!-- Footer -->
     <div style="border-top:1px solid ${LINE};padding:24px 48px;text-align:center;">
-      <div style="font-size:12px;color:${MUTED};">BNI Finance Hub — dokumen ini diterbitkan secara otomatis oleh sistem.</div>
+      <div style="font-size:12px;color:${MUTED};">BNI Indonesia — dokumen ini diterbitkan secara otomatis oleh sistem.</div>
       <div style="font-size:12px;color:#94a3b8;margin-top:3px;">Terima kasih atas kepercayaan Anda.</div>
     </div>
   </div>`
