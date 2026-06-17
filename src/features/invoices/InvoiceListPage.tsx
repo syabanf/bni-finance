@@ -64,16 +64,32 @@ export function InvoiceListPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
 
+  // Everything except the status filter. Drives the summary cards and the
+  // status-tab counts, so they reflect type/chapter/search/due-date while still
+  // showing the full per-status breakdown the user is choosing between.
+  const baseFiltered = useMemo(() => {
+    if (!invoices) return []
+    const q = search.trim().toLowerCase()
+    return invoices.filter((inv) => {
+      if (type !== 'all' && inv.type !== type) return false
+      if (chapterId !== 'all' && inv.chapterId !== chapterId) return false
+      if (q && !inv.number.toLowerCase().includes(q) && !(inv.member?.name ?? '').toLowerCase().includes(q))
+        return false
+      if (dueFrom && (inv.dueDate ?? '') < dueFrom) return false
+      if (dueTo && (inv.dueDate ?? '') > dueTo) return false
+      return true
+    })
+  }, [invoices, type, chapterId, search, dueFrom, dueTo])
+
   const countByStatus = useMemo(() => {
-    if (!invoices) return {} as Record<string, number>
-    return invoices.reduce<Record<string, number>>((acc, inv) => {
+    return baseFiltered.reduce<Record<string, number>>((acc, inv) => {
       acc[inv.status] = (acc[inv.status] ?? 0) + 1
       return acc
     }, {})
-  }, [invoices])
+  }, [baseFiltered])
 
   const summary = useMemo(() => {
-    const list = invoices ?? []
+    const list = baseFiltered
     const amt = (pred: (i: InvoiceWithRelations) => boolean) =>
       list.filter(pred).reduce((a, i) => a + i.amount, 0)
     return {
@@ -85,7 +101,7 @@ export function InvoiceListPage() {
       overdue: { count: countByStatus.overdue ?? 0, amount: amt((i) => i.status === 'overdue') },
       paid: { count: countByStatus.paid ?? 0, amount: amt((i) => i.status === 'paid') },
     }
-  }, [invoices, countByStatus])
+  }, [baseFiltered, countByStatus])
 
   const selectedInvoices = useMemo(
     () => (invoices ?? []).filter((inv) => selected.has(inv.id)),
@@ -170,21 +186,12 @@ export function InvoiceListPage() {
   }
 
   const filtered = useMemo(() => {
-    if (!invoices) return []
-    const q = search.trim().toLowerCase()
-    return invoices.filter((inv) => {
-      if (status === 'outstanding') {
-        if (!isOutstanding(inv.status)) return false
-      } else if (status !== 'all' && inv.status !== status) return false
-      if (type !== 'all' && inv.type !== type) return false
-      if (chapterId !== 'all' && inv.chapterId !== chapterId) return false
-      if (q && !inv.number.toLowerCase().includes(q) && !(inv.member?.name ?? '').toLowerCase().includes(q))
-        return false
-      if (dueFrom && (inv.dueDate ?? '') < dueFrom) return false
-      if (dueTo && (inv.dueDate ?? '') > dueTo) return false
+    return baseFiltered.filter((inv) => {
+      if (status === 'outstanding') return isOutstanding(inv.status)
+      if (status !== 'all') return inv.status === status
       return true
     })
-  }, [invoices, status, type, chapterId, search, dueFrom, dueTo])
+  }, [baseFiltered, status])
 
   const typeLabel = (t: InvoiceType) => (t === 'registration' ? 'Pendaftaran' : 'Renewal')
 
@@ -291,7 +298,7 @@ export function InvoiceListPage() {
           {STATUS_TABS.map((tab) => {
             const count =
               tab.value === 'all'
-                ? invoices?.length
+                ? baseFiltered.length
                 : tab.value === 'outstanding'
                   ? (countByStatus.sent ?? 0) + (countByStatus.overdue ?? 0)
                   : countByStatus[tab.value]

@@ -23,16 +23,7 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDate } from '@/lib/format'
-
-function downloadCsv(filename: string, headers: string[], rows: string[][]) {
-  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
-  const lines = [headers, ...rows].map((r) => r.map(escape).join(','))
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
-}
+import { downloadCsv } from '@/lib/csv'
 
 export function MemberListPage() {
   const navigate = useNavigate()
@@ -47,21 +38,12 @@ export function MemberListPage() {
   const [dueTo, setDueTo] = useState('')
   const [memberStatus, setMemberStatus] = useState<MemberStatus | 'all'>('all')
 
-  const statusCounts = useMemo(() => {
-    const list = members ?? []
-    return {
-      all: list.length,
-      active: list.filter((m) => m.status === 'active').length,
-      pending: list.filter((m) => m.status === 'pending').length,
-      inactive: list.filter((m) => m.status === 'inactive').length,
-    }
-  }, [members])
-
-  const filtered = useMemo(() => {
+  // Everything except the status filter — drives the summary cards so they
+  // reflect chapter/due-date/search while still showing the status breakdown.
+  const baseFiltered = useMemo(() => {
     if (!members) return []
     const q = search.trim().toLowerCase()
     return members.filter((m) => {
-      if (memberStatus !== 'all' && m.status !== memberStatus) return false
       if (chapterId !== 'all' && m.chapterId !== chapterId) return false
       if (hideNoDueDate && !m.renewalDate) return false
       if (dueFrom && (!m.renewalDate || m.renewalDate < dueFrom)) return false
@@ -70,7 +52,22 @@ export function MemberListPage() {
         return false
       return true
     })
-  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo, memberStatus])
+  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo])
+
+  const statusCounts = useMemo(() => {
+    const list = baseFiltered
+    return {
+      all: list.length,
+      active: list.filter((m) => m.status === 'active').length,
+      pending: list.filter((m) => m.status === 'pending').length,
+      inactive: list.filter((m) => m.status === 'inactive').length,
+    }
+  }, [baseFiltered])
+
+  const filtered = useMemo(() => {
+    if (memberStatus === 'all') return baseFiltered
+    return baseFiltered.filter((m) => m.status === memberStatus)
+  }, [baseFiltered, memberStatus])
 
   return (
     <div>
