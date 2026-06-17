@@ -239,6 +239,44 @@ export const mockInvoiceRepository: InvoiceRepository = {
     return delay(invoice, 600)
   },
 
+  async recordManualPayment(id, input) {
+    const invoice = store.invoices.find((i) => i.id === id)
+    if (!invoice) throw new Error('Invoice tidak ditemukan.')
+    if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
+      throw new Error('Hanya invoice terkirim/overdue yang bisa dicatat pembayarannya.')
+    }
+
+    const old = invoice.status
+    const paidAt = new Date(input.paidAt).toISOString()
+    invoice.status = 'paid'
+    invoice.paidAt = paidAt
+    invoice.paidAmount = input.amount
+    invoice.updatedAt = nowISO()
+
+    store.payments.unshift({
+      id: nextId('pay'),
+      invoiceId: id,
+      amount: input.amount,
+      paidAt,
+      paymentMethod: input.method,
+      proofUrl: input.proofUrl,
+      note: input.note,
+      paperIdStatus: 'manual',
+      createdAt: nowISO(),
+    })
+
+    pushAudit({
+      invoiceId: id,
+      action: 'paid',
+      oldStatus: old,
+      newStatus: 'paid',
+      actorId: 'admin-national',
+      actorName: 'Admin Nasional',
+      notes: `Pembayaran manual dicatat (${input.method})${input.note ? ' — ' + input.note : ''}`,
+    })
+    return delay(invoice, 500)
+  },
+
   async getAuditLog(invoiceId) {
     return delay(
       store.auditLog

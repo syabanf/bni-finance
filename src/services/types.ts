@@ -56,6 +56,8 @@ export interface InvoiceRepository {
   cancel(id: string, reason: string): Promise<Invoice>
   /** Simulate a Paper.id "payment.success" webhook for a sent invoice. */
   markPaid(id: string): Promise<Invoice>
+  /** Manually record an offline payment (e.g. bank transfer) with optional proof. */
+  recordManualPayment(id: string, input: ManualPaymentInput): Promise<Invoice>
   getAuditLog(invoiceId: string): Promise<AuditLogEntry[]>
   /** Members at/near the end of their membership period. */
   renewalDue(withinDays?: number): Promise<RenewalDueMember[]>
@@ -71,6 +73,15 @@ export interface CreateInvoiceInput {
   notes?: string
 }
 
+export interface ManualPaymentInput {
+  amount: number
+  paidAt: string
+  method: string
+  note?: string
+  /** URL of the uploaded payment proof (from PaymentRepository.uploadProof). */
+  proofUrl?: string
+}
+
 export interface SettingsRepository {
   getFees(): Promise<FeeSettings>
   updateFees(input: Pick<FeeSettings, 'registrationFee' | 'renewalFee' | 'notes'>): Promise<FeeSettings>
@@ -79,6 +90,8 @@ export interface SettingsRepository {
 export interface PaymentRepository {
   list(): Promise<PaymentWithInvoice[]>
   listByInvoice(invoiceId: string): Promise<PaymentWithInvoice[]>
+  /** Upload a payment-proof file, returning a URL to store with the payment. */
+  uploadProof(file: File): Promise<string>
 }
 
 export interface UrgentCount {

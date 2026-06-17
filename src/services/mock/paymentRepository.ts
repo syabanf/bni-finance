@@ -23,4 +23,10 @@ export const mockPaymentRepository: PaymentRepository = {
         .sort((a, b) => b.paidAt.localeCompare(a.paidAt)),
     )
   },
+
+  async uploadProof(file) {
+    // Mock: no real storage — return an in-session object URL so the uploaded
+    // proof can still be previewed during the demo.
+    return delay(URL.createObjectURL(file), 300)
+  },
 }

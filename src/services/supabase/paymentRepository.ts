@@ -11,6 +11,8 @@ function rowToPayment(r: Record<string, unknown>): Payment {
     paymentMethod: r.payment_method as string | undefined,
     paperIdPaymentId: r.paper_id_payment_id as string | undefined,
     paperIdStatus: r.paper_id_status as string | undefined,
+    proofUrl: r.proof_url as string | undefined,
+    note: r.note as string | undefined,
     createdAt: r.created_at as string,
   }
 }
@@ -92,5 +94,16 @@ export const supabasePaymentRepository: PaymentRepository = {
         member: mem ? rowToMember(mem) : null,
       } satisfies PaymentWithInvoice
     })
+  },
+
+  async uploadProof(file) {
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin'
+    const path = `proofs/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const { error } = await supabase.storage
+      .from('payment-proofs')
+      .upload(path, file, { cacheControl: '3600', upsert: false })
+    if (error) throw new Error('Gagal mengunggah bukti pembayaran: ' + error.message)
+    const { data } = supabase.storage.from('payment-proofs').getPublicUrl(path)
+    return data.publicUrl
   },
 }

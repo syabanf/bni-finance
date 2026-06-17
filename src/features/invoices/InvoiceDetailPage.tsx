@@ -14,6 +14,7 @@ import {
   Pencil,
   Send,
   TriangleAlert,
+  Upload,
   XCircle,
 } from 'lucide-react'
 import type { AuditAction, AuditLogEntry, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
@@ -25,11 +26,13 @@ import {
   CardBody,
   CardHeader,
   Field,
+  Input,
   InvoiceStatusBadge,
   InvoiceTypeBadge,
   LoadingState,
   Modal,
   PageHeader,
+  Select,
   Textarea,
   useToast,
   WhatsAppIcon,
@@ -61,7 +64,14 @@ const AUDIT_LABEL: Record<AuditAction, string> = {
   updated: 'Invoice diperbarui',
 }
 
-type DialogKind = 'send' | 'preview' | 'paid' | 'cancel' | null
+type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | null
+
+const MANUAL_METHODS: { value: string; label: string }[] = [
+  { value: 'bank_transfer', label: 'Transfer Bank' },
+  { value: 'cash', label: 'Tunai' },
+  { value: 'qris', label: 'QRIS' },
+  { value: 'other', label: 'Lainnya' },
+]
 
 export function InvoiceDetailPage() {
   const { id = '' } = useParams()
@@ -86,6 +96,13 @@ export function InvoiceDetailPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [busy, setBusy] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
+
+  // Manual payment form
+  const [mpAmount, setMpAmount] = useState(0)
+  const [mpDate, setMpDate] = useState('')
+  const [mpMethod, setMpMethod] = useState('bank_transfer')
+  const [mpNote, setMpNote] = useState('')
+  const [mpFile, setMpFile] = useState<File | null>(null)
 
   if (loading) return <LoadingState label="Memuat invoice…" />
   if (!invoice)
@@ -140,6 +157,38 @@ export function InvoiceDetailPage() {
       `Terima kasih. 🙏`,
     ].join('\n')
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  const openManual = () => {
+    setMpAmount(invoice.amount)
+    setMpDate(new Date().toISOString().slice(0, 10))
+    setMpMethod('bank_transfer')
+    setMpNote('')
+    setMpFile(null)
+    setDialog('manual')
+  }
+
+  const submitManual = async () => {
+    setBusy(true)
+    try {
+      let proofUrl: string | undefined
+      if (mpFile) proofUrl = await paymentService.uploadProof(mpFile)
+      await invoiceService.recordManualPayment(invoice.id, {
+        amount: mpAmount,
+        paidAt: mpDate,
+        method: mpMethod,
+        note: mpNote.trim() || undefined,
+        proofUrl,
+      })
+      toast('Pembayaran manual berhasil dicatat.')
+      setDialog(null)
+      setMpFile(null)
+      refresh()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mencatat pembayaran.', 'error')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const { status } = invoice
@@ -294,6 +343,22 @@ export function InvoiceDetailPage() {
               </CardBody>
             </Card>
           )}
+
+          {/* Manual / offline payment */}
+          {canPay && (
+            <Card>
+              <CardHeader
+                title="Pembayaran Manual"
+                subtitle="Catat pembayaran offline (transfer bank / tunai) beserta buktinya."
+              />
+              <CardBody>
+                <Button variant="outline" onClick={openManual}>
+                  <Upload className="h-4 w-4" />
+                  Catat Pembayaran Manual
+                </Button>
+              </CardBody>
+            </Card>
+          )}
         </div>
 
         {/* Right: member + audit */}
@@ -333,13 +398,24 @@ export function InvoiceDetailPage() {
                 <div className="space-y-3">
                   {payments.map((p) => (
                     <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3">
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-sm font-semibold text-emerald-700">
                           {formatCurrency(p.amount)}
                         </div>
                         <div className="mt-0.5 text-xs text-ink-500">
                           {p.paymentMethod?.replace(/_/g, ' ') ?? '—'} · {formatDateTime(p.paidAt)}
                         </div>
+                        {p.note && <div className="mt-0.5 truncate text-xs text-ink-500">{p.note}</div>}
+                        {p.proofUrl && (
+                          <a
+                            href={p.proofUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-0.5 inline-block text-xs font-medium text-brand-500 hover:underline"
+                          >
+                            Lihat bukti
+                          </a>
+                        )}
                       </div>
                       <Badge tone="green">Lunas</Badge>
                     </div>
@@ -439,6 +515,72 @@ export function InvoiceDetailPage() {
           </>
         }
       />
+
+      {/* Manual payment dialog */}
+      <Modal
+        open={dialog === 'manual'}
+        onClose={() => setDialog(null)}
+        title="Catat Pembayaran Manual"
+        description="Untuk pembayaran offline (transfer bank / tunai). Status invoice menjadi Lunas."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>
+              Batal
+            </Button>
+            <Button loading={busy} disabled={!mpAmount || !mpDate} onClick={submitManual}>
+              <CheckCircle2 className="h-4 w-4" />
+              Catat Pembayaran
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Nominal (Rp)" required>
+              <Input
+                type="number"
+                value={mpAmount}
+                min={0}
+                step={50000}
+                onChange={(e) => setMpAmount(Number(e.target.value))}
+              />
+            </Field>
+            <Field label="Tanggal Bayar" required>
+              <Input
+                type="date"
+                value={mpDate}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setMpDate(e.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="Metode Pembayaran">
+            <Select value={mpMethod} onChange={(e) => setMpMethod(e.target.value)}>
+              {MANUAL_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Bukti Pembayaran" hint="Gambar atau PDF — opsional tapi disarankan.">
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              onChange={(e) => setMpFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-brand-600 hover:file:bg-brand-100"
+            />
+            {mpFile && <span className="mt-1 block text-xs text-ink-400">{mpFile.name}</span>}
+          </Field>
+          <Field label="Catatan" hint="mis. nomor referensi transfer.">
+            <Textarea
+              value={mpNote}
+              onChange={(e) => setMpNote(e.target.value)}
+              placeholder="Catatan pembayaran…"
+            />
+          </Field>
+        </div>
+      </Modal>
 
       <Modal
         open={dialog === 'cancel'}

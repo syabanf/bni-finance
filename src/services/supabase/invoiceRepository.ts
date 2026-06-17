@@ -360,6 +360,43 @@ export const supabaseInvoiceRepository: InvoiceRepository = {
     return updated
   },
 
+  async recordManualPayment(id, input) {
+    const { data: existing, error: fetchErr } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('id', id)
+      .single()
+    if (fetchErr) throw new Error(fetchErr.message)
+    const inv = rowToInvoice(existing as Record<string, unknown>)
+
+    const paidAt = new Date(input.paidAt).toISOString()
+    const { data, error } = await supabase
+      .from('invoices')
+      .update({ status: 'paid', paid_at: paidAt, paid_amount: input.amount })
+      .eq('id', id)
+      .select('*')
+      .single()
+    if (error) throw new Error(error.message)
+
+    await supabase.from('payments').insert({
+      invoice_id: id,
+      amount: input.amount,
+      paid_at: paidAt,
+      payment_method: input.method,
+      proof_url: input.proofUrl ?? null,
+      note: input.note ?? null,
+    })
+
+    await pushAudit(
+      id,
+      'paid',
+      inv.status,
+      'paid',
+      `Pembayaran manual (${input.method})${input.note ? ' — ' + input.note : ''}`,
+    )
+    return rowToInvoice(data as Record<string, unknown>)
+  },
+
   async getAuditLog(invoiceId) {
     const { data, error } = await supabase
       .from('invoice_audit_log')

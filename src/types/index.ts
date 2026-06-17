@@ -136,6 +136,9 @@ export interface Payment {
   paymentMethod?: string
   paperIdPaymentId?: string
   paperIdStatus?: string
+  /** Manual payments: uploaded proof URL + free-text note. */
+  proofUrl?: string
+  note?: string
   createdAt: string
 }
 
