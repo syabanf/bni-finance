@@ -9,6 +9,7 @@ import {
   Input,
   PageHeader,
   Select,
+  SummaryCard,
   TableSkeleton,
   useToast,
 } from '@/components/ui'
@@ -16,7 +17,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService } from '@/services'
 import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatCurrency, formatCurrencyCompact, formatDate } from '@/lib/format'
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
@@ -70,6 +71,18 @@ export function InvoiceListPage() {
       return acc
     }, {})
   }, [invoices])
+
+  const summary = useMemo(() => {
+    const list = invoices ?? []
+    const amt = (pred: (i: InvoiceWithRelations) => boolean) =>
+      list.filter(pred).reduce((a, i) => a + i.amount, 0)
+    return {
+      total: { count: list.length, amount: amt(() => true) },
+      sent: { count: countByStatus.sent ?? 0, amount: amt((i) => i.status === 'sent') },
+      overdue: { count: countByStatus.overdue ?? 0, amount: amt((i) => i.status === 'overdue') },
+      paid: { count: countByStatus.paid ?? 0, amount: amt((i) => i.status === 'paid') },
+    }
+  }, [invoices, countByStatus])
 
   const selectedInvoices = useMemo(
     () => (invoices ?? []).filter((inv) => selected.has(inv.id)),
@@ -157,6 +170,42 @@ export function InvoiceListPage() {
           </div>
         }
       />
+
+      {/* Summary cards (also filter the table by status) */}
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard
+          label="Total Invoice"
+          value={summary.total.count}
+          sub={formatCurrencyCompact(summary.total.amount)}
+          tone="brand"
+          active={status === 'all'}
+          onClick={() => setStatus('all')}
+        />
+        <SummaryCard
+          label="Outstanding"
+          value={summary.sent.count}
+          sub={formatCurrencyCompact(summary.sent.amount)}
+          tone="amber"
+          active={status === 'sent'}
+          onClick={() => setStatus('sent')}
+        />
+        <SummaryCard
+          label="Overdue"
+          value={summary.overdue.count}
+          sub={formatCurrencyCompact(summary.overdue.amount)}
+          tone="red"
+          active={status === 'overdue'}
+          onClick={() => setStatus('overdue')}
+        />
+        <SummaryCard
+          label="Lunas"
+          value={summary.paid.count}
+          sub={formatCurrencyCompact(summary.paid.amount)}
+          tone="green"
+          active={status === 'paid'}
+          onClick={() => setStatus('paid')}
+        />
+      </div>
 
       <Card>
         {/* Status tab pills */}

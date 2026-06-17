@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Download, Eye, Search, Users, X } from 'lucide-react'
-import type { Chapter, MemberWithChapter } from '@/types'
+import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Avatar,
   Button,
@@ -11,6 +11,7 @@ import {
   MemberStatusBadge,
   PageHeader,
   Select,
+  SummaryCard,
   Table,
   TBody,
   Td,
@@ -44,11 +45,23 @@ export function MemberListPage() {
   const [hideNoDueDate, setHideNoDueDate] = useState(false)
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
+  const [memberStatus, setMemberStatus] = useState<MemberStatus | 'all'>('all')
+
+  const statusCounts = useMemo(() => {
+    const list = members ?? []
+    return {
+      all: list.length,
+      active: list.filter((m) => m.status === 'active').length,
+      pending: list.filter((m) => m.status === 'pending').length,
+      inactive: list.filter((m) => m.status === 'inactive').length,
+    }
+  }, [members])
 
   const filtered = useMemo(() => {
     if (!members) return []
     const q = search.trim().toLowerCase()
     return members.filter((m) => {
+      if (memberStatus !== 'all' && m.status !== memberStatus) return false
       if (chapterId !== 'all' && m.chapterId !== chapterId) return false
       if (hideNoDueDate && !m.renewalDate) return false
       if (dueFrom && (!m.renewalDate || m.renewalDate < dueFrom)) return false
@@ -57,7 +70,7 @@ export function MemberListPage() {
         return false
       return true
     })
-  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo])
+  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo, memberStatus])
 
   return (
     <div>
@@ -88,6 +101,38 @@ export function MemberListPage() {
           </Button>
         }
       />
+
+      {/* Summary cards (also filter by status) */}
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <SummaryCard
+          label="Total Member"
+          value={statusCounts.all}
+          tone="brand"
+          active={memberStatus === 'all'}
+          onClick={() => setMemberStatus('all')}
+        />
+        <SummaryCard
+          label="Active"
+          value={statusCounts.active}
+          tone="green"
+          active={memberStatus === 'active'}
+          onClick={() => setMemberStatus('active')}
+        />
+        <SummaryCard
+          label="Pending"
+          value={statusCounts.pending}
+          tone="amber"
+          active={memberStatus === 'pending'}
+          onClick={() => setMemberStatus('pending')}
+        />
+        <SummaryCard
+          label="Inactive"
+          value={statusCounts.inactive}
+          tone="default"
+          active={memberStatus === 'inactive'}
+          onClick={() => setMemberStatus('inactive')}
+        />
+      </div>
 
       <Card>
         <div className="space-y-3 border-b border-ink-100 p-4">

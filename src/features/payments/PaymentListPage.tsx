@@ -5,9 +5,9 @@ import {
   Avatar,
   Badge,
   Card,
-  CardBody,
   EmptyState,
   PageHeader,
+  SummaryCard,
   Table,
   TBody,
   Td,
@@ -31,6 +31,9 @@ export function PaymentListPage() {
   const { data: payments, loading } = useAsync<PaymentWithInvoice[]>(() => paymentService.list())
 
   const total = (payments ?? []).reduce((acc, p) => acc + p.amount, 0)
+  const ym = new Date().toISOString().slice(0, 7)
+  const thisMonth = (payments ?? []).filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
+  const thisMonthTotal = thisMonth.reduce((acc, p) => acc + p.amount, 0)
 
   return (
     <div>
@@ -40,18 +43,15 @@ export function PaymentListPage() {
       />
 
       {!loading && payments && payments.length > 0 && (
-        <Card className="mb-5">
-          <CardBody className="flex items-center justify-between p-5">
-            <div>
-              <div className="text-sm text-ink-500">Total Diterima</div>
-              <div className="mt-1 text-2xl font-bold text-ink-900">{formatCurrency(total)}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-ink-500">Jumlah Transaksi</div>
-              <div className="mt-1 text-2xl font-bold text-ink-900">{payments.length}</div>
-            </div>
-          </CardBody>
-        </Card>
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <SummaryCard label="Total Diterima" value={formatCurrency(total)} tone="green" />
+          <SummaryCard label="Jumlah Transaksi" value={payments.length} tone="brand" />
+          <SummaryCard
+            label="Bulan Ini"
+            value={formatCurrency(thisMonthTotal)}
+            sub={`${thisMonth.length} transaksi`}
+          />
+        </div>
       )}
 
       <Card>
