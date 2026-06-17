@@ -41,4 +41,21 @@ export const mockAuthRepository: AuthRepository = {
       return null
     }
   },
+
+  async updateProfile({ name }) {
+    await delay(null, 400)
+    const trimmed = name.trim()
+    if (!trimmed) throw new Error('Nama tidak boleh kosong.')
+    const raw = localStorage.getItem(STORAGE_KEY)
+    const current: AuthUser = raw ? (JSON.parse(raw) as AuthUser) : DEMO_USER
+    const user: AuthUser = { ...current, name: trimmed }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+    return user
+  },
+
+  async updatePassword(newPassword) {
+    await delay(null, 400)
+    if (newPassword.trim().length < 6) throw new Error('Kata sandi minimal 6 karakter.')
+    // Demo mode — no real credential store to update.
+  },
 }

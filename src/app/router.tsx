@@ -17,6 +17,9 @@ import { NotFoundPage } from '@/features/misc/NotFoundPage'
 import { UrgentPage } from '@/features/urgent/UrgentPage'
 import { PaymentModePage } from '@/features/settings/PaymentModePage'
 import { PublicPaymentPage } from '@/features/pay/PublicPaymentPage'
+import { NotificationsPage } from '@/features/notifications/NotificationsPage'
+import { ProfilePage } from '@/features/profile/ProfilePage'
+import { ReportPage } from '@/features/reports/ReportPage'
 
 export const router = createBrowserRouter([
   {
@@ -30,6 +33,8 @@ export const router = createBrowserRouter([
           { path: '/', element: <Navigate to="/dashboard" replace /> },
           { path: '/dashboard', element: <DashboardPage /> },
           { path: '/urgent', element: <UrgentPage /> },
+          { path: '/notifications', element: <NotificationsPage /> },
+          { path: '/profile', element: <ProfilePage /> },
 
           // Invoices — order matters: static segments before the :id param.
           { path: '/invoices', element: <InvoiceListPage /> },
@@ -42,6 +47,7 @@ export const router = createBrowserRouter([
 
           { path: '/chapters', element: <ChapterListPage /> },
           { path: '/payments', element: <PaymentListPage /> },
+          { path: '/reports', element: <ReportPage /> },
 
           { path: '/settings', element: <SettingsPage /> },
           { path: '/settings/payment', element: <PaymentModePage /> },

@@ -27,6 +27,10 @@ export interface AuthRepository {
   login(email: string, password: string): Promise<AuthUser>
   logout(): Promise<void>
   getCurrentUser(): AuthUser | null
+  /** Update the signed-in user's display name. */
+  updateProfile(input: { name: string }): Promise<AuthUser>
+  /** Set a new password for the signed-in user. */
+  updatePassword(newPassword: string): Promise<void>
 }
 
 export interface ChapterRepository {

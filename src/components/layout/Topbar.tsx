@@ -3,10 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Bell, ChevronDown, LogOut, Search, UserCircle2 } from 'lucide-react'
 import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useNotifications } from '@/features/notifications/NotificationsContext'
 import { cn } from '@/lib/cn'
 
 export function Topbar() {
   const { user, logout } = useAuth()
+  const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -44,13 +46,18 @@ export function Topbar() {
         </div>
 
         {/* Notifications */}
-        <button
+        <Link
+          to="/notifications"
           className="relative ml-auto rounded-xl p-2 text-ink-500 transition-colors hover:bg-ink-100 sm:ml-0"
-          aria-label="Notifikasi"
+          aria-label={`Notifikasi${unreadCount > 0 ? ` (${unreadCount} belum dibaca)` : ''}`}
         >
           <Bell className="h-5 w-5" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-500 ring-2 ring-white" />
-        </button>
+          {unreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Link>
 
         {/* User menu */}
         <div className="relative" ref={menuRef}>
@@ -72,10 +79,14 @@ export function Topbar() {
                 <div className="text-sm font-semibold text-ink-900">{user?.name}</div>
                 <div className="truncate text-xs text-ink-400">{user?.email}</div>
               </div>
-              <button className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-ink-600 hover:bg-ink-50">
+              <Link
+                to="/profile"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-ink-600 hover:bg-ink-50"
+              >
                 <UserCircle2 className="h-4 w-4" />
                 Profil Saya
-              </button>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 import { useAuth } from '@/features/auth/AuthContext'
+import { NotificationsProvider } from '@/features/notifications/NotificationsContext'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { BottomNav } from './BottomNav'
@@ -18,7 +19,8 @@ export function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-ink-50">
+    <NotificationsProvider>
+      <div className="min-h-screen bg-ink-50">
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] border-r border-ink-100 lg:block">
         <Sidebar />
@@ -60,6 +62,7 @@ export function AppLayout() {
 
       {/* Mobile bottom tab bar */}
       <BottomNav onMore={() => setMobileOpen(true)} />
-    </div>
+      </div>
+    </NotificationsProvider>
   )
 }

@@ -8,6 +8,7 @@ import {
   RefreshCw,
   AlertTriangle,
   CreditCard,
+  BarChart3,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -30,6 +31,7 @@ export const NAV: NavNode[] = [
   { kind: 'section', label: 'Keuangan' },
   { kind: 'item', to: '/invoices', label: 'Semua Invoice', icon: FileText },
   { kind: 'item', to: '/payments', label: 'Pembayaran', icon: Wallet },
+  { kind: 'item', to: '/reports', label: 'Laporan', icon: BarChart3 },
 
   { kind: 'section', label: 'Data Member' },
   { kind: 'item', to: '/members', label: 'Member', icon: Users },

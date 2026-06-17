@@ -26,4 +26,25 @@ export const supabaseAuthRepository: AuthRepository = {
   getCurrentUser() {
     return currentUser
   },
+
+  async updateProfile({ name }) {
+    const trimmed = name.trim()
+    if (!trimmed) throw new Error('Nama tidak boleh kosong.')
+    const { data, error } = await supabase.auth.updateUser({ data: { name: trimmed } })
+    if (error) throw new Error(error.message)
+    const u = data.user
+    currentUser = {
+      id: u.id,
+      name: u.user_metadata?.name ?? trimmed,
+      email: u.email ?? currentUser?.email ?? '',
+      role: 'national_admin',
+    }
+    return currentUser
+  },
+
+  async updatePassword(newPassword) {
+    if (newPassword.trim().length < 6) throw new Error('Kata sandi minimal 6 karakter.')
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) throw new Error(error.message)
+  },
 }
