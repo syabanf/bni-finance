@@ -19,12 +19,20 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+/** Constant-time string compare — avoids leaking the callback token via timing. */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let r = 0
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return r === 0
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  // Verifikasi token callback Xendit
+  // Verifikasi token callback Xendit (perbandingan constant-time)
   const token = req.headers.get('x-callback-token') ?? ''
-  if (!CALLBACK_TOKEN || token !== CALLBACK_TOKEN) {
+  if (!CALLBACK_TOKEN || !timingSafeEqual(token, CALLBACK_TOKEN)) {
     return json({ error: 'Unauthorized' }, 401)
   }
 
@@ -74,6 +82,12 @@ Deno.serve(async (req) => {
 
   if (!inv) return json({ received: true, skipped: 'invoice tidak ditemukan' })
   if (inv.status === 'paid') return json({ received: true, alreadyPaid: true })
+
+  // Defense-in-depth: tolak underpayment. VA(is_closed)/QRIS(amount tetap) sudah
+  // dijaga Xendit, jadi nominal kurang di sini = anomali → jangan tandai lunas.
+  if (paidAmount > 0 && paidAmount < (inv.amount as number)) {
+    return json({ received: true, skipped: `underpaid: ${paidAmount} < ${inv.amount}` })
+  }
 
   const now = new Date().toISOString()
   const amount = paidAmount || (inv.amount as number)
