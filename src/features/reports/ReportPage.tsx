@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, CreditCard, Download, Percent, Wallet } from 'lucide-react'
+import { CheckCircle2, CreditCard, Percent, Wallet } from 'lucide-react'
 import type { Chapter, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
 import {
   Card,
@@ -8,6 +8,7 @@ import {
   DonutChart,
   type DonutSegment,
   EmptyState,
+  ExportMenu,
   Input,
   PageHeader,
   StatCard,
@@ -15,9 +16,10 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService, paymentService } from '@/services'
-import { formatCurrency, formatCurrencyCompact } from '@/lib/format'
+import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
 import { todayISO } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
+import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
 
 type Preset = 'this-month' | 'last-month' | 'this-year' | 'all' | 'custom'
@@ -162,6 +164,9 @@ export function ReportPage() {
 
   const loading = invLoading || payLoading
 
+  const periodLabel = PRESETS.find((p) => p.value === preset)?.label ?? 'Semua'
+  const periodRange = `${range.from || 'awal'} – ${range.to || todayISO()}`
+
   const exportCsv = () => {
     downloadCsv(
       `laporan-${range.from || 'awal'}_${range.to || todayISO()}.csv`,
@@ -170,20 +175,73 @@ export function ReportPage() {
     )
   }
 
+  const exportPdf = () => {
+    printTableReport({
+      title: 'Laporan Keuangan',
+      subtitle: `${periodLabel} · ${periodRange}`,
+      meta: [`${report.count} invoice`, `Dibuat ${formatDateTime(new Date())}`],
+      summary: [
+        { label: 'Total Ditagih', value: formatCurrency(report.ditagih) },
+        { label: 'Total Diterima', value: formatCurrency(report.diterima) },
+        { label: 'Outstanding', value: formatCurrency(report.outstanding) },
+        { label: 'Collection Rate', value: `${report.rate}%` },
+      ],
+      tableHeading: 'Rincian per Chapter',
+      columns: [
+        { label: 'Chapter' },
+        { label: 'Invoice', align: 'center' },
+        { label: 'Ditagih', align: 'right' },
+        { label: 'Diterima', align: 'right' },
+        { label: 'Outstanding', align: 'right' },
+        { label: 'Rate', align: 'right' },
+      ],
+      rows: report.chapterRows.map((r) => [
+        r.name,
+        r.count,
+        formatCurrency(r.ditagih),
+        formatCurrency(r.diterima),
+        formatCurrency(r.outstanding),
+        `${r.rate}%`,
+      ]),
+      totals: [
+        'Total',
+        report.count,
+        formatCurrency(report.ditagih),
+        formatCurrency(report.diterima),
+        formatCurrency(report.outstanding),
+        `${report.rate}%`,
+      ],
+      extraSections: [
+        {
+          heading: 'Per Tipe Invoice',
+          columns: [{ label: 'Tipe' }, { label: 'Jumlah', align: 'right' }],
+          rows: report.typeData.map((t) => [t.label, t.value]),
+        },
+        {
+          heading: 'Metode Pembayaran',
+          columns: [
+            { label: 'Metode' },
+            { label: 'Transaksi', align: 'right' },
+            { label: 'Nominal', align: 'right' },
+          ],
+          rows: report.methods.map((m) => [
+            m.method.replace(/\b\w/g, (c) => c.toUpperCase()),
+            m.count,
+            formatCurrency(m.amount),
+          ]),
+        },
+      ],
+      documentTitle: 'Laporan Keuangan — BNI Finance',
+    })
+  }
+
   return (
     <div>
       <PageHeader
         title="Laporan Keuangan"
         description="Ringkasan penagihan dan penerimaan per periode."
         action={
-          <button
-            onClick={exportCsv}
-            disabled={report.chapterRows.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </button>
+          <ExportMenu onCsv={exportCsv} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
         }
       />
 

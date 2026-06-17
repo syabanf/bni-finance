@@ -23,30 +23,46 @@ export interface ReportColumn {
   align?: Align
 }
 
+export interface SummaryStat {
+  label: string
+  value: string
+}
+
+export interface ReportSection {
+  heading: string
+  columns: ReportColumn[]
+  rows: (string | number)[][]
+  totals?: (string | number)[]
+}
+
 export interface TableReportOptions {
   title: string
   subtitle?: string
   /** Extra lines shown top-right (e.g. row count, generated-at). */
   meta?: string[]
+  /** KPI strip rendered between the header and the table. */
+  summary?: SummaryStat[]
+  /** Heading shown above the main table. */
+  tableHeading?: string
   columns: ReportColumn[]
   rows: (string | number)[][]
   /** Optional bold totals row appended to the table. */
   totals?: (string | number)[]
+  /** Additional headed tables rendered after the main table. */
+  extraSections?: ReportSection[]
   /** Browser tab / document title. Defaults to `title`. */
   documentTitle?: string
 }
 
-export function buildTableReportDocument(o: TableReportOptions): string {
-  const align = (i: number) => o.columns[i]?.align ?? 'left'
-
-  const th = o.columns
+function renderTable(columns: ReportColumn[], rows: (string | number)[][], totals?: (string | number)[]): string {
+  const align = (i: number) => columns[i]?.align ?? 'left'
+  const th = columns
     .map(
       (c) =>
         `<th style="text-align:${c.align ?? 'left'};padding:10px 12px;font-size:11px;font-weight:700;letter-spacing:.5px;color:#fff;">${esc(c.label)}</th>`,
     )
     .join('')
-
-  const body = o.rows
+  const body = rows
     .map(
       (r) =>
         `<tr>${r
@@ -57,18 +73,46 @@ export function buildTableReportDocument(o: TableReportOptions): string {
           .join('')}</tr>`,
     )
     .join('')
-
-  const totals = o.totals
-    ? `<tr>${o.totals
+  const tot = totals
+    ? `<tr>${totals
         .map(
           (cell, i) =>
             `<td style="text-align:${align(i)};padding:11px 12px;font-size:12px;font-weight:700;color:${INK};border-top:2px solid ${INK};background:#f8fafc;">${esc(cell)}</td>`,
         )
         .join('')}</tr>`
     : ''
+  return `<table><thead><tr>${th}</tr></thead><tbody>${body}${tot}</tbody></table>`
+}
 
+export function buildTableReportDocument(o: TableReportOptions): string {
   const meta = (o.meta ?? [])
     .map((m) => `<div style="font-size:12px;color:${MUTED};">${esc(m)}</div>`)
+    .join('')
+
+  const summary = o.summary?.length
+    ? `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;">${o.summary
+        .map(
+          (s) =>
+            `<div style="flex:1;min-width:150px;border:1px solid ${LINE};border-radius:10px;padding:12px 16px;">
+               <div style="font-size:11px;color:${MUTED};text-transform:uppercase;letter-spacing:.4px;">${esc(s.label)}</div>
+               <div style="font-size:18px;font-weight:800;color:${INK};margin-top:4px;">${esc(s.value)}</div>
+             </div>`,
+        )
+        .join('')}</div>`
+    : ''
+
+  const tableHeading = o.tableHeading
+    ? `<div style="font-size:14px;font-weight:700;color:${INK};margin-bottom:8px;">${esc(o.tableHeading)}</div>`
+    : ''
+
+  const sections = (o.extraSections ?? [])
+    .map(
+      (sec) =>
+        `<div style="margin-top:22px;">
+           <div style="font-size:14px;font-weight:700;color:${INK};margin-bottom:8px;">${esc(sec.heading)}</div>
+           ${renderTable(sec.columns, sec.rows, sec.totals)}
+         </div>`,
+    )
     .join('')
 
   return `<!DOCTYPE html>
@@ -96,10 +140,10 @@ export function buildTableReportDocument(o: TableReportOptions): string {
     </div>
     <div style="text-align:right;">${meta}</div>
   </div>
-  <table>
-    <thead><tr>${th}</tr></thead>
-    <tbody>${body}${totals}</tbody>
-  </table>
+  ${summary}
+  ${tableHeading}
+  ${renderTable(o.columns, o.rows, o.totals)}
+  ${sections}
   <div style="margin-top:20px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid ${LINE};padding-top:12px;">
     BNI Finance Hub — dokumen dibuat otomatis oleh sistem.
   </div>
