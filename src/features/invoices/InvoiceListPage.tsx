@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Download, FileText, Plus, Search, Send, X } from 'lucide-react'
+import { Download, FileText, Mail, Plus, Search, Send, X } from 'lucide-react'
 import type { Chapter, InvoiceStatus, InvoiceType, InvoiceWithRelations } from '@/types'
 import {
   Button,
@@ -12,13 +12,16 @@ import {
   SummaryCard,
   TableSkeleton,
   useToast,
+  WhatsAppIcon,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService } from '@/services'
+import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
 import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
 import { formatCurrency, formatCurrencyCompact, formatDate } from '@/lib/format'
 import { isOutstanding } from '@/lib/status'
+import { normalizePhone } from '@/lib/whatsapp'
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
@@ -57,6 +60,7 @@ export function InvoiceListPage() {
 
   const { data: invoices, loading, reload } = useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
+  const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode())
 
   const [status, setStatus] = useState<StatusFilter>(initialStatus)
   const [type, setType] = useState<InvoiceType | 'all'>(initialType)
@@ -121,6 +125,52 @@ export function InvoiceListPage() {
       reload()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal mengirim invoice.', 'error')
+    } finally {
+      setBulkSending(false)
+    }
+  }
+
+  // Self-payment (Xendit) mode: kirim link pembayaran /pay/:id ke tiap member
+  // lewat Email atau WhatsApp. Draft diterbitkan dulu agar link-nya aktif.
+  const bulkShare = async (channel: 'email' | 'whatsapp') => {
+    if (selectedSendable.length === 0) return
+    setBulkSending(true)
+    try {
+      for (const inv of selectedSendable) {
+        if (inv.status === 'draft') await invoiceService.send(inv.id)
+      }
+      let opened = 0
+      let skipped = 0
+      for (const inv of selectedSendable) {
+        const payUrl = `${window.location.origin}/pay/${inv.id}`
+        const name = inv.member?.name ?? 'Bapak/Ibu'
+        if (channel === 'whatsapp') {
+          const phone = normalizePhone(inv.member?.phone)
+          if (!phone) {
+            skipped++
+            continue
+          }
+          const msg = `Halo ${name}, berikut tagihan BNI Anda *${inv.number}* sebesar *${formatCurrency(inv.amount)}*. Silakan lakukan pembayaran melalui tautan berikut: ${payUrl}`
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener')
+        } else {
+          const email = inv.member?.email
+          if (!email) {
+            skipped++
+            continue
+          }
+          const subject = `Tagihan BNI ${inv.number}`
+          const body = `Halo ${name},\n\nBerikut tagihan BNI Anda ${inv.number} sebesar ${formatCurrency(inv.amount)}.\nSilakan lakukan pembayaran melalui tautan berikut:\n${payUrl}\n\nTerima kasih.`
+          window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
+        }
+        opened++
+      }
+      const ch = channel === 'whatsapp' ? 'WhatsApp' : 'email'
+      const lack = channel === 'whatsapp' ? 'no. HP' : 'email'
+      toast(`${opened} ${ch} disiapkan${skipped ? `, ${skipped} dilewati (tanpa ${lack})` : ''}.`)
+      setSelected(new Set())
+      reload()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menyiapkan pengiriman.', 'error')
     } finally {
       setBulkSending(false)
     }
@@ -333,12 +383,24 @@ export function InvoiceListPage() {
                 <X className="h-4 w-4" />
                 Batal
               </Button>
-              {selectedSendable.length > 0 && (
-                <Button size="sm" loading={bulkSending} onClick={handleBulkSend}>
-                  <Send className="h-4 w-4" />
-                  Kirim {selectedSendable.length} ke Paper.id
-                </Button>
-              )}
+              {selectedSendable.length > 0 &&
+                (selfPayment ? (
+                  <>
+                    <Button variant="outline" size="sm" loading={bulkSending} onClick={() => bulkShare('email')}>
+                      <Mail className="h-4 w-4" />
+                      Kirim {selectedSendable.length} via Email
+                    </Button>
+                    <Button size="sm" loading={bulkSending} onClick={() => bulkShare('whatsapp')}>
+                      <WhatsAppIcon className="h-4 w-4" />
+                      Kirim {selectedSendable.length} via WhatsApp
+                    </Button>
+                  </>
+                ) : (
+                  <Button size="sm" loading={bulkSending} onClick={handleBulkSend}>
+                    <Send className="h-4 w-4" />
+                    Kirim {selectedSendable.length} ke Paper.id
+                  </Button>
+                ))}
             </div>
           </div>
         )}

@@ -15,6 +15,10 @@ export interface XenditPaymentResult {
 
 /** Apakah Self Payment Mode (Xendit) aktif. */
 export async function isSelfPaymentMode(): Promise<boolean> {
+  // Mock mode has no backend settings — use a localStorage flag for the demo.
+  if (import.meta.env.VITE_USE_MOCK !== 'false') {
+    return localStorage.getItem('mock.self_payment_mode') === 'true'
+  }
   const v = await getAppSetting('self_payment_mode')
   return v === 'true'
 }
