@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Download, FileText, Mail, Plus, Search, Send, X } from 'lucide-react'
+import { FileText, Mail, Plus, Search, Send, X } from 'lucide-react'
 import type { Chapter, InvoiceStatus, InvoiceType, InvoiceWithRelations } from '@/types'
 import {
   Button,
   Card,
   EmptyState,
+  ExportMenu,
   Input,
   PageHeader,
   Select,
@@ -19,10 +20,11 @@ import { chapterService, invoiceService } from '@/services'
 import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
 import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
-import { formatCurrency, formatCurrencyCompact, formatDate } from '@/lib/format'
-import { isOutstanding } from '@/lib/status'
+import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
+import { isOutstanding, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { normalizePhone } from '@/lib/whatsapp'
 import { downloadCsv } from '@/lib/csv'
+import { printTableReport } from '@/lib/pdfReport'
 
 type StatusFilter = InvoiceStatus | 'all' | 'outstanding'
 
@@ -184,6 +186,53 @@ export function InvoiceListPage() {
     })
   }, [invoices, status, type, chapterId, search, dueFrom, dueTo])
 
+  const typeLabel = (t: InvoiceType) => (t === 'registration' ? 'Pendaftaran' : 'Renewal')
+
+  const exportCsv = () => {
+    downloadCsv(
+      'invoice.csv',
+      ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo'],
+      filtered.map((inv) => [
+        inv.number,
+        inv.member?.name ?? '',
+        inv.chapter?.displayName ?? '',
+        typeLabel(inv.type),
+        inv.amount,
+        INVOICE_STATUS_LABEL[inv.status],
+        formatDate(inv.dueDate),
+      ]),
+    )
+  }
+
+  const exportPdf = () => {
+    const total = filtered.reduce((a, i) => a + i.amount, 0)
+    printTableReport({
+      title: 'Daftar Invoice',
+      subtitle: `Status: ${STATUS_TABS.find((t) => t.value === status)?.label ?? 'Semua'}`,
+      meta: [`${filtered.length} invoice`, `Dibuat ${formatDateTime(new Date())}`],
+      columns: [
+        { label: 'No. Invoice' },
+        { label: 'Member' },
+        { label: 'Chapter' },
+        { label: 'Tipe' },
+        { label: 'Nominal', align: 'right' },
+        { label: 'Status' },
+        { label: 'Jatuh Tempo' },
+      ],
+      rows: filtered.map((inv) => [
+        inv.number,
+        inv.member?.name ?? '—',
+        inv.chapter?.displayName ?? '—',
+        typeLabel(inv.type),
+        formatCurrency(inv.amount),
+        INVOICE_STATUS_LABEL[inv.status],
+        formatDate(inv.dueDate),
+      ]),
+      totals: ['', '', '', 'Total', formatCurrency(total), '', ''],
+      documentTitle: 'Daftar Invoice — BNI Finance',
+    })
+  }
+
   return (
     <div>
       <PageHeader
@@ -191,27 +240,7 @@ export function InvoiceListPage() {
         description="Kelola seluruh invoice pendaftaran dan renewal."
         action={
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() =>
-                downloadCsv(
-                  'invoice.csv',
-                  ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo'],
-                  (filtered).map((inv) => [
-                    inv.number,
-                    inv.member?.name ?? '',
-                    inv.chapter?.displayName ?? '',
-                    inv.type,
-                    String(inv.amount),
-                    inv.status,
-                    formatDate(inv.dueDate),
-                  ]),
-                )
-              }
-            >
-              <Download className="h-4 w-4" />
-              Export CSV
-            </Button>
+            <ExportMenu onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
             <Button onClick={() => navigate('/invoices/new')}>
               <Plus className="h-4 w-4" />
               Buat Invoice

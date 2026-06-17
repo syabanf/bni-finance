@@ -6,6 +6,7 @@ import {
   Badge,
   Card,
   EmptyState,
+  ExportMenu,
   PageHeader,
   SummaryCard,
   Table,
@@ -19,6 +20,8 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
+import { downloadCsv } from '@/lib/csv'
+import { printTableReport } from '@/lib/pdfReport'
 
 const METHOD_LABEL: Record<string, string> = {
   virtual_account: 'Virtual Account',
@@ -30,16 +33,58 @@ export function PaymentListPage() {
   const navigate = useNavigate()
   const { data: payments, loading } = useAsync<PaymentWithInvoice[]>(() => paymentService.list())
 
-  const total = (payments ?? []).reduce((acc, p) => acc + p.amount, 0)
+  const list = payments ?? []
+  const total = list.reduce((acc, p) => acc + p.amount, 0)
   const ym = new Date().toISOString().slice(0, 7)
-  const thisMonth = (payments ?? []).filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
+  const thisMonth = list.filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
   const thisMonthTotal = thisMonth.reduce((acc, p) => acc + p.amount, 0)
+
+  const methodLabel = (p: PaymentWithInvoice) =>
+    METHOD_LABEL[p.paymentMethod ?? ''] ?? p.paymentMethod ?? '—'
+
+  const exportCsv = () => {
+    downloadCsv(
+      'pembayaran.csv',
+      ['Member', 'No. Invoice', 'Nominal', 'Metode', 'Waktu Bayar'],
+      list.map((p) => [
+        p.member?.name ?? '',
+        p.invoice?.number ?? '',
+        p.amount,
+        methodLabel(p),
+        formatDateTime(p.paidAt),
+      ]),
+    )
+  }
+
+  const exportPdf = () => {
+    printTableReport({
+      title: 'Riwayat Pembayaran',
+      meta: [`${list.length} transaksi`, `Dibuat ${formatDateTime(new Date())}`],
+      columns: [
+        { label: 'Member' },
+        { label: 'No. Invoice' },
+        { label: 'Nominal', align: 'right' },
+        { label: 'Metode' },
+        { label: 'Waktu Bayar' },
+      ],
+      rows: list.map((p) => [
+        p.member?.name ?? '—',
+        p.invoice?.number ?? '—',
+        formatCurrency(p.amount),
+        methodLabel(p),
+        formatDateTime(p.paidAt),
+      ]),
+      totals: ['Total', '', formatCurrency(total), '', ''],
+      documentTitle: 'Riwayat Pembayaran — BNI Finance',
+    })
+  }
 
   return (
     <div>
       <PageHeader
         title="Pembayaran"
         description="Riwayat pembayaran yang diterima melalui webhook Paper.id."
+        action={<ExportMenu onCsv={exportCsv} onPdf={exportPdf} disabled={list.length === 0} />}
       />
 
       {!loading && payments && payments.length > 0 && (
