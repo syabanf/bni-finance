@@ -12,6 +12,8 @@ interface DonutChartProps {
   thickness?: number
   centerLabel?: string
   centerValue?: string | number
+  /** When set, segments + legend become clickable (drill-down). */
+  onSelect?: (index: number) => void
 }
 
 export function DonutChart({
@@ -20,6 +22,7 @@ export function DonutChart({
   thickness = 26,
   centerLabel,
   centerValue,
+  onSelect,
 }: DonutChartProps) {
   const id = useId()
   const total = data.reduce((acc, d) => acc + d.value, 0)
@@ -69,6 +72,9 @@ export function DonutChart({
                 strokeDasharray={s.dasharray}
                 strokeDashoffset={s.dashoffset}
                 strokeLinecap="round"
+                onClick={onSelect ? () => onSelect(i) : undefined}
+                style={onSelect ? { cursor: 'pointer' } : undefined}
+                className={onSelect ? 'transition-opacity hover:opacity-80' : undefined}
               />
             ))}
         </svg>
@@ -82,14 +88,30 @@ export function DonutChart({
         )}
       </div>
 
-      <div className="grid w-full grid-cols-2 gap-x-4 gap-y-2.5">
-        {data.map((d) => (
-          <div key={d.label} className="flex items-center gap-2 text-sm">
-            <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
-            <span className="text-ink-600">{d.label}</span>
-            <span className="ml-auto font-semibold text-ink-900">{d.value}</span>
-          </div>
-        ))}
+      <div className="grid w-full grid-cols-2 gap-x-4 gap-y-1">
+        {data.map((d, i) => {
+          const inner = (
+            <>
+              <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ backgroundColor: d.color }} />
+              <span className="text-ink-600">{d.label}</span>
+              <span className="ml-auto font-semibold text-ink-900">{d.value}</span>
+            </>
+          )
+          return onSelect ? (
+            <button
+              key={d.label}
+              type="button"
+              onClick={() => onSelect(i)}
+              className="-mx-1.5 flex items-center gap-2 rounded-lg px-1.5 py-1 text-sm transition-colors hover:bg-ink-50"
+            >
+              {inner}
+            </button>
+          ) : (
+            <div key={d.label} className="flex items-center gap-2 py-1 text-sm">
+              {inner}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

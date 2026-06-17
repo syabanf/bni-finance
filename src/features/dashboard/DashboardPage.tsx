@@ -27,18 +27,43 @@ import { formatCurrency, formatCurrencyCompact } from '@/lib/format'
 import { InvoiceTable } from '@/features/invoices/components/InvoiceTable'
 import { cn } from '@/lib/cn'
 
+/** A drill-down number cell — clickable when > 0. */
+function StatCell({ value, tone, onSelect }: { value: number; tone: string; onSelect: () => void }) {
+  if (value === 0) return <span className="font-semibold text-ink-300">0</span>
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onSelect()
+      }}
+      className={cn('font-semibold hover:underline', tone)}
+    >
+      {value}
+    </button>
+  )
+}
+
 function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
+  const navigate = useNavigate()
+  const drill = (chapterId: string, status?: InvoiceStatus) =>
+    navigate(`/invoices?chapter=${chapterId}${status ? `&status=${status}` : ''}`)
+
   return (
     <Card>
       <CardHeader
         title="Statistik per Chapter"
-        subtitle="Ringkasan invoice aktif, outstanding, dan overdue setiap chapter."
+        subtitle="Klik chapter atau angka untuk membuka invoice terkait."
       />
       {/* Mobile cards */}
       <div className="divide-y divide-ink-100 lg:hidden">
         {stats.map((s) => (
-          <div key={s.chapterId} className="px-4 py-3.5">
-            <div className="flex items-center justify-between">
+          <button
+            key={s.chapterId}
+            onClick={() => drill(s.chapterId)}
+            className="flex w-full flex-col px-4 py-3.5 text-left active:bg-ink-50"
+          >
+            <div className="flex w-full items-center justify-between">
               <div className="font-medium text-ink-900 text-sm">{s.chapterName}</div>
               <div className="text-sm font-semibold text-ink-900">{formatCurrencyCompact(s.totalAmount)}</div>
             </div>
@@ -52,7 +77,7 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
               )}
               <span className="text-emerald-600">{s.paid} lunas</span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
       {/* Desktop table */}
@@ -70,20 +95,22 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
           </thead>
           <tbody className="divide-y divide-ink-50">
             {stats.map((s) => (
-              <tr key={s.chapterId} className="hover:bg-ink-50/50">
+              <tr
+                key={s.chapterId}
+                onClick={() => drill(s.chapterId)}
+                className="cursor-pointer hover:bg-ink-50/50"
+              >
                 <td className="px-5 py-3 font-medium text-ink-900">{s.chapterName}</td>
                 <td className="px-3 py-3 text-center text-ink-600">{s.total}</td>
                 <td className="px-3 py-3 text-center">
-                  <span className={cn('font-semibold', s.overdue > 0 ? 'text-red-600' : 'text-ink-300')}>
-                    {s.overdue}
-                  </span>
+                  <StatCell value={s.overdue} tone="text-red-600" onSelect={() => drill(s.chapterId, 'overdue')} />
                 </td>
                 <td className="px-3 py-3 text-center">
-                  <span className={cn('font-semibold', s.outstanding > 0 ? 'text-amber-600' : 'text-ink-300')}>
-                    {s.outstanding}
-                  </span>
+                  <StatCell value={s.outstanding} tone="text-amber-600" onSelect={() => drill(s.chapterId, 'sent')} />
                 </td>
-                <td className="px-3 py-3 text-center text-emerald-600 font-semibold">{s.paid}</td>
+                <td className="px-3 py-3 text-center">
+                  <StatCell value={s.paid} tone="text-emerald-600" onSelect={() => drill(s.chapterId, 'paid')} />
+                </td>
                 <td className="px-5 py-3 text-right font-medium text-ink-900">{formatCurrency(s.totalAmount)}</td>
               </tr>
             ))}
@@ -249,6 +276,10 @@ export function DashboardPage() {
                   data={donutData}
                   centerValue={totalInvoices}
                   centerLabel="Total Invoice"
+                  onSelect={(i) => {
+                    const st = summary.statusBreakdown[i]?.status
+                    if (st) navigate(`/invoices?status=${st}`)
+                  }}
                 />
               )}
             </div>

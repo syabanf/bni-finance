@@ -48,13 +48,15 @@ export function InvoiceListPage() {
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
   const initialStatus = (searchParams.get('status') as InvoiceStatus | null) ?? 'all'
+  const initialType = (searchParams.get('type') as InvoiceType | null) ?? 'all'
+  const initialChapter = searchParams.get('chapter') ?? 'all'
 
   const { data: invoices, loading, reload } = useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
   const [status, setStatus] = useState<InvoiceStatus | 'all'>(initialStatus)
-  const [type, setType] = useState<InvoiceType | 'all'>('all')
-  const [chapterId, setChapterId] = useState<string>('all')
+  const [type, setType] = useState<InvoiceType | 'all'>(initialType)
+  const [chapterId, setChapterId] = useState<string>(initialChapter)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
