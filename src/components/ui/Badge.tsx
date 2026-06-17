@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import type { InvoiceStatus, InvoiceType, MemberStatus } from '@/types'
+import { INVOICE_STATUS_LABEL } from '@/lib/status'
 
 type Tone = 'green' | 'red' | 'amber' | 'blue' | 'gray' | 'purple'
 
@@ -38,17 +39,16 @@ export function Badge({ tone = 'gray', dot = true, children, className }: BadgeP
 
 // --- Domain-specific badges -------------------------------------------------
 
-const INVOICE_STATUS: Record<InvoiceStatus, { tone: Tone; label: string }> = {
-  draft: { tone: 'gray', label: 'Draft' },
-  sent: { tone: 'amber', label: 'Terkirim' },
-  paid: { tone: 'green', label: 'Lunas' },
-  overdue: { tone: 'red', label: 'Overdue' },
-  cancelled: { tone: 'gray', label: 'Dibatalkan' },
+const INVOICE_STATUS_TONE: Record<InvoiceStatus, Tone> = {
+  draft: 'gray',
+  sent: 'amber',
+  paid: 'green',
+  overdue: 'red',
+  cancelled: 'gray',
 }
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
-  const { tone, label } = INVOICE_STATUS[status]
-  return <Badge tone={tone}>{label}</Badge>
+  return <Badge tone={INVOICE_STATUS_TONE[status]}>{INVOICE_STATUS_LABEL[status]}</Badge>
 }
 
 const MEMBER_STATUS: Record<MemberStatus, { tone: Tone; label: string }> = {

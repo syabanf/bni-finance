@@ -18,6 +18,7 @@ import { chapterService, invoiceService } from '@/services'
 import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
 import { formatCurrency, formatCurrencyCompact, formatDate } from '@/lib/format'
+import { isOutstanding } from '@/lib/status'
 
 function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
@@ -29,12 +30,14 @@ function downloadCsv(filename: string, headers: string[], rows: string[][]) {
   URL.revokeObjectURL(url)
 }
 
-const STATUS_TABS: { value: InvoiceStatus | 'all'; label: string; dot?: string }[] = [
+type StatusFilter = InvoiceStatus | 'all' | 'outstanding'
+
+const STATUS_TABS: { value: StatusFilter; label: string; dot?: string }[] = [
   { value: 'all', label: 'Semua' },
+  { value: 'outstanding', label: 'Outstanding', dot: 'bg-amber-400' },
   { value: 'overdue', label: 'Overdue', dot: 'bg-red-500' },
-  { value: 'sent', label: 'Outstanding', dot: 'bg-amber-400' },
-  { value: 'draft', label: 'Draft', dot: 'bg-ink-300' },
   { value: 'paid', label: 'Lunas', dot: 'bg-emerald-500' },
+  { value: 'draft', label: 'Draft', dot: 'bg-ink-300' },
   { value: 'cancelled', label: 'Dibatalkan' },
 ]
 
@@ -48,14 +51,14 @@ export function InvoiceListPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [searchParams] = useSearchParams()
-  const initialStatus = (searchParams.get('status') as InvoiceStatus | null) ?? 'all'
+  const initialStatus = (searchParams.get('status') as StatusFilter | null) ?? 'all'
   const initialType = (searchParams.get('type') as InvoiceType | null) ?? 'all'
   const initialChapter = searchParams.get('chapter') ?? 'all'
 
   const { data: invoices, loading, reload } = useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
-  const [status, setStatus] = useState<InvoiceStatus | 'all'>(initialStatus)
+  const [status, setStatus] = useState<StatusFilter>(initialStatus)
   const [type, setType] = useState<InvoiceType | 'all'>(initialType)
   const [chapterId, setChapterId] = useState<string>(initialChapter)
   const [search, setSearch] = useState('')
@@ -78,7 +81,10 @@ export function InvoiceListPage() {
       list.filter(pred).reduce((a, i) => a + i.amount, 0)
     return {
       total: { count: list.length, amount: amt(() => true) },
-      sent: { count: countByStatus.sent ?? 0, amount: amt((i) => i.status === 'sent') },
+      outstanding: {
+        count: list.filter((i) => isOutstanding(i.status)).length,
+        amount: amt((i) => isOutstanding(i.status)),
+      },
       overdue: { count: countByStatus.overdue ?? 0, amount: amt((i) => i.status === 'overdue') },
       paid: { count: countByStatus.paid ?? 0, amount: amt((i) => i.status === 'paid') },
     }
@@ -124,7 +130,9 @@ export function InvoiceListPage() {
     if (!invoices) return []
     const q = search.trim().toLowerCase()
     return invoices.filter((inv) => {
-      if (status !== 'all' && inv.status !== status) return false
+      if (status === 'outstanding') {
+        if (!isOutstanding(inv.status)) return false
+      } else if (status !== 'all' && inv.status !== status) return false
       if (type !== 'all' && inv.type !== type) return false
       if (chapterId !== 'all' && inv.chapterId !== chapterId) return false
       if (q && !inv.number.toLowerCase().includes(q) && !(inv.member?.name ?? '').toLowerCase().includes(q))
@@ -183,11 +191,11 @@ export function InvoiceListPage() {
         />
         <SummaryCard
           label="Outstanding"
-          value={summary.sent.count}
-          sub={formatCurrencyCompact(summary.sent.amount)}
+          value={summary.outstanding.count}
+          sub={formatCurrencyCompact(summary.outstanding.amount)}
           tone="amber"
-          active={status === 'sent'}
-          onClick={() => setStatus('sent')}
+          active={status === 'outstanding'}
+          onClick={() => setStatus('outstanding')}
         />
         <SummaryCard
           label="Overdue"
@@ -211,7 +219,12 @@ export function InvoiceListPage() {
         {/* Status tab pills */}
         <div className="flex gap-1 overflow-x-auto border-b border-ink-100 px-4 pt-3 pb-0">
           {STATUS_TABS.map((tab) => {
-            const count = tab.value === 'all' ? invoices?.length : countByStatus[tab.value]
+            const count =
+              tab.value === 'all'
+                ? invoices?.length
+                : tab.value === 'outstanding'
+                  ? (countByStatus.sent ?? 0) + (countByStatus.overdue ?? 0)
+                  : countByStatus[tab.value]
             return (
               <button
                 key={tab.value}

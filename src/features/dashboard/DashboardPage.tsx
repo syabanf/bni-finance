@@ -25,6 +25,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { dashboardService, invoiceService } from '@/services'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/format'
 import { InvoiceTable } from '@/features/invoices/components/InvoiceTable'
+import { INVOICE_STATUS_COLOR, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { cn } from '@/lib/cn'
 
 /** A drill-down number cell — clickable when > 0. */
@@ -121,14 +122,6 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
   )
 }
 
-const STATUS_META: Record<InvoiceStatus, { label: string; color: string }> = {
-  paid: { label: 'Lunas', color: '#10b981' },
-  sent: { label: 'Menunggu', color: '#f59e0b' },
-  overdue: { label: 'Overdue', color: '#ef4444' },
-  draft: { label: 'Draft', color: '#94a3b8' },
-  cancelled: { label: 'Dibatalkan', color: '#cbd5e1' },
-}
-
 export function DashboardPage() {
   const navigate = useNavigate()
   const { data: summary, loading } = useAsync<DashboardSummary>(() => dashboardService.summary())
@@ -138,9 +131,9 @@ export function DashboardPage() {
 
   const donutData: DonutSegment[] =
     summary?.statusBreakdown.map((s) => ({
-      label: STATUS_META[s.status].label,
+      label: INVOICE_STATUS_LABEL[s.status],
       value: s.count,
-      color: STATUS_META[s.status].color,
+      color: INVOICE_STATUS_COLOR[s.status],
     })) ?? []
 
   const totalInvoices = summary?.statusBreakdown.reduce((acc, s) => acc + s.count, 0) ?? 0
@@ -214,7 +207,7 @@ export function DashboardPage() {
             label="Outstanding"
             hint={formatCurrencyCompact(summary.outstanding.amount)}
             trend={{ value: summary.outstanding.trend, intent: 'bad' }}
-            onClick={() => navigate('/invoices?status=sent')}
+            onClick={() => navigate('/invoices?status=outstanding')}
           />
           <StatCard
             icon={TriangleAlert}

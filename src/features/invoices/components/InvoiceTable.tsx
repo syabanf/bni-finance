@@ -16,7 +16,17 @@ import {
 } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { buildInvoiceWhatsAppUrl } from '@/lib/whatsapp'
+import { daysUntil } from '@/lib/date'
 import { cn } from '@/lib/cn'
+
+/** Relative due-date hint, e.g. "3 hari lagi" / "terlambat 5 hari". Only for unpaid issued invoices. */
+function DueHint({ dueDate, status }: { dueDate: string; status: InvoiceWithRelations['status'] }) {
+  if ((status !== 'sent' && status !== 'overdue') || !dueDate) return null
+  const d = daysUntil(dueDate)
+  const text = d === 0 ? 'jatuh tempo hari ini' : d > 0 ? `${d} hari lagi` : `terlambat ${Math.abs(d)} hari`
+  const tone = d < 0 ? 'text-red-500' : d <= 7 ? 'text-amber-600' : 'text-ink-400'
+  return <div className={cn('text-xs', tone)}>{text}</div>
+}
 
 type SortKey = 'number' | 'member' | 'amount' | 'dueDate' | 'status'
 
@@ -169,6 +179,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                   <div className="shrink-0 text-right">
                     <div className="font-semibold text-ink-900 text-sm">{formatCurrency(inv.amount)}</div>
                     <div className="text-xs text-ink-400 mt-0.5">{formatDate(inv.dueDate)}</div>
+                    <DueHint dueDate={inv.dueDate} status={inv.status} />
                   </div>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
@@ -256,7 +267,12 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                   <Td>
                     <InvoiceStatusBadge status={inv.status} />
                   </Td>
-                  <Td className="whitespace-nowrap text-ink-600">{formatDate(inv.dueDate)}</Td>
+                  <Td className="whitespace-nowrap text-ink-600">
+                    <div className="leading-tight">
+                      {formatDate(inv.dueDate)}
+                      <DueHint dueDate={inv.dueDate} status={inv.status} />
+                    </div>
+                  </Td>
                   {!compact && (
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">

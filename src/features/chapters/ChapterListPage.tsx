@@ -83,12 +83,16 @@ export function ChapterListPage() {
                     </div>
                     <div className="mt-0.5 text-lg font-bold text-ink-900">{memberCount(c.id)}</div>
                   </div>
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/invoices?chapter=${c.id}&status=outstanding`)}
+                    className="text-left"
+                  >
                     <div className="text-xs text-ink-400">Outstanding</div>
-                    <div className="mt-0.5 text-lg font-bold text-amber-600">
+                    <div className="mt-0.5 text-lg font-bold text-amber-600 hover:underline">
                       {formatCurrencyCompact(outstanding(c.id))}
                     </div>
-                  </div>
+                  </button>
                 </div>
               </Card>
             ))}
