@@ -58,6 +58,8 @@ export function InvoiceListPage() {
   const [type, setType] = useState<InvoiceType | 'all'>(initialType)
   const [chapterId, setChapterId] = useState<string>(initialChapter)
   const [search, setSearch] = useState('')
+  const [dueFrom, setDueFrom] = useState('')
+  const [dueTo, setDueTo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
 
@@ -114,9 +116,11 @@ export function InvoiceListPage() {
       if (chapterId !== 'all' && inv.chapterId !== chapterId) return false
       if (q && !inv.number.toLowerCase().includes(q) && !(inv.member?.name ?? '').toLowerCase().includes(q))
         return false
+      if (dueFrom && (inv.dueDate ?? '') < dueFrom) return false
+      if (dueTo && (inv.dueDate ?? '') > dueTo) return false
       return true
     })
-  }, [invoices, status, type, chapterId, search])
+  }, [invoices, status, type, chapterId, search, dueFrom, dueTo])
 
   return (
     <div>
@@ -192,8 +196,8 @@ export function InvoiceListPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="flex flex-col gap-3 border-b border-ink-100 p-4 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
+        <div className="space-y-3 border-b border-ink-100 p-4">
+          <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
             <Input
               value={search}
@@ -202,15 +206,15 @@ export function InvoiceListPage() {
               className="pl-10"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:flex">
-            <Select value={type} onChange={(e) => setType(e.target.value as InvoiceType | 'all')} className="lg:w-40">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={type} onChange={(e) => setType(e.target.value as InvoiceType | 'all')} className="w-full sm:w-40">
               {TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
             </Select>
-            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="lg:w-44">
+            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-44">
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -218,6 +222,40 @@ export function InvoiceListPage() {
                 </option>
               ))}
             </Select>
+            {/* Filter jatuh tempo (rentang tanggal) */}
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-ink-500">Jatuh tempo</span>
+              <Input
+                type="date"
+                value={dueFrom}
+                max={dueTo || undefined}
+                onChange={(e) => setDueFrom(e.target.value)}
+                className="w-[150px]"
+                aria-label="Jatuh tempo dari"
+              />
+              <span className="text-ink-400">–</span>
+              <Input
+                type="date"
+                value={dueTo}
+                min={dueFrom || undefined}
+                onChange={(e) => setDueTo(e.target.value)}
+                className="w-[150px]"
+                aria-label="Jatuh tempo sampai"
+              />
+              {(dueFrom || dueTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDueFrom('')
+                    setDueTo('')
+                  }}
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+                  aria-label="Reset filter jatuh tempo"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

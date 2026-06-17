@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, Download, Eye, Search, Users } from 'lucide-react'
+import { ArrowRight, Download, Eye, Search, Users, X } from 'lucide-react'
 import type { Chapter, MemberWithChapter } from '@/types'
 import {
   Avatar,
@@ -42,6 +42,8 @@ export function MemberListPage() {
   const [search, setSearch] = useState('')
   const [chapterId, setChapterId] = useState(searchParams.get('chapter') ?? 'all')
   const [hideNoDueDate, setHideNoDueDate] = useState(false)
+  const [dueFrom, setDueFrom] = useState('')
+  const [dueTo, setDueTo] = useState('')
 
   const filtered = useMemo(() => {
     if (!members) return []
@@ -49,11 +51,13 @@ export function MemberListPage() {
     return members.filter((m) => {
       if (chapterId !== 'all' && m.chapterId !== chapterId) return false
       if (hideNoDueDate && !m.renewalDate) return false
+      if (dueFrom && (!m.renewalDate || m.renewalDate < dueFrom)) return false
+      if (dueTo && (!m.renewalDate || m.renewalDate > dueTo)) return false
       if (q && !m.name.toLowerCase().includes(q) && !m.id.toLowerCase().includes(q) && !(m.email ?? '').toLowerCase().includes(q))
         return false
       return true
     })
-  }, [members, search, chapterId, hideNoDueDate])
+  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo])
 
   return (
     <div>
@@ -86,8 +90,8 @@ export function MemberListPage() {
       />
 
       <Card>
-        <div className="flex flex-col gap-3 border-b border-ink-100 p-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
+        <div className="space-y-3 border-b border-ink-100 p-4">
+          <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
             <Input
               value={search}
@@ -96,23 +100,59 @@ export function MemberListPage() {
               className="pl-10"
             />
           </div>
-          <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="sm:w-52">
-            <option value="all">Semua Chapter</option>
-            {chapters?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.displayName}
-              </option>
-            ))}
-          </Select>
-          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-600">
-            <input
-              type="checkbox"
-              checked={hideNoDueDate}
-              onChange={(e) => setHideNoDueDate(e.target.checked)}
-              className="h-4 w-4 rounded border-ink-300 accent-brand-500"
-            />
-            Ada due date
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-52">
+              <option value="all">Semua Chapter</option>
+              {chapters?.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.displayName}
+                </option>
+              ))}
+            </Select>
+            {/* Filter due date (rentang tanggal renewal) */}
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-ink-500">Due date</span>
+              <Input
+                type="date"
+                value={dueFrom}
+                max={dueTo || undefined}
+                onChange={(e) => setDueFrom(e.target.value)}
+                className="w-[150px]"
+                aria-label="Due date dari"
+              />
+              <span className="text-ink-400">–</span>
+              <Input
+                type="date"
+                value={dueTo}
+                min={dueFrom || undefined}
+                onChange={(e) => setDueTo(e.target.value)}
+                className="w-[150px]"
+                aria-label="Due date sampai"
+              />
+              {(dueFrom || dueTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDueFrom('')
+                    setDueTo('')
+                  }}
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+                  aria-label="Reset filter due date"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-600">
+              <input
+                type="checkbox"
+                checked={hideNoDueDate}
+                onChange={(e) => setHideNoDueDate(e.target.checked)}
+                className="h-4 w-4 rounded border-ink-300 accent-brand-500"
+              />
+              Ada due date
+            </label>
+          </div>
         </div>
 
         {loading ? (
