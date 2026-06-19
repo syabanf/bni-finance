@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { FileText, Mail, Plus, Search, Send, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileText, Mail, Plus, Search, Send, X } from 'lucide-react'
 import type { Chapter, InvoiceStatus, InvoiceType, InvoiceWithRelations } from '@/types'
 import {
   Button,
@@ -63,6 +63,8 @@ export function InvoiceListPage() {
   const [dueTo, setDueTo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
 
   // Everything except the status filter. Drives the summary cards and the
   // status-tab counts, so they reflect type/chapter/search/due-date while still
@@ -192,6 +194,11 @@ export function InvoiceListPage() {
       return true
     })
   }, [baseFiltered, status])
+
+  useEffect(() => { setPage(1) }, [filtered])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const typeLabel = (t: InvoiceType) => (t === 'registration' ? 'Pendaftaran' : 'Renewal')
 
@@ -449,12 +456,60 @@ export function InvoiceListPage() {
         ) : (
           <>
             <InvoiceTable
-              invoices={filtered}
+              invoices={paginated}
               selected={selected}
               onSelectChange={setSelected}
             />
-            <div className="px-5 py-3 text-xs text-ink-400">
-              Menampilkan {filtered.length} dari {invoices?.length ?? 0} invoice
+            <div className="flex items-center justify-between gap-4 border-t border-ink-100 px-5 py-3">
+              <span className="text-xs text-ink-400">
+                {filtered.length === 0
+                  ? 'Tidak ada invoice'
+                  : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} dari ${filtered.length} invoice`}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Halaman sebelumnya"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
+                      acc.push(p)
+                      return acc
+                    }, [])
+                    .map((item, idx) =>
+                      item === 'ellipsis' ? (
+                        <span key={`e${idx}`} className="px-1 text-xs text-ink-400">…</span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setPage(item as number)}
+                          className={`inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors ${
+                            page === item
+                              ? 'bg-brand-500 text-white'
+                              : 'text-ink-600 hover:bg-ink-100'
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ),
+                    )}
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    aria-label="Halaman berikutnya"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
