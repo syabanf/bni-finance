@@ -1,4 +1,4 @@
-# BNI Finance System
+# BNI Finance Hub
 
 Sistem finance untuk **BNI Grow Chapter Management** — mengelola invoice pendaftaran &
 renewal keanggotaan, sinkronisasi data dari BNI Visitor Management, pembayaran
@@ -10,8 +10,12 @@ Dibangun dengan **Vite + React + TypeScript + Tailwind CSS**, dapat dipasang seb
 ditukar dengan backend nyata (**Supabase** / BNI VM API / Paper.id / Xendit) tanpa
 mengubah UI.
 
+> 📖 **Dokumentasi sistem lengkap (arsitektur, payment Xendit, edge functions, deploy):**
+> [`docs/SYSTEM.md`](./docs/SYSTEM.md)
+>
 > Default berjalan di atas **mock repository** (data in-memory) — tanpa backend. Set
-> `VITE_USE_MOCK=false` (+ kredensial Supabase) untuk memakai backend nyata.
+> `VITE_USE_MOCK=false` (+ kredensial Supabase) untuk memakai backend nyata; ter-deploy
+> di **Vercel** dengan payment **Xendit** (mode test).
 
 ---
 
@@ -173,3 +177,4 @@ Implementasi Supabase tersedia di `services/supabase/` dan aktif saat `VITE_USE_
 | Backend (opsional) | Supabase — Postgres, Auth, Storage, Edge Functions |
 | Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
 | Data | Mock in-memory (default) ↔ Supabase (`VITE_USE_MOCK=false`) |
+| Hosting | Vercel |
