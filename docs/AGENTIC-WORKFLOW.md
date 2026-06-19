@@ -23,6 +23,15 @@
 | `blocked` | Butuh keputusan manusia |
 | `done` | Selesai |
 
+## Source of Truth
+
+| Dokumen | Fungsi |
+|---|---|
+| [`docs/BACKLOG.md`](BACKLOG.md) | **Master backlog** — semua task, status, prioritas |
+| [`docs/features/`](features/) | **User stories + AC** per domain fitur |
+| [`docs/epics/`](epics/) | **Epic detail** — scope, AC, automation log per sprint |
+| [`docs/SYSTEM.md`](SYSTEM.md) | Arsitektur teknis, edge functions, env vars |
+
 ## Epics
 
 - [`docs/epics/EPIC-000-project-bootstrap.md`](epics/EPIC-000-project-bootstrap.md) — bootstrap agentic workflow
