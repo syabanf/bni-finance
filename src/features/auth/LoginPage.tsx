@@ -5,12 +5,25 @@ import { Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
-const DEMO_EMAIL = 'admin@bni-finance.com'
-const DEMO_PASSWORD = 'admin123'
+
+/**
+ * Quick sign-in credentials.
+ *  - Mock mode: any credentials work, so the built-in demo pair is used.
+ *  - Real (Supabase) mode: needs an actual account, supplied via env
+ *    (VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD) — e.g. set on the Vercel preview
+ *    deployment. When they're absent the button simply doesn't render.
+ *
+ * ⚠️ VITE_* values are inlined into the public bundle, so anyone can read this
+ * password. Only ever point it at a throwaway demo account.
+ */
+const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || (useMock ? 'admin@bni-finance.com' : '')
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || (useMock ? 'admin123' : '')
+const QUICK_LOGIN_ENABLED = Boolean(DEMO_EMAIL && DEMO_PASSWORD)
 
 export function LoginPage() {
   const { login, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  // Only prefill the visible fields in mock mode — never a real demo password.
   const [email, setEmail] = useState(useMock ? DEMO_EMAIL : '')
   const [password, setPassword] = useState(useMock ? DEMO_PASSWORD : '')
   const [error, setError] = useState<string | null>(null)
@@ -127,7 +140,7 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {useMock && (
+          {QUICK_LOGIN_ENABLED && (
             <>
               <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
                 <span className="h-px flex-1 bg-ink-100" />
@@ -149,9 +162,19 @@ export function LoginPage() {
               </Button>
 
               <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-3 text-xs text-ink-500">
-                <span className="font-semibold text-ink-700">Demo:</span> gunakan kredensial apa pun
-                atau klik <span className="font-medium text-ink-700">Login Cepat</span> — data berjalan
-                di atas mock repository.
+                <span className="font-semibold text-ink-700">Demo:</span>{' '}
+                {useMock ? (
+                  <>
+                    gunakan kredensial apa pun atau klik{' '}
+                    <span className="font-medium text-ink-700">Login Cepat</span> — data berjalan di
+                    atas mock repository.
+                  </>
+                ) : (
+                  <>
+                    klik <span className="font-medium text-ink-700">Login Cepat</span> untuk masuk
+                    dengan akun demo ({DEMO_EMAIL}).
+                  </>
+                )}
               </div>
             </>
           )}
