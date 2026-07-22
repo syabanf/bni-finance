@@ -80,7 +80,8 @@ backend/
     ├── audit/                 # jejak invoice (baca + catatan manual)
     ├── dashboard/             # agregat KPI, read-only
     ├── upload/                # bukti pembayaran di disk
-    └── publicpay/             # halaman bayar publik + Xendit
+    ├── publicpay/             # halaman bayar publik + Xendit
+    └── apidocs/               # spesifikasi OpenAPI + halaman /docs
 ```
 
 Setiap resource didaftarkan lewat `api.Services`. Field yang `nil` tidak
@@ -94,7 +95,43 @@ didaftarkan — itulah yang membuat test bisa menyalakan sebagian saja.
 
 ---
 
+## 📘 Dokumentasi API
+
+Spesifikasi **OpenAPI 3.1** lengkap ada di
+[`internal/apidocs/openapi.yaml`](internal/apidocs/openapi.yaml) — 47 operasi,
+37 skema, beserta aturan bisnis dan kode galat tiap endpoint.
+
+Server menyajikannya sendiri (tanpa token):
+
+| URL | Isi |
+|---|---|
+| `/docs` | Referensi yang bisa dibaca di browser, dengan pencarian |
+| `/openapi.yaml` | Spesifikasi — arahkan Postman, Insomnia, atau generator klien ke sini |
+| `/openapi.json` | Bentuk JSON-nya, yang dirender halaman `/docs` |
+
+Ketiganya **tertanam di dalam binary**, dan halaman `/docs` sepenuhnya mandiri —
+tanpa CDN, tanpa renderer eksternal. Dokumentasi yang butuh internet akan mati
+justru ketika Anda sedang menelusuri masalah tanpa koneksi.
+
+Setelah mengubah `openapi.yaml`:
+
+```bash
+make docs    # hasilkan ulang openapi.json
+```
+
+> **Dokumentasi ini diuji, bukan sekadar ditulis.** `internal/apidocs`
+> membandingkan spesifikasi dengan rute yang benar-benar terdaftar — dibaca dari
+> kode sumber dengan `go/ast`, karena `http.ServeMux` tidak bisa mendaftar
+> polanya. Endpoint yang ditambahkan tanpa didokumentasikan **menggagalkan
+> test**, begitu pula endpoint yang didokumentasikan tapi tidak ada. Test
+> ketiga memastikan setiap rute tanpa autentikasi memang menandai
+> `security: []`, sehingga tidak ada endpoint yang diam-diam terbuka.
+
+---
+
 ## 🔌 Endpoint
+
+Ringkasan di bawah untuk orientasi cepat; detail lengkapnya di `/docs`.
 
 Base URL: `/api/v1`. Semua respons JSON **camelCase**, sama seperti tipe di
 `../src/types`, sehingga bisa langsung dipakai klien TypeScript.
@@ -207,7 +244,12 @@ Setiap member dibaca beserta chapter-nya (`LEFT JOIN`), jadi bentuknya sama deng
 | `POST` | `/webhooks/xendit` | Callback Xendit — butuh `x-callback-token` |
 
 ### Lain-lain
-`GET /healthz` — cek kesehatan + ping database (tanpa autentikasi).
+
+| Method | Path | Keterangan |
+|---|---|---|
+| `GET` | `/healthz` | Cek kesehatan + ping database (tanpa autentikasi) |
+| `GET` | `/docs` | Dokumentasi API di browser |
+| `GET` | `/openapi.yaml` · `/openapi.json` | Spesifikasi OpenAPI 3.1 |
 
 ---
 
@@ -382,6 +424,11 @@ paralel atas satu invoice yang berakhir `paid` dengan **tepat satu** entri audit
 tanpa token (didaftar satu per satu, bukan sampel), token kedaluwarsa/asing/rusak
 ditolak, peran `user` mendapat 403 pada setiap penulisan tapi 200 pada setiap
 pembacaan, dan rute publik tetap terbuka.
+
+**Dokumentasi** dijaga tiga test: setiap rute terdaftar harus ada di
+spesifikasi, setiap operasi terdokumentasi harus benar-benar dilayani, dan
+setiap rute tanpa autentikasi harus menandainya secara eksplisit. Ketiganya
+sudah dibuktikan gagal saat drift-nya sengaja dibuat.
 
 > Unit test tidak bisa menangkap SQL yang salah — bagi Go, query hanyalah string.
 > Dua bug nyata lolos persis lewat celah itu (`FILTER` menempel pada `coalesce()`,

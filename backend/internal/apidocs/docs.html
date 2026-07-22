@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BNI Finance API</title>
+<style>
+  /* Everything is inline: the page must work with no network access. */
+  :root {
+    --bg: #ffffff;      --panel: #f8fafc;   --border: #e2e8f0;
+    --ink: #0f172a;     --muted: #64748b;   --brand: #e2231a;
+    --get: #0369a1;     --post: #15803d;    --patch: #b45309;
+    --put: #7c3aed;     --delete: #b91c1c;  --code-bg: #f1f5f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1120;    --panel: #111827;   --border: #1f2937;
+      --ink: #e5e7eb;   --muted: #94a3b8;   --brand: #f87171;
+      --get: #38bdf8;   --post: #4ade80;    --patch: #fbbf24;
+      --put: #c084fc;   --delete: #f87171;  --code-bg: #1e293b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 16px 24px; display: flex; flex-wrap: wrap;
+    gap: 12px; align-items: baseline;
+  }
+  header h1 { margin: 0; font-size: 18px; }
+  header .ver { color: var(--muted); font-size: 13px; }
+  header .spacer { flex: 1; }
+  header a { color: var(--brand); font-size: 13px; text-decoration: none; margin-left: 14px; }
+  header a:hover { text-decoration: underline; }
+
+  #filter {
+    width: 100%; max-width: 320px; padding: 7px 11px; font: inherit; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 7px;
+    background: var(--panel); color: var(--ink);
+  }
+
+  main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+  .intro { color: var(--muted); }
+  .intro h2 { color: var(--ink); font-size: 15px; margin: 22px 0 6px; }
+  .intro table { border-collapse: collapse; margin: 8px 0; }
+  .intro td, .intro th {
+    border: 1px solid var(--border); padding: 5px 11px; text-align: left; font-size: 14px;
+  }
+  .intro code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .intro pre {
+    background: var(--code-bg); padding: 11px 13px; border-radius: 7px;
+    overflow-x: auto; font-size: 13px;
+  }
+
+  h2.tag {
+    margin: 34px 0 4px; padding-bottom: 7px;
+    border-bottom: 2px solid var(--border); font-size: 20px;
+  }
+  .tagdesc { color: var(--muted); margin: 0 0 14px; font-size: 14px; }
+
+  details.op {
+    border: 1px solid var(--border); border-radius: 9px;
+    margin-bottom: 9px; background: var(--panel); overflow: hidden;
+  }
+  details.op[open] { background: var(--bg); }
+  summary {
+    cursor: pointer; padding: 11px 14px; display: flex;
+    gap: 11px; align-items: center; flex-wrap: wrap; list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary:hover { background: var(--code-bg); }
+
+  .method {
+    font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    padding: 3px 8px; border-radius: 5px; color: #fff; min-width: 62px; text-align: center;
+  }
+  .method.get { background: var(--get); }
+  .method.post { background: var(--post); }
+  .method.patch { background: var(--patch); }
+  .method.put { background: var(--put); }
+  .method.delete { background: var(--delete); }
+
+  .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+  .path .param { color: var(--brand); }
+  .sum { color: var(--muted); font-size: 14px; flex: 1; min-width: 180px; }
+
+  .badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  }
+  .badge.admin { border-color: var(--patch); color: var(--patch); }
+  .badge.public { border-color: var(--post); color: var(--post); }
+
+  .body { padding: 4px 14px 16px; border-top: 1px solid var(--border); }
+  .body h4 { margin: 16px 0 6px; font-size: 13px; text-transform: uppercase;
+             letter-spacing: .6px; color: var(--muted); }
+  .body p { margin: 8px 0; }
+  .body code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  .body pre {
+    background: var(--code-bg); padding: 11px 13px; border-radius: 7px;
+    overflow-x: auto; font-size: 13px; margin: 6px 0;
+  }
+  table.grid { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.grid th, table.grid td {
+    border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top;
+  }
+  table.grid th { background: var(--code-bg); font-size: 12px;
+                  text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+  .req { color: var(--brand); font-weight: 600; }
+  .status { font-weight: 600; }
+  .status.ok { color: var(--post); }
+  .status.err { color: var(--delete); }
+  .empty { color: var(--muted); padding: 28px 0; text-align: center; }
+  footer { color: var(--muted); font-size: 13px; padding: 30px 24px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>BNI Finance API</h1>
+  <span class="ver" id="version"></span>
+  <span class="spacer"></span>
+  <input id="filter" type="search" placeholder="Cari endpoint… (mis. invoice, POST, audit)" autocomplete="off">
+  <a href="/openapi.yaml">openapi.yaml</a>
+  <a href="/openapi.json">openapi.json</a>
+</header>
+
+<main>
+  <div class="intro" id="intro"></div>
+  <div id="content"></div>
+  <p class="empty" id="empty" hidden>Tidak ada endpoint yang cocok.</p>
+</main>
+
+<footer>Dihasilkan dari <code>internal/apidocs/openapi.yaml</code> — jalankan <code>make docs</code> setelah mengubahnya.</footer>
+
+<script>
+// Deliberately dependency-free. A docs page that needs a CDN is a docs page
+// that breaks exactly when you are offline debugging the server.
+
+const el = (tag, props = {}, ...kids) => {
+  const n = Object.assign(document.createElement(tag), props);
+  for (const k of kids.flat()) n.append(k?.nodeType ? k : document.createTextNode(k ?? ''));
+  return n;
+};
+
+/** Minimal Markdown → HTML: only what the spec descriptions actually use. */
+function md(text) {
+  if (!text) return '';
+  const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // Fenced blocks are pulled out first and put back last, so their contents are
+  // never touched by the inline rules. The placeholder is delimited by control
+  // characters: a sentinel made of ordinary characters can collide with real
+  // prose — " 12 " looks exactly like an index if you use spaces and digits.
+  const BLOCK = (i) => '\x01B' + i + '\x01';
+  const blocks = [];
+  let html = esc(text)
+    .replace(/```[a-z]*\n([\s\S]*?)```/g,
+      (_, code) => BLOCK(blocks.push('<pre>' + code.trimEnd() + '</pre>') - 1))
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // Markdown tables, which the intro uses for the role matrix.
+  html = html.replace(/((?:^\|.*\|\s*$\n?)+)/gm, (table) => {
+    const rows = table.trim().split('\n').map((r) => r.trim());
+    if (rows.length < 2 || !/^\|[\s\-|:]+\|$/.test(rows[1])) return table;
+    const cells = (r, tag) =>
+      '<tr>' + r.slice(1, -1).split('|').map((c) => '<' + tag + '>' + c.trim() + '</' + tag + '>').join('') + '</tr>';
+    return '<table>' + cells(rows[0], 'th') +
+      rows.slice(2).map((r) => cells(r, 'td')).join('') + '</table>';
+  });
+
+  html = html
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .split(/\n{2,}/)
+    .map((para) => {
+      const t = para.trim();
+      // A lone placeholder is a block element — wrapping it in <p> would nest a
+      // <pre> inside a <p>, which browsers silently un-nest.
+      if (!t || /^\x01B\d+\x01$/.test(t)) return t;
+      return /^<(h2|table|ul)/.test(t) ? t : '<p>' + t.replace(/\n/g, ' ') + '</p>';
+    })
+    .join('');
+  return html.replace(/\x01B(\d+)\x01/g, (_, i) => blocks[+i] ?? '');
+}
+
+/** Resolves a local $ref one level; enough for the shapes this spec uses. */
+function deref(spec, node) {
+  let guard = 0;
+  while (node && node.$ref && guard++ < 10) {
+    node = node.$ref.slice(2).split('/').reduce((acc, k) => acc?.[k], spec);
+  }
+  return node;
+}
+
+/** A readable one-line type for a schema. */
+function typeName(spec, schema) {
+  if (!schema) return '';
+  if (schema.$ref) return schema.$ref.split('/').pop();
+  if (schema.allOf) return schema.allOf.map((s) => typeName(spec, s)).filter(Boolean).join(' + ');
+  if (schema.type === 'array') return `${typeName(spec, schema.items) || 'any'}[]`;
+  if (schema.enum) return schema.enum.join(' | ');
+  const t = Array.isArray(schema.type) ? schema.type.join(' | ') : schema.type;
+  return schema.format ? `${t} (${schema.format})` : (t || '');
+}
+
+/** Flattens allOf so inherited properties show up in the field table. */
+function properties(spec, schema) {
+  schema = deref(spec, schema);
+  if (!schema) return { props: {}, required: [] };
+  if (schema.allOf) {
+    const merged = { props: {}, required: [] };
+    for (const part of schema.allOf) {
+      const sub = properties(spec, part);
+      Object.assign(merged.props, sub.props);
+      merged.required.push(...sub.required);
+    }
+    return merged;
+  }
+  if (schema.type === 'array') return properties(spec, schema.items);
+  return { props: schema.properties || {}, required: schema.required || [] };
+}
+
+function fieldTable(spec, schema) {
+  const { props, required } = properties(spec, schema);
+  const names = Object.keys(props);
+  if (!names.length) return null;
+
+  const rows = names.map((name) => {
+    const p = deref(spec, props[name]) || props[name];
+    const isReq = required.includes(name);
+    return el('tr', {},
+      el('td', {},
+        el('code', {}, name),
+        isReq ? el('span', { className: 'req' }, ' *') : ''),
+      el('td', {}, el('span', { className: 'mono' }, typeName(spec, props[name]) || typeName(spec, p))),
+      el('td', { innerHTML: md(p.description || '') + (p.default !== undefined ? ` <code>default: ${p.default}</code>` : '') }),
+    );
+  });
+  return el('table', { className: 'grid' },
+    el('thead', {}, el('tr', {}, el('th', {}, 'Field'), el('th', {}, 'Tipe'), el('th', {}, 'Keterangan'))),
+    el('tbody', {}, rows));
+}
+
+function renderOperation(spec, path, method, op) {
+  const isPublic = Array.isArray(op.security) && op.security.length === 0;
+  const isAdmin = /Admin saja/i.test(op.description || '');
+
+  const pathNode = el('span', { className: 'path' });
+  for (const part of path.split(/(\{[^}]+\})/)) {
+    pathNode.append(part.startsWith('{')
+      ? el('span', { className: 'param' }, part)
+      : document.createTextNode(part));
+  }
+
+  const summary = el('summary', {},
+    el('span', { className: `method ${method}` }, method.toUpperCase()),
+    pathNode,
+    el('span', { className: 'sum' }, op.summary || ''),
+    isPublic ? el('span', { className: 'badge public' }, 'tanpa token') : '',
+    isAdmin ? el('span', { className: 'badge admin' }, 'admin') : '',
+  );
+
+  const body = el('div', { className: 'body' });
+  if (op.description) body.append(el('div', { innerHTML: md(op.description) }));
+
+  const params = (op.parameters || []).map((p) => deref(spec, p)).filter(Boolean);
+  if (params.length) {
+    body.append(el('h4', {}, 'Parameter'));
+    body.append(el('table', { className: 'grid' },
+      el('thead', {}, el('tr', {},
+        el('th', {}, 'Nama'), el('th', {}, 'Di'), el('th', {}, 'Tipe'), el('th', {}, 'Keterangan'))),
+      el('tbody', {}, params.map((p) => el('tr', {},
+        el('td', {}, el('code', {}, p.name), p.required ? el('span', { className: 'req' }, ' *') : ''),
+        el('td', {}, p.in),
+        el('td', {}, el('span', { className: 'mono' }, typeName(spec, p.schema))),
+        el('td', { innerHTML: md(p.description || '') +
+          (p.schema?.default !== undefined ? ` <code>default: ${p.schema.default}</code>` : '') }),
+      )))));
+  }
+
+  const reqSchema = op.requestBody?.content?.['application/json']?.schema
+    || op.requestBody?.content?.['multipart/form-data']?.schema;
+  if (reqSchema) {
+    body.append(el('h4', {}, 'Body permintaan'));
+    const table = fieldTable(spec, reqSchema);
+    if (table) body.append(table);
+    const examples = op.requestBody.content['application/json']?.examples;
+    const single = op.requestBody.content['application/json']?.example;
+    if (single) body.append(el('pre', {}, JSON.stringify(single, null, 2)));
+    for (const key in examples || {}) {
+      body.append(el('h4', {}, examples[key].summary || key));
+      body.append(el('pre', {}, JSON.stringify(examples[key].value, null, 2)));
+    }
+  }
+
+  body.append(el('h4', {}, 'Respons'));
+  body.append(el('table', { className: 'grid' },
+    el('thead', {}, el('tr', {}, el('th', {}, 'Kode'), el('th', {}, 'Bentuk'), el('th', {}, 'Keterangan'))),
+    el('tbody', {}, Object.entries(op.responses || {}).map(([code, raw]) => {
+      const res = deref(spec, raw) || {};
+      const schema = res.content?.['application/json']?.schema;
+      return el('tr', {},
+        el('td', {}, el('span', { className: `status ${code < '400' ? 'ok' : 'err'}` }, code)),
+        el('td', {}, el('span', { className: 'mono' }, schema ? typeName(spec, schema) || 'object' : '—')),
+        el('td', { innerHTML: md(res.description || '') }));
+    }))));
+
+  const detail = el('details', { className: 'op' }, summary, body);
+  detail.dataset.search = `${method} ${path} ${op.summary || ''} ${(op.tags || []).join(' ')}`.toLowerCase();
+  return detail;
+}
+
+function render(spec) {
+  document.getElementById('version').textContent = `v${spec.info.version} · OpenAPI ${spec.openapi}`;
+  document.getElementById('intro').innerHTML = md(spec.info.description || '');
+
+  const content = document.getElementById('content');
+  const byTag = new Map((spec.tags || []).map((t) => [t.name, []]));
+  const METHODS = ['get', 'post', 'patch', 'put', 'delete'];
+
+  for (const [path, item] of Object.entries(spec.paths)) {
+    for (const method of METHODS) {
+      if (!item[method]) continue;
+      const tag = (item[method].tags || ['Lainnya'])[0];
+      if (!byTag.has(tag)) byTag.set(tag, []);
+      byTag.get(tag).push(renderOperation(spec, path, method, item[method]));
+    }
+  }
+
+  for (const [tag, ops] of byTag) {
+    if (!ops.length) continue;
+    content.append(el('h2', { className: 'tag' }, tag));
+    const desc = (spec.tags || []).find((t) => t.name === tag)?.description;
+    if (desc) content.append(el('p', { className: 'tagdesc' }, desc));
+    ops.forEach((o) => content.append(o));
+  }
+
+  const filter = document.getElementById('filter');
+  const empty = document.getElementById('empty');
+  filter.addEventListener('input', () => {
+    const term = filter.value.trim().toLowerCase();
+    let visible = 0;
+    for (const op of content.querySelectorAll('details.op')) {
+      const hit = !term || op.dataset.search.includes(term);
+      op.hidden = !hit;
+      if (hit) visible++;
+      if (term && hit) op.open = true;
+      if (!term) op.open = false;
+    }
+    // Hide a heading whose endpoints are all filtered out.
+    for (const heading of content.querySelectorAll('h2.tag')) {
+      let node = heading.nextElementSibling, any = false;
+      while (node && node.tagName !== 'H2') {
+        if (node.classList.contains('op') && !node.hidden) any = true;
+        node = node.nextElementSibling;
+      }
+      heading.hidden = !any;
+      if (heading.nextElementSibling?.classList.contains('tagdesc')) {
+        heading.nextElementSibling.hidden = !any;
+      }
+    }
+    empty.hidden = visible > 0;
+  });
+}
+
+fetch('/openapi.json')
+  .then((r) => r.json())
+  .then(render)
+  .catch((err) => {
+    document.getElementById('content').append(
+      el('p', { className: 'empty' }, `Gagal memuat spesifikasi: ${err.message}`));
+  });
+</script>
+</body>
+</html>

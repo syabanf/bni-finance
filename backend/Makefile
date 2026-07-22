@@ -1,4 +1,4 @@
-.PHONY: run build test test-integration vet tidy fmt check db-create db-schema db-seed db-reset db-drop
+.PHONY: run build test test-integration vet tidy fmt check docs db-create db-schema db-seed db-reset db-drop
 
 # --- aplikasi ---------------------------------------------------------------
 
@@ -18,6 +18,14 @@ test:     ## Jalankan unit test (integration test dilewati)
 test-integration:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "set TEST_DATABASE_URL dulu" && exit 1)
 	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test ./internal/api/ -run TestLive -v -count=1
+
+## Hasilkan ulang openapi.json dari openapi.yaml. YAML adalah sumbernya; JSON
+## yang disajikan ke halaman /docs, karena browser bisa mem-parsing JSON tanpa
+## pustaka apa pun. Jalankan setiap kali openapi.yaml berubah.
+docs:
+	@ruby -ryaml -rjson -e 'puts JSON.pretty_generate(YAML.load_file("internal/apidocs/openapi.yaml"))' \
+		> internal/apidocs/openapi.json
+	@echo "internal/apidocs/openapi.json diperbarui"
 
 vet:
 	go vet ./...

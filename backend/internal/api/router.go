@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/syabanf/bni-finance/backend/internal/apidocs"
 	"github.com/syabanf/bni-finance/backend/internal/audit"
 	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
@@ -69,6 +70,10 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 		}
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+
+	// Documentation is unauthenticated: it has to be readable while you are
+	// still working out how to authenticate.
+	apidocs.NewHandler().Register(root)
 
 	if svc.Auth != nil {
 		auth.NewHandler(svc.Auth).RegisterPublic(root)

@@ -191,8 +191,17 @@ pustaka standar (satu dependensi: driver `pgx/v5`).
 | Publik | `GET /api/v1/public/invoices/{id}` · `POST /webhooks/xendit` |
 
 Respons memakai **camelCase** yang identik dengan tipe di `src/types`, jadi bisa
-dikonsumsi klien TypeScript tanpa lapisan pemetaan. Detail — aturan bisnis, keamanan,
-dan hasil stress test — ada di [`backend/README.md`](backend/README.md).
+dikonsumsi klien TypeScript tanpa lapisan pemetaan.
+
+**Dokumentasi API** tersedia langsung dari server yang berjalan:
+
+| URL | Isi |
+|---|---|
+| `http://localhost:8080/docs` | Referensi lengkap di browser, dengan pencarian |
+| `/openapi.yaml` · `/openapi.json` | Spesifikasi OpenAPI 3.1 untuk Postman atau generator klien |
+
+Detail lain — aturan bisnis, keamanan, dan hasil stress test — ada di
+[`backend/README.md`](backend/README.md).
 
 Tiga tingkat akses: **publik** (login, halaman bayar, webhook), **login**
 (semua pembacaan), **admin** (semua penulisan). Cek peran di UI hanya

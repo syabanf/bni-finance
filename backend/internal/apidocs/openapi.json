@@ -1,0 +1,3711 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BNI Finance API",
+    "version": "1.0.0",
+    "description": "REST API untuk BNI Grow Chapter Management — invoice keanggotaan\n(pendaftaran & renewal), pembayaran, member, chapter, dan pelaporan.\n\n## Autentikasi\n\nSemua endpoint `/api/v1/**` butuh token, **kecuali** yang ditandai\n`security: []` — login, halaman bayar publik, dan webhook.\n\n```\nAuthorization: Bearer <token>\n```\n\nToken didapat dari `POST /api/v1/auth/login` dan berlaku 12 jam (bisa\ndiubah lewat `TOKEN_TTL`). Tidak ada sesi di server: token yang sudah\nditerbitkan berlaku sampai kedaluwarsa, jadi keluar (logout) cukup dengan\nmembuang token di sisi klien.\n\n## Peran\n\n| Peran | Boleh |\n|---|---|\n| `admin` | Semuanya |\n| `user` | Hanya **pembacaan** (`GET`) |\n\nSetiap penulisan oleh peran `user` dibalas **403**. Ini batas yang\nsebenarnya — cek peran di UI hanya menyembunyikan tombol.\n\n## Bentuk respons\n\nDaftar selalu memakai amplop yang sama:\n\n```json\n{ \"data\": [ … ], \"meta\": { \"total\": 47, \"limit\": 50, \"offset\": 0 } }\n```\n\n`data` selalu larik — tidak pernah `null` — meski kosong.\nGalat selalu `{ \"error\": \"pesan dalam Bahasa Indonesia\" }`.\n\nSeluruh field JSON memakai **camelCase**, sama persis dengan tipe di\n`src/types`, sehingga bisa dipakai klien TypeScript tanpa lapisan pemetaan.\n",
+    "license": {
+      "name": "Internal — BNI Grow Chapter Management"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Pengembangan lokal"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Login, profil, dan pengelolaan pengguna"
+    },
+    {
+      "name": "Invoice",
+      "description": "CRUD invoice beserta jejak auditnya"
+    },
+    {
+      "name": "Pembayaran",
+      "description": "Pencatatan pembayaran; mencatat = melunasi invoice"
+    },
+    {
+      "name": "Member",
+      "description": "Anggota chapter, termasuk yang mendekati jatuh tempo renewal"
+    },
+    {
+      "name": "Chapter",
+      "description": "Chapter BNI"
+    },
+    {
+      "name": "Pengaturan",
+      "description": "Biaya keanggotaan dan konfigurasi aplikasi"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Agregat KPI, hanya baca"
+    },
+    {
+      "name": "Unggahan",
+      "description": "Bukti pembayaran"
+    },
+    {
+      "name": "Publik",
+      "description": "Dapat diakses tanpa token — pembayar bukan pengguna aplikasi"
+    },
+    {
+      "name": "Sistem",
+      "description": "Kesehatan layanan dan dokumentasi"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": [
+
+      ]
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Masuk dan dapatkan token",
+        "description": "Email dibandingkan tanpa membedakan huruf besar/kecil.\n\nEmail tak dikenal dan kata sandi salah menghasilkan **pesan yang sama\npersis** dan waktu pemrosesan yang setara — akun tidak bisa dienumerasi\nlewat endpoint ini.\n",
+        "security": [
+
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginInput"
+              },
+              "example": {
+                "email": "admin@bnifinance.local",
+                "password": "rahasia"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "Email atau kata sandi salah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "email atau kata sandi salah"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Profil pengguna yang sedang masuk",
+        "description": "Dibaca ulang dari database, bukan dari isi token — perubahan peran\nterlihat pada request berikutnya, bukan pada login berikutnya.\n",
+        "responses": {
+          "200": {
+            "description": "Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Ubah nama sendiri",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "example": "Budi Santoso"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profil setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Ubah kata sandi sendiri",
+        "description": "`currentPassword` **wajib**. Tanpa itu, token yang dicuri sudah cukup\nuntuk mengambil alih akun secara permanen.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePasswordInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Berhasil",
+            "tanpa isi": null
+          },
+          "400": {
+            "description": "Kata sandi baru kurang dari 6 karakter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Kata sandi saat ini salah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Daftar pengguna",
+        "description": "**Admin saja.**",
+        "responses": {
+          "200": {
+            "description": "Daftar pengguna",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AuthUser"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Tambah pengguna",
+        "description": "**Admin saja.** Peran default `user` bila tidak dikirim.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pengguna dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "Email sudah terdaftar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}/role": {
+      "patch": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Ubah peran pengguna",
+        "description": "**Admin saja.** Menurunkan admin **terakhir** ditolak dengan 409 —\nitu keadaan yang tidak bisa dipulihkan lewat API.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "role"
+                ],
+                "properties": {
+                  "role": {
+                    "$ref": "#/components/schemas/UserRole"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pengguna setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Ini satu-satunya admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}/password": {
+      "put": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Reset kata sandi pengguna lain",
+        "description": "**Admin saja.** Tidak perlu kata sandi lama, tapi **tidak bisa dipakai\npada diri sendiri** — untuk itu gunakan `PUT /auth/password`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "newPassword"
+                ],
+                "properties": {
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 6
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Berhasil",
+            "tanpa isi": null
+          },
+          "400": {
+            "description": "Kata sandi terlalu pendek, atau id adalah diri sendiri",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{id}": {
+      "delete": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Hapus pengguna",
+        "description": "**Admin saja.** Menghapus diri sendiri atau admin terakhir ditolak\ndengan 409.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/UserId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Terhapus"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Akun sendiri, atau admin terakhir",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/invoices": {
+      "get": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Daftar invoice",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Salah satu status, atau `outstanding` sebagai jalan pintas untuk\n`sent` + `overdue` — sama seperti tab di UI.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "sent",
+                "paid",
+                "overdue",
+                "cancelled",
+                "outstanding"
+              ]
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/InvoiceType"
+            }
+          },
+          {
+            "name": "chapterId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "memberId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Pencarian pada **nomor invoice** saja (belum nama member).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dueFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dueTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "issuedFrom",
+            "in": "query",
+            "description": "Tanggal terbit paling awal (inklusif).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "issuedTo",
+            "in": "query",
+            "description": "Tanggal terbit paling akhir (inklusif — mencakup seluruh hari itu).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman invoice, terbaru dulu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Invoice"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Buat invoice",
+        "description": "**Admin saja.** Status awal selalu `draft`.\n\n`number` dibuat otomatis (`INV-2026-013`) bila tidak dikirim, sehingga\npemanggil tidak bisa membuat duplikat tanpa sengaja.\n\nInvoice dan entri audit pertamanya ditulis dalam **satu transaksi** —\ntidak ada invoice tanpa timeline.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvoiceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invoice dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/{id}": {
+      "get": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Detail invoice",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Ubah sebagian field invoice",
+        "description": "**Admin saja.** Hanya field yang dikirim yang ditulis.\n\n**Transisi status** mengikuti siklus di UI:\n`draft → sent → paid`, dan bisa dibatalkan selama belum lunas.\n`paid` serta `cancelled` bersifat final. Lompatan seperti\n`draft → paid` ditolak **409**.\n\nInvoice berstatus `paid` atau `cancelled` **tidak bisa diubah** nominal\nmaupun periodenya — itu catatan yang sudah tertutup.\n\nSetiap perubahan menulis satu baris audit di **transaksi yang sama**.\n`actorId`/`actorName` hanya melabeli baris audit itu; keduanya tidak\ndisimpan pada invoice.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInvoiceInput"
+              },
+              "examples": {
+                "terbitkan": {
+                  "summary": "Terbitkan (draft → sent)",
+                  "value": {
+                    "status": "sent",
+                    "actorName": "Admin BNI"
+                  }
+                },
+                "batalkan": {
+                  "summary": "Batalkan dengan alasan",
+                  "value": {
+                    "status": "cancelled",
+                    "cancelReason": "Salah member"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invoice setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Transisi status tidak diizinkan, atau invoice sudah tertutup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "transisi status tidak diizinkan: draft → paid"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Hapus invoice",
+        "description": "**Admin saja.** Invoice yang sudah punya pembayaran **tidak bisa\ndihapus** — batalkan saja, supaya riwayatnya utuh.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Terhapus"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Masih ada pembayaran yang menunjuk ke invoice ini",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/invoices/{id}/audit": {
+      "get": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Timeline invoice",
+        "description": "Terbaru dulu.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entri audit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AuditEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Invoice"
+        ],
+        "summary": "Tambah catatan manual ke timeline",
+        "description": "**Admin saja.** Hanya untuk anotasi manusia — perubahan status dicatat\notomatis oleh sistem.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuditEntryInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catatan ditambahkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "tags": [
+          "Pembayaran"
+        ],
+        "summary": "Daftar pembayaran",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "method",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "bank_transfer"
+            }
+          },
+          {
+            "name": "paidFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "paidTo",
+            "in": "query",
+            "description": "Inklusif — mencakup seluruh hari itu.",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman pembayaran, terbaru dulu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Payment"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Pembayaran"
+        ],
+        "summary": "Catat pembayaran",
+        "description": "**Admin saja.**\n\n**Mencatat pembayaran = melunasi invoice.** Keduanya terjadi dalam satu\ntransaksi dengan `SELECT … FOR UPDATE`, jadi mustahil ada pembayaran\ntercatat pada invoice yang masih belum lunas. Kirim\n`\"settleInvoice\": false` untuk hanya mencatat tanpa melunasi.\n\nInvoice yang sudah dibatalkan menolak pembayaran (**409**).\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pembayaran tercatat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "description": "Invoice tidak ditemukan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Invoice sudah dibatalkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/{id}": {
+      "get": {
+        "tags": [
+          "Pembayaran"
+        ],
+        "summary": "Detail pembayaran",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pembayaran",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Pembayaran"
+        ],
+        "summary": "Ubah sebagian field pembayaran",
+        "description": "**Admin saja.**",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pembayaran setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Payment"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Pembayaran"
+        ],
+        "summary": "Hapus pembayaran",
+        "description": "**Admin saja.** Perhatikan: ini **tidak** mengembalikan status invoice\ndari `paid`.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PaymentId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Terhapus"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/members": {
+      "get": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Daftar member",
+        "description": "Setiap member dibaca beserta chapter-nya (`LEFT JOIN`) — bentuknya sama\ndengan `MemberWithChapter` di frontend, jadi tidak perlu request kedua.\n",
+        "parameters": [
+          {
+            "name": "chapterId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/MemberStatus"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Pencarian pada nama, email, atau perusahaan.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "renewalFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "renewalTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman member, urut nama",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Member"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nilai `status` tidak dikenal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Tambah member",
+        "description": "**Admin saja.** `id` opsional — database membuatkan bila kosong, yang\ntepat untuk member yang tidak berasal dari BNI VM.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMemberInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Member dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Input tidak valid, atau `chapterId` tidak ada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "`id` sudah dipakai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/members/renewal-due": {
+      "get": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Member yang keanggotaannya segera berakhir",
+        "description": "Hanya member **aktif** dengan `renewalDate` antara hari ini dan\n`days` hari ke depan. Diurutkan dari yang paling dekat.\n",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365,
+              "default": 30
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Member yang jatuh tempo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/RenewalDueMember"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/members/{id}": {
+      "get": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Detail member",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MemberId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Member beserta chapter-nya",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Ubah sebagian field member",
+        "description": "**Admin saja.**",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MemberId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemberInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Member setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Member"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Hapus member",
+        "description": "**Admin saja.** Member yang punya invoice tidak bisa dihapus — ubah\nstatusnya menjadi `inactive` supaya riwayat tagihannya utuh.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/MemberId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Terhapus"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Member masih punya invoice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chapters": {
+      "get": {
+        "tags": [
+          "Chapter"
+        ],
+        "summary": "Daftar chapter",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Pencarian pada nama, nama tampilan, atau kota.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cityName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "areaName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Offset"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman chapter, urut nama tampilan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Chapter"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Chapter"
+        ],
+        "summary": "Tambah chapter",
+        "description": "**Admin saja.** `displayName` jatuh ke `name` bila tidak dikirim.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChapterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chapter dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chapter"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "description": "`id` sudah dipakai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/chapters/{id}": {
+      "get": {
+        "tags": [
+          "Chapter"
+        ],
+        "summary": "Detail chapter",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChapterId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chapter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chapter"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Chapter"
+        ],
+        "summary": "Ubah sebagian field chapter",
+        "description": "**Admin saja.**",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChapterId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateChapterInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Chapter setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Chapter"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Chapter"
+        ],
+        "summary": "Hapus chapter",
+        "description": "**Admin saja.** Ditolak **409** bila masih dirujuk member atau invoice —\nbeserta jumlahnya, alih-alih pelanggaran foreign key yang membingungkan.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ChapterId"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Terhapus"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Masih dipakai member atau invoice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "chapter masih dipakai oleh 4 member dan 12 invoice — pindahkan dulu sebelum menghapus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fee-settings": {
+      "get": {
+        "tags": [
+          "Pengaturan"
+        ],
+        "summary": "Biaya keanggotaan yang berlaku",
+        "responses": {
+          "200": {
+            "description": "Biaya",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Pengaturan"
+        ],
+        "summary": "Ubah biaya",
+        "description": "**Admin saja.** Body kosong ditolak **400** alih-alih diam-diam tidak\nmelakukan apa-apa.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFeeSettingsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Biaya setelah diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeeSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/app-settings": {
+      "get": {
+        "tags": [
+          "Pengaturan"
+        ],
+        "summary": "Semua konfigurasi key/value",
+        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n",
+        "responses": {
+          "200": {
+            "description": "Konfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AppSetting"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/app-settings/{key}": {
+      "get": {
+        "tags": [
+          "Pengaturan"
+        ],
+        "summary": "Satu konfigurasi",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SettingKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Konfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSetting"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Pengaturan"
+        ],
+        "summary": "Simpan konfigurasi (upsert)",
+        "description": "**Admin saja.** Tabel ini adalah sumber kebenaran untuk feature flag\nseperti `self_payment_mode`, jadi penulisan tidak bergantung pada\nbarisnya sudah ada atau belum.\n\nMengirim balik nilai tersamar (`••••••`) ditolak **400**, supaya tidak\nada yang menimpa kredensial asli dengan tanda bintang.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SettingKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "value"
+                ],
+                "properties": {
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "value": "true"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Konfigurasi setelah disimpan (tersamar bila rahasia)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppSetting"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Pengaturan"
+        ],
+        "summary": "Hapus konfigurasi",
+        "description": "**Admin saja.**",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/SettingKey"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Terhapus"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard/summary": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Agregat KPI",
+        "description": "Bentuknya persis `DashboardSummary` di frontend.\n\nAngka `trend` membandingkan **30 hari terakhir** dengan 30 hari\nsebelumnya, dibulatkan satu desimal. Pertumbuhan dari nol dilaporkan\n`+100`, bukan tak hingga.\n",
+        "parameters": [
+          {
+            "name": "months",
+            "in": "query",
+            "description": "Panjang grafik tren bulanan.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24,
+              "default": 6
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ringkasan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/uploads": {
+      "post": {
+        "tags": [
+          "Unggahan"
+        ],
+        "summary": "Unggah bukti pembayaran",
+        "description": "**Admin saja.** Menerima JPG, PNG, WebP, HEIC, dan PDF — allowlist,\nbukan blocklist.\n\nNama berkas **dibuat server**, tidak pernah diambil dari klien: nama\npilihan pemanggil adalah jalan menuju path traversal atau berkas\ntertimpa. Batas ukuran default 5 MB (`MAX_UPLOAD_SIZE`).\n\nSimpan `url` yang dikembalikan pada `proofUrl` saat mencatat pembayaran.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Berkas tersimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "example": "/uploads/20260722-5a10601f9a8e.png"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tipe tidak didukung, berkas kosong, atau melebihi batas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/uploads/{filename}": {
+      "get": {
+        "tags": [
+          "Unggahan"
+        ],
+        "summary": "Ambil berkas yang tersimpan",
+        "description": "**Tanpa token.** URL sengaja dibuat tak tertebak alih-alih dijaga\nautentikasi, karena halaman bayar publik harus bisa menampilkannya\nuntuk orang yang tidak punya akun. Direktori tidak bisa dijelajahi.\n",
+        "security": [
+
+        ],
+        "parameters": [
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Isi berkas",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/public/invoices/{id}": {
+      "get": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Invoice untuk halaman pembayaran",
+        "description": "**Tanpa token** — pembayar bukan pengguna aplikasi.\n\nProyeksinya sempit dengan sengaja: hanya **nama** member, tidak pernah\nemail, telepon, perusahaan, atau bidang usaha. Penyaringan terjadi di\nserver, sehingga data pribadi tidak bisa bocor ke siapa pun yang\nmemegang tautannya.\n",
+        "security": [
+
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invoice publik + status Self Payment Mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicInvoiceView"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/api/v1/public/invoices/{id}/payment": {
+      "post": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Buat pembayaran Xendit (VA / QRIS)",
+        "description": "**Tanpa token.**\n\nSelf Payment Mode diperiksa ulang **di server**, bukan dipercaya dari\nklien: mematikan sakelar harus benar-benar menghentikan pembuatan\ntagihan, bukan sekadar menyembunyikan tombolnya.\n\nReferensi Xendit dibuat baru setiap kali, karena Xendit menolak\n`external_id` yang masih punya VA atau QR aktif.\n\nQRIS dibatasi Rp 10.000.000 per transaksi oleh Xendit — di atas itu\nbalasannya **422** dan pemanggil harus memakai Virtual Account.\n",
+        "security": [
+
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "method"
+                ],
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "va",
+                      "qris"
+                    ]
+                  },
+                  "bank": {
+                    "type": "string",
+                    "enum": [
+                      "BCA",
+                      "BNI",
+                      "MANDIRI",
+                      "BRI"
+                    ],
+                    "description": "Wajib bila `method` = `va`."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tagihan dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaymentResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "description": "Pembayaran mandiri sedang dinonaktifkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Invoice sudah lunas atau dibatalkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Nominal melebihi batas QRIS",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Gateway pembayaran menolak atau tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Gateway pembayaran belum dikonfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/xendit": {
+      "post": {
+        "tags": [
+          "Publik"
+        ],
+        "summary": "Callback pembayaran dari Xendit",
+        "description": "Diautentikasi dengan header `x-callback-token`, dibandingkan\nconstant-time. Token yang belum dikonfigurasi menolak **setiap**\ncallback, bukan menerima semuanya.\n\n**Idempoten**: Xendit mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa membuat baris pembayaran\nkedua.\n\nEvent yang bukan pembayaran selesai dijawab **200** dengan\n`settled: false` — membalas non-2xx hanya membuat Xendit mengulang\nperistiwa yang memang sengaja tidak ditindaklanjuti.\n",
+        "security": [
+
+        ],
+        "parameters": [
+          {
+            "name": "x-callback-token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/XenditWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Callback diterima",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settled": {
+                      "type": "boolean",
+                      "description": "Apakah callback ini benar-benar melunasi invoice."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "Callback token tidak valid atau belum dikonfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tidak ada invoice dengan referensi tersebut",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Sistem"
+        ],
+        "summary": "Cek kesehatan",
+        "description": "Tanpa autentikasi, supaya probe tidak perlu kredensial.",
+        "security": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "Layanan dan database siap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "database tidak siap"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.yaml": {
+      "get": {
+        "tags": [
+          "Sistem"
+        ],
+        "summary": "Spesifikasi OpenAPI ini",
+        "security": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "Spesifikasi",
+            "content": {
+              "application/yaml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "tags": [
+          "Sistem"
+        ],
+        "summary": "Spesifikasi yang sama dalam bentuk JSON",
+        "description": "Dihasilkan dari YAML oleh `make docs`. Halaman `/docs` merender bentuk\nini, karena browser bisa mem-parsing JSON tanpa pustaka apa pun.\n",
+        "security": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "Spesifikasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "tags": [
+          "Sistem"
+        ],
+        "summary": "Dokumentasi API yang bisa dibaca di browser",
+        "description": "Halaman mandiri — seluruh CSS dan JS tertanam, jadi tetap berfungsi\ntanpa koneksi jaringan.\n",
+        "security": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "Halaman HTML",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Token dari `POST /api/v1/auth/login`."
+      }
+    },
+    "parameters": {
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "InvoiceId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "UUID invoice. Format yang salah dijawab 404, bukan 500.",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "PaymentId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "MemberId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "ChapterId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "UserId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "SettingKey": {
+        "name": "key",
+        "in": "path",
+        "required": true,
+        "description": "Dinormalkan menjadi huruf kecil.",
+        "schema": {
+          "type": "string",
+          "example": "self_payment_mode"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Input tidak valid",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Token tidak disertakan, tidak valid, atau sudah kedaluwarsa",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "examples": {
+              "tanpaToken": {
+                "value": {
+                  "error": "token tidak disertakan"
+                }
+              },
+              "kedaluwarsa": {
+                "value": {
+                  "error": "sesi sudah berakhir — masuk kembali"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Butuh peran admin",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "butuh akses admin"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Data tidak ditemukan",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "data tidak ditemukan"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Pesan dalam Bahasa Indonesia."
+          }
+        }
+      },
+      "ListEnvelope": {
+        "type": "object",
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "description": "Selalu larik — tidak pernah `null`, meski kosong.",
+            "items": {
+            }
+          },
+          "meta": {
+            "type": "object",
+            "required": [
+              "total",
+              "limit",
+              "offset"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer",
+                "description": "Jumlah baris yang cocok dengan filter, bukan hanya halaman ini."
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "user"
+        ]
+      },
+      "AuthUser": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          }
+        }
+      },
+      "LoginInput": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResult": {
+        "type": "object",
+        "required": [
+          "token",
+          "expiresAt",
+          "user"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "JWT HS256. Kirim sebagai `Authorization: Bearer <token>`."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        }
+      },
+      "CreateUserInput": {
+        "type": "object",
+        "required": [
+          "email",
+          "password",
+          "name"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserRole"
+              }
+            ],
+            "default": "user"
+          }
+        }
+      },
+      "UpdatePasswordInput": {
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 6
+          }
+        }
+      },
+      "InvoiceType": {
+        "type": "string",
+        "enum": [
+          "registration",
+          "renewal"
+        ]
+      },
+      "InvoiceStatus": {
+        "type": "string",
+        "enum": [
+          "draft",
+          "sent",
+          "paid",
+          "overdue",
+          "cancelled"
+        ]
+      },
+      "Invoice": {
+        "type": "object",
+        "required": [
+          "id",
+          "number",
+          "memberId",
+          "chapterId",
+          "type",
+          "amount",
+          "currency",
+          "dueDate",
+          "periodStart",
+          "periodEnd",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "example": "INV-2026-013"
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/InvoiceType"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Rupiah penuh. Kolomnya `integer` — maks ~Rp 2,14 miliar per baris."
+          },
+          "currency": {
+            "type": "string",
+            "default": "IDR"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvoiceStatus"
+          },
+          "paperIdInvoiceId": {
+            "type": "string"
+          },
+          "paperIdInvoiceUrl": {
+            "type": "string"
+          },
+          "paperIdPaymentUrl": {
+            "type": "string"
+          },
+          "paperIdSentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentProvider": {
+            "type": "string",
+            "example": "xendit"
+          },
+          "xenditExternalId": {
+            "type": "string"
+          },
+          "xenditPaymentId": {
+            "type": "string"
+          },
+          "xenditPaymentMethod": {
+            "type": "string",
+            "enum": [
+              "va",
+              "qris"
+            ]
+          },
+          "xenditVaBank": {
+            "type": "string"
+          },
+          "xenditVaNumber": {
+            "type": "string"
+          },
+          "xenditQrisString": {
+            "type": "string"
+          },
+          "xenditPaymentStatus": {
+            "type": "string"
+          },
+          "xenditExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paidAmount": {
+            "type": "integer"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "cancelledBy": {
+            "type": "string"
+          },
+          "cancelledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cancelReason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateInvoiceInput": {
+        "type": "object",
+        "required": [
+          "memberId",
+          "chapterId",
+          "type",
+          "amount",
+          "dueDate",
+          "periodStart",
+          "periodEnd"
+        ],
+        "properties": {
+          "number": {
+            "type": "string",
+            "description": "Dibuat otomatis bila kosong."
+          },
+          "memberId": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/InvoiceType"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "currency": {
+            "type": "string",
+            "default": "IDR"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date",
+            "description": "Tidak boleh lebih awal dari `periodStart`."
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateInvoiceInput": {
+        "type": "object",
+        "description": "Hanya field yang dikirim yang ditulis.",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvoiceStatus"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "cancelReason": {
+            "type": "string"
+          },
+          "cancelledBy": {
+            "type": "string"
+          },
+          "paperIdInvoiceId": {
+            "type": "string"
+          },
+          "paperIdInvoiceUrl": {
+            "type": "string"
+          },
+          "paperIdPaymentUrl": {
+            "type": "string"
+          },
+          "paperIdSentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorId": {
+            "type": "string",
+            "description": "Hanya melabeli baris audit; tidak disimpan pada invoice."
+          },
+          "actorName": {
+            "type": "string",
+            "description": "Hanya melabeli baris audit; tidak disimpan pada invoice."
+          }
+        }
+      },
+      "AuditAction": {
+        "type": "string",
+        "enum": [
+          "created",
+          "sent",
+          "paid",
+          "cancelled",
+          "overdue",
+          "updated"
+        ]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "invoiceId",
+          "action",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "$ref": "#/components/schemas/AuditAction"
+          },
+          "oldStatus": {
+            "$ref": "#/components/schemas/InvoiceStatus"
+          },
+          "newStatus": {
+            "$ref": "#/components/schemas/InvoiceStatus"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateAuditEntryInput": {
+        "type": "object",
+        "required": [
+          "notes"
+        ],
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuditAction"
+              }
+            ],
+            "default": "updated"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "Payment": {
+        "type": "object",
+        "required": [
+          "id",
+          "invoiceId",
+          "amount",
+          "paidAt",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "example": "bank_transfer"
+          },
+          "paperIdPaymentId": {
+            "type": "string"
+          },
+          "paperIdStatus": {
+            "type": "string"
+          },
+          "xenditPaymentId": {
+            "type": "string"
+          },
+          "xenditStatus": {
+            "type": "string"
+          },
+          "proofUrl": {
+            "type": "string",
+            "description": "Path dari `POST /uploads`, mis. `/uploads/2026….png`."
+          },
+          "note": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreatePaymentInput": {
+        "type": "object",
+        "required": [
+          "invoiceId",
+          "amount"
+        ],
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Default waktu server."
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "proofUrl": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "settleInvoice": {
+            "type": "boolean",
+            "default": true,
+            "description": "Kirim `false` untuk mencatat tanpa melunasi invoice."
+          }
+        }
+      },
+      "UpdatePaymentInput": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paymentMethod": {
+            "type": "string"
+          },
+          "proofUrl": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "MemberStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "inactive",
+          "pending"
+        ]
+      },
+      "Chapter": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "displayName",
+          "syncedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "ch-garuda"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "areaName": {
+            "type": "string"
+          },
+          "cityName": {
+            "type": "string"
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CreateChapterInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Dibuatkan database bila kosong."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Jatuh ke `name` bila kosong."
+          },
+          "areaName": {
+            "type": "string"
+          },
+          "cityName": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateChapterInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "areaName": {
+            "type": "string"
+          },
+          "cityName": {
+            "type": "string"
+          }
+        }
+      },
+      "Member": {
+        "type": "object",
+        "required": [
+          "id",
+          "chapterId",
+          "name",
+          "status",
+          "joinedDate",
+          "renewalDate",
+          "syncedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "businessField": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberStatus"
+          },
+          "joinedDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "renewalDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "chapter": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Chapter"
+              }
+            ],
+            "description": "Diisi lewat LEFT JOIN, jadi tidak perlu request kedua."
+          }
+        }
+      },
+      "RenewalDueMember": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Member"
+          },
+          {
+            "type": "object",
+            "required": [
+              "daysUntilDue"
+            ],
+            "properties": {
+              "daysUntilDue": {
+                "type": "integer",
+                "description": "Sisa hari sampai keanggotaan berakhir."
+              }
+            }
+          }
+        ]
+      },
+      "CreateMemberInput": {
+        "type": "object",
+        "required": [
+          "chapterId",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Dibuatkan database bila kosong."
+          },
+          "chapterId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "businessField": {
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MemberStatus"
+              }
+            ],
+            "default": "active"
+          },
+          "joinedDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "UpdateMemberInput": {
+        "type": "object",
+        "properties": {
+          "chapterId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "businessField": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/MemberStatus"
+          },
+          "joinedDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "FeeSettings": {
+        "type": "object",
+        "required": [
+          "id",
+          "registrationFee",
+          "renewalFee",
+          "currency",
+          "updatedAt",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "default": "default"
+          },
+          "registrationFee": {
+            "type": "integer"
+          },
+          "renewalFee": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "default": "IDR"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UpdateFeeSettingsInput": {
+        "type": "object",
+        "description": "Minimal satu field harus dikirim.",
+        "properties": {
+          "registrationFee": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "renewalFee": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        }
+      },
+      "AppSetting": {
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "self_payment_mode"
+          },
+          "value": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "masked": {
+            "type": "boolean",
+            "description": "`true` bila `value` disamarkan menjadi `••••••` karena nama key-nya\nmengandung `token`, `secret`, `password`, `apikey`, `credential`,\natau `private`. Nilai aslinya tetap utuh di database — hanya jalur\nkeluarnya yang ditutup, jadi key semacam itu bersifat write-only\nlewat API ini.\n"
+          }
+        }
+      },
+      "AmountBucket": {
+        "type": "object",
+        "required": [
+          "count",
+          "amount",
+          "trend"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "trend": {
+            "type": "number",
+            "format": "double",
+            "description": "Persen perubahan terhadap 30 hari sebelumnya."
+          }
+        }
+      },
+      "CountBucket": {
+        "type": "object",
+        "required": [
+          "count",
+          "trend"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "trend": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "required": [
+          "total",
+          "paid",
+          "outstanding",
+          "overdue",
+          "renewalDue",
+          "statusBreakdown",
+          "monthly",
+          "chapterStats"
+        ],
+        "properties": {
+          "total": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountBucket"
+              }
+            ],
+            "description": "Seluruh invoice kecuali yang dibatalkan."
+          },
+          "paid": {
+            "$ref": "#/components/schemas/AmountBucket"
+          },
+          "outstanding": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AmountBucket"
+              }
+            ],
+            "description": "Sudah terbit tapi belum dibayar (`sent` + `overdue`)."
+          },
+          "overdue": {
+            "$ref": "#/components/schemas/AmountBucket"
+          },
+          "renewalDue": {
+            "$ref": "#/components/schemas/CountBucket"
+          },
+          "statusBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "$ref": "#/components/schemas/InvoiceStatus"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "monthly": {
+            "type": "array",
+            "description": "Termasuk bulan kosong, supaya jeda tidak hilang dari grafik.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "example": "2026-07"
+                },
+                "issued": {
+                  "type": "integer"
+                },
+                "paid": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "chapterStats": {
+            "type": "array",
+            "description": "Chapter tanpa invoice tetap muncul.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "chapterId": {
+                  "type": "string"
+                },
+                "chapterName": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "integer"
+                },
+                "paid": {
+                  "type": "integer"
+                },
+                "outstanding": {
+                  "type": "integer"
+                },
+                "overdue": {
+                  "type": "integer"
+                },
+                "totalAmount": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PublicInvoice": {
+        "type": "object",
+        "description": "Proyeksi sempit untuk halaman bayar. **Tidak memuat** email, telepon,\nperusahaan, atau bidang usaha member.\n",
+        "required": [
+          "id",
+          "number",
+          "type",
+          "amount",
+          "currency",
+          "status",
+          "dueDate",
+          "periodStart",
+          "periodEnd",
+          "memberName",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/InvoiceType"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/InvoiceStatus"
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date"
+          },
+          "memberName": {
+            "type": "string"
+          },
+          "chapterName": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "paymentProvider": {
+            "type": "string"
+          },
+          "paperIdPaymentUrl": {
+            "type": "string"
+          },
+          "xenditPaymentMethod": {
+            "type": "string",
+            "enum": [
+              "va",
+              "qris"
+            ]
+          },
+          "xenditVaBank": {
+            "type": "string"
+          },
+          "xenditVaNumber": {
+            "type": "string"
+          },
+          "xenditQrisString": {
+            "type": "string"
+          },
+          "xenditPaymentStatus": {
+            "type": "string"
+          },
+          "xenditExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PublicInvoiceView": {
+        "type": "object",
+        "required": [
+          "invoice",
+          "selfPaymentMode"
+        ],
+        "properties": {
+          "invoice": {
+            "$ref": "#/components/schemas/PublicInvoice"
+          },
+          "selfPaymentMode": {
+            "type": "boolean",
+            "description": "Apakah pembayaran mandiri lewat Xendit sedang aktif."
+          }
+        }
+      },
+      "PaymentResult": {
+        "type": "object",
+        "required": [
+          "method",
+          "amount"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "va",
+              "qris"
+            ]
+          },
+          "bank": {
+            "type": "string"
+          },
+          "vaNumber": {
+            "type": "string"
+          },
+          "qrString": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "XenditWebhook": {
+        "type": "object",
+        "description": "Xendit mengirim dua bentuk: callback VA memakai `external_id`,\ncallback QR memakai `reference_id`. Keduanya diterima.\n",
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "payment_id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "example": "PAID"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    }
+  }
+}
