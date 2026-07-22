@@ -14,6 +14,7 @@ import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { SyncPage } from '@/features/settings/SyncPage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
+import { RouteErrorPage } from '@/features/misc/RouteErrorPage'
 import { UrgentPage } from '@/features/urgent/UrgentPage'
 import { PaymentModePage } from '@/features/settings/PaymentModePage'
 import { PublicPaymentPage } from '@/features/pay/PublicPaymentPage'
@@ -24,6 +25,9 @@ import { ReportPage } from '@/features/reports/ReportPage'
 export const router = createBrowserRouter([
   {
     element: <Providers />,
+    // Catches render/loader errors anywhere below instead of showing React
+    // Router's raw "Unexpected Application Error!" stack trace.
+    errorElement: <RouteErrorPage />,
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/pay/:id', element: <PublicPaymentPage /> },
