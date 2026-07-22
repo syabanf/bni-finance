@@ -150,7 +150,10 @@ func (r *Repository) RenewalDue(ctx context.Context, days, limit int) ([]domain.
 		WHERE m.status = 'active'
 		  AND m.renewal_date IS NOT NULL
 		  AND m.renewal_date >= CURRENT_DATE
-		  AND m.renewal_date <= CURRENT_DATE + ($1 || ' days')::interval
+		  -- date + int stays typed. Building the interval by concatenating
+		  -- ($1 || ' days') makes Postgres infer $1 as TEXT, which then rejects
+		  -- the int the driver sends.
+		  AND m.renewal_date <= CURRENT_DATE + $1::int
 		ORDER BY m.renewal_date ASC
 		LIMIT $2`, columns, from)
 

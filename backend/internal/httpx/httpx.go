@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -89,6 +90,9 @@ func Fail(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrNotFound), isBadIdentifier(err):
 		JSON(w, http.StatusNotFound, errorBody{Error: ErrNotFound.Error()})
 	default:
+		// The cause never reaches the client, so log it here or it is lost
+		// entirely — a 500 with no trail is close to undebuggable.
+		slog.Error("kesalahan tak tertangani", "error", err)
 		JSON(w, http.StatusInternalServerError, errorBody{Error: "terjadi kesalahan pada server"})
 	}
 }

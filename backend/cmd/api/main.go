@@ -25,6 +25,9 @@ import (
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	// httpx.Fail logs unexpected causes through the default logger, so point it
+	// at ours before serving anything.
+	slog.SetDefault(log)
 
 	if err := run(log); err != nil {
 		log.Error("server berhenti", "error", err)

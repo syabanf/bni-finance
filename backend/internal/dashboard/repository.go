@@ -37,29 +37,35 @@ type totals struct {
 
 // One pass over `invoices` produces both the absolute figures and the two
 // comparison windows — cheaper and more consistent than eight separate queries.
+//
+// Windows use make_interval(days => $1::int) rather than ($1 || ' days')::interval:
+// the concatenated form makes Postgres infer $1 as TEXT, which then rejects the
+// int the driver sends.
+// FILTER attaches to the aggregate itself — coalesce(sum(x),0) FILTER (...) is
+// a syntax error, so the coalesce has to wrap the filtered aggregate instead.
 const totalsQuery = `
 SELECT
-  count(*)                    FILTER (WHERE status <> 'cancelled'),
-  coalesce(sum(amount),0)     FILTER (WHERE status <> 'cancelled'),
-  count(*)                    FILTER (WHERE status = 'paid'),
-  coalesce(sum(coalesce(paid_amount, amount)),0) FILTER (WHERE status = 'paid'),
-  count(*)                    FILTER (WHERE status IN ('sent','overdue')),
-  coalesce(sum(amount),0)     FILTER (WHERE status IN ('sent','overdue')),
-  count(*)                    FILTER (WHERE status = 'overdue'),
-  coalesce(sum(amount),0)     FILTER (WHERE status = 'overdue'),
+  count(*) FILTER (WHERE status <> 'cancelled'),
+  coalesce(sum(amount) FILTER (WHERE status <> 'cancelled'), 0),
+  count(*) FILTER (WHERE status = 'paid'),
+  coalesce(sum(coalesce(paid_amount, amount)) FILTER (WHERE status = 'paid'), 0),
+  count(*) FILTER (WHERE status IN ('sent','overdue')),
+  coalesce(sum(amount) FILTER (WHERE status IN ('sent','overdue')), 0),
+  count(*) FILTER (WHERE status = 'overdue'),
+  coalesce(sum(amount) FILTER (WHERE status = 'overdue'), 0),
 
-  count(*) FILTER (WHERE status <> 'cancelled' AND created_at >= now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status <> 'cancelled' AND created_at >= now() - (2 * $1 || ' days')::interval
-                                              AND created_at <  now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status = 'paid' AND paid_at >= now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status = 'paid' AND paid_at >= now() - (2 * $1 || ' days')::interval
-                                        AND paid_at <  now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status IN ('sent','overdue') AND created_at >= now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status IN ('sent','overdue') AND created_at >= now() - (2 * $1 || ' days')::interval
-                                                     AND created_at <  now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status = 'overdue' AND created_at >= now() - ($1 || ' days')::interval),
-  count(*) FILTER (WHERE status = 'overdue' AND created_at >= now() - (2 * $1 || ' days')::interval
-                                           AND created_at <  now() - ($1 || ' days')::interval)
+  count(*) FILTER (WHERE status <> 'cancelled' AND created_at >= now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status <> 'cancelled' AND created_at >= now() - make_interval(days => 2 * $1::int)
+                                              AND created_at <  now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status = 'paid' AND paid_at >= now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status = 'paid' AND paid_at >= now() - make_interval(days => 2 * $1::int)
+                                        AND paid_at <  now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status IN ('sent','overdue') AND created_at >= now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status IN ('sent','overdue') AND created_at >= now() - make_interval(days => 2 * $1::int)
+                                                     AND created_at <  now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status = 'overdue' AND created_at >= now() - make_interval(days => $1::int)),
+  count(*) FILTER (WHERE status = 'overdue' AND created_at >= now() - make_interval(days => 2 * $1::int)
+                                           AND created_at <  now() - make_interval(days => $1::int))
 FROM invoices`
 
 func (r *Repository) totals(ctx context.Context) (*totals, error) {
@@ -86,8 +92,8 @@ func (r *Repository) renewalDue(ctx context.Context) (current, previous int, err
 	const q = `
 	SELECT
 	  count(*) FILTER (WHERE renewal_date >= CURRENT_DATE
-	                     AND renewal_date <= CURRENT_DATE + ($1 || ' days')::interval),
-	  count(*) FILTER (WHERE renewal_date >= CURRENT_DATE - ($1 || ' days')::interval
+	                     AND renewal_date <= CURRENT_DATE + $1::int),
+	  count(*) FILTER (WHERE renewal_date >= CURRENT_DATE - $1::int
 	                     AND renewal_date <  CURRENT_DATE)
 	FROM members
 	WHERE status = 'active' AND renewal_date IS NOT NULL`
@@ -121,7 +127,7 @@ func (r *Repository) statusBreakdown(ctx context.Context) ([]domain.StatusCount,
 func (r *Repository) monthly(ctx context.Context, months int) ([]domain.MonthlyPoint, error) {
 	const q = `
 	WITH bulan AS (
-	  SELECT date_trunc('month', now()) - (n || ' month')::interval AS m
+	  SELECT date_trunc('month', now()) - make_interval(months => n) AS m
 	  FROM generate_series($1::int - 1, 0, -1) AS n
 	)
 	SELECT to_char(m, 'YYYY-MM'),

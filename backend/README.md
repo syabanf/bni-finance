@@ -35,8 +35,12 @@ Perintah lain:
 
 ```bash
 make build   # binary ke bin/api
-make test    # unit test
+make test    # unit test (integration test dilewati)
 make check   # vet + test (gate sebelum commit)
+
+# Integration test — menembak Postgres sungguhan. WAJIB database sekali pakai:
+# test ini me-TRUNCATE tabel dan menolak nama yang tak mengandung 'test'/'dev'.
+make test-integration TEST_DATABASE_URL=postgres://localhost/bni_finance_dev
 ```
 
 ---
@@ -292,15 +296,21 @@ Hasil di mesin pengembangan (Apple Silicon, 64 worker, 16.000 request campuran
 
 ## ✅ Status pengujian
 
-Terverifikasi di mesin ini: `go vet` bersih, `gofmt` rapi, seluruh test lulus
-dengan `-race` — transisi status, validasi input, round-trip `Date` YYYY-MM-DD,
-guard API key & CORS, CRUD member & chapter lewat rantai handler asli,
-penyamaran kredensial `app_settings`, guard hapus 409, `/members/renewal-due`
-yang tidak terbayangi `/members/{id}`, perhitungan `trend`, daftar kosong yang
-tetap `[]`, stress test 16.000 request, dan pelunasan paralel pada
-invoice yang sama. Binary build serta gagal-cepat dengan pesan jelas saat
-`DATABASE_URL` kosong/salah.
+**Unit test** (in-memory, `-race` bersih): transisi status, validasi input,
+round-trip `Date` YYYY-MM-DD, guard API key & CORS, CRUD member & chapter lewat
+rantai handler asli, penyamaran kredensial `app_settings`, guard hapus 409,
+`/members/renewal-due` yang tidak terbayangi `/members/{id}`, perhitungan
+`trend`, daftar kosong yang tetap `[]`, stress test 16.000 request, dan
+pelunasan paralel pada invoice yang sama.
 
-**Belum diuji:** jalur yang menyentuh database (query & transaksi) — tidak ada
-Postgres lokal di mesin ini, dan menguji ke database produksi akan menulis data nyata.
-Jalankan `make run` terhadap database dev untuk memvalidasi ujung-ke-ujung.
+**Integration test** (Postgres 17 lokal, `-race` bersih): seluruh query dieksekusi
+database sungguhan — setiap cabang filter, LEFT JOIN member–chapter, jejak audit
+`created → sent → paid` lintas paket, lima agregat dashboard, dan 32 pelunasan
+paralel atas satu invoice yang berakhir `paid` dengan **tepat satu** entri audit
+`paid` serta `paidAmount` yang tidak menumpuk.
+
+> Unit test tidak bisa menangkap SQL yang salah — bagi Go, query hanyalah string.
+> Dua bug nyata lolos persis lewat celah itu (`FILTER` menempel pada `coalesce()`,
+> dan parameter yang disimpulkan Postgres sebagai `TEXT` karena disambung menjadi
+> interval). `make test-integration` ada untuk menjaganya; keduanya sudah
+> diverifikasi gagal bila bug-nya dikembalikan.
