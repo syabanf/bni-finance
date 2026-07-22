@@ -59,17 +59,47 @@ func JSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
+// ListMeta is the pagination envelope every list endpoint returns.
+type ListMeta struct {
+	Total  int `json:"total"`
+	Limit  int `json:"limit"`
+	Offset int `json:"offset"`
+}
+
+type ListResponse[T any] struct {
+	Data []T      `json:"data"`
+	Meta ListMeta `json:"meta"`
+}
+
+// List wraps a page of results. A nil slice is normalised to [] so clients
+// never have to handle `"data": null`.
+func List[T any](items []T, total, limit, offset int) ListResponse[T] {
+	if items == nil {
+		items = []T{}
+	}
+	return ListResponse[T]{Data: items, Meta: ListMeta{Total: total, Limit: limit, Offset: offset}}
+}
+
 // Fail maps an error to a status code + JSON body.
 func Fail(w http.ResponseWriter, err error) {
 	var he *Error
 	switch {
 	case errors.As(err, &he):
 		JSON(w, he.Status, errorBody{Error: he.Message})
-	case errors.Is(err, ErrNotFound):
+	case errors.Is(err, ErrNotFound), isBadIdentifier(err):
 		JSON(w, http.StatusNotFound, errorBody{Error: ErrNotFound.Error()})
 	default:
 		JSON(w, http.StatusInternalServerError, errorBody{Error: "terjadi kesalahan pada server"})
 	}
+}
+
+// isBadIdentifier spots a malformed uuid in a path parameter. Postgres rejects
+// it as a syntax error (22P02), which would otherwise surface as a 500 — but
+// "not a valid id" and "no such id" mean the same thing to a caller.
+func isBadIdentifier(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "22P02") ||
+		strings.Contains(msg, "invalid input syntax for type uuid")
 }
 
 // Decode reads a JSON body into dst, rejecting unknown fields so typos surface

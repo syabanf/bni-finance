@@ -152,6 +152,11 @@ type UpdateInvoiceInput struct {
 	Notes        *string        `json:"notes"`
 	CancelReason *string        `json:"cancelReason"`
 	CancelledBy  *string        `json:"cancelledBy"`
+
+	// Who made the change. Not stored on the invoice — these only label the
+	// audit-log row written alongside the update.
+	ActorID   *string `json:"actorId"`
+	ActorName *string `json:"actorName"`
 }
 
 func (in UpdateInvoiceInput) Validate() error {

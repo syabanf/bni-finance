@@ -33,11 +33,10 @@ func newTestServer(t *testing.T) (*httptest.Server, *fakeInvoiceStore, *fakePaym
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	cfg := config.Config{AllowedOrigins: []string{"*"}}
 
-	h := api.NewHandler(log, cfg,
-		invoice.NewService(invStore),
-		payment.NewService(payStore),
-		nil,
-	)
+	h := api.NewHandler(log, cfg, api.Services{
+		Invoice: invoice.NewService(invStore),
+		Payment: payment.NewService(payStore),
+	}, nil)
 
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)

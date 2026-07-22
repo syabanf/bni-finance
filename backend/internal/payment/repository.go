@@ -147,6 +147,17 @@ func (r *Repository) CreateAndSettle(
 		if err != nil {
 			return nil, fmt.Errorf("tandai invoice lunas: %w", err)
 		}
+
+		// Settling here bypasses invoice.Repository.Update, so the timeline
+		// entry has to be written on this path too — same transaction.
+		paid := domain.StatusPaid
+		_, err = tx.Exec(ctx, `
+			INSERT INTO invoice_audit_log (invoice_id, action, old_status, new_status, notes)
+			VALUES ($1, 'paid', $2, $3, $4)`,
+			in.InvoiceID, status, paid, in.Note)
+		if err != nil {
+			return nil, fmt.Errorf("catat audit log: %w", err)
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

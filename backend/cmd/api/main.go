@@ -12,10 +12,15 @@ import (
 	"time"
 
 	"github.com/syabanf/bni-finance/backend/internal/api"
+	"github.com/syabanf/bni-finance/backend/internal/audit"
+	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
+	"github.com/syabanf/bni-finance/backend/internal/dashboard"
 	"github.com/syabanf/bni-finance/backend/internal/database"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
+	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/settings"
 )
 
 func main() {
@@ -43,11 +48,16 @@ func run(log *slog.Logger) error {
 	defer pool.Close()
 	log.Info("terhubung ke database")
 
-	// Wire: repository → service → handler.
-	invoiceSvc := invoice.NewService(invoice.NewRepository(pool))
-	paymentSvc := payment.NewService(payment.NewRepository(pool))
-
-	handler := api.NewHandler(log, cfg, invoiceSvc, paymentSvc, pool.Ping)
+	// Wire: repository → service → handler, one chain per resource.
+	handler := api.NewHandler(log, cfg, api.Services{
+		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
+		Payment:   payment.NewService(payment.NewRepository(pool)),
+		Member:    member.NewService(member.NewRepository(pool)),
+		Chapter:   chapter.NewService(chapter.NewRepository(pool)),
+		Settings:  settings.NewService(settings.NewRepository(pool)),
+		Audit:     audit.NewService(audit.NewRepository(pool)),
+		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
+	}, pool.Ping)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,

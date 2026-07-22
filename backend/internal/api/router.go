@@ -9,26 +9,57 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/syabanf/bni-finance/backend/internal/audit"
+	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
+	"github.com/syabanf/bni-finance/backend/internal/dashboard"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
+	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/settings"
 )
 
 // Pinger reports database health for /healthz.
 type Pinger func(ctx context.Context) error
 
+// Services collects everything the API can expose. A nil field simply means
+// that resource isn't registered — which is what lets tests bring up a subset.
+type Services struct {
+	Invoice   *invoice.Service
+	Payment   *payment.Service
+	Member    *member.Service
+	Chapter   *chapter.Service
+	Settings  *settings.Service
+	Audit     *audit.Service
+	Dashboard *dashboard.Service
+}
+
 // NewHandler builds the fully-wrapped HTTP handler.
-func NewHandler(
-	log *slog.Logger,
-	cfg config.Config,
-	invoiceSvc *invoice.Service,
-	paymentSvc *payment.Service,
-	ping Pinger,
-) http.Handler {
+func NewHandler(log *slog.Logger, cfg config.Config, svc Services, ping Pinger) http.Handler {
 	apiMux := http.NewServeMux()
-	invoice.NewHandler(invoiceSvc).Register(apiMux)
-	payment.NewHandler(paymentSvc).Register(apiMux)
+
+	if svc.Invoice != nil {
+		invoice.NewHandler(svc.Invoice).Register(apiMux)
+	}
+	if svc.Payment != nil {
+		payment.NewHandler(svc.Payment).Register(apiMux)
+	}
+	if svc.Member != nil {
+		member.NewHandler(svc.Member).Register(apiMux)
+	}
+	if svc.Chapter != nil {
+		chapter.NewHandler(svc.Chapter).Register(apiMux)
+	}
+	if svc.Settings != nil {
+		settings.NewHandler(svc.Settings).Register(apiMux)
+	}
+	if svc.Audit != nil {
+		audit.NewHandler(svc.Audit).Register(apiMux)
+	}
+	if svc.Dashboard != nil {
+		dashboard.NewHandler(svc.Dashboard).Register(apiMux)
+	}
 
 	root := http.NewServeMux()
 

@@ -138,20 +138,62 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*domain.Invoice, e
 	return scan(r.db.QueryRow(ctx, "SELECT "+columns+" FROM invoices WHERE id = $1", id))
 }
 
+// Create inserts the invoice and its first audit entry in one transaction, so
+// no invoice can exist without a timeline.
 func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, number, currency string) (*domain.Invoice, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	const q = `
 		INSERT INTO invoices (number, member_id, chapter_id, type, amount, currency,
 		                      due_date, period_start, period_end, status, notes, created_by)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10,$11)
 		RETURNING ` + columns
-	return scan(r.db.QueryRow(ctx, q,
+
+	inv, err := scan(tx.QueryRow(ctx, q,
 		number, in.MemberID, in.ChapterID, in.Type, in.Amount, currency,
 		in.DueDate.Time, in.PeriodStart.Time, in.PeriodEnd.Time, in.Notes, in.CreatedBy,
 	))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := recordAudit(ctx, tx, auditRow{
+		InvoiceID: inv.ID,
+		Action:    domain.AuditCreated,
+		NewStatus: &inv.Status,
+		ActorID:   in.CreatedBy,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("simpan invoice: %w", err)
+	}
+	return inv, nil
 }
 
-// Update writes only the fields present in the patch.
+// Update writes only the fields present in the patch, and appends an audit row
+// describing the change. The row is locked FOR UPDATE first so two concurrent
+// patches can't record contradictory before-states.
 func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvoiceInput) (*domain.Invoice, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var oldStatus domain.InvoiceStatus
+	if err := tx.QueryRow(ctx, "SELECT status FROM invoices WHERE id = $1 FOR UPDATE", id).Scan(&oldStatus); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, httpx.ErrNotFound
+		}
+		return nil, fmt.Errorf("kunci invoice: %w", err)
+	}
+
 	sets := []string{"updated_at = now()"}
 	args := []any{}
 	set := func(col string, value any) {
@@ -194,7 +236,55 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvo
 	q := fmt.Sprintf("UPDATE invoices SET %s WHERE id = $%d RETURNING %s",
 		strings.Join(sets, ", "), len(args), columns)
 
-	return scan(r.db.QueryRow(ctx, q, args...))
+	inv, err := scan(tx.QueryRow(ctx, q, args...))
+	if err != nil {
+		return nil, err
+	}
+
+	entry := auditRow{
+		InvoiceID: inv.ID,
+		Action:    domain.AuditUpdated,
+		ActorID:   in.ActorID,
+		ActorName: in.ActorName,
+		Notes:     in.CancelReason,
+	}
+	if in.Status != nil && *in.Status != oldStatus {
+		entry.Action = domain.ActionForStatus(*in.Status)
+		entry.OldStatus = &oldStatus
+		entry.NewStatus = in.Status
+	}
+	if err := recordAudit(ctx, tx, entry); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("simpan perubahan invoice: %w", err)
+	}
+	return inv, nil
+}
+
+// auditRow is the payload of one invoice_audit_log insert.
+type auditRow struct {
+	InvoiceID string
+	Action    domain.AuditAction
+	OldStatus *domain.InvoiceStatus
+	NewStatus *domain.InvoiceStatus
+	ActorID   *string
+	ActorName *string
+	Notes     *string
+}
+
+// recordAudit appends to the timeline inside the caller's transaction, so the
+// log can never drift from the invoice it describes.
+func recordAudit(ctx context.Context, tx pgx.Tx, e auditRow) error {
+	const q = `
+		INSERT INTO invoice_audit_log (invoice_id, action, old_status, new_status, actor_id, actor_name, notes)
+		VALUES ($1,$2,$3,$4,$5,$6,$7)`
+	if _, err := tx.Exec(ctx, q, e.InvoiceID, e.Action, e.OldStatus, e.NewStatus,
+		e.ActorID, e.ActorName, e.Notes); err != nil {
+		return fmt.Errorf("catat audit log: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) Delete(ctx context.Context, id string) error {

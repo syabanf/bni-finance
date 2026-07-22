@@ -55,6 +55,22 @@ create table if not exists fee_settings (
 insert into fee_settings (id) values ('default') on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
+-- app_settings — konfigurasi key/value (feature flag + kredensial integrasi)
+--
+-- Dibaca oleh edge function (self_payment_mode, invoice_draft_days_before) dan
+-- menyimpan token BNI VM, jadi RLS-nya harus authenticated-only — lihat rls.sql.
+-- ---------------------------------------------------------------------------
+create table if not exists app_settings (
+  key        text primary key,
+  value      text not null,
+  updated_at timestamptz not null default now()
+);
+insert into app_settings (key, value) values
+  ('self_payment_mode',        'false'),
+  ('invoice_draft_days_before','30')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- invoices
 -- ---------------------------------------------------------------------------
 create table if not exists invoices (

@@ -155,6 +155,35 @@ Implementasi Supabase tersedia di `services/supabase/` dan aktif saat `VITE_USE_
 
 ---
 
+## ⚙️ REST API (Go)
+
+`backend/` berisi REST API mandiri di atas **Postgres yang sama**, ditulis dengan Go +
+pustaka standar (satu dependensi: driver `pgx/v5`). Berguna untuk integrasi
+server-ke-server, job terjadwal, atau klien lain yang tidak lewat Supabase JS.
+
+| Resource | Endpoint |
+|---|---|
+| Invoice | `GET·POST /api/v1/invoices` · `GET·PATCH·DELETE /api/v1/invoices/{id}` |
+| Pembayaran | `GET·POST /api/v1/payments` · `GET·PATCH·DELETE /api/v1/payments/{id}` |
+| Member | `GET·POST /api/v1/members` · `/members/{id}` · `/members/renewal-due` |
+| Chapter | `GET·POST /api/v1/chapters` · `/chapters/{id}` |
+| Pengaturan | `/api/v1/fee-settings` · `/api/v1/app-settings/{key}` |
+| Jejak audit | `GET·POST /api/v1/invoices/{id}/audit` |
+| Dashboard | `GET /api/v1/dashboard/summary` |
+
+Respons memakai **camelCase** yang identik dengan tipe di `src/types`, jadi bisa
+dikonsumsi klien TypeScript tanpa lapisan pemetaan. Detail — aturan bisnis, keamanan,
+dan hasil stress test — ada di [`backend/README.md`](backend/README.md).
+
+```bash
+cd backend && cp .env.example .env && make run
+```
+
+> ⚠️ `DATABASE_URL` di backend ini **melewati RLS**. Jalankan hanya sebagai layanan
+> server-side, dan aktifkan `API_KEY` bila bisa dijangkau dari luar.
+
+---
+
 ## 🎨 Design System
 
 - **Warna brand**: merah BNI (`brand.500 = #e2231a`) + skala netral `ink`.
@@ -175,6 +204,7 @@ Implementasi Supabase tersedia di `services/supabase/` dan aktif saat `VITE_USE_
 | Ikon | lucide-react |
 | Ekspor | CSV (BOM UTF-8) + PDF (dokumen cetak berlabel BNI) |
 | Backend (opsional) | Supabase — Postgres, Auth, Storage, Edge Functions |
+| REST API (opsional) | Go 1.22+ (`net/http`) + `pgx/v5` — lihat `backend/` |
 | Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
 | Data | Mock in-memory (default) ↔ Supabase (`VITE_USE_MOCK=false`) |
 | Hosting | Vercel |
