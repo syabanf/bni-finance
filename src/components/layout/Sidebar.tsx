@@ -6,6 +6,7 @@ import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUrgentCount } from '@/hooks/useUrgentCount'
 import { NAV, type NavLeaf } from './nav'
+import { can, ROLE_LABEL } from '@/lib/rbac'
 
 const itemBase =
   'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
@@ -59,6 +60,11 @@ function NavGroup({ label, icon: Icon, children }: Extract<(typeof NAV)[number],
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth()
   const urgentCount = useUrgentCount()
+  // Sembunyikan menu yang tidak boleh diakses peran ini (mis. Sistem untuk User).
+  const visibleNav = NAV.filter((node) => {
+    const perm = 'permission' in node ? node.permission : undefined
+    return !perm || can(user?.role, perm)
+  })
   return (
     <div className="flex h-full flex-col bg-white">
       {/* Brand */}
@@ -72,7 +78,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" onClick={onNavigate}>
-        {NAV.map((node, i) => {
+        {visibleNav.map((node, i) => {
           if (node.kind === 'section') {
             return (
               <div
@@ -141,7 +147,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="truncate text-sm font-semibold text-ink-900">
               {user?.name ?? 'Admin Nasional'}
             </div>
-            <div className="truncate text-xs text-ink-400">National Admin</div>
+            <div className="truncate text-xs text-ink-400">
+              {user?.role ? ROLE_LABEL[user.role] : '—'}
+            </div>
           </div>
         </div>
       </div>

@@ -1,48 +1,73 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Lock, Mail, ShieldCheck, Zap } from 'lucide-react'
-import { Button, Field, Input } from '@/components/ui'
+import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound } from 'lucide-react'
+import type { UserRole } from '@/types'
+import { BniLogo, Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
+import { cn } from '@/lib/cn'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
+/** Akun demo per peran — cocok dengan DEMO_ACCOUNTS di mock authRepository. */
+const DEMO_ROLES: {
+  role: UserRole
+  label: string
+  desc: string
+  email: string
+  password: string
+  icon: typeof UserCog
+}[] = [
+  {
+    role: 'admin',
+    label: 'Admin',
+    desc: 'Akses penuh',
+    email: 'admin@bni-finance.com',
+    password: 'admin123',
+    icon: UserCog,
+  },
+  {
+    role: 'user',
+    label: 'User',
+    desc: 'Lihat & ekspor',
+    email: 'user@bni-finance.com',
+    password: 'user123',
+    icon: UserRound,
+  },
+]
+
 /**
- * Quick sign-in credentials.
- *  - Mock mode: any credentials work, so the built-in demo pair is used.
- *  - Real (Supabase) mode: needs an actual account, supplied via env
- *    (VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD) — e.g. set on the Vercel preview
- *    deployment. When they're absent the button simply doesn't render.
- *
- * ⚠️ VITE_* values are inlined into the public bundle, so anyone can read this
- * password. Only ever point it at a throwaway demo account.
+ * Di mode Supabase, quick sign-in butuh akun nyata — isi lewat env
+ * (VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD), mis. di Vercel preview.
+ * ⚠️ Nilai VITE_* ikut ter-bundle ke klien, jadi arahkan hanya ke akun demo.
  */
-const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || (useMock ? 'admin@bni-finance.com' : '')
-const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || (useMock ? 'admin123' : '')
-const QUICK_LOGIN_ENABLED = Boolean(DEMO_EMAIL && DEMO_PASSWORD)
+const ENV_DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || ''
+const ENV_DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
+const ENV_QUICK_LOGIN = Boolean(ENV_DEMO_EMAIL && ENV_DEMO_PASSWORD)
 
 export function LoginPage() {
   const { login, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-  // Only prefill the visible fields in mock mode — never a real demo password.
-  const [email, setEmail] = useState(useMock ? DEMO_EMAIL : '')
-  const [password, setPassword] = useState(useMock ? DEMO_PASSWORD : '')
+
+  const [email, setEmail] = useState(useMock ? DEMO_ROLES[0].email : '')
+  const [password, setPassword] = useState(useMock ? DEMO_ROLES[0].password : '')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [quickLoading, setQuickLoading] = useState(false)
+  const [quickRole, setQuickRole] = useState<string | null>(null)
 
   if (!authLoading && user) {
     navigate('/dashboard', { replace: true })
   }
 
-  const doLogin = async (e: string, p: string, setBusy: (v: boolean) => void) => {
+  const doLogin = async (e: string, p: string, done: (busy: boolean) => void) => {
     setError(null)
-    setBusy(true)
+    done(true)
     try {
       await login(e, p)
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal masuk.')
-      setBusy(false)
+      done(false)
     }
   }
 
@@ -51,57 +76,35 @@ export function LoginPage() {
     doLogin(email, password, setLoading)
   }
 
-  // One-click demo login — mock mode only.
-  const quickLogin = () => doLogin(DEMO_EMAIL, DEMO_PASSWORD, setQuickLoading)
+  const quickLogin = (key: string, e: string, p: string) =>
+    doLogin(e, p, (busy) => setQuickRole(busy ? key : null))
+
+  const busy = loading || quickRole !== null
 
   return (
-    <div className="flex min-h-screen bg-ink-50">
-      {/* Brand panel */}
-      <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-gradient-to-br from-brand-600 via-brand-500 to-brand-700 p-12 text-white lg:flex">
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-2xl" />
-        <div className="absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-black/10 blur-2xl" />
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-50 px-4 py-10">
+      {/* Latar dekoratif */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-brand-500/15 blur-3xl" />
+        <div className="absolute -bottom-40 -right-24 h-[26rem] w-[26rem] rounded-full bg-brand-700/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_35%,rgba(248,250,252,.9))]" />
+      </div>
 
-        <div className="relative flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 text-xl font-extrabold backdrop-blur">
-            B
-          </div>
-          <div className="leading-tight">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/80">
-              BNI Indonesia
-            </div>
-            <div className="text-lg font-bold">Finance Hub</div>
-          </div>
-        </div>
-
-        <div className="relative max-w-md">
-          <h1 className="text-3xl font-bold leading-tight">
-            Kelola invoice & pembayaran keanggotaan dalam satu tempat.
-          </h1>
-          <p className="mt-4 text-white/80">
-            Sistem finance terpadu untuk BNI Grow Chapter Management — pendaftaran,
-            renewal, dan rekonsiliasi pembayaran via Paper.id.
+      <div className="relative w-full max-w-md">
+        {/* Brand */}
+        <div className="mb-6 flex flex-col items-center text-center">
+          <span className="flex items-center rounded-2xl bg-white px-4 py-2.5 shadow-card">
+            <BniLogo className="h-8 w-auto" />
+          </span>
+          <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink-900">Finance Hub</h1>
+          <p className="mt-1 text-sm text-ink-500">
+            Invoice &amp; pembayaran keanggotaan BNI Grow Chapter
           </p>
         </div>
 
-        <div className="relative flex items-center gap-2 text-sm text-white/70">
-          <ShieldCheck className="h-4 w-4" />
-          Akses khusus National Admin · Terenkripsi
-        </div>
-      </div>
-
-      {/* Form panel */}
-      <div className="flex w-full flex-col items-center justify-center px-6 lg:w-1/2">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 text-xl font-extrabold text-white">
-              B
-            </div>
-          </div>
-
-          <h2 className="text-2xl font-bold text-ink-900">Selamat datang kembali</h2>
-          <p className="mt-1.5 text-sm text-ink-500">Masuk untuk melanjutkan ke Finance Hub.</p>
-
-          <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        {/* Kartu form */}
+        <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-card-hover sm:p-7">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Email">
               <div className="relative">
                 <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
@@ -109,7 +112,7 @@ export function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@bni-finance.com"
+                  placeholder="nama@bni-finance.com"
                   className="pl-10"
                   autoComplete="email"
                 />
@@ -120,13 +123,21 @@ export function LoginPage() {
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
                 <Input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   autoComplete="current-password"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </Field>
 
@@ -134,50 +145,73 @@ export function LoginPage() {
               <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
             )}
 
-            <Button type="submit" size="lg" loading={loading} disabled={quickLoading} className="w-full">
+            <Button type="submit" size="lg" loading={loading} disabled={busy && !loading} className="w-full">
               Masuk
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
           </form>
 
-          {QUICK_LOGIN_ENABLED && (
+          {/* Quick sign-in */}
+          {(useMock || ENV_QUICK_LOGIN) && (
             <>
               <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
                 <span className="h-px flex-1 bg-ink-100" />
-                atau
+                masuk cepat
                 <span className="h-px flex-1 bg-ink-100" />
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                loading={quickLoading}
-                disabled={loading}
-                onClick={quickLogin}
-                className="w-full"
-              >
-                {!quickLoading && <Zap className="h-4 w-4" />}
-                Login Cepat sebagai Admin Nasional
-              </Button>
+              {useMock ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {DEMO_ROLES.map((r) => {
+                    const Icon = r.icon
+                    return (
+                      <button
+                        key={r.role}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => quickLogin(r.role, r.email, r.password)}
+                        className={cn(
+                          'flex flex-col items-center gap-1 rounded-xl border border-ink-200 px-3 py-3 transition-colors',
+                          'hover:border-brand-300 hover:bg-brand-50/50 disabled:cursor-not-allowed disabled:opacity-60',
+                          quickRole === r.role && 'border-brand-400 bg-brand-50',
+                        )}
+                      >
+                        <Icon className="h-5 w-5 text-brand-500" />
+                        <span className="text-sm font-semibold text-ink-900">
+                          {quickRole === r.role ? 'Masuk…' : r.label}
+                        </span>
+                        <span className="text-[11px] text-ink-400">{r.desc}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  loading={quickRole === 'env'}
+                  disabled={busy && quickRole !== 'env'}
+                  onClick={() => quickLogin('env', ENV_DEMO_EMAIL, ENV_DEMO_PASSWORD)}
+                  className="w-full"
+                >
+                  {quickRole !== 'env' && <UserCog className="h-4 w-4" />}
+                  Masuk sebagai akun demo
+                </Button>
+              )}
 
-              <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-3 text-xs text-ink-500">
-                <span className="font-semibold text-ink-700">Demo:</span>{' '}
-                {useMock ? (
-                  <>
-                    gunakan kredensial apa pun atau klik{' '}
-                    <span className="font-medium text-ink-700">Login Cepat</span> — data berjalan di
-                    atas mock repository.
-                  </>
-                ) : (
-                  <>
-                    klik <span className="font-medium text-ink-700">Login Cepat</span> untuk masuk
-                    dengan akun demo ({DEMO_EMAIL}).
-                  </>
-                )}
-              </div>
+              <p className="mt-4 text-center text-xs text-ink-400">
+                {useMock
+                  ? 'Mode demo — data berjalan di atas mock repository.'
+                  : `Akun demo: ${ENV_DEMO_EMAIL}`}
+              </p>
             </>
           )}
+        </div>
+
+        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-ink-400">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Akses internal BNI · Terenkripsi
         </div>
       </div>
     </div>

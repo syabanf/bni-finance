@@ -17,6 +17,7 @@ import {
   WhatsAppIcon,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { useCan } from '@/features/auth/usePermission'
 import { chapterService, invoiceService } from '@/services'
 import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
 import { InvoiceTable } from './components/InvoiceTable'
@@ -69,6 +70,9 @@ export function InvoiceListPage() {
   )
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
   const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode())
+
+  const canCreate = useCan('invoice:create')
+  const canManage = useCan('invoice:manage')
 
   const [status, setStatus] = useState<StatusFilter>(initialStatus)
   const [type, setType] = useState<InvoiceType | 'all'>(initialType)
@@ -312,10 +316,12 @@ export function InvoiceListPage() {
         action={
           <div className="flex items-center gap-2">
             <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
-            <Button onClick={() => navigate('/invoices/new')}>
-              <Plus className="h-4 w-4" />
-              Buat Invoice
-            </Button>
+            {canCreate && (
+              <Button onClick={() => navigate('/invoices/new')}>
+                <Plus className="h-4 w-4" />
+                Buat Invoice
+              </Button>
+            )}
           </div>
         }
       />
@@ -514,7 +520,7 @@ export function InvoiceListPage() {
         </div>
 
         {/* Bulk action bar */}
-        {selected.size > 0 && (
+        {canManage && selected.size > 0 && (
           <div className="flex flex-col gap-3 border-b border-ink-100 bg-brand-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm font-medium text-ink-700">
               {selected.size} dipilih
@@ -567,8 +573,8 @@ export function InvoiceListPage() {
           <>
             <InvoiceTable
               invoices={paginated}
-              selected={selected}
-              onSelectChange={setSelected}
+              selected={canManage ? selected : undefined}
+              onSelectChange={canManage ? setSelected : undefined}
             />
             <div className="flex items-center justify-between gap-4 border-t border-ink-100 px-5 py-3">
               <span className="text-xs text-ink-400">

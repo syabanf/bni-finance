@@ -219,9 +219,12 @@ export interface RenewalDueMember extends MemberWithChapter {
   daysUntilDue: number
 }
 
+/** Peran pengguna. Admin = kontrol penuh, User = lihat & ekspor saja. */
+export type UserRole = 'admin' | 'user'
+
 export interface AuthUser {
   id: string
   name: string
   email: string
-  role: 'national_admin'
+  role: UserRole
 }

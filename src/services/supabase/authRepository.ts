@@ -1,6 +1,13 @@
 import { supabase } from '@/lib/supabase'
 import type { AuthRepository } from '@/services/types'
-import type { AuthUser } from '@/types'
+import type { AuthUser, UserRole } from '@/types'
+
+/** Peran diambil dari user_metadata.role. Default 'admin' agar akun lama
+ *  (yang belum punya metadata) tidak kehilangan akses. Set role: 'user' di
+ *  Supabase Auth untuk menurunkan hak akses. */
+function roleOf(meta: Record<string, unknown> | undefined): UserRole {
+  return meta?.role === 'user' ? 'user' : 'admin'
+}
 
 let currentUser: AuthUser | null = null
 
@@ -13,7 +20,7 @@ export const supabaseAuthRepository: AuthRepository = {
       id: u.id,
       name: u.user_metadata?.name ?? email.split('@')[0],
       email: u.email ?? email,
-      role: 'national_admin',
+      role: roleOf(u.user_metadata),
     }
     return currentUser
   },
@@ -37,7 +44,7 @@ export const supabaseAuthRepository: AuthRepository = {
       id: u.id,
       name: u.user_metadata?.name ?? trimmed,
       email: u.email ?? currentUser?.email ?? '',
-      role: 'national_admin',
+      role: roleOf(u.user_metadata),
     }
     return currentUser
   },

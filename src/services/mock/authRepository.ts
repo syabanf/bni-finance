@@ -1,15 +1,16 @@
 import type { AuthRepository } from '@/services/types'
-import type { AuthUser } from '@/types'
+import type { AuthUser, UserRole } from '@/types'
 import { delay } from './store'
 
 const STORAGE_KEY = 'bni-finance.auth'
 
-const DEMO_USER: AuthUser = {
-  id: 'admin-national',
-  name: 'Admin Nasional',
-  email: 'admin@bni-finance.com',
-  role: 'national_admin',
+/** Akun demo — email menentukan peran. Email lain tetap masuk sebagai Admin. */
+export const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: UserRole }> = {
+  'admin@bni-finance.com': { id: 'admin-national', name: 'Admin Nasional', role: 'admin' },
+  'user@bni-finance.com': { id: 'user-demo', name: 'User BNI', role: 'user' },
 }
+
+const DEFAULT_ACCOUNT = DEMO_ACCOUNTS['admin@bni-finance.com']
 
 /**
  * Demo auth. Accepts any non-empty credentials and persists the session in
@@ -22,7 +23,8 @@ export const mockAuthRepository: AuthRepository = {
     if (!email.trim() || !password.trim()) {
       throw new Error('Email dan password wajib diisi.')
     }
-    const user: AuthUser = { ...DEMO_USER, email }
+    const profile = DEMO_ACCOUNTS[email.trim().toLowerCase()] ?? DEFAULT_ACCOUNT
+    const user: AuthUser = { id: profile.id, name: profile.name, email, role: profile.role }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     return user
   },
@@ -47,7 +49,9 @@ export const mockAuthRepository: AuthRepository = {
     const trimmed = name.trim()
     if (!trimmed) throw new Error('Nama tidak boleh kosong.')
     const raw = localStorage.getItem(STORAGE_KEY)
-    const current: AuthUser = raw ? (JSON.parse(raw) as AuthUser) : DEMO_USER
+    const current: AuthUser = raw
+      ? (JSON.parse(raw) as AuthUser)
+      : { ...DEFAULT_ACCOUNT, email: 'admin@bni-finance.com' }
     const user: AuthUser = { ...current, name: trimmed }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     return user

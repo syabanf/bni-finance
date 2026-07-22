@@ -22,6 +22,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { useCan } from '@/features/auth/usePermission'
 import { invoiceService, settingsService } from '@/services'
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
@@ -50,6 +51,7 @@ export function RenewalDuePage() {
   )
   const { data: fees } = useAsync<FeeSettings>(() => settingsService.getFees())
 
+  const canCreate = useCan('invoice:create')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [search, setSearch] = useState('')
@@ -199,7 +201,7 @@ export function RenewalDuePage() {
         </div>
 
         {/* Bulk action bar */}
-        {selected.size > 0 && (
+        {canCreate && selected.size > 0 && (
           <div className="flex flex-col gap-3 border-b border-ink-100 bg-brand-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm font-medium text-ink-700">
               {selected.size} member dipilih · Total {formatCurrency(selectedTotal)}

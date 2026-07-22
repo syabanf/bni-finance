@@ -1,8 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { AuthUser } from '@/types'
+import type { AuthUser, UserRole } from '@/types'
 import { authService } from '@/services'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+
+/** Sama seperti supabaseAuthRepository: peran dari user_metadata, default admin. */
+const roleOf = (meta: Record<string, unknown> | undefined): UserRole =>
+  meta?.role === 'user' ? 'user' : 'admin'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -32,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: u.id,
             name: u.user_metadata?.name ?? u.email?.split('@')[0] ?? 'Admin',
             email: u.email ?? '',
-            role: 'national_admin',
+            role: roleOf(u.user_metadata),
           })
         }
         setLoading(false)
@@ -45,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: u.id,
             name: u.user_metadata?.name ?? u.email?.split('@')[0] ?? 'Admin',
             email: u.email ?? '',
-            role: 'national_admin',
+            role: roleOf(u.user_metadata),
           })
         } else {
           setUser(null)

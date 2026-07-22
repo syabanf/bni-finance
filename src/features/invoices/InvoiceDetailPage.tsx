@@ -38,6 +38,7 @@ import {
   WhatsAppIcon,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { useCan } from '@/features/auth/usePermission'
 import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
@@ -79,6 +80,8 @@ export function InvoiceDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { toast } = useToast()
+  const canManage = useCan('invoice:manage')
+  const canRecordPayment = useCan('payment:record')
 
   const { data: invoice, loading, reload } = useAsync<InvoiceWithRelations | null>(
     () => invoiceService.getById(id),
@@ -200,9 +203,11 @@ export function InvoiceDetailPage() {
   }
 
   const { status } = invoice
-  const canSend = status === 'draft'
-  const canPay = status === 'sent' || status === 'overdue'
-  const canCancel = status !== 'paid' && status !== 'cancelled'
+  const isPayable = status === 'sent' || status === 'overdue'
+  // Aksi yang mengubah data juga butuh izin peran, bukan cuma status yang cocok.
+  const canSend = canManage && status === 'draft'
+  const canPay = canManage && isPayable
+  const canCancel = canManage && status !== 'paid' && status !== 'cancelled'
 
   return (
     <div>
@@ -353,7 +358,7 @@ export function InvoiceDetailPage() {
           )}
 
           {/* Manual / offline payment */}
-          {canPay && (
+          {canRecordPayment && isPayable && (
             <Card>
               <CardHeader
                 title="Pembayaran Manual"

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { Avatar, Button, Card, CardHeader, Field, Input, PageHeader, useToast } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
+import { ROLE_LABEL } from '@/lib/rbac'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
@@ -64,7 +65,7 @@ export function ProfilePage() {
             <div className="text-lg font-semibold text-ink-900">{user?.name ?? 'Admin'}</div>
             <div className="truncate text-sm text-ink-500">{user?.email}</div>
             <span className="mt-1.5 inline-flex items-center rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600 ring-1 ring-inset ring-brand-600/10">
-              National Admin
+              {user?.role ? ROLE_LABEL[user.role] : '—'}
             </span>
           </div>
         </div>

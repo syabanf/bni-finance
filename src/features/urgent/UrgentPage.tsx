@@ -32,6 +32,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { useCan } from '@/features/auth/usePermission'
 import { chapterService, invoiceService, memberService, settingsService } from '@/services'
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
@@ -239,6 +240,7 @@ function RenewalSection({
 }) {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const canCreate = useCan('invoice:create')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
 
@@ -309,7 +311,7 @@ function RenewalSection({
       />
 
       {/* Bulk action bar */}
-      {selected.size > 0 && (
+      {canCreate && selected.size > 0 && (
         <div className="flex flex-col gap-3 border-b border-ink-100 bg-amber-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-medium text-ink-700">
             {selected.size} member dipilih · Total {formatCurrency(selectedTotal)}
@@ -481,6 +483,7 @@ function RegistrationSection({
 }) {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const canCreate = useCan('invoice:create')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
 
@@ -544,7 +547,7 @@ function RegistrationSection({
         }
       />
 
-      {selected.size > 0 && (
+      {canCreate && selected.size > 0 && (
         <div className="flex flex-col gap-3 border-b border-ink-100 bg-blue-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-medium text-ink-700">
             {selected.size} member dipilih · Total {formatCurrency(selectedTotal)}

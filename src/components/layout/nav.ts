@@ -11,6 +11,7 @@ import {
   BarChart3,
   type LucideIcon,
 } from 'lucide-react'
+import type { Permission } from '@/lib/rbac'
 
 export interface NavLeaf {
   to: string
@@ -20,8 +21,17 @@ export interface NavLeaf {
 }
 
 export type NavNode =
-  | { kind: 'section'; label: string }
-  | { kind: 'item'; to: string; label: string; icon: LucideIcon; end?: boolean; urgent?: boolean }
+  | { kind: 'section'; label: string; permission?: Permission }
+  | {
+      kind: 'item'
+      to: string
+      label: string
+      icon: LucideIcon
+      end?: boolean
+      urgent?: boolean
+      /** Bila diisi, item hanya tampil untuk peran yang punya izin ini. */
+      permission?: Permission
+    }
   | { kind: 'group'; label: string; icon: LucideIcon; children: NavLeaf[] }
 
 export const NAV: NavNode[] = [
@@ -37,8 +47,8 @@ export const NAV: NavNode[] = [
   { kind: 'item', to: '/members', label: 'Member', icon: Users },
   { kind: 'item', to: '/chapters', label: 'Chapter', icon: Building2 },
 
-  { kind: 'section', label: 'Sistem' },
-  { kind: 'item', to: '/settings', label: 'Pengaturan Biaya', icon: Settings, end: true },
-  { kind: 'item', to: '/settings/payment', label: 'Metode Pembayaran', icon: CreditCard },
-  { kind: 'item', to: '/settings/sync', label: 'Sinkronisasi Data', icon: RefreshCw },
+  { kind: 'section', label: 'Sistem', permission: 'settings:manage' },
+  { kind: 'item', to: '/settings', label: 'Pengaturan Biaya', icon: Settings, end: true, permission: 'settings:manage' },
+  { kind: 'item', to: '/settings/payment', label: 'Metode Pembayaran', icon: CreditCard, permission: 'settings:manage' },
+  { kind: 'item', to: '/settings/sync', label: 'Sinkronisasi Data', icon: RefreshCw, permission: 'sync:run' },
 ]

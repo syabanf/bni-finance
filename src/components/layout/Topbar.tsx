@@ -5,6 +5,7 @@ import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useNotifications } from '@/features/notifications/NotificationsContext'
 import { cn } from '@/lib/cn'
+import { ROLE_LABEL } from '@/lib/rbac'
 
 export function Topbar() {
   const { user, logout } = useAuth()
@@ -78,7 +79,9 @@ export function Topbar() {
           >
             <div className="hidden text-right leading-tight sm:block">
               <div className="text-sm font-semibold text-ink-900">{user?.name ?? 'Admin'}</div>
-              <div className="text-xs text-ink-400">National Admin</div>
+              <div className="text-xs text-ink-400">
+                {user?.role ? ROLE_LABEL[user.role] : '—'}
+              </div>
             </div>
             <Avatar name={user?.name ?? 'Admin'} size="sm" />
             <ChevronDown className={cn('h-4 w-4 text-ink-400 transition-transform', menuOpen && 'rotate-180')} />

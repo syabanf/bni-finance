@@ -15,6 +15,7 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { SyncPage } from '@/features/settings/SyncPage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
 import { RouteErrorPage } from '@/features/misc/RouteErrorPage'
+import { RequirePermission } from '@/features/auth/RequirePermission'
 import { UrgentPage } from '@/features/urgent/UrgentPage'
 import { PaymentModePage } from '@/features/settings/PaymentModePage'
 import { PublicPaymentPage } from '@/features/pay/PublicPaymentPage'
@@ -42,7 +43,14 @@ export const router = createBrowserRouter([
 
           // Invoices — order matters: static segments before the :id param.
           { path: '/invoices', element: <InvoiceListPage /> },
-          { path: '/invoices/new', element: <InvoiceNewPage /> },
+          {
+            path: '/invoices/new',
+            element: (
+              <RequirePermission permission="invoice:create">
+                <InvoiceNewPage />
+              </RequirePermission>
+            ),
+          },
           { path: '/invoices/renewal-due', element: <RenewalDuePage /> },
           { path: '/invoices/:id', element: <InvoiceDetailPage /> },
 
@@ -53,9 +61,30 @@ export const router = createBrowserRouter([
           { path: '/payments', element: <PaymentListPage /> },
           { path: '/reports', element: <ReportPage /> },
 
-          { path: '/settings', element: <SettingsPage /> },
-          { path: '/settings/payment', element: <PaymentModePage /> },
-          { path: '/settings/sync', element: <SyncPage /> },
+          {
+            path: '/settings',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <SettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/payment',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <PaymentModePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/settings/sync',
+            element: (
+              <RequirePermission permission="sync:run">
+                <SyncPage />
+              </RequirePermission>
+            ),
+          },
 
           { path: '*', element: <NotFoundPage /> },
         ],
