@@ -68,7 +68,7 @@ function sendOverdueWa(inv: InvoiceWithRelations) {
     ``,
     `Terima kasih. 🙏`,
   ].join('\n')
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer')
 }
 
 function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[] | null; loading: boolean }) {

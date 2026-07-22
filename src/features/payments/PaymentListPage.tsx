@@ -7,6 +7,7 @@ import {
   Badge,
   Card,
   EmptyState,
+  ErrorState,
   ExportMenu,
   Input,
   PageHeader,
@@ -19,22 +20,22 @@ import {
   THead,
   Tr,
   TableSkeleton,
+  useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
+import { monthNowKey } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
 import { printTableReport } from '@/lib/pdfReport'
-
-const METHOD_LABEL: Record<string, string> = {
-  virtual_account: 'Virtual Account',
-  bank_transfer: 'Transfer Bank',
-  qris: 'QRIS',
-}
+import { paymentMethodLabel } from '@/lib/paymentMethod'
 
 export function PaymentListPage() {
   const navigate = useNavigate()
-  const { data: payments, loading } = useAsync<PaymentWithInvoice[]>(() => paymentService.list())
+  const { toast } = useToast()
+  const { data: payments, loading, error, reload } = useAsync<PaymentWithInvoice[]>(() =>
+    paymentService.list(),
+  )
 
   const [search, setSearch] = useState('')
   const [method, setMethod] = useState('all')
@@ -53,9 +54,9 @@ export function PaymentListPage() {
     const q = search.trim().toLowerCase()
     return (payments ?? []).filter((p) => {
       if (method !== 'all' && (p.paymentMethod ?? '') !== method) return false
-      const day = (p.paidAt ?? '').slice(0, 10)
-      if (dueFrom && day < dueFrom) return false
-      if (dueTo && day > dueTo) return false
+      const day = p.paidAt ? p.paidAt.slice(0, 10) : ''
+      if (dueFrom && (!day || day < dueFrom)) return false
+      if (dueTo && (!day || day > dueTo)) return false
       if (
         q &&
         !(p.member?.name ?? '').toLowerCase().includes(q) &&
@@ -68,12 +69,9 @@ export function PaymentListPage() {
 
   // Summary reflects the active filters.
   const total = filtered.reduce((acc, p) => acc + p.amount, 0)
-  const ym = new Date().toISOString().slice(0, 7)
+  const ym = monthNowKey()
   const thisMonth = filtered.filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
   const thisMonthTotal = thisMonth.reduce((acc, p) => acc + p.amount, 0)
-
-  const methodLabel = (p: PaymentWithInvoice) =>
-    METHOD_LABEL[p.paymentMethod ?? ''] ?? p.paymentMethod ?? '—'
 
   const exportCsv = () => {
     downloadCsv(
@@ -83,14 +81,14 @@ export function PaymentListPage() {
         p.member?.name ?? '',
         p.invoice?.number ?? '',
         p.amount,
-        methodLabel(p),
+        paymentMethodLabel(p.paymentMethod),
         formatDateTime(p.paidAt),
       ]),
     )
   }
 
   const exportPdf = () => {
-    printTableReport({
+    const ok = printTableReport({
       title: 'Riwayat Pembayaran',
       meta: [`${filtered.length} transaksi`, `Dibuat ${formatDateTime(new Date())}`],
       columns: [
@@ -104,12 +102,13 @@ export function PaymentListPage() {
         p.member?.name ?? '—',
         p.invoice?.number ?? '—',
         formatCurrency(p.amount),
-        methodLabel(p),
+        paymentMethodLabel(p.paymentMethod),
         formatDateTime(p.paidAt),
       ]),
       totals: ['Total', '', formatCurrency(total), '', ''],
       documentTitle: 'Riwayat Pembayaran — BNI Finance',
     })
+    if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
   }
 
   const hasData = !loading && payments && payments.length > 0
@@ -152,7 +151,7 @@ export function PaymentListPage() {
                 <option value="all">Semua Metode</option>
                 {methodOptions.map((m) => (
                   <option key={m} value={m}>
-                    {METHOD_LABEL[m] ?? m}
+                    {paymentMethodLabel(m)}
                   </option>
                 ))}
               </Select>
@@ -194,7 +193,9 @@ export function PaymentListPage() {
           </div>
         )}
 
-        {loading ? (
+        {error ? (
+          <ErrorState message={error} onRetry={reload} />
+        ) : loading ? (
           <TableSkeleton rows={8} cols={5} />
         ) : !payments || payments.length === 0 ? (
           <EmptyState
@@ -232,7 +233,7 @@ export function PaymentListPage() {
                     </div>
                     <div className="mt-2">
                       <Badge tone="blue" dot={false}>
-                        {methodLabel(p)}
+                        {paymentMethodLabel(p.paymentMethod)}
                       </Badge>
                     </div>
                   </div>
@@ -268,7 +269,7 @@ export function PaymentListPage() {
                       <Td className="font-medium text-emerald-600">{formatCurrency(p.amount)}</Td>
                       <Td>
                         <Badge tone="blue" dot={false}>
-                          {methodLabel(p)}
+                          {paymentMethodLabel(p.paymentMethod)}
                         </Badge>
                       </Td>
                       <Td className="whitespace-nowrap text-ink-600">{formatDateTime(p.paidAt)}</Td>

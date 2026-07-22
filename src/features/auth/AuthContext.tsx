@@ -21,6 +21,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (useMock) return
+    let unsubscribe: (() => void) | undefined
+    let disposed = false
     // Restore Supabase session on mount
     import('@/lib/supabase').then(({ supabase }) => {
       supabase.auth.getSession().then(({ data }) => {
@@ -49,8 +51,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null)
         }
       })
-      return () => listener.subscription.unsubscribe()
+      // If the effect already cleaned up before the dynamic import resolved,
+      // unsubscribe immediately; otherwise expose it to the effect cleanup.
+      if (disposed) listener.subscription.unsubscribe()
+      else unsubscribe = () => listener.subscription.unsubscribe()
     })
+    return () => {
+      disposed = true
+      unsubscribe?.()
+    }
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {

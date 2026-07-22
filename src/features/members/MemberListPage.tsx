@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   EmptyState,
+  ErrorState,
   Input,
   MemberStatusBadge,
   PageHeader,
@@ -27,7 +28,9 @@ import { downloadCsv } from '@/lib/csv'
 
 export function MemberListPage() {
   const navigate = useNavigate()
-  const { data: members, loading } = useAsync<MemberWithChapter[]>(() => memberService.list())
+  const { data: members, loading, error, reload } = useAsync<MemberWithChapter[]>(() =>
+    memberService.list(),
+  )
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
   const [searchParams] = useSearchParams()
@@ -205,7 +208,9 @@ export function MemberListPage() {
           </div>
         </div>
 
-        {loading ? (
+        {error ? (
+          <ErrorState message={error} onRetry={reload} />
+        ) : loading ? (
           <TableSkeleton rows={8} cols={5} />
         ) : filtered.length === 0 ? (
           <EmptyState icon={Users} title="Tidak ada member" description="Tidak ada member yang cocok dengan filter." />

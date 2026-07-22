@@ -11,13 +11,26 @@ import { InvoicePreview } from '@/features/invoices/components/InvoicePreview'
 import { PaymentPanel } from '@/features/invoices/components/PaymentPanel'
 import { downloadInvoice } from '@/features/invoices/lib/invoiceDocument'
 
+/** Drop member PII so the public page never renders email / phone / company. */
+function toPublicInvoice(inv: InvoiceWithRelations | null): InvoiceWithRelations | null {
+  if (!inv || !inv.member) return inv
+  return {
+    ...inv,
+    member: { ...inv.member, email: undefined, phone: undefined, company: undefined, businessField: undefined },
+  }
+}
+
 export function PublicPaymentPage() {
   const { id = '' } = useParams()
   const [params] = useSearchParams()
   const forced = params.get('status') // 'success' | 'failed' (redirect dari gateway)
 
+  // Public page: never expose member PII (email/phone/company) to anyone with
+  // the link. Strip it before it can be rendered or downloaded. (The full
+  // hardening — fetch via the get-public-invoice Edge Function + lock RLS —
+  // is documented in supabase/rls.sql and the function header.)
   const { data: invoice, loading, reload } = useAsync<InvoiceWithRelations | null>(
-    () => invoiceService.getById(id),
+    () => invoiceService.getById(id).then(toPublicInvoice),
     [id],
   )
   const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode(), [id])
@@ -128,7 +141,7 @@ export function PublicPaymentPage() {
                   Total tagihan: <span className="font-semibold text-ink-900">{formatCurrency(invoice.amount)}</span>
                 </div>
                 {invoice.paperIdPaymentUrl ? (
-                  <Button onClick={() => window.open(invoice.paperIdPaymentUrl, '_blank')}>
+                  <Button onClick={() => window.open(invoice.paperIdPaymentUrl, '_blank', 'noopener,noreferrer')}>
                     <CreditCard className="h-4 w-4" />
                     Bayar via Paper.id
                     <ExternalLink className="h-4 w-4" />

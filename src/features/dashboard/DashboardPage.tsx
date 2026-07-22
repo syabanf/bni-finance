@@ -16,6 +16,7 @@ import {
   CardHeader,
   DonutChart,
   type DonutSegment,
+  ErrorState,
   LoadingState,
   PageHeader,
   StatCard,
@@ -124,7 +125,9 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { data: summary, loading } = useAsync<DashboardSummary>(() => dashboardService.summary())
+  const { data: summary, loading, error, reload } = useAsync<DashboardSummary>(() =>
+    dashboardService.summary(),
+  )
   const { data: recent, loading: recentLoading } = useAsync<InvoiceWithRelations[]>(() =>
     invoiceService.list(),
   )
@@ -137,6 +140,17 @@ export function DashboardPage() {
     })) ?? []
 
   const totalInvoices = summary?.statusBreakdown.reduce((acc, s) => acc + s.count, 0) ?? 0
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader title="Dashboard" description="Ringkasan invoice, pembayaran, dan keanggotaan." />
+        <Card>
+          <ErrorState message={error} onRetry={reload} />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div>

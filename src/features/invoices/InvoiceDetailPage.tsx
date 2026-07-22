@@ -40,6 +40,8 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
+import { paymentMethodLabel } from '@/lib/paymentMethod'
+import { todayISO } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
 import { PaymentPanel } from './components/PaymentPanel'
@@ -135,14 +137,20 @@ export function InvoiceDetailPage() {
     }
   }
 
-  const handleDownload = () => downloadInvoice(invoice)
+  const handleDownload = () => {
+    if (!downloadInvoice(invoice)) toast('Izinkan popup di browser untuk mengunduh invoice.', 'error')
+  }
 
   const payUrl = `${window.location.origin}/pay/${invoice.id}`
 
-  const copyPayLink = () => {
-    navigator.clipboard.writeText(payUrl)
-    setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 1500)
+  const copyPayLink = async () => {
+    try {
+      await navigator.clipboard.writeText(payUrl)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 1500)
+    } catch {
+      toast('Gagal menyalin tautan. Salin manual dari address bar.', 'error')
+    }
   }
 
   const sendPayLinkWa = () => {
@@ -156,12 +164,12 @@ export function InvoiceDetailPage() {
       ``,
       `Terima kasih. 🙏`,
     ].join('\n')
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer')
   }
 
   const openManual = () => {
     setMpAmount(invoice.amount)
-    setMpDate(new Date().toISOString().slice(0, 10))
+    setMpDate(todayISO())
     setMpMethod('bank_transfer')
     setMpNote('')
     setMpFile(null)
@@ -403,7 +411,7 @@ export function InvoiceDetailPage() {
                           {formatCurrency(p.amount)}
                         </div>
                         <div className="mt-0.5 text-xs text-ink-500">
-                          {p.paymentMethod?.replace(/_/g, ' ') ?? '—'} · {formatDateTime(p.paidAt)}
+                          {paymentMethodLabel(p.paymentMethod)} · {formatDateTime(p.paidAt)}
                         </div>
                         {p.note && <div className="mt-0.5 truncate text-xs text-ink-500">{p.note}</div>}
                         {p.proofUrl && (
@@ -549,7 +557,7 @@ export function InvoiceDetailPage() {
               <Input
                 type="date"
                 value={mpDate}
-                max={new Date().toISOString().slice(0, 10)}
+                max={todayISO()}
                 onChange={(e) => setMpDate(e.target.value)}
               />
             </Field>

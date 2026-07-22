@@ -1,5 +1,6 @@
 import type { InvoiceWithRelations } from '@/types'
 import { formatCurrency, formatDate, formatDateLong } from '@/lib/format'
+import { INVOICE_STATUS_LABEL } from '@/lib/status'
 
 /**
  * Self-contained invoice renderer.
@@ -13,14 +14,6 @@ const BRAND = '#E11900'
 const INK = '#0f172a'
 const MUTED = '#64748b'
 const LINE = '#e2e8f0'
-
-const STATUS_STYLE: Record<string, { label: string; bg: string; fg: string }> = {
-  draft: { label: 'DRAFT', bg: '#f1f5f9', fg: '#475569' },
-  sent: { label: 'OUTSTANDING', bg: '#fef3c7', fg: '#b45309' },
-  overdue: { label: 'OVERDUE', bg: '#fee2e2', fg: '#b91c1c' },
-  paid: { label: 'LUNAS', bg: '#dcfce7', fg: '#15803d' },
-  cancelled: { label: 'DIBATALKAN', bg: '#f1f5f9', fg: '#64748b' },
-}
 
 /** Escape DB/user-controlled values before inlining into invoice HTML (anti-XSS). */
 function esc(s: unknown): string {
@@ -41,7 +34,6 @@ function metaRow(label: string, value: string): string {
 export function renderInvoiceBody(inv: InvoiceWithRelations): string {
   const m = inv.member
   const ch = inv.chapter
-  const st = STATUS_STYLE[inv.status] ?? STATUS_STYLE.draft
   const itemTitle =
     inv.type === 'registration' ? 'Biaya Pendaftaran Member BNI' : 'Biaya Renewal Keanggotaan BNI'
   const itemSub = `Periode ${formatDate(inv.periodStart)} – ${formatDate(inv.periodEnd)}`
@@ -70,7 +62,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
         </div>
         <div style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);
                     padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.6px;">
-          ${st.label}
+          ${esc((INVOICE_STATUS_LABEL[inv.status] ?? 'Draft').toUpperCase())}
         </div>
       </div>
     </div>
@@ -187,9 +179,9 @@ export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
 }
 
 /** Open a fresh window with the invoice and trigger the browser print/save dialog. */
-export function downloadInvoice(inv: InvoiceWithRelations): void {
+export function downloadInvoice(inv: InvoiceWithRelations): boolean {
   const win = window.open('', '_blank', 'width=900,height=820')
-  if (!win) return
+  if (!win) return false
   win.document.open()
   win.document.write(buildInvoiceDocument(inv))
   win.document.close()
@@ -198,4 +190,5 @@ export function downloadInvoice(inv: InvoiceWithRelations): void {
   const trigger = () => win.print()
   if (win.document.readyState === 'complete') setTimeout(trigger, 350)
   else win.onload = () => setTimeout(trigger, 250)
+  return true
 }

@@ -32,21 +32,24 @@ export function formatCurrencyCompact(value: number): string {
 }
 
 /** 15 Jun 2024 */
-export function formatDate(iso: string | Date): string {
+export function formatDate(iso: string | Date | null | undefined): string {
+  if (iso == null) return '—'
   const d = typeof iso === 'string' ? new Date(iso) : iso
   if (Number.isNaN(d.getTime())) return '—'
   return `${d.getDate()} ${ID_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`
 }
 
 /** 15 Juni 2024 */
-export function formatDateLong(iso: string | Date): string {
+export function formatDateLong(iso: string | Date | null | undefined): string {
+  if (iso == null) return '—'
   const d = typeof iso === 'string' ? new Date(iso) : iso
   if (Number.isNaN(d.getTime())) return '—'
   return `${d.getDate()} ${ID_MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`
 }
 
 /** 15 Jun 2024, 10:30 */
-export function formatDateTime(iso: string | Date): string {
+export function formatDateTime(iso: string | Date | null | undefined): string {
+  if (iso == null) return '—'
   const d = typeof iso === 'string' ? new Date(iso) : iso
   if (Number.isNaN(d.getTime())) return '—'
   const time = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })

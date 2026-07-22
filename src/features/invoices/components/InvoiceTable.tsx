@@ -142,6 +142,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
           <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-50">
             <input
               type="checkbox"
+              aria-label="Pilih semua invoice"
               checked={!!allSelected}
               onChange={toggleAll}
               className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
@@ -163,6 +164,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
               {selectable && (
                 <input
                   type="checkbox"
+                  aria-label={`Pilih ${inv.number}`}
                   checked={selected?.has(inv.id) ?? false}
                   onChange={() => toggleOne(inv.id)}
                   onClick={(e) => e.stopPropagation()}
@@ -207,6 +209,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                 <Th className="w-10">
                   <input
                     type="checkbox"
+                    aria-label="Pilih semua invoice"
                     checked={!!allSelected}
                     onChange={toggleAll}
                     className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
@@ -236,6 +239,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                     <Td>
                       <input
                         type="checkbox"
+                        aria-label={`Pilih ${inv.number}`}
                         checked={selected?.has(inv.id) ?? false}
                         onChange={() => toggleOne(inv.id)}
                         onClick={(e) => e.stopPropagation()}

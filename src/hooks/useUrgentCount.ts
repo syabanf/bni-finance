@@ -13,7 +13,7 @@ export function useUrgentCount(): UrgentCount {
 
   useEffect(() => {
     let cancelled = false
-    const fetch = async () => {
+    const fetchCount = async () => {
       try {
         const summary = await dashboardService.summary()
         if (cancelled) return
@@ -24,8 +24,12 @@ export function useUrgentCount(): UrgentCount {
         // silently ignore — badge is non-critical
       }
     }
-    fetch()
-    return () => { cancelled = true }
+    fetchCount()
+    const t = setInterval(fetchCount, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
   }, [])
 
   return count

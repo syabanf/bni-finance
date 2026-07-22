@@ -11,6 +11,7 @@ export function Topbar() {
   const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,15 +36,25 @@ export function Topbar() {
           <span className="border-l border-ink-100 pl-2.5 text-[15px] font-bold text-ink-900">Finance Hub</span>
         </Link>
 
-        {/* Search */}
-        <div className="relative ml-auto hidden w-full max-w-xs sm:block">
+        {/* Search — submits to the invoice list (which reads ?q=) */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const q = search.trim()
+            navigate(q ? `/invoices?q=${encodeURIComponent(q)}` : '/invoices')
+          }}
+          className="relative ml-auto hidden w-full max-w-xs sm:block"
+        >
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
             type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Cari invoice, member…"
+            aria-label="Cari invoice atau member"
             className="h-9 w-full rounded-xl border border-ink-200 bg-ink-50 pl-9 pr-3 text-sm text-ink-700 placeholder:text-ink-400 transition-colors focus-ring focus:border-brand-400 focus:bg-white"
           />
-        </div>
+        </form>
 
         {/* Notifications */}
         <Link

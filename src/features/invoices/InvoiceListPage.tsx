@@ -10,6 +10,7 @@ import {
   Input,
   PageHeader,
   Select,
+  ErrorState,
   SummaryCard,
   TableSkeleton,
   useToast,
@@ -51,14 +52,16 @@ export function InvoiceListPage() {
   const initialType = (searchParams.get('type') as InvoiceType | null) ?? 'all'
   const initialChapter = searchParams.get('chapter') ?? 'all'
 
-  const { data: invoices, loading, reload } = useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
+  const { data: invoices, loading, error, reload } = useAsync<InvoiceWithRelations[]>(() =>
+    invoiceService.list(),
+  )
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
   const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode())
 
   const [status, setStatus] = useState<StatusFilter>(initialStatus)
   const [type, setType] = useState<InvoiceType | 'all'>(initialType)
   const [chapterId, setChapterId] = useState<string>(initialChapter)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -77,8 +80,9 @@ export function InvoiceListPage() {
       if (chapterId !== 'all' && inv.chapterId !== chapterId) return false
       if (q && !inv.number.toLowerCase().includes(q) && !(inv.member?.name ?? '').toLowerCase().includes(q))
         return false
-      if (dueFrom && (inv.dueDate ?? '') < dueFrom) return false
-      if (dueTo && (inv.dueDate ?? '') > dueTo) return false
+      // Missing due date is out-of-range for BOTH bounds (symmetric).
+      if (dueFrom && (!inv.dueDate || inv.dueDate < dueFrom)) return false
+      if (dueTo && (!inv.dueDate || inv.dueDate > dueTo)) return false
       return true
     })
   }, [invoices, type, chapterId, search, dueFrom, dueTo])
@@ -95,7 +99,12 @@ export function InvoiceListPage() {
     const amt = (pred: (i: InvoiceWithRelations) => boolean) =>
       list.filter(pred).reduce((a, i) => a + i.amount, 0)
     return {
-      total: { count: list.length, amount: amt(() => true) },
+      // Exclude cancelled from the headline total (matches the dashboard — a
+      // voided invoice shouldn't inflate "total billed").
+      total: {
+        count: list.filter((i) => i.status !== 'cancelled').length,
+        amount: amt((i) => i.status !== 'cancelled'),
+      },
       outstanding: {
         count: list.filter((i) => isOutstanding(i.status)).length,
         amount: amt((i) => isOutstanding(i.status)),
@@ -105,9 +114,19 @@ export function InvoiceListPage() {
     }
   }, [baseFiltered, countByStatus])
 
+  const filtered = useMemo(() => {
+    return baseFiltered.filter((inv) => {
+      if (status === 'outstanding') return isOutstanding(inv.status)
+      if (status !== 'all') return inv.status === status
+      return true
+    })
+  }, [baseFiltered, status])
+
+  // Bulk actions operate only on currently-visible (filtered) selected rows —
+  // so tightening a filter can't leave hidden invoices in the batch.
   const selectedInvoices = useMemo(
-    () => (invoices ?? []).filter((inv) => selected.has(inv.id)),
-    [invoices, selected],
+    () => filtered.filter((inv) => selected.has(inv.id)),
+    [filtered, selected],
   )
   const selectedSendable = useMemo(
     () => selectedInvoices.filter((inv) => inv.status === 'draft' || inv.status === 'sent' || inv.status === 'overdue'),
@@ -151,6 +170,7 @@ export function InvoiceListPage() {
         if (inv.status === 'draft') await invoiceService.send(inv.id)
       }
       let opened = 0
+      let blocked = 0
       let skipped = 0
       for (const inv of selectedSendable) {
         const payUrl = `${window.location.origin}/pay/${inv.id}`
@@ -162,7 +182,11 @@ export function InvoiceListPage() {
             continue
           }
           const msg = `Halo ${name}, berikut tagihan BNI Anda *${inv.number}* sebesar *${formatCurrency(inv.amount)}*. Silakan lakukan pembayaran melalui tautan berikut: ${payUrl}`
-          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener')
+          // window.open after an await loses user-activation, so the browser
+          // blocks all but the first tab — detect it (null return) and report.
+          const w = window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer')
+          if (w) opened++
+          else blocked++
         } else {
           const email = inv.member?.email
           if (!email) {
@@ -171,13 +195,22 @@ export function InvoiceListPage() {
           }
           const subject = `Tagihan BNI ${inv.number}`
           const body = `Halo ${name},\n\nBerikut tagihan BNI Anda ${inv.number} sebesar ${formatCurrency(inv.amount)}.\nSilakan lakukan pembayaran melalui tautan berikut:\n${payUrl}\n\nTerima kasih.`
-          window.open(`mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
+          // email is DB-sourced (BNI VM) — encode it so it can't inject extra
+          // mailto fields (?cc=/&bcc=). mailto success can't be reliably detected.
+          window.open(
+            `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+            '_blank',
+            'noopener,noreferrer',
+          )
+          opened++
         }
-        opened++
       }
       const ch = channel === 'whatsapp' ? 'WhatsApp' : 'email'
       const lack = channel === 'whatsapp' ? 'no. HP' : 'email'
-      toast(`${opened} ${ch} disiapkan${skipped ? `, ${skipped} dilewati (tanpa ${lack})` : ''}.`)
+      let msg = `${opened} ${ch} disiapkan`
+      if (skipped) msg += `, ${skipped} dilewati (tanpa ${lack})`
+      if (blocked) msg += `, ${blocked} diblokir popup (izinkan popup lalu ulangi)`
+      toast(msg + '.', blocked ? 'error' : undefined)
       setSelected(new Set())
       reload()
     } catch (err) {
@@ -187,15 +220,10 @@ export function InvoiceListPage() {
     }
   }
 
-  const filtered = useMemo(() => {
-    return baseFiltered.filter((inv) => {
-      if (status === 'outstanding') return isOutstanding(inv.status)
-      if (status !== 'all') return inv.status === status
-      return true
-    })
-  }, [baseFiltered, status])
-
-  useEffect(() => { setPage(1) }, [filtered])
+  // Reset ke halaman 1 setiap kali filter berubah
+  useEffect(() => {
+    setPage(1)
+  }, [filtered])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -220,7 +248,7 @@ export function InvoiceListPage() {
 
   const exportPdf = () => {
     const total = filtered.reduce((a, i) => a + i.amount, 0)
-    printTableReport({
+    const ok = printTableReport({
       title: 'Daftar Invoice',
       subtitle: `Status: ${STATUS_TABS.find((t) => t.value === status)?.label ?? 'Semua'}`,
       meta: [`${filtered.length} invoice`, `Dibuat ${formatDateTime(new Date())}`],
@@ -245,6 +273,7 @@ export function InvoiceListPage() {
       totals: ['', '', '', 'Total', formatCurrency(total), '', ''],
       documentTitle: 'Daftar Invoice — BNI Finance',
     })
+    if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
   }
 
   return (
@@ -439,7 +468,9 @@ export function InvoiceListPage() {
           </div>
         )}
 
-        {loading ? (
+        {error ? (
+          <ErrorState message={error} onRetry={reload} />
+        ) : loading ? (
           <TableSkeleton rows={8} cols={7} />
         ) : filtered.length === 0 ? (
           <EmptyState

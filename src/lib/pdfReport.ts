@@ -151,10 +151,14 @@ export function buildTableReportDocument(o: TableReportOptions): string {
 </html>`
 }
 
-/** Open the report in a fresh window and trigger the browser print/save dialog. */
-export function printTableReport(o: TableReportOptions): void {
+/**
+ * Open the report in a fresh window and trigger the browser print/save dialog.
+ * Returns false if the window was blocked (popup blocker) so the caller can
+ * tell the user instead of failing silently.
+ */
+export function printTableReport(o: TableReportOptions): boolean {
   const win = window.open('', '_blank', 'width=1000,height=820')
-  if (!win) return
+  if (!win) return false
   win.document.open()
   win.document.write(buildTableReportDocument(o))
   win.document.close()
@@ -162,4 +166,5 @@ export function printTableReport(o: TableReportOptions): void {
   const trigger = () => win.print()
   if (win.document.readyState === 'complete') setTimeout(trigger, 350)
   else win.onload = () => setTimeout(trigger, 250)
+  return true
 }

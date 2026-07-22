@@ -8,15 +8,18 @@ import {
   DonutChart,
   type DonutSegment,
   EmptyState,
+  ErrorState,
   ExportMenu,
   Input,
   PageHeader,
   StatCard,
   TableSkeleton,
+  useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
+import { paymentMethodLabel } from '@/lib/paymentMethod'
 import { todayISO } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
 import { printTableReport } from '@/lib/pdfReport'
@@ -76,9 +79,17 @@ interface ChapterRow {
 
 export function ReportPage() {
   const navigate = useNavigate()
-  const { data: invoices, loading: invLoading } = useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
-  const { data: payments, loading: payLoading } = useAsync<PaymentWithInvoice[]>(() => paymentService.list())
+  const { toast } = useToast()
+  const { data: invoices, loading: invLoading, error: invError, reload: reloadInv } =
+    useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
+  const { data: payments, loading: payLoading, error: payError, reload: reloadPay } =
+    useAsync<PaymentWithInvoice[]>(() => paymentService.list())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
+  const error = invError || payError
+  const reloadAll = () => {
+    reloadInv()
+    reloadPay()
+  }
 
   const [preset, setPreset] = useState<Preset>('this-year')
   const [customFrom, setCustomFrom] = useState('')
@@ -98,32 +109,46 @@ export function ReportPage() {
   }, [range.from, range.to])
 
   const report = useMemo(() => {
+    // Billing basis: invoices ISSUED in the period (by createdAt).
     const invs = (invoices ?? []).filter((i) => i.status !== 'cancelled' && inRange(i.createdAt))
-    const paid = invs.filter((i) => i.status === 'paid')
     const outstandingInvs = invs.filter((i) => i.status === 'sent' || i.status === 'overdue')
+    // Cash basis: payments RECEIVED in the period (by paidAt). "Diterima", the
+    // method breakdown, and the monthly "paid" bars all use this set, so they
+    // reconcile with one another instead of mixing bases.
+    const pays = (payments ?? []).filter((p) => inRange(p.paidAt))
 
     const ditagih = sum(invs.map((i) => i.amount))
-    const diterima = sum(paid.map((i) => i.paidAmount ?? i.amount))
+    const diterima = sum(pays.map((p) => p.amount))
     const outstanding = sum(outstandingInvs.map((i) => i.amount))
     const rate = ditagih > 0 ? Math.round((diterima / ditagih) * 100) : 0
 
-    // Per chapter
+    // Per chapter — ditagih/outstanding from invoices issued, diterima from
+    // payments received (keyed by the paid invoice's chapter).
     const chapMap = new Map<string, ChapterRow>()
+    const chapterName = (id: string) => chapters?.find((c) => c.id === id)?.displayName ?? '—'
+    const ensureRow = (id: string, name: string) => {
+      let row = chapMap.get(id)
+      if (!row) {
+        row = { id, name, count: 0, ditagih: 0, diterima: 0, outstanding: 0, rate: 0 }
+        chapMap.set(id, row)
+      }
+      return row
+    }
     for (const i of invs) {
-      const id = i.chapterId
-      const name = i.chapter?.displayName ?? chapters?.find((c) => c.id === id)?.displayName ?? '—'
-      const row = chapMap.get(id) ?? { id, name, count: 0, ditagih: 0, diterima: 0, outstanding: 0, rate: 0 }
+      const row = ensureRow(i.chapterId, i.chapter?.displayName ?? chapterName(i.chapterId))
       row.count += 1
       row.ditagih += i.amount
-      if (i.status === 'paid') row.diterima += i.paidAmount ?? i.amount
       if (i.status === 'sent' || i.status === 'overdue') row.outstanding += i.amount
-      chapMap.set(id, row)
+    }
+    for (const p of pays) {
+      const chId = p.invoice?.chapterId
+      if (chId) ensureRow(chId, chapterName(chId)).diterima += p.amount
     }
     const chapterRows = [...chapMap.values()]
       .map((r) => ({ ...r, rate: r.ditagih > 0 ? Math.round((r.diterima / r.ditagih) * 100) : 0 }))
       .sort((a, b) => b.ditagih - a.ditagih)
 
-    // Per type
+    // Per type (invoices issued)
     const reg = invs.filter((i) => i.type === 'registration')
     const ren = invs.filter((i) => i.type === 'renewal')
     const typeData: DonutSegment[] = [
@@ -131,7 +156,7 @@ export function ReportPage() {
       { label: 'Renewal', value: ren.length, color: '#3b82f6' },
     ]
 
-    // Monthly issued vs collected
+    // Monthly: issued (by createdAt) vs received (by paidAt)
     const monthMap = new Map<string, { issued: number; paid: number }>()
     const bump = (key: string, field: 'issued' | 'paid', amt: number) => {
       const m = monthMap.get(key) ?? { issued: 0, paid: 0 }
@@ -139,17 +164,16 @@ export function ReportPage() {
       monthMap.set(key, m)
     }
     for (const i of invs) bump(i.createdAt.slice(0, 7), 'issued', i.amount)
-    for (const i of paid) bump((i.paidAt ?? i.createdAt).slice(0, 7), 'paid', i.paidAmount ?? i.amount)
+    for (const p of pays) bump(p.paidAt.slice(0, 7), 'paid', p.amount)
     const monthly = [...monthMap.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .slice(-12)
       .map(([month, v]) => ({ month, ...v }))
 
-    // Payment methods (cash actually received in the period)
-    const pays = (payments ?? []).filter((p) => inRange(p.paidAt))
+    // Payment methods (cash received in period)
     const methodMap = new Map<string, { count: number; amount: number }>()
     for (const p of pays) {
-      const key = (p.paymentMethod || 'Lainnya').replace(/_/g, ' ')
+      const key = p.paymentMethod || 'other'
       const m = methodMap.get(key) ?? { count: 0, amount: 0 }
       m.count += 1
       m.amount += p.amount
@@ -176,7 +200,7 @@ export function ReportPage() {
   }
 
   const exportPdf = () => {
-    printTableReport({
+    const ok = printTableReport({
       title: 'Laporan Keuangan',
       subtitle: `${periodLabel} · ${periodRange}`,
       meta: [`${report.count} invoice`, `Dibuat ${formatDateTime(new Date())}`],
@@ -225,7 +249,7 @@ export function ReportPage() {
             { label: 'Nominal', align: 'right' },
           ],
           rows: report.methods.map((m) => [
-            m.method.replace(/\b\w/g, (c) => c.toUpperCase()),
+            paymentMethodLabel(m.method),
             m.count,
             formatCurrency(m.amount),
           ]),
@@ -233,6 +257,21 @@ export function ReportPage() {
       ],
       documentTitle: 'Laporan Keuangan — BNI Finance',
     })
+    if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
+  }
+
+  if (error) {
+    return (
+      <div>
+        <PageHeader
+          title="Laporan Keuangan"
+          description="Ringkasan penagihan dan penerimaan per periode."
+        />
+        <Card>
+          <ErrorState message={error} onRetry={reloadAll} />
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -310,7 +349,7 @@ export function ReportPage() {
             iconTone="green"
             value={formatCurrencyCompact(report.diterima)}
             label="Total Diterima"
-            hint="Invoice lunas"
+            hint="Diterima periode ini"
           />
           <StatCard
             icon={Wallet}
@@ -420,7 +459,7 @@ export function ReportPage() {
                 <div className="space-y-3">
                   {report.methods.map((m) => (
                     <div key={m.method} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="capitalize text-ink-600">{m.method}</span>
+                      <span className="text-ink-600">{paymentMethodLabel(m.method)}</span>
                       <div className="text-right">
                         <div className="font-semibold text-ink-900">{formatCurrency(m.amount)}</div>
                         <div className="text-xs text-ink-400">{m.count}× transaksi</div>

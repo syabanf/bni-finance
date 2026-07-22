@@ -1,34 +1,8 @@
 import { supabase } from '@/lib/supabase'
 import { getAppSetting } from './settingsRepository'
 import type { MemberRepository } from '@/services/types'
-import type { Chapter, Member, MemberStatus, MemberWithChapter } from '@/types'
-
-function rowToMember(r: Record<string, unknown>): Member {
-  return {
-    id: r.id as string,
-    chapterId: r.chapter_id as string,
-    name: r.name as string,
-    email: r.email as string | undefined,
-    phone: r.phone as string | undefined,
-    company: r.company as string | undefined,
-    businessField: r.business_field as string | undefined,
-    status: r.status as MemberStatus,
-    joinedDate: r.joined_date as string | null,
-    renewalDate: r.renewal_date as string | null,
-    syncedAt: r.synced_at as string,
-  }
-}
-
-function rowToChapter(r: Record<string, unknown>): Chapter {
-  return {
-    id: r.id as string,
-    name: r.name as string,
-    displayName: r.display_name as string,
-    areaName: r.area_name as string | undefined,
-    cityName: r.city_name as string | undefined,
-    syncedAt: r.synced_at as string,
-  }
-}
+import type { MemberWithChapter } from '@/types'
+import { rowToChapter, rowToMember } from './mappers'
 
 function withChapter(r: Record<string, unknown>): MemberWithChapter {
   const ch = r.chapters as Record<string, unknown> | null

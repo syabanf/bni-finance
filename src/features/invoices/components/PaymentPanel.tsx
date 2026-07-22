@@ -49,11 +49,15 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
     }
   }
 
-  const copyVa = () => {
+  const copyVa = async () => {
     if (!invoice.xenditVaNumber) return
-    navigator.clipboard.writeText(invoice.xenditVaNumber)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(invoice.xenditVaNumber)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast('Gagal menyalin. Salin nomor VA secara manual.', 'error')
+    }
   }
 
   const sendWa = () => {
@@ -74,7 +78,7 @@ export function PaymentPanel({ invoice, onUpdated, publicMode = false }: Props) 
     }
     if (invoice.xenditExpiresAt) lines.push(`⏰ Berlaku s/d ${formatDateTime(invoice.xenditExpiresAt)}`)
     lines.push(``, `Terima kasih. 🙏`)
-    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank')
+    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank', 'noopener,noreferrer')
   }
 
   return (
