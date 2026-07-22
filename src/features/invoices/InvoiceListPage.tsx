@@ -24,6 +24,7 @@ import { cn } from '@/lib/cn'
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
 import { isOutstanding, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { normalizePhone } from '@/lib/whatsapp'
+import { daysUntil } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
@@ -43,6 +44,16 @@ const TYPE_OPTIONS: { value: InvoiceType | 'all'; label: string }[] = [
   { value: 'all', label: 'Semua Tipe' },
   { value: 'registration', label: 'Pendaftaran' },
   { value: 'renewal', label: 'Renewal' },
+]
+
+/** Umur tunggakan (AR aging) — hanya relevan untuk invoice yang belum dibayar. */
+type Aging = 'all' | '1-30' | '31-60' | '60+'
+
+const AGING_OPTIONS: { value: Aging; label: string }[] = [
+  { value: 'all', label: 'Semua Umur' },
+  { value: '1-30', label: 'Telat 1–30 hari' },
+  { value: '31-60', label: 'Telat 31–60 hari' },
+  { value: '60+', label: 'Telat > 60 hari' },
 ]
 
 export function InvoiceListPage() {
@@ -65,6 +76,9 @@ export function InvoiceListPage() {
   const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
+  const [aging, setAging] = useState<Aging>('all')
+  const [issuedFrom, setIssuedFrom] = useState('')
+  const [issuedTo, setIssuedTo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
   const [page, setPage] = useState(1)
@@ -84,9 +98,22 @@ export function InvoiceListPage() {
       // Missing due date is out-of-range for BOTH bounds (symmetric).
       if (dueFrom && (!inv.dueDate || inv.dueDate < dueFrom)) return false
       if (dueTo && (!inv.dueDate || inv.dueDate > dueTo)) return false
+      // Tanggal terbit (createdAt) — sumbu waktu yang dipakai Laporan.
+      const issued = inv.createdAt ? inv.createdAt.slice(0, 10) : ''
+      if (issuedFrom && (!issued || issued < issuedFrom)) return false
+      if (issuedTo && (!issued || issued > issuedTo)) return false
+      // Umur tunggakan: hanya invoice belum dibayar yang punya "umur".
+      if (aging !== 'all') {
+        if (!isOutstanding(inv.status) || !inv.dueDate) return false
+        const late = -daysUntil(inv.dueDate) // positif = jumlah hari telat
+        if (late < 1) return false
+        if (aging === '1-30' && late > 30) return false
+        if (aging === '31-60' && (late < 31 || late > 60)) return false
+        if (aging === '60+' && late <= 60) return false
+      }
       return true
     })
-  }, [invoices, type, chapterId, search, dueFrom, dueTo])
+  }, [invoices, type, chapterId, search, dueFrom, dueTo, issuedFrom, issuedTo, aging])
 
   const countByStatus = useMemo(() => {
     return baseFiltered.reduce<Record<string, number>>((acc, inv) => {
@@ -398,6 +425,22 @@ export function InvoiceListPage() {
                 </option>
               ))}
             </Select>
+            {/* Umur tunggakan (aging) */}
+            <Select
+              value={aging}
+              onChange={(e) => setAging(e.target.value as Aging)}
+              className="w-full sm:w-44"
+              aria-label="Umur tunggakan"
+            >
+              {AGING_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             {/* Filter jatuh tempo (rentang tanggal) */}
             <div className="flex items-center gap-2">
               <span className="text-[13px] text-ink-500">Jatuh tempo</span>
@@ -427,6 +470,41 @@ export function InvoiceListPage() {
                   }}
                   className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
                   aria-label="Reset filter jatuh tempo"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter tanggal terbit (createdAt) — sumbu waktu Laporan */}
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] text-ink-500">Tanggal terbit</span>
+              <Input
+                type="date"
+                value={issuedFrom}
+                max={issuedTo || undefined}
+                onChange={(e) => setIssuedFrom(e.target.value)}
+                className="w-[150px]"
+                aria-label="Tanggal terbit dari"
+              />
+              <span className="text-ink-400">–</span>
+              <Input
+                type="date"
+                value={issuedTo}
+                min={issuedFrom || undefined}
+                onChange={(e) => setIssuedTo(e.target.value)}
+                className="w-[150px]"
+                aria-label="Tanggal terbit sampai"
+              />
+              {(issuedFrom || issuedTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIssuedFrom('')
+                    setIssuedTo('')
+                  }}
+                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+                  aria-label="Reset filter tanggal terbit"
                 >
                   <X className="h-4 w-4" />
                 </button>

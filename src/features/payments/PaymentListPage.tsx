@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Search, Wallet, X } from 'lucide-react'
-import type { PaymentWithInvoice } from '@/types'
+import type { Chapter, PaymentWithInvoice } from '@/types'
 import {
   Avatar,
   Badge,
@@ -23,7 +23,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { paymentService } from '@/services'
+import { chapterService, paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { monthNowKey } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
@@ -38,8 +38,11 @@ export function PaymentListPage() {
     paymentService.list(),
   )
 
+  const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
+
   const [search, setSearch] = useState('')
   const [method, setMethod] = useState('all')
+  const [chapterId, setChapterId] = useState('all')
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
 
@@ -55,6 +58,7 @@ export function PaymentListPage() {
     const q = search.trim().toLowerCase()
     return (payments ?? []).filter((p) => {
       if (method !== 'all' && (p.paymentMethod ?? '') !== method) return false
+      if (chapterId !== 'all' && p.invoice?.chapterId !== chapterId) return false
       const day = p.paidAt ? p.paidAt.slice(0, 10) : ''
       if (dueFrom && (!day || day < dueFrom)) return false
       if (dueTo && (!day || day > dueTo)) return false
@@ -66,7 +70,7 @@ export function PaymentListPage() {
         return false
       return true
     })
-  }, [payments, search, method, dueFrom, dueTo])
+  }, [payments, search, method, chapterId, dueFrom, dueTo])
 
   // Summary reflects the active filters.
   const total = filtered.reduce((acc, p) => acc + p.amount, 0)
@@ -74,11 +78,15 @@ export function PaymentListPage() {
   const thisMonth = filtered.filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
   const thisMonthTotal = thisMonth.reduce((acc, p) => acc + p.amount, 0)
 
-  const EXPORT_HEADERS = ['Member', 'No. Invoice', 'Nominal', 'Metode', 'Waktu Bayar']
+  const chapterName = (id?: string) =>
+    id ? (chapters?.find((c) => c.id === id)?.displayName ?? '') : ''
+
+  const EXPORT_HEADERS = ['Member', 'Chapter', 'No. Invoice', 'Nominal', 'Metode', 'Waktu Bayar']
   // Raw rows (amount numeric so Excel can sum) — always the FILTERED set.
   const exportRows = () =>
     filtered.map((p) => [
       p.member?.name ?? '',
+      chapterName(p.invoice?.chapterId),
       p.invoice?.number ?? '',
       p.amount,
       paymentMethodLabel(p.paymentMethod),
@@ -95,6 +103,7 @@ export function PaymentListPage() {
       meta: [`${filtered.length} transaksi`, `Dibuat ${formatDateTime(new Date())}`],
       columns: [
         { label: 'Member' },
+        { label: 'Chapter' },
         { label: 'No. Invoice' },
         { label: 'Nominal', align: 'right' },
         { label: 'Metode' },
@@ -102,12 +111,13 @@ export function PaymentListPage() {
       ],
       rows: filtered.map((p) => [
         p.member?.name ?? '—',
+        chapterName(p.invoice?.chapterId) || '—',
         p.invoice?.number ?? '—',
         formatCurrency(p.amount),
         paymentMethodLabel(p.paymentMethod),
         formatDateTime(p.paidAt),
       ]),
-      totals: ['Total', '', formatCurrency(total), '', ''],
+      totals: ['Total', '', '', formatCurrency(total), '', ''],
       documentTitle: 'Riwayat Pembayaran — BNI Finance',
     })
     if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
@@ -154,6 +164,19 @@ export function PaymentListPage() {
                 {methodOptions.map((m) => (
                   <option key={m} value={m}>
                     {paymentMethodLabel(m)}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={chapterId}
+                onChange={(e) => setChapterId(e.target.value)}
+                className="w-full sm:w-44"
+                aria-label="Filter chapter"
+              >
+                <option value="all">Semua Chapter</option>
+                {chapters?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.displayName}
                   </option>
                 ))}
               </Select>

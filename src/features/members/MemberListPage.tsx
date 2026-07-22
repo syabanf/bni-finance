@@ -27,6 +27,16 @@ import { chapterService, memberService } from '@/services'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
 
+/** Kelengkapan kontak — menentukan siapa yang bisa dikirimi WhatsApp/Email. */
+type ContactFilter = 'all' | 'no-phone' | 'no-email' | 'no-contact'
+
+const CONTACT_OPTIONS: { value: ContactFilter; label: string }[] = [
+  { value: 'all', label: 'Semua Kontak' },
+  { value: 'no-phone', label: 'Tanpa No. HP' },
+  { value: 'no-email', label: 'Tanpa Email' },
+  { value: 'no-contact', label: 'Tanpa HP & Email' },
+]
+
 const MEMBER_STATUS_LABEL: Record<string, string> = {
   active: 'Aktif',
   pending: 'Pending',
@@ -48,6 +58,7 @@ export function MemberListPage() {
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
   const [memberStatus, setMemberStatus] = useState<MemberStatus | 'all'>('all')
+  const [contact, setContact] = useState<ContactFilter>('all')
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
 
@@ -63,9 +74,15 @@ export function MemberListPage() {
       if (dueTo && (!m.renewalDate || m.renewalDate > dueTo)) return false
       if (q && !m.name.toLowerCase().includes(q) && !m.id.toLowerCase().includes(q) && !(m.email ?? '').toLowerCase().includes(q))
         return false
+      // Kelengkapan kontak — bulk WhatsApp/Email diam-diam melewati member ini.
+      const hasPhone = Boolean(m.phone?.trim())
+      const hasEmail = Boolean(m.email?.trim())
+      if (contact === 'no-phone' && hasPhone) return false
+      if (contact === 'no-email' && hasEmail) return false
+      if (contact === 'no-contact' && (hasPhone || hasEmail)) return false
       return true
     })
-  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo])
+  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo, contact])
 
   const statusCounts = useMemo(() => {
     const list = baseFiltered
@@ -172,6 +189,18 @@ export function MemberListPage() {
               {chapters?.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.displayName}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={contact}
+              onChange={(e) => setContact(e.target.value as ContactFilter)}
+              className="w-full sm:w-44"
+              aria-label="Filter kelengkapan kontak"
+            >
+              {CONTACT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
                 </option>
               ))}
             </Select>
