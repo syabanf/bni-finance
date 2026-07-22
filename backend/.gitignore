@@ -1,0 +1,6 @@
+# Rahasia — berisi DATABASE_URL & API_KEY
+.env
+
+# Binary hasil build
+bin/
+/api
