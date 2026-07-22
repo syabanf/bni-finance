@@ -1,35 +1,45 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Lock, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Lock, Mail, ShieldCheck, Zap } from 'lucide-react'
 import { Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const DEMO_EMAIL = 'admin@bni-finance.com'
+const DEMO_PASSWORD = 'admin123'
 
 export function LoginPage() {
   const { login, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState(useMock ? 'admin@bni-finance.com' : '')
-  const [password, setPassword] = useState(useMock ? 'admin123' : '')
+  const [email, setEmail] = useState(useMock ? DEMO_EMAIL : '')
+  const [password, setPassword] = useState(useMock ? DEMO_PASSWORD : '')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [quickLoading, setQuickLoading] = useState(false)
 
   if (!authLoading && user) {
     navigate('/dashboard', { replace: true })
   }
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
+  const doLogin = async (e: string, p: string, setBusy: (v: boolean) => void) => {
     setError(null)
-    setLoading(true)
+    setBusy(true)
     try {
-      await login(email, password)
+      await login(e, p)
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal masuk.')
-      setLoading(false)
+      setBusy(false)
     }
   }
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    doLogin(email, password, setLoading)
+  }
+
+  // One-click demo login — mock mode only.
+  const quickLogin = () => doLogin(DEMO_EMAIL, DEMO_PASSWORD, setQuickLoading)
 
   return (
     <div className="flex min-h-screen bg-ink-50">
@@ -111,17 +121,39 @@ export function LoginPage() {
               <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
             )}
 
-            <Button type="submit" size="lg" loading={loading} className="w-full">
+            <Button type="submit" size="lg" loading={loading} disabled={quickLoading} className="w-full">
               Masuk
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
           </form>
 
           {useMock && (
-            <div className="mt-6 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-3 text-xs text-ink-500">
-              <span className="font-semibold text-ink-700">Demo:</span> gunakan kredensial apa pun —
-              data berjalan di atas mock repository.
-            </div>
+            <>
+              <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
+                <span className="h-px flex-1 bg-ink-100" />
+                atau
+                <span className="h-px flex-1 bg-ink-100" />
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                loading={quickLoading}
+                disabled={loading}
+                onClick={quickLogin}
+                className="w-full"
+              >
+                {!quickLoading && <Zap className="h-4 w-4" />}
+                Login Cepat sebagai Admin Nasional
+              </Button>
+
+              <div className="mt-4 rounded-xl border border-dashed border-ink-200 bg-white px-4 py-3 text-xs text-ink-500">
+                <span className="font-semibold text-ink-700">Demo:</span> gunakan kredensial apa pun
+                atau klik <span className="font-medium text-ink-700">Login Cepat</span> — data berjalan
+                di atas mock repository.
+              </div>
+            </>
           )}
         </div>
       </div>
