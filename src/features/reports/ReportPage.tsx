@@ -22,6 +22,7 @@ import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/for
 import { paymentMethodLabel } from '@/lib/paymentMethod'
 import { todayISO } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
+import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
 
@@ -191,13 +192,21 @@ export function ReportPage() {
   const periodLabel = PRESETS.find((p) => p.value === preset)?.label ?? 'Semua'
   const periodRange = `${range.from || 'awal'} – ${range.to || todayISO()}`
 
-  const exportCsv = () => {
-    downloadCsv(
-      `laporan-${range.from || 'awal'}_${range.to || todayISO()}.csv`,
-      ['Chapter', 'Jumlah Invoice', 'Ditagih', 'Diterima', 'Outstanding', 'Collection Rate'],
-      report.chapterRows.map((r) => [r.name, r.count, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`]),
-    )
-  }
+  const EXPORT_HEADERS = [
+    'Chapter',
+    'Jumlah Invoice',
+    'Ditagih',
+    'Diterima',
+    'Outstanding',
+    'Collection Rate',
+  ]
+  // Raw rows (amounts numeric so Excel can sum) — reflects the active period.
+  const exportRows = () =>
+    report.chapterRows.map((r) => [r.name, r.count, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`])
+  const exportBase = `laporan-${range.from || 'awal'}_${range.to || todayISO()}`
+
+  const exportCsv = () => downloadCsv(`${exportBase}.csv`, EXPORT_HEADERS, exportRows())
+  const exportExcel = () => downloadXlsx(exportBase, 'Laporan Keuangan', EXPORT_HEADERS, exportRows())
 
   const exportPdf = () => {
     const ok = printTableReport({
@@ -280,7 +289,7 @@ export function ReportPage() {
         title="Laporan Keuangan"
         description="Ringkasan penagihan dan penerimaan per periode."
         action={
-          <ExportMenu onCsv={exportCsv} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
+          <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
         }
       />
 

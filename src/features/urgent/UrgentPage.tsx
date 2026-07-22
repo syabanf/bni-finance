@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Download,
   MessageCircle,
+  Search,
   UserPlus,
 } from 'lucide-react'
 import type { Chapter, FeeSettings, InvoiceWithRelations, MemberWithChapter, RenewalDueMember } from '@/types'
@@ -17,6 +18,8 @@ import {
   Card,
   CardHeader,
   EmptyState,
+  ExportMenu,
+  Input,
   PageHeader,
   Select,
   Table,
@@ -31,7 +34,8 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService, memberService, settingsService } from '@/services'
 import { addDays, addYear, todayISO } from '@/lib/date'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
+import { makeExportHandlers } from '@/lib/exporters'
 import { cn } from '@/lib/cn'
 import { downloadInvoice } from '@/features/invoices/lib/invoiceDocument'
 
@@ -664,7 +668,9 @@ function RegistrationSection({
 // ---------------------------------------------------------------------------
 
 export function UrgentPage() {
+  const { toast } = useToast()
   const [chapterId, setChapterId] = useState<string>('all')
+  const [search, setSearch] = useState('')
 
   const {
     data: overdue,
@@ -685,23 +691,82 @@ export function UrgentPage() {
   const { data: fees } = useAsync<FeeSettings>(() => settingsService.getFees())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
+  const q = search.trim().toLowerCase()
+
   const filteredOverdue = useMemo(
-    () => (chapterId === 'all' ? overdue : overdue?.filter((i) => i.chapterId === chapterId)) ?? null,
-    [overdue, chapterId],
+    () =>
+      overdue?.filter(
+        (i) =>
+          (chapterId === 'all' || i.chapterId === chapterId) &&
+          (!q ||
+            i.number.toLowerCase().includes(q) ||
+            (i.member?.name ?? '').toLowerCase().includes(q)),
+      ) ?? null,
+    [overdue, chapterId, q],
   )
   const filteredRenewal = useMemo(
-    () => (chapterId === 'all' ? renewalDue : renewalDue?.filter((m) => m.chapterId === chapterId)) ?? null,
-    [renewalDue, chapterId],
+    () =>
+      renewalDue?.filter(
+        (m) =>
+          (chapterId === 'all' || m.chapterId === chapterId) &&
+          (!q || m.name.toLowerCase().includes(q) || (m.email ?? '').toLowerCase().includes(q)),
+      ) ?? null,
+    [renewalDue, chapterId, q],
   )
   const filteredEligible = useMemo(
-    () => (chapterId === 'all' ? eligible : eligible?.filter((m) => m.chapterId === chapterId)) ?? null,
-    [eligible, chapterId],
+    () =>
+      eligible?.filter(
+        (m) =>
+          (chapterId === 'all' || m.chapterId === chapterId) &&
+          (!q || m.name.toLowerCase().includes(q) || (m.email ?? '').toLowerCase().includes(q)),
+      ) ?? null,
+    [eligible, chapterId, q],
   )
 
   const totalUrgent =
     (filteredOverdue?.length ?? 0) +
     (filteredRenewal?.length ?? 0) +
     (filteredEligible?.length ?? 0)
+
+  // One combined "action list" export covering all three sections, respecting
+  // the active chapter + search filters.
+  const exportHandlers = makeExportHandlers({
+    filename: 'perlu-tindakan',
+    title: 'Perlu Tindakan',
+    subtitle: `Chapter: ${chapterId === 'all' ? 'Semua' : (chapters?.find((c) => c.id === chapterId)?.displayName ?? chapterId)}`,
+    meta: [`${totalUrgent} item`, `Dibuat ${formatDateTime(new Date())}`],
+    columns: [
+      { label: 'Jenis' },
+      { label: 'Nama' },
+      { label: 'Chapter' },
+      { label: 'Detail' },
+      { label: 'Tanggal' },
+    ],
+    rows: [
+      ...(filteredOverdue ?? []).map((i) => [
+        'Overdue',
+        i.member?.name ?? '',
+        i.chapter?.displayName ?? '',
+        `${i.number} · ${formatCurrency(i.amount)}`,
+        formatDate(i.dueDate),
+      ]),
+      ...(filteredRenewal ?? []).map((m) => [
+        'Renewal',
+        m.name,
+        m.chapter?.displayName ?? '',
+        `Berakhir ${formatDate(m.lastInvoice.periodEnd)} · ${m.daysUntilDue} hari`,
+        formatDate(m.lastInvoice.periodEnd),
+      ]),
+      ...(filteredEligible ?? []).map((m) => [
+        'Pendaftaran',
+        m.name,
+        m.chapter?.displayName ?? '',
+        m.email ?? '',
+        m.joinedDate ? formatDate(m.joinedDate) : '',
+      ]),
+    ],
+    onPopupBlocked: () => toast('Izinkan popup di browser untuk mengekspor PDF.', 'error'),
+  })
 
   return (
     <div>
@@ -722,6 +787,7 @@ export function UrgentPage() {
                 </option>
               ))}
             </Select>
+            <ExportMenu {...exportHandlers} disabled={totalUrgent === 0} />
             {totalUrgent > 0 && (
               <div className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2">
                 <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -731,6 +797,19 @@ export function UrgentPage() {
           </div>
         }
       />
+
+      {/* Pencarian lintas-seksi */}
+      <Card className="mb-5">
+        <div className="relative p-4">
+          <Search className="pointer-events-none absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama member atau nomor invoice…"
+            className="pl-10"
+          />
+        </div>
+      </Card>
 
       <div className="space-y-5">
         <OverdueSection invoices={filteredOverdue} loading={loadingOverdue} />

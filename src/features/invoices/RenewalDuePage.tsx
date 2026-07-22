@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, CalendarClock, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, CalendarClock, CheckCircle2, Search, X } from 'lucide-react'
 import type { FeeSettings, RenewalDueMember } from '@/types'
 import {
   Avatar,
@@ -8,7 +8,10 @@ import {
   Button,
   Card,
   EmptyState,
+  ExportMenu,
+  Input,
   PageHeader,
+  Select,
   Table,
   TBody,
   Td,
@@ -21,7 +24,17 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, settingsService } from '@/services'
 import { addDays, addYear, todayISO } from '@/lib/date'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
+import { makeExportHandlers } from '@/lib/exporters'
+
+type Urgency = 'all' | 'overdue' | 'week' | 'later'
+
+const URGENCY_OPTIONS: { value: Urgency; label: string }[] = [
+  { value: 'all', label: 'Semua Urgensi' },
+  { value: 'overdue', label: 'Sudah terlewat' },
+  { value: 'week', label: '≤ 7 hari' },
+  { value: 'later', label: '> 7 hari' },
+]
 
 function DueBadge({ days }: { days: number }) {
   if (days < 0) return <Badge tone="red">Terlewat {Math.abs(days)} hari</Badge>
@@ -39,8 +52,27 @@ export function RenewalDuePage() {
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
+  const [search, setSearch] = useState('')
+  const [urgency, setUrgency] = useState<Urgency>('all')
 
-  const allSelected = !!members && members.length > 0 && selected.size === members.length
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return (members ?? []).filter((m) => {
+      if (urgency === 'overdue' && m.daysUntilDue >= 0) return false
+      if (urgency === 'week' && !(m.daysUntilDue >= 0 && m.daysUntilDue <= 7)) return false
+      if (urgency === 'later' && m.daysUntilDue <= 7) return false
+      if (
+        q &&
+        !m.name.toLowerCase().includes(q) &&
+        !(m.email ?? '').toLowerCase().includes(q) &&
+        !(m.chapter?.displayName ?? '').toLowerCase().includes(q)
+      )
+        return false
+      return true
+    })
+  }, [members, search, urgency])
+
+  const allSelected = filtered.length > 0 && filtered.every((m) => selected.has(m.id))
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -49,9 +81,9 @@ export function RenewalDuePage() {
       return next
     })
 
+  // Select-all applies to the CURRENTLY FILTERED rows only.
   const toggleAll = () => {
-    if (!members) return
-    setSelected(allSelected ? new Set() : new Set(members.map((m) => m.id)))
+    setSelected(allSelected ? new Set() : new Set(filtered.map((m) => m.id)))
   }
 
   const selectedTotal = useMemo(
@@ -60,10 +92,11 @@ export function RenewalDuePage() {
   )
 
   const handleGenerate = async () => {
-    if (!members || !fees || selected.size === 0) return
+    if (!fees || selected.size === 0) return
     setGenerating(true)
     try {
-      const targets = members.filter((m) => selected.has(m.id))
+      // Only act on rows still visible under the active filter.
+      const targets = filtered.filter((m) => selected.has(m.id))
       for (const m of targets) {
         const periodStart = addDays(m.lastInvoice.periodEnd, 1)
         await invoiceService.create({
@@ -85,11 +118,34 @@ export function RenewalDuePage() {
     }
   }
 
+  const exportHandlers = makeExportHandlers({
+    filename: 'renewal-due',
+    title: 'Renewal Due',
+    subtitle: `Urgensi: ${URGENCY_OPTIONS.find((u) => u.value === urgency)?.label ?? 'Semua'}`,
+    meta: [`${filtered.length} member`, `Dibuat ${formatDateTime(new Date())}`],
+    columns: [
+      { label: 'Member' },
+      { label: 'Chapter' },
+      { label: 'Email' },
+      { label: 'Berakhir' },
+      { label: 'Sisa Hari', align: 'right' },
+    ],
+    rows: filtered.map((m) => [
+      m.name,
+      m.chapter?.displayName ?? '',
+      m.email ?? '',
+      formatDate(m.lastInvoice.periodEnd),
+      m.daysUntilDue,
+    ]),
+    onPopupBlocked: () => toast('Izinkan popup di browser untuk mengekspor PDF.', 'error'),
+  })
+
   return (
     <div>
       <PageHeader
         title="Renewal Due"
         description="Member yang masa keanggotaannya berakhir dalam 30 hari ke depan."
+        action={<ExportMenu {...exportHandlers} disabled={filtered.length === 0} />}
         breadcrumb={
           <button
             onClick={() => navigate('/invoices')}
@@ -102,6 +158,46 @@ export function RenewalDuePage() {
       />
 
       <Card>
+        {/* Filter: pencarian + urgensi */}
+        <div className="space-y-3 border-b border-ink-100 p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari nama member, email, atau chapter…"
+              className="pl-10"
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={urgency}
+              onChange={(e) => setUrgency(e.target.value as Urgency)}
+              className="w-full sm:w-48"
+            >
+              {URGENCY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+            {(search || urgency !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setUrgency('all')
+                }}
+                className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+                aria-label="Reset filter renewal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+            <span className="ml-auto text-sm text-ink-400">{filtered.length} member</span>
+          </div>
+        </div>
+
         {/* Bulk action bar */}
         {selected.size > 0 && (
           <div className="flex flex-col gap-3 border-b border-ink-100 bg-brand-50/50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
@@ -128,11 +224,17 @@ export function RenewalDuePage() {
             title="Tidak ada renewal jatuh tempo"
             description="Semua member masih dalam masa keanggotaan aktif untuk 30 hari ke depan."
           />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={CalendarClock}
+            title="Tidak ada hasil"
+            description="Tidak ada member yang cocok dengan filter saat ini."
+          />
         ) : (
           <>
             {/* Mobile cards */}
             <div className="divide-y divide-ink-100 lg:hidden">
-              {members.map((m) => (
+              {filtered.map((m) => (
                 <div
                   key={m.id}
                   onClick={() => toggle(m.id)}
@@ -182,7 +284,7 @@ export function RenewalDuePage() {
                   </Tr>
                 </THead>
                 <TBody>
-                  {members.map((m) => (
+                  {filtered.map((m) => (
                     <Tr key={m.id} onClick={() => toggle(m.id)} className={selected.has(m.id) ? 'bg-brand-50/40' : ''}>
                       <Td>
                         <input

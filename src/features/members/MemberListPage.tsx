@@ -1,13 +1,13 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Download, Eye, Search, Users, X } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Users, X } from 'lucide-react'
 import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Avatar,
-  Button,
   Card,
   EmptyState,
   ErrorState,
+  ExportMenu,
   Input,
   MemberStatusBadge,
   PageHeader,
@@ -20,14 +20,22 @@ import {
   THead,
   Tr,
   TableSkeleton,
+  useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
-import { formatDate } from '@/lib/format'
-import { downloadCsv } from '@/lib/csv'
+import { formatDate, formatDateTime } from '@/lib/format'
+import { makeExportHandlers } from '@/lib/exporters'
+
+const MEMBER_STATUS_LABEL: Record<string, string> = {
+  active: 'Aktif',
+  pending: 'Pending',
+  inactive: 'Nonaktif',
+}
 
 export function MemberListPage() {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const { data: members, loading, error, reload } = useAsync<MemberWithChapter[]>(() =>
     memberService.list(),
   )
@@ -80,34 +88,39 @@ export function MemberListPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
+  // Exports always reflect the active filters (not just the visible page).
+  const exportHandlers = makeExportHandlers({
+    filename: 'member',
+    title: 'Daftar Member',
+    subtitle: `Status: ${memberStatus === 'all' ? 'Semua' : (MEMBER_STATUS_LABEL[memberStatus] ?? memberStatus)}`,
+    meta: [`${filtered.length} member`, `Dibuat ${formatDateTime(new Date())}`],
+    columns: [
+      { label: 'Nama' },
+      { label: 'ID' },
+      { label: 'Chapter' },
+      { label: 'Email' },
+      { label: 'Telepon' },
+      { label: 'Status' },
+      { label: 'Due Date' },
+    ],
+    rows: filtered.map((m) => [
+      m.name,
+      m.id,
+      m.chapter?.displayName ?? '',
+      m.email ?? '',
+      m.phone ?? '',
+      MEMBER_STATUS_LABEL[m.status] ?? m.status,
+      m.renewalDate ? formatDate(m.renewalDate) : '',
+    ]),
+    onPopupBlocked: () => toast('Izinkan popup di browser untuk mengekspor PDF.', 'error'),
+  })
+
   return (
     <div>
       <PageHeader
         title="Member"
         description="Data member hasil sinkronisasi dari BNI Visitor Management."
-        action={
-          <Button
-            variant="outline"
-            onClick={() =>
-              downloadCsv(
-                'member.csv',
-                ['Nama', 'ID', 'Chapter', 'Email', 'Telepon', 'Status', 'Due Date'],
-                filtered.map((m) => [
-                  m.name,
-                  m.id,
-                  m.chapter?.displayName ?? '',
-                  m.email ?? '',
-                  m.phone ?? '',
-                  m.status,
-                  m.renewalDate ? formatDate(m.renewalDate) : '',
-                ]),
-              )
-            }
-          >
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
-        }
+        action={<ExportMenu {...exportHandlers} disabled={filtered.length === 0} />}
       />
 
       {/* Summary cards (also filter by status) */}

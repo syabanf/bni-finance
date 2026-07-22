@@ -25,6 +25,7 @@ import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } fro
 import { isOutstanding, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { normalizePhone } from '@/lib/whatsapp'
 import { downloadCsv } from '@/lib/csv'
+import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 
 type StatusFilter = InvoiceStatus | 'all' | 'outstanding'
@@ -230,21 +231,21 @@ export function InvoiceListPage() {
 
   const typeLabel = (t: InvoiceType) => (t === 'registration' ? 'Pendaftaran' : 'Renewal')
 
-  const exportCsv = () => {
-    downloadCsv(
-      'invoice.csv',
-      ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo'],
-      filtered.map((inv) => [
-        inv.number,
-        inv.member?.name ?? '',
-        inv.chapter?.displayName ?? '',
-        typeLabel(inv.type),
-        inv.amount,
-        INVOICE_STATUS_LABEL[inv.status],
-        formatDate(inv.dueDate),
-      ]),
-    )
-  }
+  const EXPORT_HEADERS = ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo']
+  // Raw rows (amount stays numeric so Excel can sum it) — always the FILTERED set.
+  const exportRows = () =>
+    filtered.map((inv) => [
+      inv.number,
+      inv.member?.name ?? '',
+      inv.chapter?.displayName ?? '',
+      typeLabel(inv.type),
+      inv.amount,
+      INVOICE_STATUS_LABEL[inv.status],
+      formatDate(inv.dueDate),
+    ])
+
+  const exportCsv = () => downloadCsv('invoice.csv', EXPORT_HEADERS, exportRows())
+  const exportExcel = () => downloadXlsx('invoice', 'Daftar Invoice', EXPORT_HEADERS, exportRows())
 
   const exportPdf = () => {
     const total = filtered.reduce((a, i) => a + i.amount, 0)
@@ -283,7 +284,7 @@ export function InvoiceListPage() {
         description="Kelola seluruh invoice pendaftaran dan renewal."
         action={
           <div className="flex items-center gap-2">
-            <ExportMenu onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
+            <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
             <Button onClick={() => navigate('/invoices/new')}>
               <Plus className="h-4 w-4" />
               Buat Invoice

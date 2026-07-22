@@ -27,6 +27,7 @@ import { paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { monthNowKey } from '@/lib/date'
 import { downloadCsv } from '@/lib/csv'
+import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
 
@@ -73,19 +74,20 @@ export function PaymentListPage() {
   const thisMonth = filtered.filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
   const thisMonthTotal = thisMonth.reduce((acc, p) => acc + p.amount, 0)
 
-  const exportCsv = () => {
-    downloadCsv(
-      'pembayaran.csv',
-      ['Member', 'No. Invoice', 'Nominal', 'Metode', 'Waktu Bayar'],
-      filtered.map((p) => [
-        p.member?.name ?? '',
-        p.invoice?.number ?? '',
-        p.amount,
-        paymentMethodLabel(p.paymentMethod),
-        formatDateTime(p.paidAt),
-      ]),
-    )
-  }
+  const EXPORT_HEADERS = ['Member', 'No. Invoice', 'Nominal', 'Metode', 'Waktu Bayar']
+  // Raw rows (amount numeric so Excel can sum) — always the FILTERED set.
+  const exportRows = () =>
+    filtered.map((p) => [
+      p.member?.name ?? '',
+      p.invoice?.number ?? '',
+      p.amount,
+      paymentMethodLabel(p.paymentMethod),
+      formatDateTime(p.paidAt),
+    ])
+
+  const exportCsv = () => downloadCsv('pembayaran.csv', EXPORT_HEADERS, exportRows())
+  const exportExcel = () =>
+    downloadXlsx('pembayaran', 'Riwayat Pembayaran', EXPORT_HEADERS, exportRows())
 
   const exportPdf = () => {
     const ok = printTableReport({
@@ -118,7 +120,7 @@ export function PaymentListPage() {
       <PageHeader
         title="Pembayaran"
         description="Riwayat pembayaran yang diterima melalui webhook Paper.id."
-        action={<ExportMenu onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />}
+        action={<ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />}
       />
 
       {hasData && (
