@@ -12,6 +12,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/api"
 	"github.com/syabanf/bni-finance/backend/internal/audit"
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
@@ -24,10 +25,13 @@ import (
 
 type fullStack struct {
 	srv      *httptest.Server
+	token    string
+	signer   *auth.Signer
 	chapters *fakeChapterStore
 	members  *fakeMemberStore
 	settings *fakeSettingsStore
 	audits   *fakeAuditStore
+	users    *fakeUserStore
 }
 
 // newFullServer registers EVERY resource. Building it at all is part of the
@@ -42,12 +46,15 @@ func newFullServer(t *testing.T) *fullStack {
 		members:  newFakeMemberStore(),
 		settings: newFakeSettingsStore(),
 		audits:   newFakeAuditStore(),
+		users:    newFakeUserStore(),
 	}
 
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	cfg := config.Config{AllowedOrigins: []string{"*"}}
+	stack.signer = testSigner(t)
 
-	h := api.NewHandler(log, cfg, api.Services{
+	h := api.NewHandler(log, cfg, stack.signer, api.Services{
+		Auth:      auth.NewService(stack.users, stack.signer),
 		Invoice:   invoice.NewService(invStore),
 		Payment:   payment.NewService(newFakePaymentStore(invStore)),
 		Chapter:   chapter.NewService(stack.chapters),
@@ -59,6 +66,7 @@ func newFullServer(t *testing.T) *fullStack {
 
 	stack.srv = httptest.NewServer(h)
 	t.Cleanup(stack.srv.Close)
+	stack.token = tokenFor(t, stack.signer, domain.RoleAdmin)
 	return stack
 }
 
@@ -74,6 +82,9 @@ func (s *fullStack) do(t *testing.T, method, path, body string) (int, []byte) {
 	}
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if s.token != "" {
+		req.Header.Set("Authorization", "Bearer "+s.token)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

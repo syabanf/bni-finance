@@ -3,6 +3,7 @@ package invoice
 import (
 	"net/http"
 
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -16,10 +17,10 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 // Register wires the CRUD routes onto the mux (Go 1.22 method+path patterns).
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/invoices", h.list)
-	mux.HandleFunc("POST /api/v1/invoices", h.create)
+	mux.HandleFunc("POST /api/v1/invoices", auth.RequireAdmin(h.create))
 	mux.HandleFunc("GET /api/v1/invoices/{id}", h.get)
-	mux.HandleFunc("PATCH /api/v1/invoices/{id}", h.update)
-	mux.HandleFunc("DELETE /api/v1/invoices/{id}", h.remove)
+	mux.HandleFunc("PATCH /api/v1/invoices/{id}", auth.RequireAdmin(h.update))
+	mux.HandleFunc("DELETE /api/v1/invoices/{id}", auth.RequireAdmin(h.remove))
 }
 
 type listMeta struct {

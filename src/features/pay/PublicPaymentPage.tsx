@@ -4,19 +4,40 @@ import { CheckCircle2, CreditCard, Download, ExternalLink, FileText, XCircle } f
 import type { InvoiceWithRelations } from '@/types'
 import { BniLogo, Button, Card, CardBody, CardHeader, LoadingState } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { invoiceService } from '@/services'
-import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
+import { fetchPublicInvoice, type PublicInvoiceView } from '@/services/api/paymentGateway'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { InvoicePreview } from '@/features/invoices/components/InvoicePreview'
 import { PaymentPanel } from '@/features/invoices/components/PaymentPanel'
 import { downloadInvoice } from '@/features/invoices/lib/invoiceDocument'
 
 /** Drop member PII so the public page never renders email / phone / company. */
-function toPublicInvoice(inv: InvoiceWithRelations | null): InvoiceWithRelations | null {
-  if (!inv || !inv.member) return inv
+/**
+ * The public endpoint returns a narrow projection — member NAME only, never
+ * email/phone/company. Stripping now happens on the server, so PII cannot leak
+ * to anyone holding the link even if this page changed. Here we only widen it
+ * back into the shape the shared invoice components already render.
+ */
+function toInvoiceWithRelations(view: PublicInvoiceView): InvoiceWithRelations {
+  const { invoice, } = view
   return {
-    ...inv,
-    member: { ...inv.member, email: undefined, phone: undefined, company: undefined, businessField: undefined },
+    ...(invoice as unknown as InvoiceWithRelations),
+    member: {
+      id: '',
+      chapterId: '',
+      name: invoice.memberName,
+      status: 'active',
+      joinedDate: null,
+      renewalDate: null,
+      syncedAt: invoice.createdAt,
+    },
+    chapter: invoice.chapterName
+      ? {
+          id: '',
+          name: invoice.chapterName,
+          displayName: invoice.chapterName,
+          syncedAt: invoice.createdAt,
+        }
+      : null,
   }
 }
 
@@ -25,15 +46,15 @@ export function PublicPaymentPage() {
   const [params] = useSearchParams()
   const forced = params.get('status') // 'success' | 'failed' (redirect dari gateway)
 
-  // Public page: never expose member PII (email/phone/company) to anyone with
-  // the link. Strip it before it can be rendered or downloaded. (The full
-  // hardening — fetch via the get-public-invoice Edge Function + lock RLS —
-  // is documented in supabase/rls.sql and the function header.)
-  const { data: invoice, loading, reload } = useAsync<InvoiceWithRelations | null>(
-    () => invoiceService.getById(id).then(toPublicInvoice),
+  // Unauthenticated on purpose: whoever is paying this invoice has no account.
+  // The endpoint returns a PII-free projection and reports whether self-payment
+  // is switched on, so the page needs a single request.
+  const { data: view, loading, reload } = useAsync<PublicInvoiceView | null>(
+    () => fetchPublicInvoice(id).catch(() => null),
     [id],
   )
-  const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode(), [id])
+  const invoice = view ? toInvoiceWithRelations(view) : null
+  const selfPayment = view?.selfPaymentMode ?? false
 
   const isPaid = invoice?.status === 'paid'
   const isPayable = invoice?.status === 'sent' || invoice?.status === 'overdue'

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/syabanf/bni-finance/backend/internal/audit"
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
@@ -17,7 +18,9 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
+	"github.com/syabanf/bni-finance/backend/internal/upload"
 )
 
 // Pinger reports database health for /healthz.
@@ -26,6 +29,7 @@ type Pinger func(ctx context.Context) error
 // Services collects everything the API can expose. A nil field simply means
 // that resource isn't registered — which is what lets tests bring up a subset.
 type Services struct {
+	Auth      *auth.Service
 	Invoice   *invoice.Service
 	Payment   *payment.Service
 	Member    *member.Service
@@ -33,37 +37,27 @@ type Services struct {
 	Settings  *settings.Service
 	Audit     *audit.Service
 	Dashboard *dashboard.Service
+	Public    *publicpay.Service
+	Upload    *upload.Store
 }
 
 // NewHandler builds the fully-wrapped HTTP handler.
-func NewHandler(log *slog.Logger, cfg config.Config, svc Services, ping Pinger) http.Handler {
-	apiMux := http.NewServeMux()
-
-	if svc.Invoice != nil {
-		invoice.NewHandler(svc.Invoice).Register(apiMux)
-	}
-	if svc.Payment != nil {
-		payment.NewHandler(svc.Payment).Register(apiMux)
-	}
-	if svc.Member != nil {
-		member.NewHandler(svc.Member).Register(apiMux)
-	}
-	if svc.Chapter != nil {
-		chapter.NewHandler(svc.Chapter).Register(apiMux)
-	}
-	if svc.Settings != nil {
-		settings.NewHandler(svc.Settings).Register(apiMux)
-	}
-	if svc.Audit != nil {
-		audit.NewHandler(svc.Audit).Register(apiMux)
-	}
-	if svc.Dashboard != nil {
-		dashboard.NewHandler(svc.Dashboard).Register(apiMux)
-	}
+//
+// Three tiers of access:
+//
+//	public    — no token: login, the public payment page, health, stored files
+//	protected — any signed-in user: reads
+//	admin     — writes that change money or configuration
+//
+// Supabase enforced this with RLS in the database. The Go backend connects as a
+// single trusted role, so the boundary lives here instead; see auth.RequireAuth.
+func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Services, ping Pinger) http.Handler {
+	protected := http.NewServeMux()
+	registerProtected(protected, svc)
 
 	root := http.NewServeMux()
 
-	// Health check stays unauthenticated so probes work without a key.
+	// Health check stays unauthenticated so probes work without credentials.
 	root.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		if ping != nil {
 			ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
@@ -76,7 +70,18 @@ func NewHandler(log *slog.Logger, cfg config.Config, svc Services, ping Pinger) 
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	root.Handle("/api/", httpx.APIKey(cfg.APIKey)(apiMux))
+	if svc.Auth != nil {
+		auth.NewHandler(svc.Auth).RegisterPublic(root)
+	}
+	if svc.Public != nil {
+		publicpay.NewHandler(svc.Public).Register(root)
+	}
+	if svc.Upload != nil {
+		upload.NewHandler(svc.Upload).RegisterFileServer(root)
+	}
+
+	// Everything else under /api/ needs a valid token.
+	root.Handle("/api/", auth.RequireAuth(signer)(protected))
 
 	return httpx.Chain(root,
 		httpx.RequestID,
@@ -84,4 +89,34 @@ func NewHandler(log *slog.Logger, cfg config.Config, svc Services, ping Pinger) 
 		httpx.Recoverer(log),
 		httpx.CORS(cfg.AllowedOrigins),
 	)
+}
+
+func registerProtected(mux *http.ServeMux, svc Services) {
+	if svc.Auth != nil {
+		auth.NewHandler(svc.Auth).RegisterProtected(mux)
+	}
+	if svc.Invoice != nil {
+		invoice.NewHandler(svc.Invoice).Register(mux)
+	}
+	if svc.Payment != nil {
+		payment.NewHandler(svc.Payment).Register(mux)
+	}
+	if svc.Member != nil {
+		member.NewHandler(svc.Member).Register(mux)
+	}
+	if svc.Chapter != nil {
+		chapter.NewHandler(svc.Chapter).Register(mux)
+	}
+	if svc.Settings != nil {
+		settings.NewHandler(svc.Settings).Register(mux)
+	}
+	if svc.Audit != nil {
+		audit.NewHandler(svc.Audit).Register(mux)
+	}
+	if svc.Dashboard != nil {
+		dashboard.NewHandler(svc.Dashboard).Register(mux)
+	}
+	if svc.Upload != nil {
+		upload.NewHandler(svc.Upload).Register(mux)
+	}
 }

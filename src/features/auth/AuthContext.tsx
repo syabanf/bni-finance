@@ -1,12 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { AuthUser, UserRole } from '@/types'
+import type { AuthUser } from '@/types'
 import { authService } from '@/services'
+import { clearSession, getToken, setUnauthorizedHandler } from '@/lib/apiClient'
+import { fetchCurrentUser, PASSWORD_SEPARATOR, setCurrentUser } from '@/services/api/authRepository'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
-
-/** Sama seperti supabaseAuthRepository: peran dari user_metadata, default admin. */
-const roleOf = (meta: Record<string, unknown> | undefined): UserRole =>
-  meta?.role === 'user' ? 'user' : 'admin'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -14,55 +12,50 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (name: string) => Promise<void>
-  updatePassword: (newPassword: string) => Promise<void>
+  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => authService.getCurrentUser())
-  const [loading, setLoading] = useState(!useMock)
+  // In API mode a cached session still has to be confirmed with the server, so
+  // start in a loading state only when there is a token worth checking.
+  const [loading, setLoading] = useState(!useMock && getToken() !== null)
 
   useEffect(() => {
     if (useMock) return
-    let unsubscribe: (() => void) | undefined
-    let disposed = false
-    // Restore Supabase session on mount
-    import('@/lib/supabase').then(({ supabase }) => {
-      supabase.auth.getSession().then(({ data }) => {
-        const u = data.session?.user
-        if (u) {
-          setUser({
-            id: u.id,
-            name: u.user_metadata?.name ?? u.email?.split('@')[0] ?? 'Admin',
-            email: u.email ?? '',
-            role: roleOf(u.user_metadata),
-          })
-        }
-        setLoading(false)
+
+    // A token the server rejects (expired, or signed with a rotated secret)
+    // must drop the user out of the app rather than leave a dead session.
+    setUnauthorizedHandler(() => {
+      setCurrentUser(null)
+      setUser(null)
+    })
+
+    if (getToken() === null) {
+      setLoading(false)
+      return () => setUnauthorizedHandler(null)
+    }
+
+    let cancelled = false
+    fetchCurrentUser()
+      .then((u) => {
+        if (!cancelled) setUser(u)
+      })
+      .catch(() => {
+        // Token no longer valid — start clean.
+        clearSession()
+        setCurrentUser(null)
+        if (!cancelled) setUser(null)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
 
-      const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-        const u = session?.user
-        if (u) {
-          setUser({
-            id: u.id,
-            name: u.user_metadata?.name ?? u.email?.split('@')[0] ?? 'Admin',
-            email: u.email ?? '',
-            role: roleOf(u.user_metadata),
-          })
-        } else {
-          setUser(null)
-        }
-      })
-      // If the effect already cleaned up before the dynamic import resolved,
-      // unsubscribe immediately; otherwise expose it to the effect cleanup.
-      if (disposed) listener.subscription.unsubscribe()
-      else unsubscribe = () => listener.subscription.unsubscribe()
-    })
     return () => {
-      disposed = true
-      unsubscribe?.()
+      cancelled = true
+      setUnauthorizedHandler(null)
     }
   }, [])
 
@@ -81,8 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u)
   }, [])
 
-  const updatePassword = useCallback(async (newPassword: string) => {
-    await authService.updatePassword(newPassword)
+  // The repository contract takes one string; the API also needs the current
+  // password, so the pair travels joined and is split at the boundary.
+  const updatePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await authService.updatePassword(
+      useMock ? newPassword : `${currentPassword}${PASSWORD_SEPARATOR}${newPassword}`,
+    )
   }, [])
 
   const value = useMemo(

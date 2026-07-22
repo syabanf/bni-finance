@@ -153,6 +153,12 @@ type UpdateInvoiceInput struct {
 	CancelReason *string        `json:"cancelReason"`
 	CancelledBy  *string        `json:"cancelledBy"`
 
+	// Paper.id link, written when an invoice is issued through that provider.
+	PaperIDInvoiceID  *string    `json:"paperIdInvoiceId"`
+	PaperIDInvoiceURL *string    `json:"paperIdInvoiceUrl"`
+	PaperIDPaymentURL *string    `json:"paperIdPaymentUrl"`
+	PaperIDSentAt     *time.Time `json:"paperIdSentAt"`
+
 	// Who made the change. Not stored on the invoice — these only label the
 	// audit-log row written alongside the update.
 	ActorID   *string `json:"actorId"`

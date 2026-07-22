@@ -1,4 +1,5 @@
-// Command api serves the BNI Finance CRUD API for invoices and payments.
+// Command api serves the BNI Finance API: CRUD for every resource, local
+// accounts, file uploads, and the public payment page.
 package main
 
 import (
@@ -13,6 +14,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/api"
 	"github.com/syabanf/bni-finance/backend/internal/audit"
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
@@ -20,7 +22,9 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
+	"github.com/syabanf/bni-finance/backend/internal/upload"
 )
 
 func main() {
@@ -41,6 +45,16 @@ func run(log *slog.Logger) error {
 		return err
 	}
 
+	signer, err := auth.NewSigner(cfg.JWTSecret, cfg.TokenTTL)
+	if err != nil {
+		return err
+	}
+
+	uploads, err := upload.NewStore(cfg.UploadDir, cfg.MaxUploadSize)
+	if err != nil {
+		return err
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -52,7 +66,26 @@ func run(log *slog.Logger) error {
 	log.Info("terhubung ke database")
 
 	// Wire: repository → service → handler, one chain per resource.
-	handler := api.NewHandler(log, cfg, api.Services{
+	authSvc := auth.NewService(auth.NewRepository(pool), signer)
+
+	if cfg.HasSeedAdmin() {
+		created, err := authSvc.EnsureSeedAdmin(ctx, cfg.SeedAdminEmail, cfg.SeedAdminPassword, cfg.SeedAdminName)
+		if err != nil {
+			return err
+		}
+		if created {
+			log.Info("admin awal dibuat", "email", cfg.SeedAdminEmail)
+		}
+	}
+
+	// Gateway secrets stay in the environment, never in app_settings — that
+	// table is readable through the API, and a masked value is still a value
+	// somebody could rotate by accident.
+	xenditKey := os.Getenv("XENDIT_SECRET_KEY")
+	callbackToken := os.Getenv("XENDIT_CALLBACK_TOKEN")
+
+	handler := api.NewHandler(log, cfg, signer, api.Services{
+		Auth:      authSvc,
 		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
 		Payment:   payment.NewService(payment.NewRepository(pool)),
 		Member:    member.NewService(member.NewRepository(pool)),
@@ -60,6 +93,8 @@ func run(log *slog.Logger) error {
 		Settings:  settings.NewService(settings.NewRepository(pool)),
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
+		Public:    publicpay.NewService(publicpay.NewRepository(pool), xenditKey, callbackToken),
+		Upload:    uploads,
 	}, pool.Ping)
 
 	srv := &http.Server{
@@ -72,7 +107,10 @@ func run(log *slog.Logger) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		log.Info("server berjalan", "port", cfg.Port, "auth", cfg.APIKey != "")
+		log.Info("server berjalan",
+			"port", cfg.Port,
+			"uploads", uploads.Dir(),
+			"gateway", xenditKey != "")
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

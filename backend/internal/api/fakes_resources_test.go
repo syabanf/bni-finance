@@ -3,6 +3,7 @@ package api_test
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -374,4 +375,124 @@ func (fakeDashboardStore) Summary(_ context.Context, months int) (*domain.Dashbo
 		Monthly:         monthly,
 		ChapterStats:    []domain.ChapterStat{},
 	}, nil
+}
+
+// --- users ------------------------------------------------------------------
+
+type fakeUserStore struct {
+	mu    sync.RWMutex
+	items map[string]domain.User
+	seq   int
+}
+
+func newFakeUserStore() *fakeUserStore {
+	return &fakeUserStore{items: make(map[string]domain.User)}
+}
+
+func (s *fakeUserStore) GetByEmail(_ context.Context, email string) (*domain.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, u := range s.items {
+		if u.Email == domain.NormalizeEmail(email) {
+			return &u, nil
+		}
+	}
+	return nil, httpx.ErrNotFound
+}
+
+func (s *fakeUserStore) GetByID(_ context.Context, id string) (*domain.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	u, ok := s.items[id]
+	if !ok {
+		return nil, httpx.ErrNotFound
+	}
+	return &u, nil
+}
+
+func (s *fakeUserStore) List(context.Context) ([]domain.User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]domain.User, 0, len(s.items))
+	for _, u := range s.items {
+		out = append(out, u)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+func (s *fakeUserStore) Create(_ context.Context, email, hash, name string, role domain.UserRole) (*domain.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	email = domain.NormalizeEmail(email)
+	for _, u := range s.items {
+		if u.Email == email {
+			return nil, httpx.Conflict("email tersebut sudah terdaftar")
+		}
+	}
+	s.seq++
+	u := domain.User{
+		ID: fmt.Sprintf("usr-%03d", s.seq), Email: email, PasswordHash: hash,
+		Name: name, Role: role, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	s.items[u.ID] = u
+	return &u, nil
+}
+
+func (s *fakeUserStore) UpdateName(_ context.Context, id, name string) (*domain.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.items[id]
+	if !ok {
+		return nil, httpx.ErrNotFound
+	}
+	u.Name = name
+	s.items[id] = u
+	return &u, nil
+}
+
+func (s *fakeUserStore) UpdateRole(_ context.Context, id string, role domain.UserRole) (*domain.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.items[id]
+	if !ok {
+		return nil, httpx.ErrNotFound
+	}
+	u.Role = role
+	s.items[id] = u
+	return &u, nil
+}
+
+func (s *fakeUserStore) UpdatePasswordHash(_ context.Context, id, hash string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.items[id]
+	if !ok {
+		return httpx.ErrNotFound
+	}
+	u.PasswordHash = hash
+	s.items[id] = u
+	return nil
+}
+
+func (s *fakeUserStore) Delete(_ context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.items[id]; !ok {
+		return httpx.ErrNotFound
+	}
+	delete(s.items, id)
+	return nil
+}
+
+func (s *fakeUserStore) CountAdmins(context.Context) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := 0
+	for _, u := range s.items {
+		if u.Role == domain.RoleAdmin {
+			n++
+		}
+	}
+	return n, nil
 }

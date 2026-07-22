@@ -1,34 +1,46 @@
 # BNI Finance — Backend API (Go)
 
-REST API untuk **seluruh entitas** sistem — invoice, pembayaran, member, chapter,
-pengaturan, jejak audit, dan ringkasan dashboard — terpisah dari aplikasi Vite di
-`../src`. Menggunakan **Postgres yang sama** dengan Supabase (`../supabase/schema.sql`),
-jadi data antara frontend dan backend ini konsisten.
+Backend **satu-satunya** untuk sistem ini: seluruh entitas (invoice, pembayaran,
+member, chapter, pengaturan, jejak audit, dashboard) plus **autentikasi, unggah
+berkas, dan halaman bayar publik**. Frontend Vite di `../src` berbicara hanya
+dengan API ini.
 
-Dibangun dengan **Go + pustaka standar** (`net/http` routing Go 1.22) — satu-satunya
-dependensi eksternal adalah driver Postgres `pgx/v5`.
+Dibangun dengan **Go + pustaka standar** — satu-satunya dependensi eksternal
+adalah driver Postgres `pgx/v5`. Hashing kata sandi (`crypto/pbkdf2`) dan token
+sesi (HS256 di atas `crypto/hmac`) memakai stdlib, tanpa pustaka pihak ketiga.
 
----
-
-## ⚠️ Prasyarat database
-
-Backend ini membaca kolom yang ditambahkan oleh migrasi. Jalankan di Supabase SQL
-Editor **sebelum** menjalankan server, sesuai urutan:
-
-| Migrasi | Kenapa dibutuhkan |
-|---|---|
-| `0002_xendit_self_payment.sql` | Kolom `xendit_*` pada `invoices` |
-| `0003_manual_payment.sql` | Kolom `proof_url` & `note` pada `payments` — **di-SELECT setiap query pembayaran**; tanpa ini semua endpoint `/payments` error |
-| `0004_performance_indexes.sql` | Indeks untuk `ORDER BY`/filter pada invoice & pembayaran |
-| `0005_app_settings_and_indexes.sql` | **Membuat tabel `app_settings`** — sebelumnya tidak pernah didefinisikan di mana pun, padahal 0002 sudah meng-`insert` ke sana dan tiga edge function membacanya. Plus indeks untuk member, chapter, dan audit log |
+> **Menggantikan Supabase sepenuhnya.** Postgres → database lokal;
+> Supabase Auth → tabel `users` + JWT; Storage → berkas di disk; Edge Functions →
+> paket `publicpay`; RLS → middleware `auth.RequireAuth` + `RequireAdmin`.
 
 ---
 
 ## 🚀 Menjalankan
 
+Butuh Postgres 14+ yang berjalan lokal.
+
 ```bash
-cp .env.example .env     # lalu isi DATABASE_URL
+cp .env.example .env     # isi DATABASE_URL + JWT_SECRET
+make db-reset            # buat database, terapkan skema, isi data contoh
 make run                 # http://localhost:8080
+```
+
+`JWT_SECRET` wajib, minimal 32 karakter:
+
+```bash
+openssl rand -base64 48
+```
+
+Admin pertama dibuat otomatis dari `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`,
+**hanya** saat tabel `users` masih kosong.
+
+Perintah database lain (`DB_NAME`, `DB_PORT`, `PSQL` bisa ditimpa):
+
+```bash
+make db-create   # buat database saja
+make db-schema   # terapkan ../db/schema.sql (idempoten)
+make db-seed     # isi data contoh
+make db-drop     # hapus database — minta konfirmasi
 ```
 
 Perintah lain:
@@ -59,13 +71,16 @@ backend/
     ├── database/              # pool pgx + ping saat start (fail fast)
     ├── domain/                # model, validasi, aturan transisi status
     ├── httpx/                 # envelope JSON, error → status, middleware
+    ├── auth/                  # akun lokal, PBKDF2, JWT, middleware peran
     ├── invoice/               # repository · service · handler
     ├── payment/               # repository · service · handler
     ├── member/                # repository · service · handler
     ├── chapter/               # repository · service · handler
     ├── settings/              # fee_settings + app_settings
     ├── audit/                 # jejak invoice (baca + catatan manual)
-    └── dashboard/             # agregat KPI, read-only
+    ├── dashboard/             # agregat KPI, read-only
+    ├── upload/                # bukti pembayaran di disk
+    └── publicpay/             # halaman bayar publik + Xendit
 ```
 
 Setiap resource didaftarkan lewat `api.Services`. Field yang `nil` tidak
@@ -163,6 +178,34 @@ Setiap member dibaca beserta chapter-nya (`LEFT JOIN`), jadi bentuknya sama deng
 
 `?months=6` mengatur panjang grafik tren bulanan (1–24).
 
+### Autentikasi
+
+| Method | Path | Akses |
+|---|---|---|
+| `POST` | `/auth/login` | **publik** — mengembalikan token + profil |
+| `GET` | `/auth/me` | login |
+| `PATCH` | `/auth/me` | login — ubah nama |
+| `PUT` | `/auth/password` | login — wajib kirim `currentPassword` |
+| `GET·POST` | `/users` | admin |
+| `PATCH` | `/users/{id}/role` | admin |
+| `PUT` | `/users/{id}/password` | admin — reset kata sandi orang lain |
+| `DELETE` | `/users/{id}` | admin |
+
+### Unggahan
+
+| Method | Path | Akses |
+|---|---|---|
+| `POST` | `/uploads` | admin — multipart, field `file` |
+| `GET` | `/uploads/{nama}` | **publik** — nama berkas dibuat acak |
+
+### Publik (tanpa token)
+
+| Method | Path | Keterangan |
+|---|---|---|
+| `GET` | `/public/invoices/{id}` | Proyeksi sempit untuk halaman bayar |
+| `POST` | `/public/invoices/{id}/payment` | Buat pembayaran Xendit (VA/QRIS) |
+| `POST` | `/webhooks/xendit` | Callback Xendit — butuh `x-callback-token` |
+
 ### Lain-lain
 `GET /healthz` — cek kesehatan + ping database (tanpa autentikasi).
 
@@ -236,12 +279,38 @@ Bentuk error: `{ "error": "pesan" }`.
 
 ## 🔒 Keamanan
 
-- Isi `API_KEY` untuk mewajibkan `Authorization: Bearer <key>` pada seluruh `/api/**`.
-  Dibandingkan **constant-time**. Dikosongkan = terbuka (khusus development).
+**Otorisasi ada di sini sekarang.** Supabase menegakkannya di database lewat RLS;
+backend ini menyambung sebagai satu peran tepercaya, jadi kebijakan per-baris
+tidak punya identitas pengguna untuk dipakai. Tiga tingkat akses:
+
+| Tingkat | Isi |
+|---|---|
+| Publik | `/auth/login`, `/public/**`, `/webhooks/xendit`, `/uploads/{nama}`, `/healthz` |
+| Login | Seluruh **pembacaan** `/api/**` |
+| Admin | Seluruh **penulisan** + `/users/**` |
+
+Cek di UI (tombol yang disembunyikan) adalah kenyamanan, bukan kontrol akses —
+batas sebenarnya `auth.RequireAuth` dan `auth.RequireAdmin`.
+
+- **Kata sandi** di-hash PBKDF2-HMAC-SHA256, 600.000 iterasi, salt acak per baris.
+  Jumlah iterasi disimpan di dalam hash sehingga bisa dinaikkan tanpa
+  membatalkan kata sandi lama.
+- **Token** HS256, hanya algoritma itu yang diterima — `alg: none` dan token yang
+  payload-nya ditukar ditolak (ada test-nya). `JWT_SECRET` minimal 32 karakter.
+- **Login gagal** memberi pesan identik untuk email tak dikenal dan kata sandi
+  salah, dan tetap menghitung satu hash, agar akun tidak bisa dienumerasi.
+- **Ganti kata sandi sendiri wajib menyertakan kata sandi lama** — token yang
+  dicuri saja tidak cukup untuk mengambil alih akun.
+- **Admin terakhir tidak bisa dihapus atau diturunkan** — itu keadaan yang tak
+  bisa dipulihkan lewat API.
 - `ALLOWED_ORIGINS` membatasi CORS; `*` hanya untuk development.
-- `DATABASE_URL` memakai kredensial database langsung — **melewati RLS Supabase**.
-  Karena itu backend ini harus dijalankan sebagai layanan tepercaya (server-side),
-  jangan pernah diekspos langsung ke browser tanpa `API_KEY`.
+- `DATABASE_URL` memakai kredensial database langsung dan **melewati seluruh
+  otorisasi aplikasi**. Backend harus berjalan server-side; jangan pernah
+  diekspos apa adanya ke browser.
+- **Unggahan** memakai allowlist tipe (JPG/PNG/WebP/HEIC/PDF), dibatasi ukuran,
+  dan namanya dibuat server — nama dari klien adalah jalan menuju path traversal.
+  Direktori tidak bisa dijelajahi; URL sengaja tak tertebak karena halaman bayar
+  publik harus bisa menampilkannya.
 - Semua query memakai parameter binding (`$1`, `$2`) — tidak ada perangkaian string
   dari input pengguna.
 - **`app_settings` menyimpan token BNI VM.** Karena itu key yang namanya
@@ -308,6 +377,11 @@ database sungguhan — setiap cabang filter, LEFT JOIN member–chapter, jejak a
 `created → sent → paid` lintas paket, lima agregat dashboard, dan 32 pelunasan
 paralel atas satu invoice yang berakhir `paid` dengan **tepat satu** entri audit
 `paid` serta `paidAmount` yang tidak menumpuk.
+
+**Batas keamanan** diuji tersendiri: seluruh rute terproteksi menolak request
+tanpa token (didaftar satu per satu, bukan sampel), token kedaluwarsa/asing/rusak
+ditolak, peran `user` mendapat 403 pada setiap penulisan tapi 200 pada setiap
+pembacaan, dan rute publik tetap terbuka.
 
 > Unit test tidak bisa menangkap SQL yang salah — bagi Go, query hanyalah string.
 > Dua bug nyata lolos persis lewat celah itu (`FILTER` menempel pada `coalesce()`,

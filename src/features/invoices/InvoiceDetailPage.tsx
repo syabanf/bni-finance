@@ -47,7 +47,7 @@ import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
 import { PaymentPanel } from './components/PaymentPanel'
 import { downloadInvoice } from './lib/invoiceDocument'
-import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
+import { isSelfPaymentMode } from '@/services/api/paymentGateway'
 
 const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> = {
   created: { icon: FilePlus2, tone: 'bg-ink-100 text-ink-500' },

@@ -15,7 +15,7 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDateTime } from '@/lib/format'
-import { getAppSetting, setAppSetting } from '@/services/supabase/settingsRepository'
+import { getAppSetting, setAppSetting } from '@/services/api/settingsRepository'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 

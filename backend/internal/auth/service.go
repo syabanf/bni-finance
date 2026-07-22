@@ -1,0 +1,242 @@
+package auth
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/syabanf/bni-finance/backend/internal/domain"
+	"github.com/syabanf/bni-finance/backend/internal/httpx"
+)
+
+type Store interface {
+	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	GetByID(ctx context.Context, id string) (*domain.User, error)
+	List(ctx context.Context) ([]domain.User, error)
+	Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole) (*domain.User, error)
+	UpdateName(ctx context.Context, id, name string) (*domain.User, error)
+	UpdateRole(ctx context.Context, id string, role domain.UserRole) (*domain.User, error)
+	UpdatePasswordHash(ctx context.Context, id, hash string) error
+	Delete(ctx context.Context, id string) error
+	CountAdmins(ctx context.Context) (int, error)
+}
+
+var _ Store = (*Repository)(nil)
+
+type Service struct {
+	repo   Store
+	signer *Signer
+	now    func() time.Time
+}
+
+func NewService(repo Store, signer *Signer) *Service {
+	return &Service{repo: repo, signer: signer, now: time.Now}
+}
+
+// invalidCredentials is deliberately the same message for an unknown email and
+// a wrong password — telling them apart would enumerate accounts.
+func invalidCredentials() error {
+	return httpx.Unauthorized("email atau kata sandi salah")
+}
+
+func (s *Service) Login(ctx context.Context, in domain.LoginInput) (*domain.LoginResult, error) {
+	if err := in.Validate(); err != nil {
+		return nil, httpx.BadRequest(err.Error())
+	}
+
+	user, err := s.repo.GetByEmail(ctx, in.Email)
+	if err != nil {
+		if errors.Is(err, httpx.ErrNotFound) {
+			// Still hash once, so a missing account and a wrong password take
+			// comparable time and can't be told apart by the clock.
+			_ = VerifyPassword(dummyHash, in.Password)
+			return nil, invalidCredentials()
+		}
+		return nil, err
+	}
+	if !VerifyPassword(user.PasswordHash, in.Password) {
+		return nil, invalidCredentials()
+	}
+
+	token, expires, err := s.signer.Sign(*user, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return &domain.LoginResult{Token: token, ExpiresAt: expires, User: user.AsAuthUser()}, nil
+}
+
+// dummyHash is a real, valid hash of an unusable password. Verifying against it
+// costs the same as a genuine check.
+var dummyHash = mustHash("kata-sandi-yang-tidak-akan-pernah-cocok")
+
+func mustHash(pw string) string {
+	h, err := HashPassword(pw)
+	if err != nil {
+		// Only reachable if the system entropy source fails at init.
+		panic("auth: gagal menyiapkan hash pembanding: " + err.Error())
+	}
+	return h
+}
+
+func (s *Service) Me(ctx context.Context, id string) (*domain.AuthUser, error) {
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	out := user.AsAuthUser()
+	return &out, nil
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, id string, in domain.UpdateProfileInput) (*domain.AuthUser, error) {
+	if err := in.Validate(); err != nil {
+		return nil, httpx.BadRequest(err.Error())
+	}
+	if in.Name == nil {
+		return s.Me(ctx, id)
+	}
+	user, err := s.repo.UpdateName(ctx, id, strings.TrimSpace(*in.Name))
+	if err != nil {
+		return nil, err
+	}
+	out := user.AsAuthUser()
+	return &out, nil
+}
+
+// ChangeOwnPassword requires the current password — otherwise a stolen token
+// would be enough to take over the account permanently.
+func (s *Service) ChangeOwnPassword(ctx context.Context, id string, in domain.UpdatePasswordInput) error {
+	if err := in.Validate(); err != nil {
+		return httpx.BadRequest(err.Error())
+	}
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !VerifyPassword(user.PasswordHash, in.CurrentPassword) {
+		return httpx.Unauthorized("kata sandi saat ini salah")
+	}
+	hash, err := HashPassword(in.NewPassword)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdatePasswordHash(ctx, id, hash)
+}
+
+// ResetPassword is the admin path: no current password, but it cannot be used
+// on yourself — that's what ChangeOwnPassword is for.
+func (s *Service) ResetPassword(ctx context.Context, targetID string, in domain.UpdatePasswordInput) error {
+	if err := in.Validate(); err != nil {
+		return httpx.BadRequest(err.Error())
+	}
+	if _, err := s.repo.GetByID(ctx, targetID); err != nil {
+		return err
+	}
+	hash, err := HashPassword(in.NewPassword)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdatePasswordHash(ctx, targetID, hash)
+}
+
+func (s *Service) List(ctx context.Context) ([]domain.AuthUser, error) {
+	users, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.AuthUser, len(users))
+	for i, u := range users {
+		out[i] = u.AsAuthUser()
+	}
+	return out, nil
+}
+
+func (s *Service) Create(ctx context.Context, in domain.CreateUserInput) (*domain.AuthUser, error) {
+	if err := in.Validate(); err != nil {
+		return nil, httpx.BadRequest(err.Error())
+	}
+	role := domain.RoleUser
+	if in.Role != nil {
+		role = *in.Role
+	}
+	hash, err := HashPassword(in.Password)
+	if err != nil {
+		return nil, err
+	}
+	user, err := s.repo.Create(ctx, in.Email, hash, strings.TrimSpace(in.Name), role)
+	if err != nil {
+		return nil, err
+	}
+	out := user.AsAuthUser()
+	return &out, nil
+}
+
+func (s *Service) SetRole(ctx context.Context, id string, role domain.UserRole) (*domain.AuthUser, error) {
+	if !role.Valid() {
+		return nil, httpx.BadRequest("role harus 'admin' atau 'user'")
+	}
+	current, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if current.Role == domain.RoleAdmin && role != domain.RoleAdmin {
+		if err := s.guardLastAdmin(ctx); err != nil {
+			return nil, err
+		}
+	}
+	user, err := s.repo.UpdateRole(ctx, id, role)
+	if err != nil {
+		return nil, err
+	}
+	out := user.AsAuthUser()
+	return &out, nil
+}
+
+func (s *Service) Delete(ctx context.Context, id, actorID string) error {
+	if id == actorID {
+		return httpx.Conflict("tidak bisa menghapus akun sendiri")
+	}
+	user, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if user.Role == domain.RoleAdmin {
+		if err := s.guardLastAdmin(ctx); err != nil {
+			return err
+		}
+	}
+	return s.repo.Delete(ctx, id)
+}
+
+// guardLastAdmin refuses any change that would leave the system with no
+// administrator — an unrecoverable state through the API alone.
+func (s *Service) guardLastAdmin(ctx context.Context) error {
+	n, err := s.repo.CountAdmins(ctx)
+	if err != nil {
+		return err
+	}
+	if n <= 1 {
+		return httpx.Conflict("ini satu-satunya admin — angkat admin lain lebih dulu")
+	}
+	return nil
+}
+
+// EnsureSeedAdmin creates the first administrator when the table is empty, so a
+// fresh database is reachable without hand-writing a password hash. It is a
+// no-op once any user exists.
+func (s *Service) EnsureSeedAdmin(ctx context.Context, email, password, name string) (created bool, err error) {
+	users, err := s.repo.List(ctx)
+	if err != nil {
+		return false, err
+	}
+	if len(users) > 0 {
+		return false, nil
+	}
+	in := domain.CreateUserInput{Email: email, Password: password, Name: name}
+	admin := domain.RoleAdmin
+	in.Role = &admin
+	if _, err := s.Create(ctx, in); err != nil {
+		return false, err
+	}
+	return true, nil
+}

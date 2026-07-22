@@ -3,6 +3,7 @@ package audit
 import (
 	"net/http"
 
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -16,7 +17,7 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 // Register nests the timeline under the invoice it belongs to.
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/invoices/{id}/audit", h.list)
-	mux.HandleFunc("POST /api/v1/invoices/{id}/audit", h.create)
+	mux.HandleFunc("POST /api/v1/invoices/{id}/audit", auth.RequireAdmin(h.create))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

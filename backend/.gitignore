@@ -1,6 +1,9 @@
-# Rahasia — berisi DATABASE_URL & API_KEY
+# Rahasia — berisi DATABASE_URL & JWT_SECRET
 .env
 
 # Binary hasil build
 bin/
 /api
+
+# Bukti pembayaran yang diunggah — data pengguna, bukan kode.
+uploads/

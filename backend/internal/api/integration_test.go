@@ -86,7 +86,8 @@ func databaseName(url string) string {
 }
 
 type liveStack struct {
-	srv *httptest.Server
+	srv   *httptest.Server
+	token string
 }
 
 func newLiveServer(t *testing.T) *liveStack {
@@ -94,7 +95,8 @@ func newLiveServer(t *testing.T) *liveStack {
 	pool := integrationPool(t)
 
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
-	h := api.NewHandler(log, config.Config{AllowedOrigins: []string{"*"}}, api.Services{
+	signer := testSigner(t)
+	h := api.NewHandler(log, config.Config{AllowedOrigins: []string{"*"}}, signer, api.Services{
 		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
 		Payment:   payment.NewService(payment.NewRepository(pool)),
 		Member:    member.NewService(member.NewRepository(pool)),
@@ -106,7 +108,7 @@ func newLiveServer(t *testing.T) *liveStack {
 
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &liveStack{srv: srv}
+	return &liveStack{srv: srv, token: tokenFor(t, signer, domain.RoleAdmin)}
 }
 
 func (s *liveStack) req(t *testing.T, method, path, body string, want int) []byte {
@@ -119,6 +121,7 @@ func (s *liveStack) req(t *testing.T, method, path, body string, want int) []byt
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set("Authorization", "Bearer "+s.token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
@@ -280,8 +283,11 @@ func TestLiveConcurrentSettle(t *testing.T) {
 	errs := make(chan error, concurrency)
 	for i := 0; i < concurrency; i++ {
 		go func() {
-			resp, err := http.Post(s.srv.URL+"/api/v1/payments", "application/json",
+			req, _ := http.NewRequest(http.MethodPost, s.srv.URL+"/api/v1/payments",
 				strings.NewReader(`{"invoiceId":"`+inv.ID+`","amount":2000000,"paymentMethod":"qris"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+s.token)
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				errs <- err
 				return

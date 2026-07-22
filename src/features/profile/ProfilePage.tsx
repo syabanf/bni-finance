@@ -14,6 +14,7 @@ export function ProfilePage() {
 
   const [name, setName] = useState(user?.name ?? '')
   const [savingName, setSavingName] = useState(false)
+  const [currentPw, setCurrentPw] = useState('')
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
   const [savingPw, setSavingPw] = useState(false)
@@ -33,11 +34,13 @@ export function ProfilePage() {
   }
 
   const savePassword = async () => {
+    if (!currentPw) return toast('Masukkan kata sandi saat ini.', 'error')
     if (pw.length < 6) return toast('Kata sandi minimal 6 karakter.', 'error')
     if (pw !== pw2) return toast('Konfirmasi kata sandi tidak cocok.', 'error')
     setSavingPw(true)
     try {
-      await updatePassword(pw)
+      await updatePassword(currentPw, pw)
+      setCurrentPw('')
       setPw('')
       setPw2('')
       toast('Kata sandi berhasil diperbarui.')
@@ -95,10 +98,20 @@ export function ProfilePage() {
         <div className="space-y-4 border-t border-ink-100 p-5">
           {useMock ? (
             <p className="text-sm text-ink-500">
-              Penggantian kata sandi tersedia pada mode produksi (Supabase Auth).
+              Penggantian kata sandi tersedia saat terhubung ke backend (mode non-mock).
             </p>
           ) : (
             <>
+              {/* The server requires the current password: a stolen session
+                  token alone must not be enough to take over the account. */}
+              <Field label="Kata Sandi Saat Ini">
+                <Input
+                  type="password"
+                  value={currentPw}
+                  onChange={(e) => setCurrentPw(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </Field>
               <Field label="Kata Sandi Baru">
                 <Input
                   type="password"
@@ -117,7 +130,7 @@ export function ProfilePage() {
                 />
               </Field>
               <div className="flex justify-end">
-                <Button onClick={savePassword} loading={savingPw} disabled={!pw || !pw2}>
+                <Button onClick={savePassword} loading={savingPw} disabled={!currentPw || !pw || !pw2}>
                   Perbarui Kata Sandi
                 </Button>
               </div>

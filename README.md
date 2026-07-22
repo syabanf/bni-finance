@@ -7,15 +7,14 @@ renewal keanggotaan, sinkronisasi data dari BNI Visitor Management, pembayaran
 Dibangun dengan **Vite + React + TypeScript + Tailwind CSS**, dapat dipasang sebagai
 **PWA**, mengikuti [rencana teknis](./docs/bni-finance-system-plan.md) dan menerapkan
 **clean architecture** (presentation → application → data) sehingga data layer mock dapat
-ditukar dengan backend nyata (**Supabase** / BNI VM API / Paper.id / Xendit) tanpa
+ditukar dengan backend nyata (**REST API Go** / BNI VM API / Paper.id / Xendit) tanpa
 mengubah UI.
 
 > 📖 **Dokumentasi sistem lengkap (arsitektur, payment Xendit, edge functions, deploy):**
 > [`docs/SYSTEM.md`](./docs/SYSTEM.md)
 >
 > Default berjalan di atas **mock repository** (data in-memory) — tanpa backend. Set
-> `VITE_USE_MOCK=false` (+ kredensial Supabase) untuk memakai backend nyata; ter-deploy
-> di **Vercel** dengan payment **Xendit** (mode test).
+> `VITE_USE_MOCK=false` + `VITE_API_URL` untuk memakai backend Go di `backend/`.
 
 ---
 
@@ -49,11 +48,12 @@ mengubah UI.
   Save as PDF), CSV ber-BOM UTF-8 agar rapi di Excel.
 - **Notifikasi** — feed tagihan terlambat / jatuh tempo / pembayaran diterima, dengan badge
   jumlah belum-dibaca pada lonceng.
-- **Profil** — ubah nama & kata sandi (Supabase Auth pada mode produksi).
+- **Profil** — ubah nama & kata sandi (butuh kata sandi lama, mode non-mock).
 - **PWA** — installable, navigasi bottom-tab di mobile, sadar safe-area.
 - **Pengaturan Biaya** — konfigurasi nominal pendaftaran & renewal.
 - **Sinkronisasi** — trigger manual pull data dari BNI VM.
-- **Auth** — login National Admin (mock localStorage atau Supabase Auth).
+- **Auth** — login berbasis JWT dengan dua peran (Admin / User); di mode mock
+  memakai localStorage.
 
 ---
 
@@ -67,12 +67,12 @@ npm run dev        # http://localhost:5173
 **Mode mock** (default) — login dengan kredensial **apa pun** (mis. `admin@bni-finance.com`
 / `admin123`).
 
-**Mode Supabase** — buat `.env.local` lalu set:
+**Mode API** — jalankan `backend/` lebih dulu (lihat bagian Backend), lalu buat
+`.env.local`:
 
 ```
 VITE_USE_MOCK=false
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_API_URL=http://localhost:8080
 ```
 
 Skrip lain:
@@ -100,9 +100,9 @@ src/
 │
 ├── services/            # 🟩 Data layer
 │   ├── types.ts         #    Repository INTERFACES (kontrak)
-│   ├── index.ts         #    Pilih implementasi (mock ↔ supabase) via VITE_USE_MOCK
+│   ├── index.ts         #    Pilih implementasi (mock ↔ api) via VITE_USE_MOCK
 │   ├── mock/            #    Implementasi in-memory (seed, store, repositories)
-│   └── supabase/        #    Implementasi Supabase (Postgres + Auth + Storage)
+│   └── api/             #    Implementasi HTTP → backend Go
 │
 ├── hooks/               # 🟨 Application layer (useAsync, …)
 ├── lib/                 # Helpers (csv, pdfReport, status, whatsapp, date, format, …)
@@ -117,9 +117,8 @@ src/
     ├── pay/             #    Halaman pembayaran publik (Xendit, tanpa login)
     ├── urgent/  settings/  misc/
 
-supabase/                # SQL schema, migrations, RLS, seed, & Edge Functions
-└── functions/           #    xendit-create-payment · xendit-webhook ·
-                         #    auto-create-invoices · get-public-invoice
+db/                      # Skema Postgres + data contoh
+backend/                 # REST API Go (lihat backend/README.md)
 ```
 
 ### Kenapa repository pattern?
@@ -131,35 +130,52 @@ implementasi lain di `services/index.ts`:
 ```ts
 // services/index.ts
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
-export const services = useMock ? mockServices : supabaseServices // ← tukar di sini
+export const services = useMock ? mockServices : apiServices // ← tukar di sini
 ```
 
 ---
 
-## 🔌 Backend (Supabase)
+## 🔌 Backend
 
-Implementasi Supabase tersedia di `services/supabase/` dan aktif saat `VITE_USE_MOCK=false`.
+Aplikasi berjalan penuh di atas **Postgres lokal + REST API Go** di `backend/`.
+Tidak ada lagi ketergantungan Supabase.
 
-| Bagian | Mekanisme |
-|---|---|
-| Database & Auth | Supabase Postgres + Supabase Auth (`supabase/schema.sql`, `supabase/rls.sql`) |
-| Pembayaran mandiri | Edge Function `xendit-create-payment` + halaman publik `/pay/:id` |
-| Webhook pembayaran | Edge Function `xendit-webhook` (verifikasi `x-callback-token`) |
-| Invoice otomatis | Edge Function `auto-create-invoices` |
-| Bukti pembayaran manual | Supabase Storage bucket `payment-proofs` |
-| Sync member & chapter | `ChapterRepository` / `MemberRepository` → BNI VM API |
+| Kebutuhan | Dulu (Supabase) | Sekarang |
+|---|---|---|
+| Database | Supabase Postgres | Postgres lokal — `db/schema.sql` |
+| Autentikasi | Supabase Auth | Tabel `users` + JWT (PBKDF2 + HS256, stdlib) |
+| Otorisasi | RLS per baris | Middleware peran di backend |
+| Penyimpanan berkas | Storage bucket | Berkas di disk (`UPLOAD_DIR`) |
+| Halaman bayar publik | Edge Function | Endpoint `/public/**` |
+| Webhook Xendit | Edge Function | Endpoint `/webhooks/xendit` |
 
-> ⚠️ Kunci **service-role** dan **password database** bersifat **rahasia** — jangan pernah
-> dimasukkan ke variabel `VITE_*` karena akan ter-bundle ke klien. Hanya `VITE_SUPABASE_URL`
-> dan `VITE_SUPABASE_ANON_KEY` (publik) yang boleh ada di sisi klien.
+```bash
+# 1. database + backend
+cd backend
+cp .env.example .env      # isi DATABASE_URL + JWT_SECRET
+make db-reset             # skema + data contoh
+make run                  # http://localhost:8080
+
+# 2. frontend (terminal lain)
+cd ..
+echo "VITE_USE_MOCK=false" >> .env.local
+echo "VITE_API_URL=http://localhost:8080" >> .env.local
+npm run dev               # http://localhost:5173
+```
+
+Masuk dengan `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` dari `backend/.env` —
+admin pertama dibuat otomatis saat tabel `users` masih kosong.
+
+> ⚠️ `DATABASE_URL` dan `JWT_SECRET` adalah **rahasia**. Jangan pernah dimasukkan
+> ke variabel `VITE_*`, karena Vite menyisipkannya ke bundel JavaScript publik.
+> Hanya `VITE_API_URL` yang boleh ada di sisi klien.
 
 ---
 
 ## ⚙️ REST API (Go)
 
-`backend/` berisi REST API mandiri di atas **Postgres yang sama**, ditulis dengan Go +
-pustaka standar (satu dependensi: driver `pgx/v5`). Berguna untuk integrasi
-server-ke-server, job terjadwal, atau klien lain yang tidak lewat Supabase JS.
+`backend/` berisi REST API yang melayani seluruh aplikasi, ditulis dengan Go +
+pustaka standar (satu dependensi: driver `pgx/v5`).
 
 | Resource | Endpoint |
 |---|---|
@@ -170,17 +186,20 @@ server-ke-server, job terjadwal, atau klien lain yang tidak lewat Supabase JS.
 | Pengaturan | `/api/v1/fee-settings` · `/api/v1/app-settings/{key}` |
 | Jejak audit | `GET·POST /api/v1/invoices/{id}/audit` |
 | Dashboard | `GET /api/v1/dashboard/summary` |
+| Autentikasi | `POST /api/v1/auth/login` · `/auth/me` · `/auth/password` · `/users/**` |
+| Unggahan | `POST /api/v1/uploads` · `GET /uploads/{nama}` |
+| Publik | `GET /api/v1/public/invoices/{id}` · `POST /webhooks/xendit` |
 
 Respons memakai **camelCase** yang identik dengan tipe di `src/types`, jadi bisa
 dikonsumsi klien TypeScript tanpa lapisan pemetaan. Detail — aturan bisnis, keamanan,
 dan hasil stress test — ada di [`backend/README.md`](backend/README.md).
 
-```bash
-cd backend && cp .env.example .env && make run
-```
+Tiga tingkat akses: **publik** (login, halaman bayar, webhook), **login**
+(semua pembacaan), **admin** (semua penulisan). Cek peran di UI hanya
+menyembunyikan tombol — batas sebenarnya ada di backend.
 
-> ⚠️ `DATABASE_URL` di backend ini **melewati RLS**. Jalankan hanya sebagai layanan
-> server-side, dan aktifkan `API_KEY` bila bisa dijangkau dari luar.
+> ⚠️ `DATABASE_URL` menyambung sebagai peran tepercaya dan melewati seluruh
+> otorisasi aplikasi. Jalankan backend hanya sebagai layanan server-side.
 
 ---
 
@@ -203,8 +222,9 @@ cd backend && cp .env.example .env && make run
 | Styling | Tailwind CSS 3 |
 | Ikon | lucide-react |
 | Ekspor | CSV (BOM UTF-8) + PDF (dokumen cetak berlabel BNI) |
-| Backend (opsional) | Supabase — Postgres, Auth, Storage, Edge Functions |
-| REST API (opsional) | Go 1.22+ (`net/http`) + `pgx/v5` — lihat `backend/` |
+| Backend | Go 1.25 (`net/http`) + `pgx/v5` — lihat `backend/` |
+| Database | Postgres 14+ — skema di `db/schema.sql` |
+| Autentikasi | JWT HS256 + PBKDF2, seluruhnya pustaka standar Go |
 | Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
-| Data | Mock in-memory (default) ↔ Supabase (`VITE_USE_MOCK=false`) |
+| Data | Mock in-memory (default) ↔ REST API Go (`VITE_USE_MOCK=false`) |
 | Hosting | Vercel |

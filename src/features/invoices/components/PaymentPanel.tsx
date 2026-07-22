@@ -4,7 +4,7 @@ import { Check, Copy, Landmark, QrCode, RefreshCw } from 'lucide-react'
 import type { InvoiceWithRelations } from '@/types'
 import { Badge, Button, CardBody, CardHeader, Card, useToast, WhatsAppIcon } from '@/components/ui'
 import { formatCurrency, formatDateTime } from '@/lib/format'
-import { createXenditPayment, VA_BANKS, type VaBank } from '@/services/supabase/paymentGateway'
+import { createXenditPayment, VA_BANKS, type VaBank } from '@/services/api/paymentGateway'
 import { BankLogo } from './BankLogo'
 
 interface Props {

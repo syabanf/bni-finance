@@ -3,6 +3,7 @@ package member
 import (
 	"net/http"
 
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -15,13 +16,13 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/members", h.list)
-	mux.HandleFunc("POST /api/v1/members", h.create)
+	mux.HandleFunc("POST /api/v1/members", auth.RequireAdmin(h.create))
 	// Literal patterns beat wildcards in Go 1.22 routing, so this stays
 	// reachable alongside /members/{id}.
 	mux.HandleFunc("GET /api/v1/members/renewal-due", h.renewalDue)
 	mux.HandleFunc("GET /api/v1/members/{id}", h.get)
-	mux.HandleFunc("PATCH /api/v1/members/{id}", h.update)
-	mux.HandleFunc("DELETE /api/v1/members/{id}", h.remove)
+	mux.HandleFunc("PATCH /api/v1/members/{id}", auth.RequireAdmin(h.update))
+	mux.HandleFunc("DELETE /api/v1/members/{id}", auth.RequireAdmin(h.remove))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

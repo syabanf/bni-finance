@@ -15,7 +15,7 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
-import { getAppSetting, setAppSetting } from '@/services/supabase/settingsRepository'
+import { getAppSetting, setAppSetting } from '@/services/api/settingsRepository'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'

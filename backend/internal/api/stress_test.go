@@ -32,15 +32,41 @@ func newTestServer(t *testing.T) (*httptest.Server, *fakeInvoiceStore, *fakePaym
 	// Discard logs — per-request logging would dominate the measurement.
 	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
 	cfg := config.Config{AllowedOrigins: []string{"*"}}
+	signer := testSigner(t)
 
-	h := api.NewHandler(log, cfg, api.Services{
+	h := api.NewHandler(log, cfg, signer, api.Services{
 		Invoice: invoice.NewService(invStore),
 		Payment: payment.NewService(payStore),
 	}, nil)
 
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
+
+	// Token verification now runs on every request — the load figures include it.
+	adminToken = tokenFor(t, signer, domain.RoleAdmin)
 	return srv, invStore, payStore
+}
+
+// adminToken is set by newTestServer and read by the authed* helpers below.
+var adminToken string
+
+func authedPost(client *http.Client, url string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	return client.Do(req)
+}
+
+func authedGet(client *http.Client, url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	return client.Do(req)
 }
 
 func createInvoiceBody(i int) []byte {
@@ -77,8 +103,7 @@ func TestStressMixedWorkload(t *testing.T) {
 
 	// Seed so list/get have something to work with.
 	for i := 0; i < 200; i++ {
-		resp, err := client.Post(srv.URL+"/api/v1/invoices", "application/json",
-			bytes.NewReader(createInvoiceBody(i)))
+		resp, err := authedPost(client, srv.URL+"/api/v1/invoices", createInvoiceBody(i))
 		if err != nil {
 			t.Fatalf("seed: %v", err)
 		}
@@ -117,19 +142,17 @@ func TestStressMixedWorkload(t *testing.T) {
 				)
 				switch n % 20 {
 				case 0, 1, 2: // 15% create invoice (write)
-					resp, err = client.Post(srv.URL+"/api/v1/invoices", "application/json",
-						bytes.NewReader(createInvoiceBody(n)))
+					resp, err = authedPost(client, srv.URL+"/api/v1/invoices", createInvoiceBody(n))
 				case 3: // 5% create payment (write + settle, cross-resource)
 					body := fmt.Sprintf(`{"invoiceId":"inv-%06d","amount":1500000,"paymentMethod":"bank_transfer"}`,
 						(n%200)+1)
-					resp, err = client.Post(srv.URL+"/api/v1/payments", "application/json",
-						bytes.NewReader([]byte(body)))
+					resp, err = authedPost(client, srv.URL+"/api/v1/payments", []byte(body))
 				case 4, 5, 6, 7: // 20% get by id
-					resp, err = client.Get(fmt.Sprintf("%s/api/v1/invoices/inv-%06d", srv.URL, (n%200)+1))
+					resp, err = authedGet(client, fmt.Sprintf("%s/api/v1/invoices/inv-%06d", srv.URL, (n%200)+1))
 				case 8: // 5% list payments
-					resp, err = client.Get(srv.URL + "/api/v1/payments?limit=25")
+					resp, err = authedGet(client, srv.URL+"/api/v1/payments?limit=25")
 				default: // 55% list invoices with filters
-					resp, err = client.Get(fmt.Sprintf(
+					resp, err = authedGet(client, fmt.Sprintf(
 						"%s/api/v1/invoices?status=outstanding&chapterId=ch-%d&limit=25&offset=0", srv.URL, n%6))
 				}
 
@@ -190,8 +213,7 @@ func TestConcurrentSettleSameInvoice(t *testing.T) {
 	srv, invStore, payStore := newTestServer(t)
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Post(srv.URL+"/api/v1/invoices", "application/json",
-		bytes.NewReader(createInvoiceBody(1)))
+	resp, err := authedPost(client, srv.URL+"/api/v1/invoices", createInvoiceBody(1))
 	if err != nil {
 		t.Fatalf("buat invoice: %v", err)
 	}
@@ -208,8 +230,7 @@ func TestConcurrentSettleSameInvoice(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			body := fmt.Sprintf(`{"invoiceId":%q,"amount":1500000}`, created.ID)
-			r, err := client.Post(srv.URL+"/api/v1/payments", "application/json",
-				bytes.NewReader([]byte(body)))
+			r, err := authedPost(client, srv.URL+"/api/v1/payments", []byte(body))
 			if err != nil {
 				server5xx.Add(1)
 				return

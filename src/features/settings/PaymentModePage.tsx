@@ -7,7 +7,7 @@ import {
   PageHeader,
   useToast,
 } from '@/components/ui'
-import { getAppSetting, setAppSetting } from '@/services/supabase/settingsRepository'
+import { getAppSetting, setAppSetting } from '@/services/api/settingsRepository'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 

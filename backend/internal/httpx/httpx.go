@@ -37,6 +37,7 @@ func BadRequest(msg string) *Error   { return &Error{Status: http.StatusBadReque
 func NotFound(msg string) *Error     { return &Error{Status: http.StatusNotFound, Message: msg} }
 func Conflict(msg string) *Error     { return &Error{Status: http.StatusConflict, Message: msg} }
 func Unauthorized(msg string) *Error { return &Error{Status: http.StatusUnauthorized, Message: msg} }
+func Forbidden(msg string) *Error    { return &Error{Status: http.StatusForbidden, Message: msg} }
 
 // ErrNotFound is returned by repositories when a row is missing.
 var ErrNotFound = errors.New("data tidak ditemukan")

@@ -19,7 +19,7 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
 import { chapterService, invoiceService } from '@/services'
-import { isSelfPaymentMode } from '@/services/supabase/paymentGateway'
+import { isSelfPaymentMode } from '@/services/api/paymentGateway'
 import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'

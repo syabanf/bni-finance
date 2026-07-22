@@ -1,10 +1,10 @@
 /**
  * Service container — the composition root.
  *
- * The UI imports repositories from HERE, never from a concrete module. Today
- * everything resolves to the in-memory mock implementations. When the real
- * backend is ready, gate on `VITE_USE_MOCK` and return Supabase/HTTP-backed
- * implementations instead — no page or hook needs to change.
+ * The UI imports repositories from HERE, never from a concrete module.
+ * `VITE_USE_MOCK` picks between the in-memory mock (default) and the HTTP
+ * implementations that talk to the Go backend — no page or hook changes either
+ * way. Swapping Supabase out for that backend touched only this file.
  */
 
 import type {
@@ -25,13 +25,13 @@ import { mockMemberRepository } from './mock/memberRepository'
 import { mockPaymentRepository } from './mock/paymentRepository'
 import { mockSettingsRepository } from './mock/settingsRepository'
 
-import { supabaseAuthRepository } from './supabase/authRepository'
-import { supabaseChapterRepository } from './supabase/chapterRepository'
-import { supabaseDashboardRepository } from './supabase/dashboardRepository'
-import { supabaseInvoiceRepository } from './supabase/invoiceRepository'
-import { supabaseMemberRepository } from './supabase/memberRepository'
-import { supabasePaymentRepository } from './supabase/paymentRepository'
-import { supabaseSettingsRepository } from './supabase/settingsRepository'
+import { apiAuthRepository } from './api/authRepository'
+import { apiChapterRepository } from './api/chapterRepository'
+import { apiDashboardRepository } from './api/dashboardRepository'
+import { apiInvoiceRepository } from './api/invoiceRepository'
+import { apiMemberRepository } from './api/memberRepository'
+import { apiPaymentRepository } from './api/paymentRepository'
+import { apiSettingsRepository } from './api/settingsRepository'
 
 const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
 
@@ -55,17 +55,17 @@ const mockServices: Services = {
   dashboard: mockDashboardRepository,
 }
 
-const supabaseServices: Services = {
-  auth: supabaseAuthRepository,
-  chapters: supabaseChapterRepository,
-  members: supabaseMemberRepository,
-  invoices: supabaseInvoiceRepository,
-  settings: supabaseSettingsRepository,
-  payments: supabasePaymentRepository,
-  dashboard: supabaseDashboardRepository,
+const apiServices: Services = {
+  auth: apiAuthRepository,
+  chapters: apiChapterRepository,
+  members: apiMemberRepository,
+  invoices: apiInvoiceRepository,
+  settings: apiSettingsRepository,
+  payments: apiPaymentRepository,
+  dashboard: apiDashboardRepository,
 }
 
-export const services: Services = useMock ? mockServices : supabaseServices
+export const services: Services = useMock ? mockServices : apiServices
 
 // Convenience named exports
 export const {

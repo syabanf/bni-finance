@@ -3,6 +3,7 @@ package chapter
 import (
 	"net/http"
 
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -15,10 +16,10 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/chapters", h.list)
-	mux.HandleFunc("POST /api/v1/chapters", h.create)
+	mux.HandleFunc("POST /api/v1/chapters", auth.RequireAdmin(h.create))
 	mux.HandleFunc("GET /api/v1/chapters/{id}", h.get)
-	mux.HandleFunc("PATCH /api/v1/chapters/{id}", h.update)
-	mux.HandleFunc("DELETE /api/v1/chapters/{id}", h.remove)
+	mux.HandleFunc("PATCH /api/v1/chapters/{id}", auth.RequireAdmin(h.update))
+	mux.HandleFunc("DELETE /api/v1/chapters/{id}", auth.RequireAdmin(h.remove))
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

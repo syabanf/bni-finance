@@ -5,8 +5,15 @@ keanggotaan BNI (pendaftaran & renewal) dengan **pembayaran mandiri (self paymen
 Xendit, sinkronisasi data dari BNI Visitor Management, dan halaman pembayaran publik untuk
 member.
 
-> Status: berjalan di atas **backend nyata (Supabase)** dengan `VITE_USE_MOCK=false`,
-> ter-deploy di **Vercel**, payment gateway **Xendit** (mode test/development).
+> ⚠️ **Dokumen ini sudah usang sejak migrasi lepas dari Supabase.** Bagian yang
+> menjelaskan Supabase (PostgREST, RLS, Edge Functions, Storage) tidak lagi
+> menggambarkan sistem yang berjalan. Rujukan yang benar:
+>
+> - Arsitektur & cara menjalankan → [`../README.md`](../README.md)
+> - Backend, endpoint, dan model keamanan → [`../backend/README.md`](../backend/README.md)
+> - Skema database → [`../db/schema.sql`](../db/schema.sql)
+>
+> Bagian tentang alur bisnis, siklus invoice, dan integrasi Xendit masih berlaku.
 
 ---
 
@@ -16,7 +23,7 @@ member.
 |---|---|
 | Tipe | SPA (Single Page Application) |
 | Frontend | Vite 5 + React 18 + TypeScript + Tailwind CSS 3 + React Router 6 |
-| Backend | Supabase (PostgreSQL + PostgREST + Edge Functions Deno) |
+| Backend | REST API Go + Postgres (dulu: Supabase) — lihat `backend/README.md` |
 | Payment Gateway | Xendit — Virtual Account (BCA/BNI/Mandiri/BRI) & QRIS |
 | Sumber data member | BNI Visitor Management API (`bni-vh.com`) |
 | Hosting | Vercel (`https://bni-finance-five.vercel.app`) |

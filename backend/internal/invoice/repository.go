@@ -231,6 +231,18 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvo
 	if in.CancelledBy != nil {
 		set("cancelled_by", *in.CancelledBy)
 	}
+	if in.PaperIDInvoiceID != nil {
+		set("paper_id_invoice_id", *in.PaperIDInvoiceID)
+	}
+	if in.PaperIDInvoiceURL != nil {
+		set("paper_id_invoice_url", *in.PaperIDInvoiceURL)
+	}
+	if in.PaperIDPaymentURL != nil {
+		set("paper_id_payment_url", *in.PaperIDPaymentURL)
+	}
+	if in.PaperIDSentAt != nil {
+		set("paper_id_sent_at", *in.PaperIDSentAt)
+	}
 
 	args = append(args, id)
 	q := fmt.Sprintf("UPDATE invoices SET %s WHERE id = $%d RETURNING %s",

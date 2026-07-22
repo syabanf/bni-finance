@@ -3,6 +3,7 @@ package settings
 import (
 	"net/http"
 
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -15,12 +16,12 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/fee-settings", h.getFees)
-	mux.HandleFunc("PATCH /api/v1/fee-settings", h.updateFees)
+	mux.HandleFunc("PATCH /api/v1/fee-settings", auth.RequireAdmin(h.updateFees))
 
 	mux.HandleFunc("GET /api/v1/app-settings", h.listApp)
 	mux.HandleFunc("GET /api/v1/app-settings/{key}", h.getApp)
-	mux.HandleFunc("PUT /api/v1/app-settings/{key}", h.setApp)
-	mux.HandleFunc("DELETE /api/v1/app-settings/{key}", h.deleteApp)
+	mux.HandleFunc("PUT /api/v1/app-settings/{key}", auth.RequireAdmin(h.setApp))
+	mux.HandleFunc("DELETE /api/v1/app-settings/{key}", auth.RequireAdmin(h.deleteApp))
 }
 
 func (h *Handler) getFees(w http.ResponseWriter, r *http.Request) {
