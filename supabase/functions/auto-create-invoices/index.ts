@@ -5,7 +5,17 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
 )
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  // Defense-in-depth: bila di-deploy dengan verify_jwt=false (umum untuk cron),
+  // wajibkan shared secret saat CRON_SECRET diset agar tidak bisa dipicu publik.
+  const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
+  if (CRON_SECRET && req.headers.get('x-cron-secret') !== CRON_SECRET) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   // Baca konfigurasi timing dari app_settings
   const { data: settingRow } = await supabase
     .from('app_settings')

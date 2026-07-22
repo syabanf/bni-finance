@@ -131,7 +131,17 @@ create table if not exists invoice_audit_log (
 create index if not exists audit_invoice_id_idx on invoice_audit_log(invoice_id);
 
 -- ---------------------------------------------------------------------------
--- Row Level Security (RLS) — allow all for anon key (tighten later per role)
+-- Row Level Security (RLS) — AUTHENTICATED-ONLY by default.
+--
+-- The anon (public) role gets NO policy, so the public anon key alone cannot
+-- read or write any table. A logged-in Supabase session is required.
+--
+-- The public /pay/:id page reads via the `get-public-invoice` Edge Function
+-- (service-role key bypasses RLS and returns a minimal, PII-free projection).
+-- All other Edge Functions likewise use the service-role key.
+--
+-- ⚠️ Existing databases created with the old permissive policies must run
+--    `supabase/rls.sql` once to drop them — this block only affects fresh setups.
 -- ---------------------------------------------------------------------------
 alter table chapters          enable row level security;
 alter table members           enable row level security;
@@ -140,13 +150,12 @@ alter table invoices          enable row level security;
 alter table payments          enable row level security;
 alter table invoice_audit_log enable row level security;
 
--- Permissive policies (anon key can read/write — tighten when auth roles are set up)
-create policy "allow_all_chapters"   on chapters          for all using (true) with check (true);
-create policy "allow_all_members"    on members           for all using (true) with check (true);
-create policy "allow_all_fees"       on fee_settings      for all using (true) with check (true);
-create policy "allow_all_invoices"   on invoices          for all using (true) with check (true);
-create policy "allow_all_payments"   on payments          for all using (true) with check (true);
-create policy "allow_all_audit"      on invoice_audit_log for all using (true) with check (true);
+create policy "auth_all_chapters" on chapters          for all to authenticated using (true) with check (true);
+create policy "auth_all_members"  on members           for all to authenticated using (true) with check (true);
+create policy "auth_all_fees"     on fee_settings      for all to authenticated using (true) with check (true);
+create policy "auth_all_invoices" on invoices          for all to authenticated using (true) with check (true);
+create policy "auth_all_payments" on payments          for all to authenticated using (true) with check (true);
+create policy "auth_all_audit"    on invoice_audit_log for all to authenticated using (true) with check (true);
 
 -- ---------------------------------------------------------------------------
 -- Helper function: auto-update invoices.updated_at

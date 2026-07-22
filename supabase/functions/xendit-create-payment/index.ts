@@ -19,8 +19,9 @@ const VA_EXPIRY_HOURS = Number(Deno.env.get('XENDIT_VA_EXPIRY_HOURS') ?? 24)
 
 const ALLOWED_BANKS = ['BCA', 'BNI', 'MANDIRI', 'BRI']
 
+// Restrict to the app origin when APP_ORIGIN is configured (defaults to '*').
 const CORS = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': Deno.env.get('APP_ORIGIN') ?? '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
@@ -55,6 +56,17 @@ Deno.serve(async (req) => {
   if (method !== 'va' && method !== 'qris') return json({ error: 'method harus va | qris' }, 400)
   if (method === 'va' && !ALLOWED_BANKS.includes(bank)) {
     return json({ error: `bank harus salah satu: ${ALLOWED_BANKS.join(', ')}` }, 400)
+  }
+
+  // Gate: hanya izinkan saat Self Payment Mode (Xendit) aktif. Dicek di server
+  // agar tidak bisa di-bypass dari klien meski mode sedang Paper.id.
+  const { data: spm } = await supabase
+    .from('app_settings')
+    .select('value')
+    .eq('key', 'self_payment_mode')
+    .maybeSingle()
+  if (spm?.value !== 'true') {
+    return json({ error: 'Self payment mode tidak aktif' }, 403)
   }
 
   // Ambil invoice

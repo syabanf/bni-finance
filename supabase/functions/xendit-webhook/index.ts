@@ -19,20 +19,30 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Constant-time string compare — avoids leaking the callback token via timing. */
-function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false
+/**
+ * Constant-time compare of SHA-256 digests. Hashing first makes both sides a
+ * fixed 32 bytes, so neither the timing nor the length of the callback token
+ * leaks (unlike a raw char-by-char compare that returns early on length).
+ */
+async function tokenMatches(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder()
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(a)),
+    crypto.subtle.digest('SHA-256', enc.encode(b)),
+  ])
+  const va = new Uint8Array(ha)
+  const vb = new Uint8Array(hb)
   let r = 0
-  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  for (let i = 0; i < va.length; i++) r |= va[i] ^ vb[i]
   return r === 0
 }
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
-  // Verifikasi token callback Xendit (perbandingan constant-time)
+  // Verifikasi token callback Xendit (perbandingan constant-time, tanpa bocor panjang)
   const token = req.headers.get('x-callback-token') ?? ''
-  if (!CALLBACK_TOKEN || !timingSafeEqual(token, CALLBACK_TOKEN)) {
+  if (!CALLBACK_TOKEN || !(await tokenMatches(token, CALLBACK_TOKEN))) {
     return json({ error: 'Unauthorized' }, 401)
   }
 
