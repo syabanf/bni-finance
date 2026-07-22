@@ -34,6 +34,7 @@ export function ExportMenu({ onExcel, onCsv, onPdf, disabled, label = 'Export' }
         type="button"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
+        title={disabled ? 'Tidak ada data untuk diekspor pada filter saat ini.' : 'Pilih format export'}
         className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-3.5 py-2 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Download className="h-4 w-4" />
