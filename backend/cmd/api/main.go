@@ -24,6 +24,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
+	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
 )
 
@@ -95,6 +96,7 @@ func run(log *slog.Logger) error {
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
 		Public:    publicpay.NewService(publicpay.NewRepository(pool), xenditKey, callbackToken),
 		Upload:    uploads,
+		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken),
 	}, pool.Ping)
 
 	srv := &http.Server{

@@ -112,6 +112,10 @@
   }
   table.grid th { background: var(--code-bg); font-size: 12px;
                   text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+  /* Descriptions render as <p>, whose margin would drop the text a line below
+     the field name it belongs to. */
+  table.grid td > p:first-child { margin-top: 0; }
+  table.grid td > p:last-child { margin-bottom: 0; }
   .req { color: var(--brand); font-weight: 600; }
   .status { font-weight: 600; }
   .status.ok { color: var(--post); }

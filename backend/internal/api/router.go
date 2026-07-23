@@ -21,6 +21,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
+	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
 )
 
@@ -40,6 +41,7 @@ type Services struct {
 	Dashboard *dashboard.Service
 	Public    *publicpay.Service
 	Upload    *upload.Store
+	Sync      *sync.Service
 }
 
 // NewHandler builds the fully-wrapped HTTP handler.
@@ -123,5 +125,8 @@ func registerProtected(mux *http.ServeMux, svc Services) {
 	}
 	if svc.Upload != nil {
 		upload.NewHandler(svc.Upload).Register(mux)
+	}
+	if svc.Sync != nil {
+		sync.NewHandler(svc.Sync).Register(mux)
 	}
 }

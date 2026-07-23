@@ -17,7 +17,7 @@ test:     ## Jalankan unit test (integration test dilewati)
 ##   make test-integration TEST_DATABASE_URL=postgres://…/bni_finance_dev
 test-integration:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "set TEST_DATABASE_URL dulu" && exit 1)
-	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test ./internal/api/ -run TestLive -v -count=1
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test ./internal/api/ ./internal/sync/ -run TestLive -v -count=1
 
 ## Hasilkan ulang openapi.json dari openapi.yaml. YAML adalah sumbernya; JSON
 ## yang disajikan ke halaman /docs, karena browser bisa mem-parsing JSON tanpa

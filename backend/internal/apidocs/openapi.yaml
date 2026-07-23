@@ -69,6 +69,8 @@ tags:
     description: Agregat KPI, hanya baca
   - name: Unggahan
     description: Bukti pembayaran
+  - name: Sinkronisasi
+    description: Tarik data member & chapter dari BNI Visitor Management
   - name: Publik
     description: Dapat diakses tanpa token — pembayar bukan pengguna aplikasi
   - name: Sistem
@@ -1011,6 +1013,52 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ===========================================================================
+  # Sinkronisasi
+  # ===========================================================================
+  /api/v1/sync:
+    post:
+      tags: [Sinkronisasi]
+      summary: Tarik member & chapter dari BNI Visitor Management
+      description: |
+        **Admin saja.** Satu panggilan menyegarkan **keduanya** — BNI VM tidak
+        punya endpoint chapter tersendiri, jadi chapter diturunkan dari daftar
+        member.
+
+        Token diambil dari `app_settings.bni_vm_token` lebih dulu (bisa diganti
+        dari halaman Pengaturan tanpa redeploy), lalu jatuh ke variabel
+        lingkungan `BNI_VM_TOKEN`. Token **tidak pernah** sampai ke browser:
+        seluruh proses berjalan di server.
+
+        Seluruh snapshot ditulis dalam **satu transaksi**. Penulisan sebagian
+        bisa meninggalkan member yang menunjuk chapter yang belum ada.
+
+        **Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**
+        Menghapusnya akan melanggar foreign key begitu mereka punya invoice, dan
+        membuang riwayat tagihan meski berhasil.
+
+        **Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan
+        seluruh member — jauh lebih mungkin BNI VM sedang bermasalah daripada
+        organisasi kehilangan semua anggotanya sekaligus.
+      responses:
+        "200":
+          description: Sinkronisasi selesai
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SyncResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "502":
+          description: BNI VM tidak bisa dihubungi, menolak token, atau balasannya kosong
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Token BNI VM belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ===========================================================================
   # Unggahan
   # ===========================================================================
   /api/v1/uploads:
@@ -1859,6 +1907,23 @@ components:
         qrString: { type: string }
         amount: { type: integer }
         expiresAt: { type: [string, "null"], format: date-time }
+
+    SyncResult:
+      type: object
+      required: [chapters, members, deactivated, syncedAt]
+      properties:
+        chapters:
+          type: integer
+          description: Chapter unik yang ditemukan pada snapshot.
+        members:
+          type: integer
+          description: Member yang diterima dari BNI VM.
+        deactivated:
+          type: integer
+          description: |
+            Member lokal yang tidak lagi ada di BNI VM, jadi statusnya diubah
+            menjadi `inactive`. Tidak ada yang dihapus.
+        syncedAt: { type: string, format: date-time }
 
     XenditWebhook:
       type: object

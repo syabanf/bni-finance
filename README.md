@@ -51,7 +51,9 @@ mengubah UI.
 - **Profil** — ubah nama & kata sandi (butuh kata sandi lama, mode non-mock).
 - **PWA** — installable, navigasi bottom-tab di mobile, sadar safe-area.
 - **Pengaturan Biaya** — konfigurasi nominal pendaftaran & renewal.
-- **Sinkronisasi** — trigger manual pull data dari BNI VM.
+- **Sinkronisasi** — tarik manual data dari BNI VM. Berjalan di server, jadi
+  tokennya tidak pernah ada di browser; member yang hilang dinonaktifkan, bukan
+  dihapus, agar riwayat tagihan utuh.
 - **Auth** — login berbasis JWT dengan dua peran (Admin / User); di mode mock
   memakai localStorage.
 
@@ -189,6 +191,7 @@ pustaka standar (satu dependensi: driver `pgx/v5`).
 | Autentikasi | `POST /api/v1/auth/login` · `/auth/me` · `/auth/password` · `/users/**` |
 | Unggahan | `POST /api/v1/uploads` · `GET /uploads/{nama}` |
 | Publik | `GET /api/v1/public/invoices/{id}` · `POST /webhooks/xendit` |
+| Sinkronisasi | `POST /api/v1/sync` — tarik member & chapter dari BNI VM |
 
 Respons memakai **camelCase** yang identik dengan tipe di `src/types`, jadi bisa
 dikonsumsi klien TypeScript tanpa lapisan pemetaan.

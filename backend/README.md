@@ -81,6 +81,7 @@ backend/
     ├── dashboard/             # agregat KPI, read-only
     ├── upload/                # bukti pembayaran di disk
     ├── publicpay/             # halaman bayar publik + Xendit
+    ├── sync/                  # tarik member & chapter dari BNI VM
     └── apidocs/               # spesifikasi OpenAPI + halaman /docs
 ```
 
@@ -98,8 +99,8 @@ didaftarkan — itulah yang membuat test bisa menyalakan sebagian saja.
 ## 📘 Dokumentasi API
 
 Spesifikasi **OpenAPI 3.1** lengkap ada di
-[`internal/apidocs/openapi.yaml`](internal/apidocs/openapi.yaml) — 47 operasi,
-37 skema, beserta aturan bisnis dan kode galat tiap endpoint.
+[`internal/apidocs/openapi.yaml`](internal/apidocs/openapi.yaml) — 49 operasi,
+38 skema, beserta aturan bisnis dan kode galat tiap endpoint.
 
 Server menyajikannya sendiri (tanpa token):
 
@@ -228,6 +229,16 @@ Setiap member dibaca beserta chapter-nya (`LEFT JOIN`), jadi bentuknya sama deng
 | `PUT` | `/users/{id}/password` | admin — reset kata sandi orang lain |
 | `DELETE` | `/users/{id}` | admin |
 
+### Sinkronisasi
+
+| Method | Path | Akses |
+|---|---|---|
+| `POST` | `/sync` | admin — tarik member & chapter dari BNI Visitor Management |
+
+Satu panggilan menyegarkan keduanya: BNI VM tidak punya endpoint chapter, jadi
+chapter diturunkan dari daftar member. Token diambil dari
+`app_settings.bni_vm_token` lebih dulu, lalu jatuh ke `BNI_VM_TOKEN`.
+
 ### Unggahan
 
 | Method | Path | Akses |
@@ -274,6 +285,13 @@ Ini bukan CRUD telanjang — beberapa aturan domain dijaga di lapis service:
   jumlah data yang menahannya, bukan pelanggaran foreign key yang membingungkan.
 - **Biaya tidak boleh negatif**, dan `PATCH /fee-settings` tanpa field apa pun
   ditolak alih-alih diam-diam tidak melakukan apa-apa.
+- **Sinkronisasi menonaktifkan, tidak menghapus.** Member yang hilang dari BNI
+  VM diubah menjadi `inactive`. Menghapusnya akan melanggar foreign key begitu
+  mereka punya invoice, dan membuang riwayat tagihan meski berhasil.
+- **Snapshot kosong dari BNI VM ditolak** (502) sebelum menyentuh database —
+  menerapkannya berarti menonaktifkan seluruh member sekaligus.
+- **Nama tampilan chapter yang diubah lokal tidak ditimpa** sinkronisasi; hanya
+  nama kanonik yang mengikuti BNI VM.
 
 ---
 
@@ -346,6 +364,10 @@ batas sebenarnya `auth.RequireAuth` dan `auth.RequireAdmin`.
 - **Admin terakhir tidak bisa dihapus atau diturunkan** — itu keadaan yang tak
   bisa dipulihkan lewat API.
 - `ALLOWED_ORIGINS` membatasi CORS; `*` hanya untuk development.
+- **Token BNI VM tidak pernah sampai ke browser.** Dulu halaman mengambilnya
+  dari `app_settings` lalu memanggil API lewat proxy; sekarang seluruh
+  sinkronisasi berjalan di server. Key-nya mengandung kata `token`, jadi API
+  membacanya tersamar.
 - `DATABASE_URL` memakai kredensial database langsung dan **melewati seluruh
   otorisasi aplikasi**. Backend harus berjalan server-side; jangan pernah
   diekspos apa adanya ke browser.
@@ -415,7 +437,9 @@ rantai handler asli, penyamaran kredensial `app_settings`, guard hapus 409,
 pelunasan paralel pada invoice yang sama.
 
 **Integration test** (Postgres 17 lokal, `-race` bersih): seluruh query dieksekusi
-database sungguhan — setiap cabang filter, LEFT JOIN member–chapter, jejak audit
+database sungguhan — termasuk sinkronisasi, yang diuji menonaktifkan member yang
+hilang tanpa kehilangan invoice mereka, dan tidak menimpa nama tampilan chapter
+yang sudah diubah lokal — — setiap cabang filter, LEFT JOIN member–chapter, jejak audit
 `created → sent → paid` lintas paket, lima agregat dashboard, dan 32 pelunasan
 paralel atas satu invoice yang berakhir `paid` dengan **tepat satu** entri audit
 `paid` serta `paidAmount` yang tidak menumpuk.

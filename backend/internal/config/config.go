@@ -26,6 +26,11 @@ type Config struct {
 	UploadDir     string
 	MaxUploadSize int64
 
+	// BNI Visitor Management, the upstream for member and chapter data. The
+	// token may also live in app_settings, which takes precedence.
+	BNIVMURL   string
+	BNIVMToken string
+
 	// Seed credentials create the first administrator on an empty users table,
 	// so a fresh database is reachable without hand-writing a password hash.
 	SeedAdminEmail    string
@@ -51,6 +56,9 @@ func Load() (Config, error) {
 
 		UploadDir:     envOr("UPLOAD_DIR", "./uploads"),
 		MaxUploadSize: bytesOr("MAX_UPLOAD_SIZE", 5<<20), // 5 MiB
+
+		BNIVMURL:   envOr("BNI_VM_URL", "https://www.bni-vh.com/api/external/v1"),
+		BNIVMToken: strings.TrimSpace(os.Getenv("BNI_VM_TOKEN")),
 
 		SeedAdminEmail:    strings.TrimSpace(os.Getenv("SEED_ADMIN_EMAIL")),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),

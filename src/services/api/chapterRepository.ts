@@ -1,6 +1,7 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
 import type { ChapterRepository } from '@/services/types'
 import type { Chapter } from '@/types'
+import { runSync } from './syncService'
 
 // The API already speaks camelCase, so responses map straight onto the domain
 // types — no row-mapping layer, unlike the Supabase client this replaces.
@@ -22,11 +23,10 @@ export const apiChapterRepository: ChapterRepository = {
   },
 
   async sync() {
-    // BNI Visitor Management is a separate integration, not part of the local
-    // stack. Fail loudly rather than pretending a sync happened.
-    throw new Error(
-      'Sinkronisasi BNI VM belum tersedia pada backend lokal. Kelola chapter lewat halaman Chapter.',
-    )
+    // One server-side call refreshes chapters AND members — BNI VM has no
+    // chapters endpoint, so chapters are derived from the member list.
+    const result = await runSync()
+    return { count: result.chapters, syncedAt: result.syncedAt }
   },
 }
 

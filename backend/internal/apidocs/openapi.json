@@ -48,6 +48,10 @@
       "description": "Bukti pembayaran"
     },
     {
+      "name": "Sinkronisasi",
+      "description": "Tarik data member & chapter dari BNI Visitor Management"
+    },
+    {
       "name": "Publik",
       "description": "Dapat diakses tanpa token — pembayar bukan pengguna aplikasi"
     },
@@ -1853,6 +1857,53 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/sync": {
+      "post": {
+        "tags": [
+          "Sinkronisasi"
+        ],
+        "summary": "Tarik member & chapter dari BNI Visitor Management",
+        "description": "**Admin saja.** Satu panggilan menyegarkan **keduanya** — BNI VM tidak\npunya endpoint chapter tersendiri, jadi chapter diturunkan dari daftar\nmember.\n\nToken diambil dari `app_settings.bni_vm_token` lebih dulu (bisa diganti\ndari halaman Pengaturan tanpa redeploy), lalu jatuh ke variabel\nlingkungan `BNI_VM_TOKEN`. Token **tidak pernah** sampai ke browser:\nseluruh proses berjalan di server.\n\nSeluruh snapshot ditulis dalam **satu transaksi**. Penulisan sebagian\nbisa meninggalkan member yang menunjuk chapter yang belum ada.\n\n**Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**\nMenghapusnya akan melanggar foreign key begitu mereka punya invoice, dan\nmembuang riwayat tagihan meski berhasil.\n\n**Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan\nseluruh member — jauh lebih mungkin BNI VM sedang bermasalah daripada\norganisasi kehilangan semua anggotanya sekaligus.\n",
+        "responses": {
+          "200": {
+            "description": "Sinkronisasi selesai",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "502": {
+            "description": "BNI VM tidak bisa dihubungi, menolak token, atau balasannya kosong",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Token BNI VM belum dikonfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -3673,6 +3724,33 @@
               "string",
               "null"
             ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SyncResult": {
+        "type": "object",
+        "required": [
+          "chapters",
+          "members",
+          "deactivated",
+          "syncedAt"
+        ],
+        "properties": {
+          "chapters": {
+            "type": "integer",
+            "description": "Chapter unik yang ditemukan pada snapshot."
+          },
+          "members": {
+            "type": "integer",
+            "description": "Member yang diterima dari BNI VM."
+          },
+          "deactivated": {
+            "type": "integer",
+            "description": "Member lokal yang tidak lagi ada di BNI VM, jadi statusnya diubah\nmenjadi `inactive`. Tidak ada yang dihapus.\n"
+          },
+          "syncedAt": {
+            "type": "string",
             "format": "date-time"
           }
         }

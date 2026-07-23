@@ -2,6 +2,7 @@ import { api, query, type ListResponse } from '@/lib/apiClient'
 import type { MemberRepository } from '@/services/types'
 import type { Invoice, MemberWithChapter } from '@/types'
 import { isNotFound } from './chapterRepository'
+import { runSync } from './syncService'
 
 // The API returns each member with its chapter already joined, so the shape
 // matches MemberWithChapter without extra work.
@@ -39,8 +40,7 @@ export const apiMemberRepository: MemberRepository = {
   },
 
   async sync() {
-    throw new Error(
-      'Sinkronisasi BNI VM belum tersedia pada backend lokal. Kelola member lewat halaman Member.',
-    )
+    const result = await runSync()
+    return { count: result.members, syncedAt: result.syncedAt }
   },
 }
