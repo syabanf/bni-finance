@@ -7,9 +7,10 @@ import {
   PageHeader,
   useToast,
 } from '@/components/ui'
-import { getAppSetting, setAppSetting } from '@/services/api/settingsRepository'
+import { getAppSetting, setAppSetting } from '@/services/appSettings'
+import { isMockMode } from '@/services/dataSource'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
 
 export function PaymentModePage() {
   const { toast } = useToast()
@@ -18,10 +19,6 @@ export function PaymentModePage() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (useMock) {
-      setLoading(false)
-      return
-    }
     getAppSetting('self_payment_mode')
       .then((v) => setSelfPayment(v === 'true'))
       .finally(() => setLoading(false))

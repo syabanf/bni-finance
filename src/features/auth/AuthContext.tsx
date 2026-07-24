@@ -3,8 +3,9 @@ import type { AuthUser } from '@/types'
 import { authService } from '@/services'
 import { clearSession, getToken, setUnauthorizedHandler } from '@/lib/apiClient'
 import { fetchCurrentUser, PASSWORD_SEPARATOR, setCurrentUser } from '@/services/api/authRepository'
+import { isMockMode } from '@/services/dataSource'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
 
 interface AuthContextValue {
   user: AuthUser | null

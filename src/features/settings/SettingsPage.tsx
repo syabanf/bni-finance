@@ -15,10 +15,12 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
-import { getAppSetting, setAppSetting } from '@/services/api/settingsRepository'
+import { getAppSetting, setAppSetting } from '@/services/appSettings'
 import { formatCurrency, formatDateTime } from '@/lib/format'
+import { isMockMode } from '@/services/dataSource'
+import { DataSourceCard } from './components/DataSourceCard'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
 
 export function SettingsPage() {
   const { toast } = useToast()
@@ -35,7 +37,7 @@ export function SettingsPage() {
   const [savingTiming, setSavingTiming] = useState(false)
 
   useEffect(() => {
-    if (useMock) return
+    // Berlaku di kedua mode: mock membaca dari localStorage, API dari server.
     getAppSetting('invoice_draft_days_before').then(v => { if (v) setDraftDaysBefore(Number(v)) })
     getAppSetting('invoice_due_days_after').then(v => { if (v) setDueDaysAfter(Number(v)) })
   }, [])
@@ -127,6 +129,8 @@ export function SettingsPage() {
             </CardBody>
           </Card>
         </div>
+
+        <DataSourceCard />
 
         {/* Invoice Timing */}
         {!useMock && (

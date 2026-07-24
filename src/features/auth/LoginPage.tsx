@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound } from 'lucide-react'
 import type { UserRole } from '@/types'
 import { BniLogo, Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
 import { cn } from '@/lib/cn'
+import { DATA_SOURCE_LABEL, getDataSource, isMockMode, setDataSource } from '@/services/dataSource'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
+const dataSource = getDataSource()
 
 /** Akun demo per peran — cocok dengan DEMO_ACCOUNTS di mock authRepository. */
 const DEMO_ROLES: {
@@ -55,8 +57,11 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [quickRole, setQuickRole] = useState<string | null>(null)
 
+  // Redirect lewat elemen, bukan navigate() di dalam render — memanggilnya saat
+  // render memperbarui router sementara komponen ini masih dirender, dan React
+  // memperingatkannya.
   if (!authLoading && user) {
-    navigate('/dashboard', { replace: true })
+    return <Navigate to="/dashboard" replace />
   }
 
   const doLogin = async (e: string, p: string, done: (busy: boolean) => void) => {
@@ -209,7 +214,31 @@ export function LoginPage() {
           )}
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-ink-400">
+        {/* Pemilih sumber data juga ada di sini, bukan hanya di Pengaturan:
+            kalau backend mati saat mode API, halaman login adalah satu-satunya
+            layar yang bisa dijangkau — tanpa ini pengguna terkunci. */}
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs">
+          <span className="text-ink-400">Sumber data</span>
+          <div className="inline-flex overflow-hidden rounded-lg border border-ink-200 bg-white">
+            {(['mock', 'api'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={dataSource === mode}
+                onClick={() => dataSource !== mode && setDataSource(mode)}
+                className={`px-2.5 py-1 transition ${
+                  dataSource === mode
+                    ? 'bg-brand-500 font-medium text-white'
+                    : 'text-ink-500 hover:bg-ink-50'
+                }`}
+              >
+                {DATA_SOURCE_LABEL[mode]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-ink-400">
           <ShieldCheck className="h-3.5 w-3.5" />
           Akses internal BNI · Terenkripsi
         </div>

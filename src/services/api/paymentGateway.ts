@@ -1,5 +1,5 @@
 import { api } from '@/lib/apiClient'
-import { getAppSetting } from './settingsRepository'
+import { getAppSetting } from '../appSettings'
 
 export const VA_BANKS = ['BCA', 'BNI', 'MANDIRI', 'BRI'] as const
 export type VaBank = (typeof VA_BANKS)[number]
@@ -13,12 +13,13 @@ export interface XenditPaymentResult {
   expiresAt: string | null
 }
 
-/** Whether Self Payment Mode (Xendit) is switched on. */
+/**
+ * Whether Self Payment Mode (Xendit) is switched on.
+ *
+ * Reads through the composition point, so mock mode answers from localStorage
+ * and API mode from the server — no branch needed here.
+ */
 export async function isSelfPaymentMode(): Promise<boolean> {
-  // Mock mode has no backend settings — use a localStorage flag for the demo.
-  if (import.meta.env.VITE_USE_MOCK !== 'false') {
-    return localStorage.getItem('mock.self_payment_mode') === 'true'
-  }
   return (await getAppSetting('self_payment_mode')) === 'true'
 }
 

@@ -4,8 +4,9 @@ import { LogOut } from 'lucide-react'
 import { Avatar, Button, Card, CardHeader, Field, Input, PageHeader, useToast } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { ROLE_LABEL } from '@/lib/rbac'
+import { isMockMode } from '@/services/dataSource'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
 
 export function ProfilePage() {
   const { user, updateProfile, updatePassword, logout } = useAuth()

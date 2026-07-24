@@ -2,9 +2,10 @@
  * Service container — the composition root.
  *
  * The UI imports repositories from HERE, never from a concrete module.
- * `VITE_USE_MOCK` picks between the in-memory mock (default) and the HTTP
- * implementations that talk to the Go backend — no page or hook changes either
- * way. Swapping Supabase out for that backend touched only this file.
+ * `dataSource` picks between the in-memory mock and the HTTP implementations
+ * that talk to the Go backend — no page or hook changes either way. The choice
+ * is a runtime setting (a button in Pengaturan), not a build-time env var, so a
+ * demo can switch without restarting the dev server.
  */
 
 import type {
@@ -16,6 +17,8 @@ import type {
   PaymentRepository,
   SettingsRepository,
 } from './types'
+
+import { isMockMode } from './dataSource'
 
 import { mockAuthRepository } from './mock/authRepository'
 import { mockChapterRepository } from './mock/chapterRepository'
@@ -33,7 +36,7 @@ import { apiMemberRepository } from './api/memberRepository'
 import { apiPaymentRepository } from './api/paymentRepository'
 import { apiSettingsRepository } from './api/settingsRepository'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
 
 interface Services {
   auth: AuthRepository

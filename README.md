@@ -13,8 +13,9 @@ mengubah UI.
 > 📖 **Dokumentasi sistem lengkap (arsitektur, payment Xendit, edge functions, deploy):**
 > [`docs/SYSTEM.md`](./docs/SYSTEM.md)
 >
-> Default berjalan di atas **mock repository** (data in-memory) — tanpa backend. Set
-> `VITE_USE_MOCK=false` + `VITE_API_URL` untuk memakai backend Go di `backend/`.
+> Default berjalan di atas **mock repository** (data in-memory) — tanpa backend.
+> Berpindah ke backend Go dilakukan lewat **tombol _Sumber Data_** di halaman
+> Pengaturan atau di bawah form login, bukan lewat env.
 
 ---
 
@@ -67,15 +68,23 @@ npm run dev        # http://localhost:5173
 ```
 
 **Mode mock** (default) — login dengan kredensial **apa pun** (mis. `admin@bni-finance.com`
-/ `admin123`).
+/ `admin123`), atau pakai tombol **Login Cepat**.
 
-**Mode API** — jalankan `backend/` lebih dulu (lihat bagian Backend), lalu buat
-`.env.local`:
+**Berpindah sumber data** dilakukan lewat **tombol**, bukan env: ada pemilih
+_Sumber Data_ di halaman **Pengaturan** dan di bawah **form login**. Pilihannya
+tersimpan di browser, jadi tidak perlu menjalankan ulang dev server.
+
+`VITE_USE_MOCK` di `.env.local` hanya menentukan nilai **awal** untuk browser
+yang belum pernah memilih. Untuk mode API, jalankan `backend/` lebih dulu dan
+set alamatnya:
 
 ```
-VITE_USE_MOCK=false
 VITE_API_URL=http://localhost:8080
 ```
+
+> Pemilih itu sengaja juga ada di halaman login: kalau backend mati saat mode
+> API, login adalah satu-satunya layar yang bisa dijangkau — tanpa tombol di
+> sana Anda akan terkunci.
 
 Skrip lain:
 
@@ -102,7 +111,9 @@ src/
 │
 ├── services/            # 🟩 Data layer
 │   ├── types.ts         #    Repository INTERFACES (kontrak)
-│   ├── index.ts         #    Pilih implementasi (mock ↔ api) via VITE_USE_MOCK
+│   ├── dataSource.ts    #    Sumber data aktif (mock ↔ api), bisa ditukar runtime
+│   ├── index.ts         #    Pilih implementasi repository berdasarkan dataSource
+│   ├── appSettings.ts   #    Titik komposisi untuk konfigurasi key/value
 │   ├── mock/            #    Implementasi in-memory (seed, store, repositories)
 │   └── api/             #    Implementasi HTTP → backend Go
 │
@@ -131,9 +142,12 @@ implementasi lain di `services/index.ts`:
 
 ```ts
 // services/index.ts
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
-export const services = useMock ? mockServices : apiServices // ← tukar di sini
+const useMock = isMockMode()                                  // ← dari dataSource.ts
+export const services = useMock ? mockServices : apiServices  // ← tukar di sini
 ```
+
+Halaman **tidak pernah** mengimpor dari `services/mock/` atau `services/api/`
+secara langsung — selalu lewat `@/services` atau `@/services/appSettings`.
 
 ---
 
@@ -160,10 +174,11 @@ make run                  # http://localhost:8080
 
 # 2. frontend (terminal lain)
 cd ..
-echo "VITE_USE_MOCK=false" >> .env.local
 echo "VITE_API_URL=http://localhost:8080" >> .env.local
 npm run dev               # http://localhost:5173
 ```
+
+Lalu pilih **Backend API** pada pemilih _Sumber Data_ di halaman login.
 
 Masuk dengan `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` dari `backend/.env` —
 admin pertama dibuat otomatis saat tabel `users` masih kosong.

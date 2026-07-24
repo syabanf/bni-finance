@@ -15,9 +15,10 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDateTime } from '@/lib/format'
-import { getAppSetting, setAppSetting } from '@/services/api/settingsRepository'
+import { getAppSetting, setAppSetting } from '@/services/appSettings'
+import { isMockMode } from '@/services/dataSource'
 
-const useMock = import.meta.env.VITE_USE_MOCK !== 'false'
+const useMock = isMockMode()
 
 interface SyncCardState {
   count: number
@@ -40,7 +41,6 @@ export function SyncPage() {
   const [savingToken, setSavingToken] = useState(false)
 
   useEffect(() => {
-    if (useMock) return
     getAppSetting('bni_vm_token').then(v => setToken(v ?? ''))
     getAppSetting('bni_vm_url').then(v => setApiUrl(v ?? ''))
   }, [])
