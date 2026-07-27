@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound } from 'lucide-react'
 import type { UserRole } from '@/types'
@@ -6,6 +6,7 @@ import { BniLogo, Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
 import { cn } from '@/lib/cn'
 import { DATA_SOURCE_LABEL, getDataSource, isMockMode, setDataSource } from '@/services/dataSource'
+import { listQuickLoginAccounts, type QuickLoginAccount } from '@/services/api/quickLoginService'
 
 const useMock = isMockMode()
 const dataSource = getDataSource()
@@ -37,17 +38,12 @@ const DEMO_ROLES: {
   },
 ]
 
-/**
- * Di mode Supabase, quick sign-in butuh akun nyata — isi lewat env
- * (VITE_DEMO_EMAIL / VITE_DEMO_PASSWORD), mis. di Vercel preview.
- * ⚠️ Nilai VITE_* ikut ter-bundle ke klien, jadi arahkan hanya ke akun demo.
- */
-const ENV_DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || ''
-const ENV_DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
-const ENV_QUICK_LOGIN = Boolean(ENV_DEMO_EMAIL && ENV_DEMO_PASSWORD)
+/** Ikon & keterangan per peran, dipakai kartu mock maupun kartu mode API. */
+const ROLE_ICON: Record<UserRole, typeof UserCog> = { admin: UserCog, user: UserRound }
+const ROLE_DESC: Record<UserRole, string> = { admin: 'Akses penuh', user: 'Lihat & ekspor' }
 
 export function LoginPage() {
-  const { login, user, loading: authLoading } = useAuth()
+  const { login, quickLogin: quickLoginAs, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = useState(useMock ? DEMO_ROLES[0].email : '')
@@ -56,6 +52,24 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [quickRole, setQuickRole] = useState<string | null>(null)
+  // Akun quick login mode API datang dari server — kata sandinya tidak pernah
+  // sampai ke browser. Daftar kosong berarti fiturnya tidak diaktifkan.
+  const [apiAccounts, setApiAccounts] = useState<QuickLoginAccount[]>([])
+
+  useEffect(() => {
+    if (useMock) return
+    let cancelled = false
+    listQuickLoginAccounts()
+      .then((rows) => {
+        if (!cancelled) setApiAccounts(rows)
+      })
+      .catch(() => {
+        // Fitur mati atau backend tak terjangkau — cukup tampil tanpa tombol.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Redirect lewat elemen, bukan navigate() di dalam render — memanggilnya saat
   // render memperbarui router sementara komponen ini masih dirender, dan React
@@ -83,6 +97,19 @@ export function LoginPage() {
 
   const quickLogin = (key: string, e: string, p: string) =>
     doLogin(e, p, (busy) => setQuickRole(busy ? key : null))
+
+  /** Mode API: server memegang kredensialnya, kita hanya menyebut emailnya. */
+  const quickLoginApi = async (account: QuickLoginAccount) => {
+    setError(null)
+    setQuickRole(account.email)
+    try {
+      await quickLoginAs(account.email)
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal masuk cepat.')
+      setQuickRole(null)
+    }
+  }
 
   const busy = loading || quickRole !== null
 
@@ -156,8 +183,8 @@ export function LoginPage() {
             </Button>
           </form>
 
-          {/* Quick sign-in */}
-          {(useMock || ENV_QUICK_LOGIN) && (
+          {/* Masuk cepat — kartu mock, atau akun yang diizinkan server. */}
+          {(useMock || apiAccounts.length > 0) && (
             <>
               <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
                 <span className="h-px flex-1 bg-ink-100" />
@@ -165,50 +192,36 @@ export function LoginPage() {
                 <span className="h-px flex-1 bg-ink-100" />
               </div>
 
-              {useMock ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {DEMO_ROLES.map((r) => {
-                    const Icon = r.icon
-                    return (
-                      <button
+              <div className="grid grid-cols-2 gap-3">
+                {useMock
+                  ? DEMO_ROLES.map((r) => (
+                      <QuickCard
                         key={r.role}
-                        type="button"
+                        icon={r.icon}
+                        title={r.label}
+                        subtitle={r.desc}
+                        active={quickRole === r.role}
                         disabled={busy}
                         onClick={() => quickLogin(r.role, r.email, r.password)}
-                        className={cn(
-                          'flex flex-col items-center gap-1 rounded-xl border border-ink-200 px-3 py-3 transition-colors',
-                          'hover:border-brand-300 hover:bg-brand-50/50 disabled:cursor-not-allowed disabled:opacity-60',
-                          quickRole === r.role && 'border-brand-400 bg-brand-50',
-                        )}
-                      >
-                        <Icon className="h-5 w-5 text-brand-500" />
-                        <span className="text-sm font-semibold text-ink-900">
-                          {quickRole === r.role ? 'Masuk…' : r.label}
-                        </span>
-                        <span className="text-[11px] text-ink-400">{r.desc}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  loading={quickRole === 'env'}
-                  disabled={busy && quickRole !== 'env'}
-                  onClick={() => quickLogin('env', ENV_DEMO_EMAIL, ENV_DEMO_PASSWORD)}
-                  className="w-full"
-                >
-                  {quickRole !== 'env' && <UserCog className="h-4 w-4" />}
-                  Masuk sebagai akun demo
-                </Button>
-              )}
+                      />
+                    ))
+                  : apiAccounts.map((a) => (
+                      <QuickCard
+                        key={a.email}
+                        icon={ROLE_ICON[a.role] ?? UserRound}
+                        title={a.name}
+                        subtitle={ROLE_DESC[a.role] ?? a.email}
+                        active={quickRole === a.email}
+                        disabled={busy}
+                        onClick={() => void quickLoginApi(a)}
+                      />
+                    ))}
+              </div>
 
               <p className="mt-4 text-center text-xs text-ink-400">
                 {useMock
                   ? 'Mode demo — data berjalan di atas mock repository.'
-                  : `Akun demo: ${ENV_DEMO_EMAIL}`}
+                  : 'Akun uji yang diizinkan server — kata sandinya tidak pernah dikirim ke browser.'}
               </p>
             </>
           )}
@@ -244,5 +257,40 @@ export function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function QuickCard({
+  icon: Icon,
+  title,
+  subtitle,
+  active,
+  disabled,
+  onClick,
+}: {
+  icon: typeof UserCog
+  title: string
+  subtitle: string
+  active: boolean
+  disabled: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'flex flex-col items-center gap-1 rounded-xl border border-ink-200 px-3 py-3 transition-colors',
+        'hover:border-brand-300 hover:bg-brand-50/50 disabled:cursor-not-allowed disabled:opacity-60',
+        active && 'border-brand-400 bg-brand-50',
+      )}
+    >
+      <Icon className="h-5 w-5 text-brand-500" />
+      <span className="max-w-full truncate text-sm font-semibold text-ink-900">
+        {active ? 'Masuk…' : title}
+      </span>
+      <span className="max-w-full truncate text-[11px] text-ink-400">{subtitle}</span>
+    </button>
   )
 }

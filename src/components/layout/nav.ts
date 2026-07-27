@@ -5,10 +5,9 @@ import {
   Users,
   Building2,
   Settings,
-  RefreshCw,
   AlertTriangle,
-  CreditCard,
   BarChart3,
+  TerminalSquare,
   type LucideIcon,
 } from 'lucide-react'
 import type { Permission } from '@/lib/rbac'
@@ -18,6 +17,8 @@ export interface NavLeaf {
   label: string
   /** Exact match for the active state (used for index routes). */
   end?: boolean
+  /** Bila diisi, leaf hanya tampil untuk peran yang punya izin ini. */
+  permission?: Permission
 }
 
 export type NavNode =
@@ -32,7 +33,13 @@ export type NavNode =
       /** Bila diisi, item hanya tampil untuk peran yang punya izin ini. */
       permission?: Permission
     }
-  | { kind: 'group'; label: string; icon: LucideIcon; children: NavLeaf[] }
+  | {
+      kind: 'group'
+      label: string
+      icon: LucideIcon
+      children: NavLeaf[]
+      permission?: Permission
+    }
 
 export const NAV: NavNode[] = [
   { kind: 'item', to: '/dashboard', label: 'Dashboard', icon: LayoutGrid },
@@ -47,8 +54,28 @@ export const NAV: NavNode[] = [
   { kind: 'item', to: '/members', label: 'Member', icon: Users },
   { kind: 'item', to: '/chapters', label: 'Chapter', icon: Building2 },
 
+  // Sistem dikelompokkan agar sidebar tidak memanjang: menu harian di atas,
+  // urusan konfigurasi dan alat teknis terlipat sampai dibutuhkan.
   { kind: 'section', label: 'Sistem', permission: 'settings:manage' },
-  { kind: 'item', to: '/settings', label: 'Pengaturan Biaya', icon: Settings, end: true, permission: 'settings:manage' },
-  { kind: 'item', to: '/settings/payment', label: 'Metode Pembayaran', icon: CreditCard, permission: 'settings:manage' },
-  { kind: 'item', to: '/settings/sync', label: 'Sinkronisasi Data', icon: RefreshCw, permission: 'sync:run' },
+  {
+    kind: 'group',
+    label: 'Pengaturan',
+    icon: Settings,
+    permission: 'settings:manage',
+    children: [
+      { to: '/settings', label: 'Biaya Keanggotaan', end: true },
+      { to: '/settings/payment', label: 'Metode Pembayaran' },
+      { to: '/settings/sync', label: 'Sinkronisasi Data', permission: 'sync:run' },
+    ],
+  },
+  {
+    kind: 'group',
+    label: 'Alat Teknis',
+    icon: TerminalSquare,
+    permission: 'settings:manage',
+    children: [
+      { to: '/api-console', label: 'Konsol API' },
+      { to: '/blackbox', label: 'Blackbox Integrasi' },
+    ],
+  },
 ]

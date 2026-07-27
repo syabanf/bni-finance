@@ -236,6 +236,11 @@ export function buildSeedData(): BuiltData {
         })
       }
 
+      // The membership lapses when its latest covered period ends. The backend
+      // filters renewal-due on `renewal_date` alone, so leaving it null here
+      // would make that endpoint permanently empty on mock data.
+      if (status !== 'cancelled') member.renewalDate = periodEnd
+
       // Next renewal period begins the day after the current one ends.
       periodStart = addDays(periodEnd, 1)
     })

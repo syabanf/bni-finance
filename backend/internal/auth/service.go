@@ -28,10 +28,20 @@ type Service struct {
 	repo   Store
 	signer *Signer
 	now    func() time.Time
+
+	// quickLogin is the lower-cased allow-list for passwordless sign-in.
+	// Empty means the feature is off — see the quick login section below.
+	quickLogin []string
 }
 
-func NewService(repo Store, signer *Signer) *Service {
-	return &Service{repo: repo, signer: signer, now: time.Now}
+func NewService(repo Store, signer *Signer, quickLogin ...string) *Service {
+	allowed := make([]string, 0, len(quickLogin))
+	for _, e := range quickLogin {
+		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+			allowed = append(allowed, e)
+		}
+	}
+	return &Service{repo: repo, signer: signer, now: time.Now, quickLogin: allowed}
 }
 
 // invalidCredentials is deliberately the same message for an unknown email and
@@ -239,4 +249,79 @@ func (s *Service) EnsureSeedAdmin(ctx context.Context, email, password, name str
 		return false, err
 	}
 	return true, nil
+}
+
+// --- quick login -------------------------------------------------------------
+
+// Quick login signs a caller in WITHOUT a password. It exists so demos and
+// local development don't retype seeded credentials on every reload.
+//
+// The obvious alternative — shipping the password to the browser through a
+// VITE_* variable — bakes it into the public JS bundle, where anyone who opens
+// devtools can read it. Here the credential never leaves the server.
+//
+// The guard is an explicit allow-list of emails, not a boolean. A boolean would
+// mean that switching the feature on in production turns EVERY account into a
+// passwordless one; naming the accounts makes that impossible by construction.
+// An empty list disables the feature outright, which is the default.
+
+// QuickLoginEnabled reports whether any account was allow-listed.
+func (s *Service) QuickLoginEnabled() bool { return len(s.quickLogin) > 0 }
+
+// QuickLoginAccounts lists the allow-listed accounts that actually exist, so
+// the sign-in page can render one button each. Never returns password hashes.
+func (s *Service) QuickLoginAccounts(ctx context.Context) ([]domain.AuthUser, error) {
+	if !s.QuickLoginEnabled() {
+		return nil, httpx.NotFound("quick login tidak aktif")
+	}
+	out := make([]domain.AuthUser, 0, len(s.quickLogin))
+	for _, email := range s.quickLogin {
+		user, err := s.repo.GetByEmail(ctx, email)
+		if err != nil {
+			// A configured account that was never seeded is a misconfiguration,
+			// not a request failure — skip it rather than breaking the page.
+			if errors.Is(err, httpx.ErrNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		out = append(out, user.AsAuthUser())
+	}
+	return out, nil
+}
+
+// QuickLogin issues a token for an allow-listed account.
+func (s *Service) QuickLogin(ctx context.Context, email string) (*domain.LoginResult, error) {
+	if !s.QuickLoginEnabled() {
+		return nil, httpx.NotFound("quick login tidak aktif")
+	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	if !s.isQuickLoginAllowed(email) {
+		// Deliberately not "unknown account": the caller learns only that this
+		// email is not on the list, never whether it exists.
+		return nil, httpx.Forbidden("akun ini tidak terdaftar untuk quick login")
+	}
+
+	user, err := s.repo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, httpx.ErrNotFound) {
+			return nil, httpx.NotFound("akun quick login belum ada di database")
+		}
+		return nil, err
+	}
+
+	token, expires, err := s.signer.Sign(*user, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return &domain.LoginResult{Token: token, ExpiresAt: expires, User: user.AsAuthUser()}, nil
+}
+
+func (s *Service) isQuickLoginAllowed(email string) bool {
+	for _, allowed := range s.quickLogin {
+		if allowed == email {
+			return true
+		}
+	}
+	return false
 }

@@ -12,12 +12,14 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/apidocs"
 	"github.com/syabanf/bni-finance/backend/internal/audit"
 	"github.com/syabanf/bni-finance/backend/internal/auth"
+	"github.com/syabanf/bni-finance/backend/internal/blackbox"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
+	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
@@ -42,6 +44,8 @@ type Services struct {
 	Public    *publicpay.Service
 	Upload    *upload.Store
 	Sync      *sync.Service
+	PaperID   *paperid.Service
+	Blackbox  *blackbox.Recorder
 }
 
 // NewHandler builds the fully-wrapped HTTP handler.
@@ -82,6 +86,9 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 	}
 	if svc.Public != nil {
 		publicpay.NewHandler(svc.Public).Register(root)
+	}
+	if svc.PaperID != nil {
+		paperid.NewHandler(svc.PaperID).RegisterPublic(root)
 	}
 	if svc.Upload != nil {
 		upload.NewHandler(svc.Upload).RegisterFileServer(root)
@@ -128,5 +135,11 @@ func registerProtected(mux *http.ServeMux, svc Services) {
 	}
 	if svc.Sync != nil {
 		sync.NewHandler(svc.Sync).Register(mux)
+	}
+	if svc.PaperID != nil {
+		paperid.NewHandler(svc.PaperID).RegisterProtected(mux)
+	}
+	if svc.Blackbox != nil {
+		blackbox.NewHandler(svc.Blackbox).Register(mux)
 	}
 }

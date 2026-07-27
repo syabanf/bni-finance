@@ -21,6 +21,37 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 // the obvious one, since you have no token until it succeeds.
 func (h *Handler) RegisterPublic(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
+	mux.HandleFunc("GET /api/v1/auth/quick-login", h.quickLoginAccounts)
+	mux.HandleFunc("POST /api/v1/auth/quick-login", h.quickLogin)
+}
+
+// quickLoginAccounts lists the allow-listed demo accounts. Public because the
+// sign-in page must render before anyone has a token — and it exposes only
+// name/email/role, never a credential. Returns 404 when the feature is off, so
+// a production deployment gives no hint that it exists.
+func (h *Handler) quickLoginAccounts(w http.ResponseWriter, r *http.Request) {
+	accounts, err := h.svc.QuickLoginAccounts(r.Context())
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": accounts})
+}
+
+func (h *Handler) quickLogin(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	result, err := h.svc.QuickLogin(r.Context(), in.Email)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, result)
 }
 
 // RegisterProtected wires everything that requires a signed-in caller.

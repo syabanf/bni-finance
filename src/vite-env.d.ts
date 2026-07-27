@@ -1,14 +1,18 @@
 /// <reference types="vite/client" />
 
+/**
+ * Hanya variabel yang benar-benar dibaca kode. Ingat: Vite menanam setiap nilai
+ * `VITE_*` ke dalam bundel JS publik, jadi tidak ada rahasia yang boleh masuk
+ * ke sini. Kredensial (Paper.id, BNI VM, JWT, database) hidup di backend.
+ */
 interface ImportMetaEnv {
+  /** Alamat backend Go. Kosong berarti origin yang sama. */
+  readonly VITE_API_URL: string
+  /**
+   * Sumber data awal saat localStorage belum diisi. Setelah itu tombol di
+   * halaman Pengaturan / Login yang menentukan — lihat services/dataSource.ts.
+   */
   readonly VITE_USE_MOCK: string
-  readonly VITE_SUPABASE_URL: string
-  readonly VITE_SUPABASE_ANON_KEY: string
-  readonly VITE_BNI_VM_API_URL: string
-  readonly VITE_PAPER_ID_API_URL: string
-  /** Optional demo account for the "Login Cepat" button on deployed demos. */
-  readonly VITE_DEMO_EMAIL: string
-  readonly VITE_DEMO_PASSWORD: string
 }
 
 interface ImportMeta {

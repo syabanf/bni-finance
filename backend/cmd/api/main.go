@@ -9,18 +9,21 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/syabanf/bni-finance/backend/internal/api"
 	"github.com/syabanf/bni-finance/backend/internal/audit"
 	"github.com/syabanf/bni-finance/backend/internal/auth"
+	"github.com/syabanf/bni-finance/backend/internal/blackbox"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
 	"github.com/syabanf/bni-finance/backend/internal/database"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
+	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
@@ -66,8 +69,19 @@ func run(log *slog.Logger) error {
 	defer pool.Close()
 	log.Info("terhubung ke database")
 
+	// One recorder shared by every integration, so the blackbox page shows all
+	// traffic in a single timeline.
+	recorder := blackbox.New(cfg.BlackboxSize)
+
 	// Wire: repository → service → handler, one chain per resource.
-	authSvc := auth.NewService(auth.NewRepository(pool), signer)
+	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...)
+
+	// Passwordless sign-in is a deliberate hole in authentication. Say so at
+	// every start, naming the accounts, so it can never be on unnoticed.
+	if authSvc.QuickLoginEnabled() {
+		log.Warn("QUICK LOGIN AKTIF — akun berikut bisa masuk tanpa kata sandi; jangan dipakai di produksi",
+			"akun", strings.Join(cfg.QuickLoginEmails, ", "))
+	}
 
 	if cfg.HasSeedAdmin() {
 		created, err := authSvc.EnsureSeedAdmin(ctx, cfg.SeedAdminEmail, cfg.SeedAdminPassword, cfg.SeedAdminName)
@@ -94,9 +108,13 @@ func run(log *slog.Logger) error {
 		Settings:  settings.NewService(settings.NewRepository(pool)),
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
-		Public:    publicpay.NewService(publicpay.NewRepository(pool), xenditKey, callbackToken),
+		Public:    publicpay.NewService(publicpay.NewRepository(pool), xenditKey, callbackToken, recorder),
 		Upload:    uploads,
-		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken),
+		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder),
+		PaperID: paperid.NewService(paperid.NewRepository(pool),
+			cfg.PaperIDBaseURL, cfg.PaperIDClientID, cfg.PaperIDClientSecret,
+			cfg.PaperIDCallbackToken, recorder),
+		Blackbox: recorder,
 	}, pool.Ping)
 
 	srv := &http.Server{

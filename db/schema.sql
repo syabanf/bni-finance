@@ -122,9 +122,18 @@ create table if not exists app_settings (
   value      text not null,
   updated_at timestamptz not null default now()
 );
+-- Bawaan aman. `do nothing` menjaga instalasi yang sudah jalan: nilai yang
+-- sudah diubah operator tidak ditimpa.
+--
+-- Kedua kunci paperid_send_* mengatur apakah Paper.id benar-benar mengantar
+-- invoice ke member. Bawaannya mati supaya staging dan instalasi baru tidak
+-- mengirim pesan ke orang sungguhan sebelum ada yang menyalakannya.
 insert into app_settings (key, value) values
   ('self_payment_mode',        'false'),
-  ('invoice_draft_days_before','30')
+  ('invoice_draft_days_before','30'),
+  ('invoice_due_days_after',   '30'),
+  ('paperid_send_email',       'false'),
+  ('paperid_send_whatsapp',    'false')
 on conflict (key) do nothing;
 
 -- ---------------------------------------------------------------------------

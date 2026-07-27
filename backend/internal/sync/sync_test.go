@@ -130,7 +130,7 @@ func (f stubFetcher) FetchMembers(context.Context) ([]RemoteMember, error) {
 }
 
 func newTestService(store *stubStore, fetch Fetcher) *Service {
-	svc := NewService(store, "http://contoh.invalid", "")
+	svc := NewService(store, "http://contoh.invalid", "", nil)
 	svc.newFetcher = func(string, string) Fetcher { return fetch }
 	return svc
 }
@@ -192,7 +192,7 @@ func TestRunAppliesSnapshot(t *testing.T) {
 func TestRunPrefersSettingOverEnv(t *testing.T) {
 	var usedToken string
 	store := &stubStore{token: "dari-pengaturan"}
-	svc := NewService(store, "http://contoh.invalid", "dari-env")
+	svc := NewService(store, "http://contoh.invalid", "dari-env", nil)
 	svc.newFetcher = func(_ string, token string) Fetcher {
 		usedToken = token
 		return stubFetcher{members: []RemoteMember{{ID: "m", ChapterID: "c", Name: "n"}}}

@@ -11,10 +11,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/syabanf/bni-finance/backend/internal/blackbox"
 )
 
 // DefaultBaseURL is the BNI Visitor Management external API.
@@ -55,6 +58,15 @@ type Client struct {
 	baseURL string
 	token   string
 	http    *http.Client
+	// rec captures each page fetch; nil disables recording. Only bodies are
+	// captured — the BNI VM token lives in the Authorization header.
+	rec *blackbox.Recorder
+}
+
+// WithRecorder attaches a blackbox recorder.
+func (c *Client) WithRecorder(rec *blackbox.Recorder) *Client {
+	c.rec = rec
+	return c
 }
 
 func NewClient(baseURL, token string) *Client {
@@ -107,11 +119,25 @@ func (c *Client) fetchPage(ctx context.Context, offset int) ([]RemoteMember, boo
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
 
+	started := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
+		c.rec.Record(blackbox.Call{
+			Integration: "bni_vm", Direction: blackbox.Outbound,
+			Method: http.MethodGet, URL: endpoint,
+			Success: false, Duration: time.Since(started), Err: err,
+		})
 		return nil, false, fmt.Errorf("hubungi BNI VM: %w", err)
 	}
 	defer resp.Body.Close()
+
+	raw, readErr := io.ReadAll(resp.Body)
+	c.rec.Record(blackbox.Call{
+		Integration: "bni_vm", Direction: blackbox.Outbound,
+		Method: http.MethodGet, URL: endpoint,
+		Response: raw, Status: resp.StatusCode, Success: resp.StatusCode < 300,
+		Duration: time.Since(started),
+	})
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return nil, false, fmt.Errorf("BNI VM menolak token (HTTP %d) — periksa pengaturan bni_vm_token", resp.StatusCode)
@@ -119,9 +145,12 @@ func (c *Client) fetchPage(ctx context.Context, offset int) ([]RemoteMember, boo
 	if resp.StatusCode >= 300 {
 		return nil, false, fmt.Errorf("BNI VM membalas HTTP %d", resp.StatusCode)
 	}
+	if readErr != nil {
+		return nil, false, fmt.Errorf("baca balasan BNI VM: %w", readErr)
+	}
 
 	var page memberPage
-	if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
+	if err := json.Unmarshal(raw, &page); err != nil {
 		return nil, false, fmt.Errorf("baca balasan BNI VM: %w", err)
 	}
 	return page.Data, page.Pagination.HasMore, nil

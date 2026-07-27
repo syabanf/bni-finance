@@ -90,7 +90,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             )
           }
           if (node.kind === 'group') {
-            return <NavGroup key={node.label} {...node} />
+            // Anak grup punya izinnya sendiri (mis. Sinkronisasi butuh sync:run),
+            // jadi harus disaring juga — bukan hanya grupnya.
+            const children = node.children.filter((c) => !c.permission || can(user?.role, c.permission))
+            if (children.length === 0) return null
+            return <NavGroup key={node.label} {...{ ...node, children }} />
           }
           const Icon = node.icon
           if (node.urgent) {

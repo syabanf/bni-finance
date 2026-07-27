@@ -124,27 +124,32 @@ export const apiInvoiceRepository: InvoiceRepository = {
     const invoice = await api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)
     if (invoice.status !== 'draft') throw new Error('Hanya invoice draft yang bisa dikirim')
 
-    // Due date = today + N days, configurable in app_settings.
-    const dueDaysAfter = Number((await getAppSetting('invoice_due_days_after')) ?? 30)
-    const sentAt = new Date()
-    const due = new Date(sentAt)
-    due.setDate(due.getDate() + dueDaysAfter)
-    const dueDate = due.toISOString().slice(0, 10)
-
-    // Self Payment Mode ON  → the payer settles via Xendit, no Paper.id link.
-    // Self Payment Mode OFF → Paper.id integration (simulated link).
+    // Self Payment Mode ON  → the payer settles via Xendit on the public page,
+    //                         so there's no Paper.id push — just issue it.
+    // Self Payment Mode OFF → the server pushes a real invoice to Paper.id and
+    //                         flips the status in one call.
     const selfPayment = (await getAppSetting('self_payment_mode')) === 'true'
 
-    const payload: Record<string, unknown> = { status: 'sent', dueDate }
-    if (!selfPayment) {
-      const paperId = `paperid-${id.slice(0, 8)}`
-      payload.paperIdInvoiceId = paperId
-      payload.paperIdInvoiceUrl = `https://paper.id/invoice/${paperId}`
-      payload.paperIdPaymentUrl = `https://paper.id/pay/${paperId}`
-      payload.paperIdSentAt = sentAt.toISOString()
+    if (selfPayment) {
+      const dueDaysAfter = Number((await getAppSetting('invoice_due_days_after')) ?? 30)
+      const due = new Date()
+      due.setDate(due.getDate() + dueDaysAfter)
+      return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, {
+        status: 'sent',
+        dueDate: due.toISOString().slice(0, 10),
+      })
     }
 
-    return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, payload)
+    // The Paper.id credentials live on the server; this endpoint does the push,
+    // stores the returned payment link + PDF, and records the audit entry.
+    //
+    // The body is deliberately empty: which channels deliver the invoice is an
+    // operational policy read from app_settings by the server, not a per-click
+    // choice. Passing flags from here would mean this path, the bulk actions in
+    // the invoice list, and "create + send" each had to remember them — and the
+    // one that forgot would quietly stop reaching members while still
+    // reporting success. Set the channels in Pengaturan → Metode Pembayaran.
+    return api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/send`, {})
   },
 
   async resend(id) {
@@ -152,13 +157,10 @@ export const apiInvoiceRepository: InvoiceRepository = {
     if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
       throw new Error('Hanya invoice terkirim atau terlambat yang bisa dikirim ulang')
     }
-    const paperId = `paperid-${id.slice(0, 8)}`
-    return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, {
-      paperIdInvoiceId: paperId,
-      paperIdInvoiceUrl: `https://paper.id/invoice/${paperId}`,
-      paperIdPaymentUrl: `https://paper.id/pay/${paperId}`,
-      paperIdSentAt: new Date().toISOString(),
-    })
+    // The Paper.id invoice already exists and its payment link is persistent, so
+    // there's nothing to re-create — the stored link stays valid. Return the
+    // invoice as-is rather than fabricating a new link.
+    return invoice
   },
 
   async cancel(id, reason) {

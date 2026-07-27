@@ -3,6 +3,7 @@ import type { AuthUser } from '@/types'
 import { authService } from '@/services'
 import { clearSession, getToken, setUnauthorizedHandler } from '@/lib/apiClient'
 import { fetchCurrentUser, PASSWORD_SEPARATOR, setCurrentUser } from '@/services/api/authRepository'
+import { quickLogin as apiQuickLogin } from '@/services/api/quickLoginService'
 import { isMockMode } from '@/services/dataSource'
 
 const useMock = isMockMode()
@@ -11,6 +12,8 @@ interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
+  /** Passwordless sign-in for allow-listed demo accounts (Backend API mode). */
+  quickLogin: (email: string) => Promise<void>
   logout: () => Promise<void>
   updateProfile: (name: string) => Promise<void>
   updatePassword: (currentPassword: string, newPassword: string) => Promise<void>
@@ -65,6 +68,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u)
   }, [])
 
+  const quickLoginAs = useCallback(async (email: string) => {
+    const u = await apiQuickLogin(email)
+    setUser(u)
+  }, [])
+
   const logout = useCallback(async () => {
     await authService.logout()
     setUser(null)
@@ -84,8 +92,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, updateProfile, updatePassword }),
-    [user, loading, login, logout, updateProfile, updatePassword],
+    () => ({ user, loading, login, quickLogin: quickLoginAs, logout, updateProfile, updatePassword }),
+    [user, loading, login, quickLoginAs, logout, updateProfile, updatePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
