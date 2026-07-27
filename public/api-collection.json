@@ -68,6 +68,23 @@
         "email": "nama@contoh.com",
         "password": ""
       },
+      "bodyFields": [
+        {
+          "name": "email",
+          "type": "string",
+          "format": "email",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": false,
@@ -95,6 +112,15 @@
       "description": "",
       "params": [],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -112,6 +138,22 @@
         "currentPassword": "",
         "newPassword": ""
       },
+      "bodyFields": [
+        {
+          "name": "currentPassword",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "newPassword",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -141,6 +183,16 @@
       "body": {
         "email": "nama@contoh.com"
       },
+      "bodyFields": [
+        {
+          "name": "email",
+          "type": "string",
+          "format": "email",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": false,
@@ -179,6 +231,38 @@
           "4": "n"
         }
       },
+      "bodyFields": [
+        {
+          "name": "email",
+          "type": "string",
+          "format": "email",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "password",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "role",
+          "type": "string",
+          "required": false,
+          "default": "user",
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -224,6 +308,15 @@
       "body": {
         "newPassword": ""
       },
+      "bodyFields": [
+        {
+          "name": "newPassword",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -248,6 +341,19 @@
       "body": {
         "role": "admin"
       },
+      "bodyFields": [
+        {
+          "name": "role",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "admin",
+            "user"
+          ],
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -376,6 +482,93 @@
         "periodStart": "2026-07-27",
         "periodEnd": "2026-07-27"
       },
+      "bodyFields": [
+        {
+          "name": "number",
+          "type": "string",
+          "required": false,
+          "description": "Dibuat otomatis bila kosong.",
+          "complex": false
+        },
+        {
+          "name": "memberId",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "chapterId",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "registration",
+            "renewal"
+          ],
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "amount",
+          "type": "integer",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "currency",
+          "type": "string",
+          "required": false,
+          "default": "IDR",
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "dueDate",
+          "type": "string",
+          "format": "date",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "periodStart",
+          "type": "string",
+          "format": "date",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "periodEnd",
+          "type": "string",
+          "format": "date",
+          "required": true,
+          "description": "Tidak boleh lebih awal dari periodStart.",
+          "complex": false
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "createdBy",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -440,6 +633,117 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "amount",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "dueDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "periodStart",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "periodEnd",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "draft",
+            "sent",
+            "paid",
+            "overdue",
+            "cancelled"
+          ],
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "cancelReason",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "cancelledBy",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paperIdInvoiceId",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paperIdInvoiceUrl",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paperIdPaymentUrl",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paperIdSentAt",
+          "type": "string",
+          "format": "date-time",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "actorId",
+          "type": "string",
+          "required": false,
+          "description": "Hanya melabeli baris audit; tidak disimpan pada invoice.",
+          "complex": false
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "required": false,
+          "description": "Hanya melabeli baris audit; tidak disimpan pada invoice.",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -502,6 +806,37 @@
         },
         "notes": ""
       },
+      "bodyFields": [
+        {
+          "name": "action",
+          "type": "string",
+          "required": false,
+          "default": "updated",
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "actorId",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "actorName",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -578,6 +913,60 @@
         "amount": 1500000,
         "settleInvoice": true
       },
+      "bodyFields": [
+        {
+          "name": "invoiceId",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "amount",
+          "type": "integer",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paidAt",
+          "type": "string",
+          "format": "date-time",
+          "required": false,
+          "description": "Default waktu server.",
+          "complex": false
+        },
+        {
+          "name": "paymentMethod",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "proofUrl",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "settleInvoice",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Kirim false untuk mencatat tanpa melunasi invoice.",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -642,6 +1031,44 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "amount",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paidAt",
+          "type": "string",
+          "format": "date-time",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paymentMethod",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "proofUrl",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -737,6 +1164,82 @@
           "5": "e"
         }
       },
+      "bodyFields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "Dibuatkan database bila kosong.",
+          "complex": false
+        },
+        {
+          "name": "chapterId",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "format": "email",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "company",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "businessField",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "default": "active",
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "joinedDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "renewalDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -801,6 +1304,78 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "chapterId",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "company",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "businessField",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "active",
+            "inactive",
+            "pending"
+          ],
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "joinedDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "renewalDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -898,6 +1473,43 @@
       "body": {
         "name": ""
       },
+      "bodyFields": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "Dibuatkan database bila kosong.",
+          "complex": false
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "displayName",
+          "type": "string",
+          "required": false,
+          "description": "Jatuh ke name bila kosong.",
+          "complex": false
+        },
+        {
+          "name": "areaName",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "cityName",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -962,6 +1574,36 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "displayName",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "areaName",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "cityName",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -1041,6 +1683,15 @@
       "body": {
         "value": ""
       },
+      "bodyFields": [
+        {
+          "name": "value",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -1068,6 +1719,43 @@
       "description": "**Admin saja.** Body kosong ditolak **400** alih-alih diam-diam tidak\nmelakukan apa-apa.\n",
       "params": [],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "registrationFee",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "renewalFee",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "currency",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "updatedBy",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -1159,6 +1847,22 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "sendEmail",
+          "type": "boolean",
+          "required": false,
+          "description": "Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti",
+          "complex": false
+        },
+        {
+          "name": "sendWhatsApp",
+          "type": "boolean",
+          "required": false,
+          "description": "Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,",
+          "complex": false
+        }
+      ],
       "bodyRequired": false,
       "multipart": false,
       "auth": true,
@@ -1192,6 +1896,61 @@
         "status": "PAID",
         "dryRun": true
       },
+      "bodyFields": [
+        {
+          "name": "invoiceId",
+          "label": "Invoice yang Dilunasi",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "description": "Invoice kita yang mau dianggap lunas. Harus sudah dikirim ke Paper.id.",
+          "complex": false
+        },
+        {
+          "name": "amount",
+          "label": "Nominal Dibayar (Rp)",
+          "type": "integer",
+          "required": false,
+          "description": "Nominal yang dibayar. Kosong = mengikuti nominal invoice.",
+          "complex": false
+        },
+        {
+          "name": "method",
+          "label": "Cara Bayar",
+          "type": "string",
+          "required": false,
+          "default": "bank_transfer",
+          "description": "Cara pembayaran yang dilaporkan Paper.id.",
+          "complex": false
+        },
+        {
+          "name": "channel",
+          "label": "Bank / Kanal",
+          "type": "string",
+          "required": false,
+          "default": "bni",
+          "description": "Bank atau kanal pembayarannya.",
+          "complex": false
+        },
+        {
+          "name": "status",
+          "label": "Status Pembayaran",
+          "type": "string",
+          "required": false,
+          "default": "PAID",
+          "description": "Status pembayaran. Selain PAID akan diabaikan handler.",
+          "complex": false
+        },
+        {
+          "name": "dryRun",
+          "label": "Mode Uji (tidak melunasi)",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Aktif = payload hanya disusun, invoice tidak dilunasi. Matikan hanya bila memang ingin menandai invoice ini lunas.",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": true,
@@ -1206,11 +1965,95 @@
       "description": "**Admin saja.** Menyusun payload `store-invoice` dan (opsional)\nmengirimkannya, lalu mengembalikan request beserta response apa adanya.\nBerguna untuk memastikan kredensial bekerja tanpa perlu menyiapkan\ninvoice dan member sungguhan.\n\n**`dryRun` default `true`** — payload disusun tetapi **tidak** dikirim.\nPanggilan sungguhan membuat invoice nyata di Paper.id dan memakai\nnomornya secara permanen, jadi mengirim harus menjadi pilihan sadar.\n\nNomor uji selalu ber-prefix `TEST-` dengan stempel waktu + acak, sehingga\ntidak pernah menghabiskan nomor invoice sungguhan maupun bentrok satu\nsama lain.\n\nKonsol ini **tidak menyentuh tabel invoice** — murni uji kontrak.\n",
       "params": [],
       "body": {
+        "customerName": "Uji Coba BNI Finance",
+        "customerPhone": "081200000000",
         "amount": 1500000,
+        "itemName": "Uji Koneksi Paper.id",
         "sendEmail": false,
         "sendWhatsApp": false,
         "dryRun": true
       },
+      "bodyFields": [
+        {
+          "name": "customerName",
+          "label": "Nama Penerima",
+          "type": "string",
+          "required": false,
+          "default": "Uji Coba BNI Finance",
+          "description": "Nama penerima invoice.",
+          "complex": false
+        },
+        {
+          "name": "customerPhone",
+          "label": "Nomor Telepon",
+          "type": "string",
+          "required": false,
+          "default": "081200000000",
+          "description": "Nomor telepon penerima — Paper.id mewajibkannya. Bawaannya nomor contoh, bukan nomor sungguhan, supaya uji coba tidak pernah mengirim pesan ke orang lain tanpa sengaja.",
+          "complex": false
+        },
+        {
+          "name": "customerEmail",
+          "label": "Email Penerima",
+          "type": "string",
+          "required": false,
+          "description": "Alamat email penerima. Boleh kosong bila tidak mengirim email.",
+          "complex": false
+        },
+        {
+          "name": "amount",
+          "label": "Nominal (Rp)",
+          "type": "integer",
+          "required": false,
+          "default": 1500000,
+          "description": "Nominal tagihan dalam rupiah, tanpa titik.",
+          "complex": false
+        },
+        {
+          "name": "itemName",
+          "label": "Nama Item",
+          "type": "string",
+          "required": false,
+          "default": "Uji Koneksi Paper.id",
+          "description": "Nama barang/jasa yang tercetak pada invoice.",
+          "complex": false
+        },
+        {
+          "name": "notes",
+          "label": "Catatan",
+          "type": "string",
+          "required": false,
+          "description": "Catatan tambahan yang ikut tercetak di invoice.",
+          "complex": false
+        },
+        {
+          "name": "sendEmail",
+          "label": "Kirim via Email",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Minta Paper.id mengirim invoice ke email di atas.",
+          "complex": false
+        },
+        {
+          "name": "sendWhatsApp",
+          "label": "Kirim via WhatsApp",
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Minta Paper.id mengirim tautan pembayaran via WhatsApp.",
+          "complex": false
+        },
+        {
+          "name": "dryRun",
+          "label": "Mode Uji (tidak benar-benar dikirim)",
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Aktif = payload hanya disusun dan ditampilkan, tidak dikirim ke Paper.id. Matikan hanya bila memang ingin membuat invoice sungguhan.",
+          "complex": false
+        }
+      ],
       "bodyRequired": false,
       "multipart": false,
       "auth": true,
@@ -1240,6 +2083,43 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "ref_id",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "external_id",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "payment_date",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "payment_info",
+          "type": "object",
+          "required": false,
+          "description": "",
+          "complex": true
+        },
+        {
+          "name": "additional_info",
+          "type": "object",
+          "required": false,
+          "description": "",
+          "complex": true
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": false,
@@ -1353,6 +2233,32 @@
       "body": {
         "method": "va"
       },
+      "bodyFields": [
+        {
+          "name": "method",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "va",
+            "qris"
+          ],
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "bank",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "BCA",
+            "BNI",
+            "MANDIRI",
+            "BRI"
+          ],
+          "description": "Wajib bila method = va.",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": false,
@@ -1375,6 +2281,58 @@
         }
       ],
       "body": {},
+      "bodyFields": [
+        {
+          "name": "external_id",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "reference_id",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "id",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "payment_id",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "amount",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "created",
+          "type": "string",
+          "format": "date-time",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
       "bodyRequired": true,
       "multipart": false,
       "auth": false,

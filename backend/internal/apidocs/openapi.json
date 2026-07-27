@@ -4266,36 +4266,56 @@
         "description": "Semua field opsional — kosongkan untuk memakai data contoh.",
         "properties": {
           "customerName": {
-            "type": "string"
+            "title": "Nama Penerima",
+            "type": "string",
+            "default": "Uji Coba BNI Finance",
+            "description": "Nama penerima invoice."
           },
           "customerPhone": {
-            "type": "string"
+            "title": "Nomor Telepon",
+            "type": "string",
+            "default": "081200000000",
+            "description": "Nomor telepon penerima — Paper.id mewajibkannya. Bawaannya nomor contoh, bukan nomor sungguhan, supaya uji coba tidak pernah mengirim pesan ke orang lain tanpa sengaja."
           },
           "customerEmail": {
-            "type": "string"
+            "title": "Email Penerima",
+            "type": "string",
+            "description": "Alamat email penerima. Boleh kosong bila tidak mengirim email."
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer",
-            "default": 1500000
+            "default": 1500000,
+            "description": "Nominal tagihan dalam rupiah, tanpa titik."
           },
           "itemName": {
-            "type": "string"
+            "title": "Nama Item",
+            "type": "string",
+            "default": "Uji Koneksi Paper.id",
+            "description": "Nama barang/jasa yang tercetak pada invoice."
           },
           "notes": {
-            "type": "string"
+            "title": "Catatan",
+            "type": "string",
+            "description": "Catatan tambahan yang ikut tercetak di invoice."
           },
           "sendEmail": {
+            "title": "Kirim via Email",
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "Minta Paper.id mengirim invoice ke email di atas."
           },
           "sendWhatsApp": {
+            "title": "Kirim via WhatsApp",
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "Minta Paper.id mengirim tautan pembayaran via WhatsApp."
           },
           "dryRun": {
+            "title": "Mode Uji (tidak benar-benar dikirim)",
             "type": "boolean",
             "default": true,
-            "description": "`true` = susun payload tanpa mengirim."
+            "description": "Aktif = payload hanya disusun dan ditampilkan, tidak dikirim ke Paper.id. Matikan hanya bila memang ingin membuat invoice sungguhan."
           }
         }
       },
@@ -4355,30 +4375,39 @@
         ],
         "properties": {
           "invoiceId": {
+            "title": "Invoice yang Dilunasi",
             "type": "string",
             "format": "uuid",
-            "description": "Invoice **kita**, harus sudah dikirim ke Paper.id."
+            "description": "Invoice kita yang mau dianggap lunas. Harus sudah dikirim ke Paper.id."
           },
           "amount": {
+            "title": "Nominal Dibayar (Rp)",
             "type": "integer",
-            "description": "Default nominal invoice."
+            "description": "Nominal yang dibayar. Kosong = mengikuti nominal invoice."
           },
           "method": {
+            "title": "Cara Bayar",
             "type": "string",
-            "default": "bank_transfer"
+            "default": "bank_transfer",
+            "description": "Cara pembayaran yang dilaporkan Paper.id."
           },
           "channel": {
+            "title": "Bank / Kanal",
             "type": "string",
-            "default": "bni"
+            "default": "bni",
+            "description": "Bank atau kanal pembayarannya."
           },
           "status": {
+            "title": "Status Pembayaran",
             "type": "string",
-            "default": "PAID"
+            "default": "PAID",
+            "description": "Status pembayaran. Selain PAID akan diabaikan handler."
           },
           "dryRun": {
+            "title": "Mode Uji (tidak melunasi)",
             "type": "boolean",
             "default": true,
-            "description": "`true` = susun payload tanpa melunasi."
+            "description": "Aktif = payload hanya disusun, invoice tidak dilunasi. Matikan hanya bila memang ingin menandai invoice ini lunas."
           }
         }
       },

@@ -17,6 +17,7 @@ import {
   Play,
   Search,
   Server,
+  Braces,
   Trash2,
   Wand2,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ import {
 import { getToken } from '@/lib/apiClient'
 import { isMockMode } from '@/services/dataSource'
 import { autofill } from '@/services/apiAutofill'
+import { BodyForm } from './BodyForm'
 import {
   buildPath,
   loadCollection,
@@ -88,6 +90,7 @@ export function ApiConsolePage() {
   const [sending, setSending] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [filling, setFilling] = useState(false)
+  const [rawBody, setRawBody] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
   const [history, setHistory] = useState<
     { id: string; method: string; path: string; status: number; ms: number }[]
@@ -167,23 +170,60 @@ export function ApiConsolePage() {
     }
   }
 
-  const handleAutofill = async () => {
-    if (!operation || !draft) return
+  /** Shared by the button and the automatic Paper.id fill. */
+  const runAutofill = async (op: ConsoleOperation, current: Draft): Promise<string[]> => {
     setFilling(true)
     try {
-      const res = await autofill(operation)
-      patchDraft({
-        pathValues: { ...draft.pathValues, ...res.pathValues },
-        queryValues: { ...draft.queryValues, ...res.queryValues },
-        ...(res.body !== undefined ? { body: res.body } : {}),
-      })
-      toast(res.notes.length ? `Terisi: ${res.notes.join(', ')}.` : 'Tidak ada yang perlu diisi.')
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal mengisi otomatis.', 'error')
+      const res = await autofill(op)
+      setDrafts((prev) => ({
+        ...prev,
+        [op.id]: {
+          ...(prev[op.id] ?? current),
+          pathValues: { ...current.pathValues, ...res.pathValues },
+          queryValues: { ...current.queryValues, ...res.queryValues },
+          ...(res.body !== undefined ? { body: res.body } : {}),
+        },
+      }))
+      return res.notes
     } finally {
       setFilling(false)
     }
   }
+
+  const handleAutofill = async () => {
+    if (!operation || !draft) return
+    try {
+      const notes = await runAutofill(operation, draft)
+      toast(notes.length ? `Terisi: ${notes.join(', ')}.` : 'Tidak ada yang perlu diisi.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengisi otomatis.', 'error')
+    }
+  }
+
+  /** Automatic fill: no toast — nobody asked for it, so it shouldn't interrupt. */
+  const handleAutofillQuiet = async (op: ConsoleOperation, current: Draft) => {
+    try {
+      await runAutofill(op, current)
+    } catch {
+      // The fields simply stay empty; the Isi Otomatis button is still there.
+    }
+  }
+
+  // Paper.id endpoints exist to be fired at, and every one of them needs an id
+  // that only the database knows — a draft invoice, a sent one, a settings key.
+  // Making people click Isi Otomatis first is a step with no decision in it, so
+  // fill on arrival. Once per operation: re-filling would overwrite the values
+  // someone just typed.
+  const filledRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!operation || !draft || operation.tag !== 'Paper.id') return
+    if (filledRef.current.has(operation.id)) return
+    filledRef.current.add(operation.id)
+    void handleAutofillQuiet(operation, draft)
+    // handleAutofillQuiet is stable enough for this one-shot effect; keying on
+    // the operation id is what actually decides when it runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [operation?.id])
 
   const handleSend = () => {
     if (!operation || !draft) return
@@ -221,6 +261,22 @@ export function ApiConsolePage() {
   const hasBody = WRITE_METHODS.has(operation.method) && operation.body !== undefined
   // Nothing to fill on an endpoint with neither path params nor a body.
   const canAutofill = pathParams.length > 0 || hasBody
+  const formFields = operation.bodyFields?.length ? operation.bodyFields : null
+
+  // The form edits an object; the draft stores text. Parsing here keeps the two
+  // views on one source of truth instead of letting them drift apart.
+  let parsedBody: Record<string, unknown> = {}
+  let bodyParseError: string | null = null
+  if (formFields) {
+    try {
+      const parsed: unknown = draft.body.trim() ? JSON.parse(draft.body) : {}
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        parsedBody = parsed as Record<string, unknown>
+      }
+    } catch (err) {
+      bodyParseError = err instanceof Error ? err.message : 'tidak bisa dibaca'
+    }
+  }
 
   return (
     <div>
@@ -374,26 +430,57 @@ export function ApiConsolePage() {
               )}
 
               {tab === 'body' && hasBody && (
-                <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between">
+                <div className="space-y-3 pt-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-semibold uppercase tracking-wide text-ink-400">
-                      JSON {operation.bodyRequired && <span className="text-red-500">wajib</span>}
+                      Isi permintaan{' '}
+                      {operation.bodyRequired && <span className="text-red-500">wajib</span>}
                     </span>
-                    <button
-                      type="button"
-                      className="text-xs text-brand-600 hover:underline"
-                      onClick={() => patchDraft({ body: JSON.stringify(operation.body, null, 2) })}
-                    >
-                      Kembalikan contoh
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="text-xs text-brand-600 hover:underline"
+                        onClick={() => patchDraft({ body: JSON.stringify(operation.body, null, 2) })}
+                      >
+                        Kembalikan contoh
+                      </button>
+                      {formFields && (
+                        <button
+                          type="button"
+                          onClick={() => setRawBody((v) => !v)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-xs text-ink-600 transition hover:bg-ink-50"
+                        >
+                          <Braces className="h-3.5 w-3.5" />
+                          {rawBody ? 'Tampilan form' : 'Tampilan JSON'}
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <textarea
-                    value={draft.body}
-                    onChange={(e) => patchDraft({ body: e.target.value })}
-                    spellCheck={false}
-                    rows={12}
-                    className="w-full rounded-lg border border-ink-200 bg-ink-900 p-3 font-mono text-xs leading-relaxed text-ink-100 focus:border-brand-500 focus:outline-none"
-                  />
+
+                  {formFields && !rawBody ? (
+                    <>
+                      <BodyForm
+                        fields={formFields}
+                        value={parsedBody}
+                        onChange={(next) => patchDraft({ body: JSON.stringify(next, null, 2) })}
+                      />
+                      {bodyParseError && (
+                        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                          JSON di tampilan JSON belum valid ({bodyParseError}), jadi form ini
+                          menampilkan isi terakhir yang bisa dibaca. Perbaiki di tampilan JSON,
+                          atau tekan “Kembalikan contoh”.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <textarea
+                      value={draft.body}
+                      onChange={(e) => patchDraft({ body: e.target.value })}
+                      spellCheck={false}
+                      rows={12}
+                      className="w-full rounded-lg border border-ink-200 bg-ink-900 p-3 font-mono text-xs leading-relaxed text-ink-100 focus:border-brand-500 focus:outline-none"
+                    />
+                  )}
                 </div>
               )}
 
