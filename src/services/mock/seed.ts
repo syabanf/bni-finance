@@ -116,9 +116,16 @@ export const seedFeeSettings: FeeSettings = {
 // Generation: members → invoices → payments → audit log
 // ---------------------------------------------------------------------------
 
-function emailFor(name: string): string {
-  return name.toLowerCase().replace(/[^a-z]+/g, '.') + '@email.com'
-}
+/**
+ * Satu alamat untuk seluruh member seed, alasannya sama dengan [SEED_PHONE]:
+ * menerbitkan invoice dengan kanal email menyala membuat Paper.id benar-benar
+ * mengirim ke alamat yang tertulis di member. Alamat karangan bisa saja milik
+ * orang lain; dengan satu alamat milik tim, uji coba hanya sampai ke kita.
+ *
+ * Ganti bila kotak masuk ujinya berganti — jangan dikembalikan menjadi
+ * per-nama.
+ */
+const SEED_EMAIL = 'fahmi@wit.id'
 
 /**
  * Satu nomor untuk seluruh member seed, dan itu disengaja.
@@ -130,6 +137,7 @@ function emailFor(name: string): string {
  * kita sendiri.
  *
  * Ganti bila ponsel ujinya berganti — jangan dikembalikan menjadi acak.
+ * Alamat email mengikuti alasan yang sama; lihat SEED_EMAIL.
  */
 const SEED_PHONE = '082240274833'
 
@@ -156,7 +164,7 @@ export function buildSeedData(): BuiltData {
       id: memberId,
       chapterId: seed.chapterId,
       name: seed.name,
-      email: emailFor(seed.name),
+      email: SEED_EMAIL,
       phone: SEED_PHONE,
       status: seed.status ?? (seed.history.includes('overdue') ? 'pending' : 'active'),
       joinedDate: seed.joined,
