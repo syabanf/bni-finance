@@ -169,7 +169,7 @@ paths:
               type: object
               required: [email]
               properties:
-                email: { type: string, format: email }
+                email: { title: Email, type: string, format: email }
             example: { email: "admin@bnifinance.local" }
       responses:
         "200":
@@ -212,7 +212,7 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, minLength: 1, example: "Budi Santoso" }
+                name: { title: Nama, type: string, minLength: 1, example: "Budi Santoso" }
       responses:
         "200":
           description: Profil setelah diubah
@@ -308,7 +308,7 @@ paths:
               type: object
               required: [role]
               properties:
-                role: { $ref: "#/components/schemas/UserRole" }
+                role: { title: Peran, $ref: "#/components/schemas/UserRole" }
       responses:
         "200":
           description: Pengguna setelah diubah
@@ -341,7 +341,7 @@ paths:
               type: object
               required: [newPassword]
               properties:
-                newPassword: { type: string, minLength: 6 }
+                newPassword: { title: Kata Sandi Baru, type: string, minLength: 6 }
       responses:
         "204": { description: Berhasil, tanpa isi }
         "400":
@@ -1002,13 +1002,13 @@ paths:
         | `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |
         | `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |
         | `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |
-        | `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `false` |
-        | `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `false` |
+        | `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |
+        | `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |
         | `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |
 
-        Kunci yang belum ada bernilai kosong, dan kosong berarti mati. Itu
-        disengaja: pengiriman ke member harus dinyalakan dengan sadar, bukan
-        menyala sendiri karena barisnya belum sempat dibuat.
+        Untuk kunci `paperid_send_*`, hanya nilai `false` yang mematikan —
+        baris yang belum ada tetap berarti mengantar. Untuk `self_payment_mode`
+        sebaliknya: hanya `true` yang mengaktifkan.
       responses:
         "200":
           description: Konfigurasi
@@ -1055,7 +1055,7 @@ paths:
               type: object
               required: [value]
               properties:
-                value: { type: string }
+                value: { title: Nilai, type: string }
             example: { value: "true" }
       responses:
         "200":
@@ -1119,12 +1119,16 @@ paths:
 
         **Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan
         mengikuti kebijakan operasional di `app_settings`
-        (`paperid_send_email`, `paperid_send_whatsapp`), bukan mati begitu saja
-        — penerbitan invoice terjadi massal, dan bila tiap pemanggil harus
-        menyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke
-        member sambil tetap melaporkan sukses. Kunci yang belum diisi bernilai
-        mati, sehingga instalasi baru dan staging tetap senyap sampai pengiriman
-        dinyalakan dengan sengaja.
+        (`paperid_send_email`, `paperid_send_whatsapp`) — penerbitan invoice
+        terjadi massal, dan bila tiap pemanggil harus menyertakan flagnya, satu
+        jalur yang lupa akan berhenti mengantar ke member sambil tetap
+        melaporkan sukses.
+
+        **Bawaannya nyala.** Hanya nilai `false` yang mematikan sebuah kanal;
+        baris yang belum ada, nilai kosong, maupun kegagalan membaca setting
+        tetap mengantar. Invoice yang tidak pernah sampai ke member bukan hasil
+        yang lebih ringan — itu kegagalan diam-diam yang tetap dilaporkan
+        sukses.
 
         Member tanpa alamat email dilewati untuk kanal email (WhatsApp tetap
         jalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.
@@ -1138,11 +1142,13 @@ paths:
               type: object
               properties:
                 sendEmail:
+                  title: Kirim via Email
                   type: boolean
                   description: |
                     Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti
                     `paperid_send_email` di app_settings.
                 sendWhatsApp:
+                  title: Kirim via WhatsApp
                   type: boolean
                   description: |
                     Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,
@@ -1554,8 +1560,9 @@ paths:
               type: object
               required: [method]
               properties:
-                method: { type: string, enum: [va, qris] }
+                method: { title: Metode, type: string, enum: [va, qris] }
                 bank:
+                  title: Bank
                   type: string
                   enum: [BCA, BNI, MANDIRI, BRI]
                   description: Wajib bila `method` = `va`.
@@ -1660,7 +1667,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: ok }
+                  status: { title: Status, type: string, example: ok }
         "503":
           description: Database tidak bisa dihubungi
           content:
@@ -1668,7 +1675,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  status: { type: string, example: "database tidak siap" }
+                  status: { title: Status, type: string, example: "database tidak siap" }
 
   /openapi.yaml:
     get:
@@ -1817,6 +1824,7 @@ components:
 
     # --- Auth ----------------------------------------------------------------
     UserRole:
+      title: Peran
       type: string
       enum: [admin, user]
 
@@ -1824,17 +1832,17 @@ components:
       type: object
       required: [id, name, email, role]
       properties:
-        id: { type: string, format: uuid }
-        name: { type: string }
-        email: { type: string, format: email }
-        role: { $ref: "#/components/schemas/UserRole" }
+        id: { title: ID, type: string, format: uuid }
+        name: { title: Nama, type: string }
+        email: { title: Email, type: string, format: email }
+        role: { title: Peran, $ref: "#/components/schemas/UserRole" }
 
     LoginInput:
       type: object
       required: [email, password]
       properties:
-        email: { type: string, format: email }
-        password: { type: string }
+        email: { title: Email, type: string, format: email }
+        password: { title: Kata Sandi, type: string }
 
     LoginResult:
       type: object
@@ -1850,10 +1858,11 @@ components:
       type: object
       required: [email, password, name]
       properties:
-        email: { type: string, format: email }
-        password: { type: string, minLength: 6 }
-        name: { type: string }
+        email: { title: Email, type: string, format: email }
+        password: { title: Kata Sandi, type: string, minLength: 6 }
+        name: { title: Nama, type: string }
         role:
+          title: Peran
           allOf: [{ $ref: "#/components/schemas/UserRole" }]
           default: user
 
@@ -1861,15 +1870,17 @@ components:
       type: object
       required: [currentPassword, newPassword]
       properties:
-        currentPassword: { type: string }
-        newPassword: { type: string, minLength: 6 }
+        currentPassword: { title: Kata Sandi Saat Ini, type: string }
+        newPassword: { title: Kata Sandi Baru, type: string, minLength: 6 }
 
     # --- Invoice -------------------------------------------------------------
     InvoiceType:
+      title: Jenis Invoice
       type: string
       enum: [registration, renewal]
 
     InvoiceStatus:
+      title: Status Invoice
       type: string
       enum: [draft, sent, paid, overdue, cancelled]
 
@@ -1879,23 +1890,25 @@ components:
         [id, number, memberId, chapterId, type, amount, currency,
          dueDate, periodStart, periodEnd, status, createdAt, updatedAt]
       properties:
-        id: { type: string, format: uuid }
-        number: { type: string, example: INV-2026-013 }
-        memberId: { type: string }
-        chapterId: { type: string }
-        type: { $ref: "#/components/schemas/InvoiceType" }
+        id: { title: ID, type: string, format: uuid }
+        number: { title: Nomor Invoice, type: string, example: INV-2026-013 }
+        memberId: { title: Member, type: string }
+        chapterId: { title: Chapter, type: string }
+        type: { title: Jenis Invoice, $ref: "#/components/schemas/InvoiceType" }
         amount:
+
+          title: Nominal (Rp)
           type: integer
           description: Rupiah penuh. Kolomnya `integer` — maks ~Rp 2,14 miliar per baris.
-        currency: { type: string, default: IDR }
-        dueDate: { type: string, format: date }
-        periodStart: { type: string, format: date }
-        periodEnd: { type: string, format: date }
-        status: { $ref: "#/components/schemas/InvoiceStatus" }
-        paperIdInvoiceId: { type: string }
-        paperIdInvoiceUrl: { type: string }
-        paperIdPaymentUrl: { type: string }
-        paperIdSentAt: { type: string, format: date-time }
+        currency: { title: Mata Uang, type: string, default: IDR }
+        dueDate: { title: Jatuh Tempo, type: string, format: date }
+        periodStart: { title: Periode Mulai, type: string, format: date }
+        periodEnd: { title: Periode Selesai, type: string, format: date }
+        status: { title: Status, $ref: "#/components/schemas/InvoiceStatus" }
+        paperIdInvoiceId: { title: ID Invoice Paper.id, type: string }
+        paperIdInvoiceUrl: { title: URL Invoice Paper.id, type: string }
+        paperIdPaymentUrl: { title: URL Pembayaran Paper.id, type: string }
+        paperIdSentAt: { title: Waktu Kirim ke Paper.id, type: string, format: date-time }
         paymentProvider: { type: string, example: xendit }
         xenditExternalId: { type: string }
         xenditPaymentId: { type: string }
@@ -1905,13 +1918,13 @@ components:
         xenditQrisString: { type: string }
         xenditPaymentStatus: { type: string }
         xenditExpiresAt: { type: string, format: date-time }
-        paidAt: { type: string, format: date-time }
+        paidAt: { title: Waktu Pembayaran, type: string, format: date-time }
         paidAmount: { type: integer }
-        notes: { type: string }
-        createdBy: { type: string }
-        cancelledBy: { type: string }
+        notes: { title: Catatan, type: string }
+        createdBy: { title: Dibuat Oleh, type: string }
+        cancelledBy: { title: Dibatalkan Oleh, type: string }
         cancelledAt: { type: string, format: date-time }
-        cancelReason: { type: string }
+        cancelReason: { title: Alasan Pembatalan, type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -1920,42 +1933,50 @@ components:
       required: [memberId, chapterId, type, amount, dueDate, periodStart, periodEnd]
       properties:
         number:
+
+          title: Nomor Invoice
           type: string
           description: Dibuat otomatis bila kosong.
-        memberId: { type: string }
-        chapterId: { type: string }
-        type: { $ref: "#/components/schemas/InvoiceType" }
-        amount: { type: integer, minimum: 1 }
-        currency: { type: string, default: IDR }
-        dueDate: { type: string, format: date }
-        periodStart: { type: string, format: date }
+        memberId: { title: Member, type: string }
+        chapterId: { title: Chapter, type: string }
+        type: { title: Jenis Invoice, $ref: "#/components/schemas/InvoiceType" }
+        amount: { title: Nominal (Rp), type: integer, minimum: 1 }
+        currency: { title: Mata Uang, type: string, default: IDR }
+        dueDate: { title: Jatuh Tempo, type: string, format: date }
+        periodStart: { title: Periode Mulai, type: string, format: date }
         periodEnd:
+
+          title: Periode Selesai
           type: string
           format: date
           description: Tidak boleh lebih awal dari `periodStart`.
-        notes: { type: string }
-        createdBy: { type: string }
+        notes: { title: Catatan, type: string }
+        createdBy: { title: Dibuat Oleh, type: string }
 
     UpdateInvoiceInput:
       type: object
       description: Hanya field yang dikirim yang ditulis.
       properties:
-        amount: { type: integer, minimum: 1 }
-        dueDate: { type: string, format: date }
-        periodStart: { type: string, format: date }
-        periodEnd: { type: string, format: date }
-        status: { $ref: "#/components/schemas/InvoiceStatus" }
-        notes: { type: string }
-        cancelReason: { type: string }
-        cancelledBy: { type: string }
-        paperIdInvoiceId: { type: string }
-        paperIdInvoiceUrl: { type: string }
-        paperIdPaymentUrl: { type: string }
-        paperIdSentAt: { type: string, format: date-time }
+        amount: { title: Nominal (Rp), type: integer, minimum: 1 }
+        dueDate: { title: Jatuh Tempo, type: string, format: date }
+        periodStart: { title: Periode Mulai, type: string, format: date }
+        periodEnd: { title: Periode Selesai, type: string, format: date }
+        status: { title: Status, $ref: "#/components/schemas/InvoiceStatus" }
+        notes: { title: Catatan, type: string }
+        cancelReason: { title: Alasan Pembatalan, type: string }
+        cancelledBy: { title: Dibatalkan Oleh, type: string }
+        paperIdInvoiceId: { title: ID Invoice Paper.id, type: string }
+        paperIdInvoiceUrl: { title: URL Invoice Paper.id, type: string }
+        paperIdPaymentUrl: { title: URL Pembayaran Paper.id, type: string }
+        paperIdSentAt: { title: Waktu Kirim ke Paper.id, type: string, format: date-time }
         actorId:
+
+          title: ID Pelaku
           type: string
           description: Hanya melabeli baris audit; tidak disimpan pada invoice.
         actorName:
+
+          title: Nama Pelaku
           type: string
           description: Hanya melabeli baris audit; tidak disimpan pada invoice.
 
@@ -1968,14 +1989,14 @@ components:
       type: object
       required: [id, invoiceId, action, createdAt]
       properties:
-        id: { type: string, format: uuid }
-        invoiceId: { type: string, format: uuid }
-        action: { $ref: "#/components/schemas/AuditAction" }
+        id: { title: ID, type: string, format: uuid }
+        invoiceId: { title: Invoice, type: string, format: uuid }
+        action: { title: Aksi, $ref: "#/components/schemas/AuditAction" }
         oldStatus: { $ref: "#/components/schemas/InvoiceStatus" }
         newStatus: { $ref: "#/components/schemas/InvoiceStatus" }
-        actorId: { type: string }
-        actorName: { type: string }
-        notes: { type: string }
+        actorId: { title: ID Pelaku, type: string }
+        actorName: { title: Nama Pelaku, type: string }
+        notes: { title: Catatan, type: string }
         createdAt: { type: string, format: date-time }
 
     CreateAuditEntryInput:
@@ -1983,46 +2004,53 @@ components:
       required: [notes]
       properties:
         action:
+          title: Aksi
           allOf: [{ $ref: "#/components/schemas/AuditAction" }]
           default: updated
-        actorId: { type: string }
-        actorName: { type: string }
-        notes: { type: string, minLength: 1 }
+        actorId: { title: ID Pelaku, type: string }
+        actorName: { title: Nama Pelaku, type: string }
+        notes: { title: Catatan, type: string, minLength: 1 }
 
     # --- Pembayaran ----------------------------------------------------------
     Payment:
       type: object
       required: [id, invoiceId, amount, paidAt, createdAt]
       properties:
-        id: { type: string, format: uuid }
-        invoiceId: { type: string, format: uuid }
-        amount: { type: integer }
-        paidAt: { type: string, format: date-time }
-        paymentMethod: { type: string, example: bank_transfer }
+        id: { title: ID, type: string, format: uuid }
+        invoiceId: { title: Invoice, type: string, format: uuid }
+        amount: { title: Nominal (Rp), type: integer }
+        paidAt: { title: Waktu Pembayaran, type: string, format: date-time }
+        paymentMethod: { title: Metode Pembayaran, type: string, example: bank_transfer }
         paperIdPaymentId: { type: string }
         paperIdStatus: { type: string }
         xenditPaymentId: { type: string }
         xenditStatus: { type: string }
         proofUrl:
+
+          title: Bukti Pembayaran (URL)
           type: string
           description: Path dari `POST /uploads`, mis. `/uploads/2026….png`.
-        note: { type: string }
+        note: { title: Catatan, type: string }
         createdAt: { type: string, format: date-time }
 
     CreatePaymentInput:
       type: object
       required: [invoiceId, amount]
       properties:
-        invoiceId: { type: string, format: uuid }
-        amount: { type: integer, minimum: 1 }
+        invoiceId: { title: Invoice, type: string, format: uuid }
+        amount: { title: Nominal (Rp), type: integer, minimum: 1 }
         paidAt:
+
+          title: Waktu Pembayaran
           type: string
           format: date-time
           description: Default waktu server.
-        paymentMethod: { type: string }
-        proofUrl: { type: string }
-        note: { type: string }
+        paymentMethod: { title: Metode Pembayaran, type: string }
+        proofUrl: { title: Bukti Pembayaran (URL), type: string }
+        note: { title: Catatan, type: string }
         settleInvoice:
+
+          title: Sekalian Lunasi Invoice
           type: boolean
           default: true
           description: Kirim `false` untuk mencatat tanpa melunasi invoice.
@@ -2030,14 +2058,15 @@ components:
     UpdatePaymentInput:
       type: object
       properties:
-        amount: { type: integer, minimum: 1 }
-        paidAt: { type: string, format: date-time }
-        paymentMethod: { type: string }
-        proofUrl: { type: string }
-        note: { type: string }
+        amount: { title: Nominal (Rp), type: integer, minimum: 1 }
+        paidAt: { title: Waktu Pembayaran, type: string, format: date-time }
+        paymentMethod: { title: Metode Pembayaran, type: string }
+        proofUrl: { title: Bukti Pembayaran (URL), type: string }
+        note: { title: Catatan, type: string }
 
     # --- Member & Chapter ----------------------------------------------------
     MemberStatus:
+      title: Status Member
       type: string
       enum: [active, inactive, pending]
 
@@ -2045,11 +2074,11 @@ components:
       type: object
       required: [id, name, displayName, syncedAt]
       properties:
-        id: { type: string, example: ch-garuda }
-        name: { type: string }
-        displayName: { type: string }
-        areaName: { type: string }
-        cityName: { type: string }
+        id: { title: ID, type: string, example: ch-garuda }
+        name: { title: Nama, type: string }
+        displayName: { title: Nama Tampilan, type: string }
+        areaName: { title: Area, type: string }
+        cityName: { title: Kota, type: string }
         syncedAt: { type: string, format: date-time }
 
     CreateChapterInput:
@@ -2057,37 +2086,41 @@ components:
       required: [name]
       properties:
         id:
+
+          title: ID
           type: string
           description: Dibuatkan database bila kosong.
-        name: { type: string, minLength: 1 }
+        name: { title: Nama, type: string, minLength: 1 }
         displayName:
+
+          title: Nama Tampilan
           type: string
           description: Jatuh ke `name` bila kosong.
-        areaName: { type: string }
-        cityName: { type: string }
+        areaName: { title: Area, type: string }
+        cityName: { title: Kota, type: string }
 
     UpdateChapterInput:
       type: object
       properties:
-        name: { type: string, minLength: 1 }
-        displayName: { type: string, minLength: 1 }
-        areaName: { type: string }
-        cityName: { type: string }
+        name: { title: Nama, type: string, minLength: 1 }
+        displayName: { title: Nama Tampilan, type: string, minLength: 1 }
+        areaName: { title: Area, type: string }
+        cityName: { title: Kota, type: string }
 
     Member:
       type: object
       required: [id, chapterId, name, status, joinedDate, renewalDate, syncedAt]
       properties:
-        id: { type: string }
-        chapterId: { type: string }
-        name: { type: string }
-        email: { type: string, format: email }
-        phone: { type: string }
-        company: { type: string }
-        businessField: { type: string }
-        status: { $ref: "#/components/schemas/MemberStatus" }
-        joinedDate: { type: [string, "null"], format: date }
-        renewalDate: { type: [string, "null"], format: date }
+        id: { title: ID, type: string }
+        chapterId: { title: Chapter, type: string }
+        name: { title: Nama, type: string }
+        email: { title: Email, type: string, format: email }
+        phone: { title: Nomor Telepon, type: string }
+        company: { title: Perusahaan, type: string }
+        businessField: { title: Bidang Usaha, type: string }
+        status: { title: Status, $ref: "#/components/schemas/MemberStatus" }
+        joinedDate: { title: Tanggal Bergabung, type: [string, "null"], format: date }
+        renewalDate: { title: Tanggal Perpanjangan, type: [string, "null"], format: date }
         syncedAt: { type: string, format: date-time }
         chapter:
           allOf: [{ $ref: "#/components/schemas/Chapter" }]
@@ -2108,44 +2141,47 @@ components:
       required: [chapterId, name]
       properties:
         id:
+
+          title: ID
           type: string
           description: Dibuatkan database bila kosong.
-        chapterId: { type: string }
-        name: { type: string, minLength: 1 }
-        email: { type: string, format: email }
-        phone: { type: string }
-        company: { type: string }
-        businessField: { type: string }
+        chapterId: { title: Chapter, type: string }
+        name: { title: Nama, type: string, minLength: 1 }
+        email: { title: Email, type: string, format: email }
+        phone: { title: Nomor Telepon, type: string }
+        company: { title: Perusahaan, type: string }
+        businessField: { title: Bidang Usaha, type: string }
         status:
+          title: Status
           allOf: [{ $ref: "#/components/schemas/MemberStatus" }]
           default: active
-        joinedDate: { type: string, format: date }
-        renewalDate: { type: string, format: date }
+        joinedDate: { title: Tanggal Bergabung, type: string, format: date }
+        renewalDate: { title: Tanggal Perpanjangan, type: string, format: date }
 
     UpdateMemberInput:
       type: object
       properties:
-        chapterId: { type: string }
-        name: { type: string, minLength: 1 }
-        email: { type: string }
-        phone: { type: string }
-        company: { type: string }
-        businessField: { type: string }
-        status: { $ref: "#/components/schemas/MemberStatus" }
-        joinedDate: { type: string, format: date }
-        renewalDate: { type: string, format: date }
+        chapterId: { title: Chapter, type: string }
+        name: { title: Nama, type: string, minLength: 1 }
+        email: { title: Email, type: string }
+        phone: { title: Nomor Telepon, type: string }
+        company: { title: Perusahaan, type: string }
+        businessField: { title: Bidang Usaha, type: string }
+        status: { title: Status, $ref: "#/components/schemas/MemberStatus" }
+        joinedDate: { title: Tanggal Bergabung, type: string, format: date }
+        renewalDate: { title: Tanggal Perpanjangan, type: string, format: date }
 
     # --- Pengaturan ----------------------------------------------------------
     FeeSettings:
       type: object
       required: [id, registrationFee, renewalFee, currency, updatedAt, createdAt]
       properties:
-        id: { type: string, default: "default" }
-        registrationFee: { type: integer }
-        renewalFee: { type: integer }
-        currency: { type: string, default: IDR }
-        notes: { type: string }
-        updatedBy: { type: string }
+        id: { title: ID, type: string, default: "default" }
+        registrationFee: { title: Biaya Pendaftaran, type: integer }
+        renewalFee: { title: Biaya Perpanjangan, type: integer }
+        currency: { title: Mata Uang, type: string, default: IDR }
+        notes: { title: Catatan, type: string }
+        updatedBy: { title: Diubah Oleh, type: string }
         updatedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
 
@@ -2153,18 +2189,18 @@ components:
       type: object
       description: Minimal satu field harus dikirim.
       properties:
-        registrationFee: { type: integer, minimum: 0 }
-        renewalFee: { type: integer, minimum: 0 }
-        currency: { type: string, minLength: 1 }
-        notes: { type: string }
-        updatedBy: { type: string }
+        registrationFee: { title: Biaya Pendaftaran, type: integer, minimum: 0 }
+        renewalFee: { title: Biaya Perpanjangan, type: integer, minimum: 0 }
+        currency: { title: Mata Uang, type: string, minLength: 1 }
+        notes: { title: Catatan, type: string }
+        updatedBy: { title: Diubah Oleh, type: string }
 
     AppSetting:
       type: object
       required: [key, value]
       properties:
         key: { type: string, example: self_payment_mode }
-        value: { type: string }
+        value: { title: Nilai, type: string }
         updatedAt: { type: string, format: date-time }
         masked:
           type: boolean
@@ -2181,7 +2217,7 @@ components:
       required: [count, amount, trend]
       properties:
         count: { type: integer }
-        amount: { type: integer }
+        amount: { title: Nominal (Rp), type: integer }
         trend:
           type: number
           format: double
@@ -2214,7 +2250,7 @@ components:
           items:
             type: object
             properties:
-              status: { $ref: "#/components/schemas/InvoiceStatus" }
+              status: { title: Status, $ref: "#/components/schemas/InvoiceStatus" }
               count: { type: integer }
         monthly:
           type: array
@@ -2249,20 +2285,20 @@ components:
         [id, number, type, amount, currency, status,
          dueDate, periodStart, periodEnd, memberName, createdAt]
       properties:
-        id: { type: string, format: uuid }
-        number: { type: string }
-        type: { $ref: "#/components/schemas/InvoiceType" }
-        amount: { type: integer }
-        currency: { type: string }
-        status: { $ref: "#/components/schemas/InvoiceStatus" }
-        dueDate: { type: string, format: date }
-        periodStart: { type: string, format: date }
-        periodEnd: { type: string, format: date }
+        id: { title: ID, type: string, format: uuid }
+        number: { title: Nomor Invoice, type: string }
+        type: { title: Jenis Invoice, $ref: "#/components/schemas/InvoiceType" }
+        amount: { title: Nominal (Rp), type: integer }
+        currency: { title: Mata Uang, type: string }
+        status: { title: Status, $ref: "#/components/schemas/InvoiceStatus" }
+        dueDate: { title: Jatuh Tempo, type: string, format: date }
+        periodStart: { title: Periode Mulai, type: string, format: date }
+        periodEnd: { title: Periode Selesai, type: string, format: date }
         memberName: { type: string }
         chapterName: { type: string }
-        notes: { type: string }
+        notes: { title: Catatan, type: string }
         paymentProvider: { type: string }
-        paperIdPaymentUrl: { type: string }
+        paperIdPaymentUrl: { title: URL Pembayaran Paper.id, type: string }
         xenditPaymentMethod: { type: string, enum: [va, qris] }
         xenditVaBank: { type: string }
         xenditVaNumber: { type: string }
@@ -2284,11 +2320,11 @@ components:
       type: object
       required: [method, amount]
       properties:
-        method: { type: string, enum: [va, qris] }
-        bank: { type: string }
+        method: { title: Metode, type: string, enum: [va, qris] }
+        bank: { title: Bank, type: string }
         vaNumber: { type: string }
         qrString: { type: string }
-        amount: { type: integer }
+        amount: { title: Nominal (Rp), type: integer }
         expiresAt: { type: [string, "null"], format: date-time }
 
     PaperTestInvoiceInput:
@@ -2313,6 +2349,8 @@ components:
           type: string
           description: Alamat email penerima. Boleh kosong bila tidak mengirim email.
         amount:
+
+          title: Nominal (Rp)
           title: Nominal (Rp)
           type: integer
           default: 1500000
@@ -2323,15 +2361,23 @@ components:
           default: Uji Koneksi Paper.id
           description: Nama barang/jasa yang tercetak pada invoice.
         notes:
+
+          title: Catatan
           title: Catatan
           type: string
           description: Catatan tambahan yang ikut tercetak di invoice.
         sendEmail:
           title: Kirim via Email
+
+          title: Kirim via Email
+          title: Kirim via Email
           type: boolean
           default: false
           description: Minta Paper.id mengirim invoice ke email di atas.
         sendWhatsApp:
+          title: Kirim via WhatsApp
+
+          title: Kirim via WhatsApp
           title: Kirim via WhatsApp
           type: boolean
           default: false
@@ -2349,7 +2395,7 @@ components:
       required: [dryRun, method, url, request, success]
       properties:
         dryRun: { type: boolean }
-        method: { type: string }
+        method: { title: Metode, type: string }
         url: { type: string }
         request:
           description: Payload persis seperti yang dikirim ke Paper.id.
@@ -2361,7 +2407,7 @@ components:
         durationMs: { type: integer }
         error: { type: string }
         paperInvoiceId: { type: string }
-        number: { type: string }
+        number: { title: Nomor Invoice, type: string }
         paymentUrl: { type: string }
         invoicePdfUrl: { type: string }
 
@@ -2370,15 +2416,22 @@ components:
       required: [invoiceId]
       properties:
         invoiceId:
+
+          title: Invoice
           title: Invoice yang Dilunasi
           type: string
           format: uuid
           description: Invoice kita yang mau dianggap lunas. Harus sudah dikirim ke Paper.id.
         amount:
+
+          title: Nominal (Rp)
           title: Nominal Dibayar (Rp)
           type: integer
           description: Nominal yang dibayar. Kosong = mengikuti nominal invoice.
         method:
+          title: Metode
+
+          title: Metode
           title: Cara Bayar
           type: string
           default: bank_transfer
@@ -2389,6 +2442,9 @@ components:
           default: bni
           description: Bank atau kanal pembayarannya.
         status:
+          title: Status
+
+          title: Status
           title: Status Pembayaran
           type: string
           default: PAID
@@ -2416,14 +2472,14 @@ components:
       type: object
       required: [id, time, integration, direction, method, url, status, success, durationMs]
       properties:
-        id: { type: string }
+        id: { title: ID, type: string }
         time: { type: string, format: date-time }
         integration: { type: string, enum: [paper_id, xendit, bni_vm] }
         direction:
           type: string
           enum: [outbound, inbound]
           description: "`outbound` = kita → pihak luar; `inbound` = pihak luar → kita."
-        method: { type: string, example: POST }
+        method: { title: Metode, type: string, example: POST }
         url:
           type: string
           description: Endpoint yang dihubungi (atau path callback kita, untuk inbound).
@@ -2431,7 +2487,7 @@ components:
           description: Body permintaan sebagai JSON. String bila upstream membalas non-JSON.
         response:
           description: Body balasan sebagai JSON. String bila upstream membalas non-JSON.
-        status: { type: integer, example: 201 }
+        status: { title: Status, type: integer, example: 201 }
         success: { type: boolean }
         durationMs: { type: integer }
         error:
@@ -2442,19 +2498,21 @@ components:
       type: object
       description: Payload callback pembayaran Paper.id.
       properties:
-        ref_id: { type: string }
-        external_id: { type: string }
-        payment_date: { type: string, example: "2026-07-27" }
+        ref_id: { title: Ref ID, type: string }
+        external_id: { title: External ID, type: string }
+        payment_date: { title: Tanggal Pembayaran, type: string, example: "2026-07-27" }
         payment_info:
+          title: Info Pembayaran
           type: object
           properties:
-            method: { type: string, example: bank_transfer }
+            method: { title: Metode, type: string, example: bank_transfer }
             channel: { type: string, example: bni }
             amount: { type: number }
             paid_amount: { type: number }
             paid_at: { type: string }
-            status: { type: string, example: PAID }
+            status: { title: Status, type: string, example: PAID }
         additional_info:
+          title: Info Tambahan
           type: object
           properties:
             invoices:
@@ -2488,10 +2546,10 @@ components:
         Xendit mengirim dua bentuk: callback VA memakai `external_id`,
         callback QR memakai `reference_id`. Keduanya diterima.
       properties:
-        external_id: { type: string }
-        reference_id: { type: string }
-        id: { type: string }
-        payment_id: { type: string }
-        amount: { type: integer }
-        status: { type: string, example: PAID }
-        created: { type: string, format: date-time }
+        external_id: { title: External ID, type: string }
+        reference_id: { title: Reference ID, type: string }
+        id: { title: ID, type: string }
+        payment_id: { title: ID Pembayaran, type: string }
+        amount: { title: Nominal (Rp), type: integer }
+        status: { title: Status, type: string, example: PAID }
+        created: { title: Waktu Dibuat, type: string, format: date-time }

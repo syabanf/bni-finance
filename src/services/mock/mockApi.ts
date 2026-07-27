@@ -199,7 +199,8 @@ export async function mockApiFetch(
       // setting rather than defaulting to "don't deliver".
       const b = (body ?? {}) as { sendEmail?: boolean; sendWhatsApp?: boolean }
       const member = memberOf(invoice)
-      const setting = async (key: string) => (await getMockAppSetting(key)) === 'true'
+      // Cermin server: hanya 'false' yang mematikan kanal.
+      const setting = async (key: string) => (await getMockAppSetting(key)) !== 'false'
       const sendEmail = (b.sendEmail ?? (await setting('paperid_send_email'))) && Boolean(member?.email)
       const sendWhatsApp = b.sendWhatsApp ?? (await setting('paperid_send_whatsapp'))
       return ok({

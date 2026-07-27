@@ -91,6 +91,7 @@ export function ApiConsolePage() {
   const [confirming, setConfirming] = useState(false)
   const [filling, setFilling] = useState(false)
   const [rawBody, setRawBody] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
   const [history, setHistory] = useState<
     { id: string; method: string; path: string; status: number; ms: number }[]
@@ -154,6 +155,7 @@ export function ApiConsolePage() {
         path: resolvedPath,
         queryValues: draft.queryValues,
         body: WRITE_METHODS.has(operation.method) ? draft.body : undefined,
+        file: operation.multipart ? (uploadFile ?? undefined) : undefined,
       })
       setResult(res)
       setHistory((h) =>
@@ -327,6 +329,11 @@ export function ApiConsolePage() {
                   setResult(null)
                   setSendError(null)
                   setTab('params')
+                  // The JSON view is a per-request detour, not a preference.
+                  // Leaving it on made every later endpoint look like a JSON
+                  // blob again, which is the thing the form replaced.
+                  setRawBody(false)
+                  setUploadFile(null)
                 }}
                 defaultOpen={group.ops.some((o) => o.id === selectedId) || filter.trim() !== ''}
               />
@@ -391,7 +398,7 @@ export function ApiConsolePage() {
                     <span className="ml-1.5 text-ink-400">{operation.params.length}</span>
                   )}
                 </Tab>
-                {hasBody && (
+                {(hasBody || operation.multipart) && (
                   <Tab active={tab === 'body'} onClick={() => setTab('body')}>
                     Body
                   </Tab>
@@ -426,6 +433,25 @@ export function ApiConsolePage() {
                       }
                     />
                   )}
+                </div>
+              )}
+
+              {tab === 'body' && operation.multipart && (
+                <div className="space-y-2 pt-1">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-ink-400">
+                    Berkas <span className="text-red-500">wajib</span>
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                    onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                    className="block w-full text-sm text-ink-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
+                  />
+                  <p className="text-xs text-ink-400">
+                    JPG, PNG, WebP, HEIC, atau PDF. Nama berkas dibuat server, bukan diambil dari
+                    nama aslinya.
+                    {uploadFile && ` Dipilih: ${uploadFile.name} (${Math.ceil(uploadFile.size / 1024)} KB).`}
+                  </p>
                 </div>
               )}
 

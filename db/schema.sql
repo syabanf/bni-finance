@@ -126,14 +126,16 @@ create table if not exists app_settings (
 -- sudah diubah operator tidak ditimpa.
 --
 -- Kedua kunci paperid_send_* mengatur apakah Paper.id benar-benar mengantar
--- invoice ke member. Bawaannya mati supaya staging dan instalasi baru tidak
--- mengirim pesan ke orang sungguhan sebelum ada yang menyalakannya.
+-- invoice ke member. Bawaannya NYALA: invoice yang tidak pernah sampai ke
+-- member bukan hasil yang lebih ringan, melainkan kegagalan diam-diam yang
+-- tetap dilaporkan sukses. Hanya nilai 'false' yang mematikannya, sehingga
+-- mematikan kanal selalu keputusan seseorang.
 insert into app_settings (key, value) values
   ('self_payment_mode',        'false'),
   ('invoice_draft_days_before','30'),
   ('invoice_due_days_after',   '30'),
-  ('paperid_send_email',       'false'),
-  ('paperid_send_whatsapp',    'false')
+  ('paperid_send_email',       'true'),
+  ('paperid_send_whatsapp',    'true')
 on conflict (key) do nothing;
 
 -- ---------------------------------------------------------------------------

@@ -152,7 +152,7 @@ export function PaymentModePage() {
             <p className="mb-4 text-sm text-ink-500">
               {selfPayment
                 ? 'Tidak berlaku saat Self Payment Mode aktif — Paper.id tidak dipanggil, tautan pembayaran dibagikan manual dari halaman invoice.'
-                : 'Kanal yang dipakai Paper.id untuk mengantar invoice ke member saat tombol Terbitkan ditekan.'}
+                : 'Kanal yang dipakai Paper.id untuk mengantar invoice ke member saat tombol Terbitkan ditekan. Bawaannya keduanya menyala.'}
             </p>
 
             <div className="space-y-3">
@@ -198,8 +198,9 @@ export function PaymentModePage() {
             {!selfPayment && !channels.paperid_send_email && !channels.paperid_send_whatsapp && (
               <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
                 <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                Semua kanal mati — invoice tetap dibuat di Paper.id, tetapi member tidak
-                menerima pemberitahuan apa pun. Aman untuk uji coba, bukan untuk operasional.
+                Semua kanal dimatikan — invoice tetap dibuat di Paper.id, tetapi member tidak
+                menerima pemberitahuan apa pun dan tidak akan tahu ada tagihan. Bawaannya
+                kedua kanal menyala; matikan hanya untuk uji coba.
               </div>
             )}
             {useMock && (

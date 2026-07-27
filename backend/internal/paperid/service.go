@@ -2,7 +2,9 @@ package paperid
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -78,9 +80,13 @@ func (s *Service) recordInbound(in WebhookInput, status int, success bool, err e
 	})
 }
 
-// Keys controlling how a sent invoice reaches the member. Absent means off, so
-// a fresh install and every staging environment stay silent until someone turns
-// delivery on deliberately.
+// Keys controlling how a sent invoice reaches the member.
+//
+// Absent means ON. Delivering the invoice is the point of issuing one — an
+// invoice the member never receives is not a milder outcome, it is a silent
+// failure that still reports success. Only an explicit "false" turns a channel
+// off, so switching one off is a decision someone made, never something that
+// happened because a settings row was missing.
 const (
 	sendEmailSettingKey    = "paperid_send_email"
 	sendWhatsAppSettingKey = "paperid_send_whatsapp"
@@ -100,20 +106,25 @@ type SendOptions struct {
 
 // resolve fills the unset channels from app_settings.
 func (s *Service) resolve(ctx context.Context, opts SendOptions) (email, whatsapp bool) {
-	setting := func(key string) bool {
+	// Only a literal "false" disables a channel. A missing row, an empty value,
+	// or a failed read all mean "nobody turned this off", and the invoice still
+	// has to reach the member.
+	enabled := func(key string) bool {
 		v, err := s.repo.GetSetting(ctx, key)
-		// A settings read failure must not silently enable messaging.
-		return err == nil && v == "true"
+		if err != nil {
+			return true
+		}
+		return strings.TrimSpace(v) != "false"
 	}
 	if opts.Email != nil {
 		email = *opts.Email
 	} else {
-		email = setting(sendEmailSettingKey)
+		email = enabled(sendEmailSettingKey)
 	}
 	if opts.WhatsApp != nil {
 		whatsapp = *opts.WhatsApp
 	} else {
-		whatsapp = setting(sendWhatsAppSettingKey)
+		whatsapp = enabled(sendWhatsAppSettingKey)
 	}
 	return email, whatsapp
 }
@@ -156,7 +167,7 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 		Amount:        inv.Amount,
 		ItemName:      itemName(inv.Type),
 		ItemDesc:      itemDesc(inv.Type),
-		CustomerID:    inv.MemberID, // stable, so repeat invoices reuse the customer
+		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,
 		CustomerPhone: inv.Phone,
@@ -313,9 +324,23 @@ func gatewayError(err error) error {
 				"invoice ini sudah pernah dibuat di Paper.id (nomor sudah dipakai) — " +
 					"periksa dashboard Paper.id sebelum mengirim ulang")
 		}
+		if isPartnerMismatch(ae) {
+			// Should be unreachable now that customerRef changes with the
+			// details, but the message is worth keeping: on its own the
+			// upstream text gives no hint that contact data is the cause.
+			return httpx.Conflict(
+				"Paper.id sudah menyimpan member ini dengan nama/email/telepon yang berbeda — " +
+					"samakan datanya, atau hubungi Paper.id untuk memperbarui kontaknya")
+		}
 		return httpx.NewError(http.StatusBadGateway, "Paper.id menolak: "+ae.Message, err)
 	}
 	return httpx.NewError(http.StatusBadGateway, "tidak bisa menghubungi Paper.id", err)
+}
+
+// isPartnerMismatch spots Paper.id refusing a customer.id whose stored details
+// differ from the ones we just sent.
+func isPartnerMismatch(ae *apiError) bool {
+	return strings.Contains(strings.ToLower(ae.Message), "partner doesn't match")
 }
 
 func isDuplicateNumber(ae *apiError) bool {
@@ -324,4 +349,29 @@ func isDuplicateNumber(ae *apiError) bool {
 		strings.Contains(m, "number already") ||
 		strings.Contains(m, "already used") ||
 		strings.Contains(m, "duplicate")
+}
+
+// customerRef builds the `customer.id` Paper.id stores the member under.
+//
+// Paper.id binds that id to the customer's details the first time it sees it.
+// Sending the SAME id later with a different name, email, or phone is rejected
+// with "Failed partner doesn't match" — a 400 that says nothing about contact
+// details being the cause.
+//
+// The member id alone therefore cannot be the reference: BNI VM sync updates
+// names and phone numbers routinely, and the first such update would break
+// every future invoice for that member, permanently and opaquely. Proven
+// against staging: the same member id succeeds with its original phone and
+// fails with a new one.
+//
+// So the reference is the member id plus a short digest of the details Paper.id
+// binds. Unchanged details reuse the existing customer, exactly as before; the
+// moment they change, the id changes too and Paper.id registers a new customer
+// instead of refusing the invoice. A member who changes phone ends up with a
+// second contact upstream — cheaper than an invoice that can never be sent.
+func customerRef(inv *Sendable) string {
+	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(inv.Name)) + "\x00" +
+		strings.ToLower(strings.TrimSpace(inv.Email)) + "\x00" +
+		strings.TrimSpace(inv.Phone)))
+	return inv.MemberID + "-" + hex.EncodeToString(sum[:4])
 }
