@@ -89,6 +89,57 @@ function firstLine(text) {
     .trim()
 }
 
+/**
+ * Flattens a request body's top-level properties into form fields.
+ *
+ * The console used to show one raw JSON textarea, which asks the reader to know
+ * both the field names and JSON syntax before they can send anything. A labelled
+ * field per property removes both requirements; the raw JSON stays one click
+ * away for anyone who prefers it.
+ *
+ * Nested objects/arrays keep a small JSON box of their own — only the Paper.id
+ * callback has them, and inventing a nested form for one endpoint would cost
+ * more than it returns.
+ */
+function bodyFieldsFor(schema) {
+  const s = deref(schema)
+  if (!s) return undefined
+
+  // allOf composes into one flat property set for our schemas.
+  const merged = s.allOf
+    ? s.allOf.map(deref).reduce(
+        (acc, part) => ({
+          properties: { ...acc.properties, ...(part.properties ?? {}) },
+          required: [...acc.required, ...(part.required ?? [])],
+        }),
+        { properties: {}, required: [] },
+      )
+    : { properties: s.properties ?? {}, required: s.required ?? [] }
+
+  const entries = Object.entries(merged.properties)
+  if (entries.length === 0) return undefined
+
+  const required = new Set(merged.required)
+  return entries.map(([name, prop]) => {
+    const p = deref(prop) ?? {}
+    const complex = p.type === 'object' || p.type === 'array'
+    return {
+      name,
+      // `title` is the human label. Derived labels get names like
+      // "Send Whats App" — a camelCase splitter cannot know WhatsApp is one
+      // word — so the readable version belongs in the spec with everything else.
+      label: p.title,
+      type: p.type ?? 'string',
+      format: p.format,
+      required: required.has(name),
+      enum: p.enum,
+      default: p.default,
+      description: firstLine(p.description),
+      complex,
+    }
+  })
+}
+
 const METHODS = ['get', 'post', 'put', 'patch', 'delete']
 const operations = []
 
@@ -123,6 +174,7 @@ for (const [path, item] of Object.entries(spec.paths)) {
       description: op.description ?? '',
       params,
       body: bodySchema ? sampleFor(bodySchema) : undefined,
+      bodyFields: bodySchema ? bodyFieldsFor(bodySchema) : undefined,
       bodyRequired: Boolean(op.requestBody?.required),
       multipart: Boolean(multipart),
       // `security: []` on an operation opts out of the global bearer default.

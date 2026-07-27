@@ -3,9 +3,11 @@ package paperid
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/syabanf/bni-finance/backend/internal/apidocs"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 )
 
@@ -233,5 +235,64 @@ func TestStatusHidesSecrets(t *testing.T) {
 	raw, _ := json.Marshal(st)
 	if strings.Contains(string(raw), "rahasia-sekali") {
 		t.Errorf("status membocorkan token: %s", raw)
+	}
+}
+
+// The console form is rendered from openapi.yaml, so the defaults documented
+// there are what a reader sees pre-filled. If they drift from what the server
+// actually substitutes, the form shows one thing and sends another — a lie that
+// no other test would catch, because each side is self-consistent.
+func TestDocumentedDefaultsMatchServerDefaults(t *testing.T) {
+	var spec struct {
+		Components struct {
+			Schemas map[string]struct {
+				Properties map[string]struct {
+					Default any `json:"default"`
+				} `json:"properties"`
+			} `json:"schemas"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(apidocs.SpecJSON(), &spec); err != nil {
+		t.Fatalf("baca spesifikasi: %v", err)
+	}
+	props := spec.Components.Schemas["PaperTestInvoiceInput"].Properties
+	if len(props) == 0 {
+		t.Fatal("PaperTestInvoiceInput tidak ada di spesifikasi")
+	}
+
+	svc := newService(&stubStore{}, &stubGateway{}, "tok")
+	got := svc.buildTestPayload(TestInvoiceInput{}, svc.now())
+
+	cases := []struct {
+		field  string
+		actual any
+	}{
+		{"customerName", got.CustomerName},
+		{"customerPhone", got.CustomerPhone},
+		{"itemName", got.ItemName},
+		{"amount", float64(got.Amount)}, // JSON numbers decode as float64
+	}
+	for _, c := range cases {
+		documented := props[c.field].Default
+		if documented == nil {
+			t.Errorf("%s: tidak punya `default` di spesifikasi, padahal server mengisinya dengan %v",
+				c.field, c.actual)
+			continue
+		}
+		if fmt.Sprint(documented) != fmt.Sprint(c.actual) {
+			t.Errorf("%s: spesifikasi bilang %v, server memakai %v", c.field, documented, c.actual)
+		}
+	}
+
+	// Delivery must stay off in the documented defaults too — a form that
+	// arrives with WhatsApp pre-ticked would message someone on first click.
+	for _, quiet := range []string{"sendEmail", "sendWhatsApp"} {
+		if v := props[quiet].Default; v != false {
+			t.Errorf("%s harus berbawaan false di spesifikasi, dapat %v", quiet, v)
+		}
+	}
+	// And dry-run must stay on.
+	if v := props["dryRun"].Default; v != true {
+		t.Errorf("dryRun harus berbawaan true di spesifikasi, dapat %v", v)
 	}
 }

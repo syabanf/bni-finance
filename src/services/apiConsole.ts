@@ -23,6 +23,21 @@ export interface ConsoleParam {
   description?: string
 }
 
+/** One top-level property of a request body, rendered as a labelled input. */
+export interface ConsoleBodyField {
+  name: string
+  /** Human label from the spec's `title`; falls back to a derived one. */
+  label?: string
+  type: string
+  format?: string
+  required: boolean
+  enum?: string[]
+  default?: unknown
+  description?: string
+  /** Object/array — edited as JSON rather than a single input. */
+  complex: boolean
+}
+
 export interface ConsoleOperation {
   id: string
   method: string
@@ -32,6 +47,7 @@ export interface ConsoleOperation {
   description: string
   params: ConsoleParam[]
   body?: unknown
+  bodyFields?: ConsoleBodyField[]
   bodyRequired: boolean
   multipart: boolean
   auth: boolean
