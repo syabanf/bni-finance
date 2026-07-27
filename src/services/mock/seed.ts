@@ -120,9 +120,18 @@ function emailFor(name: string): string {
   return name.toLowerCase().replace(/[^a-z]+/g, '.') + '@email.com'
 }
 
-function phoneFor(i: number): string {
-  return '+62812' + String(34567000 + i * 137).slice(0, 7)
-}
+/**
+ * Satu nomor untuk seluruh member seed, dan itu disengaja.
+ *
+ * Menerbitkan invoice dengan kanal WhatsApp menyala membuat Paper.id benar-benar
+ * mengirim pesan ke nomor yang tertulis di member. Nomor karangan yang berbeda-
+ * beda berarti pesan uji coba mendarat di ponsel orang lain yang kebetulan
+ * memiliki nomor itu. Dengan satu nomor milik tim, uji coba hanya sampai ke
+ * kita sendiri.
+ *
+ * Ganti bila ponsel ujinya berganti — jangan dikembalikan menjadi acak.
+ */
+const SEED_PHONE = '082240274833'
 
 interface BuiltData {
   members: Member[]
@@ -148,7 +157,7 @@ export function buildSeedData(): BuiltData {
       chapterId: seed.chapterId,
       name: seed.name,
       email: emailFor(seed.name),
-      phone: phoneFor(idx),
+      phone: SEED_PHONE,
       status: seed.status ?? (seed.history.includes('overdue') ? 'pending' : 'active'),
       joinedDate: seed.joined,
       renewalDate: null,
