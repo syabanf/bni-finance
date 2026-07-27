@@ -10,23 +10,24 @@ insert into chapters (id, name, display_name, area_name, city_name) values
   ('ch-samudra',  'Samudra',  'BNI Samudra',  'Surabaya Timur', 'Surabaya')
 on conflict (id) do nothing;
 
--- Semua member memakai NOMOR YANG SAMA, dan itu disengaja.
+-- Semua member memakai NOMOR DAN EMAIL YANG SAMA, dan itu disengaja.
 --
--- Menerbitkan invoice dengan kanal WhatsApp menyala membuat Paper.id benar-benar
--- mengirim pesan ke nomor yang tertulis di sini. Nomor karangan yang berbeda-beda
--- berarti pesan uji coba mendarat di ponsel orang lain yang kebetulan memilikinya.
--- Dengan satu nomor milik tim, uji coba hanya sampai ke kita sendiri.
+-- Menerbitkan invoice dengan kanal WhatsApp/email menyala membuat Paper.id
+-- benar-benar mengirim ke nomor dan alamat yang tertulis di sini. Data karangan
+-- yang berbeda-beda berarti pesan uji coba mendarat di ponsel atau kotak masuk
+-- orang lain yang kebetulan memilikinya. Dengan satu kontak milik tim, uji coba
+-- hanya sampai ke kita sendiri.
 --
--- Ganti bila ponsel ujinya berganti — jangan dikembalikan menjadi acak.
+-- Ganti bila kontak ujinya berganti — jangan dikembalikan menjadi acak.
 insert into members (id, chapter_id, name, email, phone, company, business_field, status, joined_date, renewal_date) values
-  ('mem-001','ch-garuda',   'Budi Santoso',   'budi@example.com',   '082240274833','PT Maju Bersama',   'Konstruksi',  'active',  current_date - 340, current_date + 25),
-  ('mem-002','ch-garuda',   'Siti Rahayu',    'siti@example.com',   '082240274833','CV Karya Abadi',    'Kuliner',     'active',  current_date - 300, current_date + 65),
-  ('mem-003','ch-nusantara','Andi Wijaya',    'andi@example.com',   '082240274833','PT Sinar Terang',   'Properti',    'active',  current_date - 355, current_date + 10),
-  ('mem-004','ch-nusantara','Dewi Lestari',   'dewi@example.com',   '082240274833','Lestari Group',     'Retail',      'active',  current_date - 120, current_date + 245),
-  ('mem-005','ch-merdeka',  'Rudi Hartono',   'rudi@example.com',   '082240274833','PT Cipta Karya',    'Manufaktur',  'active',  current_date - 200, current_date + 165),
-  ('mem-006','ch-merdeka',  'Maya Puspita',   'maya@example.com',   '082240274833','Puspita Consulting','Jasa',        'pending', null,               null),
-  ('mem-007','ch-samudra',  'Hendra Gunawan', 'hendra@example.com', '082240274833','PT Bahari Jaya',    'Logistik',    'active',  current_date - 60,  current_date + 305),
-  ('mem-008','ch-samudra',  'Rina Kartika',   'rina@example.com',   '082240274833','Kartika Digital',   'Teknologi',   'inactive',current_date - 400, current_date - 35)
+  ('mem-001','ch-garuda',   'Budi Santoso',   'fahmi@wit.id',   '082240274833','PT Maju Bersama',   'Konstruksi',  'active',  current_date - 340, current_date + 25),
+  ('mem-002','ch-garuda',   'Siti Rahayu',    'fahmi@wit.id',   '082240274833','CV Karya Abadi',    'Kuliner',     'active',  current_date - 300, current_date + 65),
+  ('mem-003','ch-nusantara','Andi Wijaya',    'fahmi@wit.id',   '082240274833','PT Sinar Terang',   'Properti',    'active',  current_date - 355, current_date + 10),
+  ('mem-004','ch-nusantara','Dewi Lestari',   'fahmi@wit.id',   '082240274833','Lestari Group',     'Retail',      'active',  current_date - 120, current_date + 245),
+  ('mem-005','ch-merdeka',  'Rudi Hartono',   'fahmi@wit.id',   '082240274833','PT Cipta Karya',    'Manufaktur',  'active',  current_date - 200, current_date + 165),
+  ('mem-006','ch-merdeka',  'Maya Puspita',   'fahmi@wit.id',   '082240274833','Puspita Consulting','Jasa',        'pending', null,               null),
+  ('mem-007','ch-samudra',  'Hendra Gunawan', 'fahmi@wit.id', '082240274833','PT Bahari Jaya',    'Logistik',    'active',  current_date - 60,  current_date + 305),
+  ('mem-008','ch-samudra',  'Rina Kartika',   'fahmi@wit.id',   '082240274833','Kartika Digital',   'Teknologi',   'inactive',current_date - 400, current_date - 35)
 on conflict (id) do nothing;
 
 -- Invoice contoh yang mencakup setiap status, supaya dashboard dan filter
