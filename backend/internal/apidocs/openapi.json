@@ -191,6 +191,7 @@
                 ],
                 "properties": {
                   "email": {
+                    "title": "Email",
                     "type": "string",
                     "format": "email"
                   }
@@ -272,6 +273,7 @@
                 "type": "object",
                 "properties": {
                   "name": {
+                    "title": "Nama",
                     "type": "string",
                     "minLength": 1,
                     "example": "Budi Santoso"
@@ -459,6 +461,7 @@
                 ],
                 "properties": {
                   "role": {
+                    "title": "Peran",
                     "$ref": "#/components/schemas/UserRole"
                   }
                 }
@@ -522,6 +525,7 @@
                 ],
                 "properties": {
                   "newPassword": {
+                    "title": "Kata Sandi Baru",
                     "type": "string",
                     "minLength": 6
                   }
@@ -1803,7 +1807,7 @@
           "Pengaturan"
         ],
         "summary": "Semua konfigurasi key/value",
-        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `false` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `false` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nKunci yang belum ada bernilai kosong, dan kosong berarti mati. Itu\ndisengaja: pengiriman ke member harus dinyalakan dengan sadar, bukan\nmenyala sendiri karena barisnya belum sempat dibuat.\n",
+        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nUntuk kunci `paperid_send_*`, hanya nilai `false` yang mematikan —\nbaris yang belum ada tetap berarti mengantar. Untuk `self_payment_mode`\nsebaliknya: hanya `true` yang mengaktifkan.\n",
         "responses": {
           "200": {
             "description": "Konfigurasi",
@@ -1885,6 +1889,7 @@
                 ],
                 "properties": {
                   "value": {
+                    "title": "Nilai",
                     "type": "string"
                   }
                 }
@@ -1981,7 +1986,7 @@
           "Paper.id"
         ],
         "summary": "Kirim invoice ke Paper.id",
-        "description": "**Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,\nURL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,\nlalu memindahkan status ke `sent` — semuanya dalam satu transaksi\nbeserta baris audit `sent`.\n\n`client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;\nseluruh pemanggilan terjadi di server.\n\n**Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan\nmengikuti kebijakan operasional di `app_settings`\n(`paperid_send_email`, `paperid_send_whatsapp`), bukan mati begitu saja\n— penerbitan invoice terjadi massal, dan bila tiap pemanggil harus\nmenyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke\nmember sambil tetap melaporkan sukses. Kunci yang belum diisi bernilai\nmati, sehingga instalasi baru dan staging tetap senyap sampai pengiriman\ndinyalakan dengan sengaja.\n\nMember tanpa alamat email dilewati untuk kanal email (WhatsApp tetap\njalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.\nNomor telepon tetap wajib (dipersyaratkan Paper.id).\n",
+        "description": "**Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,\nURL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,\nlalu memindahkan status ke `sent` — semuanya dalam satu transaksi\nbeserta baris audit `sent`.\n\n`client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;\nseluruh pemanggilan terjadi di server.\n\n**Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan\nmengikuti kebijakan operasional di `app_settings`\n(`paperid_send_email`, `paperid_send_whatsapp`) — penerbitan invoice\nterjadi massal, dan bila tiap pemanggil harus menyertakan flagnya, satu\njalur yang lupa akan berhenti mengantar ke member sambil tetap\nmelaporkan sukses.\n\n**Bawaannya nyala.** Hanya nilai `false` yang mematikan sebuah kanal;\nbaris yang belum ada, nilai kosong, maupun kegagalan membaca setting\ntetap mengantar. Invoice yang tidak pernah sampai ke member bukan hasil\nyang lebih ringan — itu kegagalan diam-diam yang tetap dilaporkan\nsukses.\n\nMember tanpa alamat email dilewati untuk kanal email (WhatsApp tetap\njalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.\nNomor telepon tetap wajib (dipersyaratkan Paper.id).\n",
         "parameters": [
           {
             "$ref": "#/components/parameters/InvoiceId"
@@ -1995,10 +2000,12 @@
                 "type": "object",
                 "properties": {
                   "sendEmail": {
+                    "title": "Kirim via Email",
                     "type": "boolean",
                     "description": "Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti\n`paperid_send_email` di app_settings.\n"
                   },
                   "sendWhatsApp": {
+                    "title": "Kirim via WhatsApp",
                     "type": "boolean",
                     "description": "Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,\nmengikuti `paperid_send_whatsapp` di app_settings.\n"
                   }
@@ -2596,6 +2603,7 @@
                 ],
                 "properties": {
                   "method": {
+                    "title": "Metode",
                     "type": "string",
                     "enum": [
                       "va",
@@ -2603,6 +2611,7 @@
                     ]
                   },
                   "bank": {
+                    "title": "Bank",
                     "type": "string",
                     "enum": [
                       "BCA",
@@ -2779,6 +2788,7 @@
                   "type": "object",
                   "properties": {
                     "status": {
+                      "title": "Status",
                       "type": "string",
                       "example": "ok"
                     }
@@ -2795,6 +2805,7 @@
                   "type": "object",
                   "properties": {
                     "status": {
+                      "title": "Status",
                       "type": "string",
                       "example": "database tidak siap"
                     }
@@ -3071,6 +3082,7 @@
         }
       },
       "UserRole": {
+        "title": "Peran",
         "type": "string",
         "enum": [
           "admin",
@@ -3087,17 +3099,21 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "format": "uuid"
           },
           "name": {
+            "title": "Nama",
             "type": "string"
           },
           "email": {
+            "title": "Email",
             "type": "string",
             "format": "email"
           },
           "role": {
+            "title": "Peran",
             "$ref": "#/components/schemas/UserRole"
           }
         }
@@ -3110,10 +3126,12 @@
         ],
         "properties": {
           "email": {
+            "title": "Email",
             "type": "string",
             "format": "email"
           },
           "password": {
+            "title": "Kata Sandi",
             "type": "string"
           }
         }
@@ -3148,17 +3166,21 @@
         ],
         "properties": {
           "email": {
+            "title": "Email",
             "type": "string",
             "format": "email"
           },
           "password": {
+            "title": "Kata Sandi",
             "type": "string",
             "minLength": 6
           },
           "name": {
+            "title": "Nama",
             "type": "string"
           },
           "role": {
+            "title": "Peran",
             "allOf": [
               {
                 "$ref": "#/components/schemas/UserRole"
@@ -3176,15 +3198,18 @@
         ],
         "properties": {
           "currentPassword": {
+            "title": "Kata Sandi Saat Ini",
             "type": "string"
           },
           "newPassword": {
+            "title": "Kata Sandi Baru",
             "type": "string",
             "minLength": 6
           }
         }
       },
       "InvoiceType": {
+        "title": "Jenis Invoice",
         "type": "string",
         "enum": [
           "registration",
@@ -3192,6 +3217,7 @@
         ]
       },
       "InvoiceStatus": {
+        "title": "Status Invoice",
         "type": "string",
         "enum": [
           "draft",
@@ -3220,55 +3246,70 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "format": "uuid"
           },
           "number": {
+            "title": "Nomor Invoice",
             "type": "string",
             "example": "INV-2026-013"
           },
           "memberId": {
+            "title": "Member",
             "type": "string"
           },
           "chapterId": {
+            "title": "Chapter",
             "type": "string"
           },
           "type": {
+            "title": "Jenis Invoice",
             "$ref": "#/components/schemas/InvoiceType"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer",
             "description": "Rupiah penuh. Kolomnya `integer` — maks ~Rp 2,14 miliar per baris."
           },
           "currency": {
+            "title": "Mata Uang",
             "type": "string",
             "default": "IDR"
           },
           "dueDate": {
+            "title": "Jatuh Tempo",
             "type": "string",
             "format": "date"
           },
           "periodStart": {
+            "title": "Periode Mulai",
             "type": "string",
             "format": "date"
           },
           "periodEnd": {
+            "title": "Periode Selesai",
             "type": "string",
             "format": "date"
           },
           "status": {
+            "title": "Status",
             "$ref": "#/components/schemas/InvoiceStatus"
           },
           "paperIdInvoiceId": {
+            "title": "ID Invoice Paper.id",
             "type": "string"
           },
           "paperIdInvoiceUrl": {
+            "title": "URL Invoice Paper.id",
             "type": "string"
           },
           "paperIdPaymentUrl": {
+            "title": "URL Pembayaran Paper.id",
             "type": "string"
           },
           "paperIdSentAt": {
+            "title": "Waktu Kirim ke Paper.id",
             "type": "string",
             "format": "date-time"
           },
@@ -3306,6 +3347,7 @@
             "format": "date-time"
           },
           "paidAt": {
+            "title": "Waktu Pembayaran",
             "type": "string",
             "format": "date-time"
           },
@@ -3313,12 +3355,15 @@
             "type": "integer"
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "createdBy": {
+            "title": "Dibuat Oleh",
             "type": "string"
           },
           "cancelledBy": {
+            "title": "Dibatalkan Oleh",
             "type": "string"
           },
           "cancelledAt": {
@@ -3326,6 +3371,7 @@
             "format": "date-time"
           },
           "cancelReason": {
+            "title": "Alasan Pembatalan",
             "type": "string"
           },
           "createdAt": {
@@ -3351,43 +3397,54 @@
         ],
         "properties": {
           "number": {
+            "title": "Nomor Invoice",
             "type": "string",
             "description": "Dibuat otomatis bila kosong."
           },
           "memberId": {
+            "title": "Member",
             "type": "string"
           },
           "chapterId": {
+            "title": "Chapter",
             "type": "string"
           },
           "type": {
+            "title": "Jenis Invoice",
             "$ref": "#/components/schemas/InvoiceType"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer",
             "minimum": 1
           },
           "currency": {
+            "title": "Mata Uang",
             "type": "string",
             "default": "IDR"
           },
           "dueDate": {
+            "title": "Jatuh Tempo",
             "type": "string",
             "format": "date"
           },
           "periodStart": {
+            "title": "Periode Mulai",
             "type": "string",
             "format": "date"
           },
           "periodEnd": {
+            "title": "Periode Selesai",
             "type": "string",
             "format": "date",
             "description": "Tidak boleh lebih awal dari `periodStart`."
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "createdBy": {
+            "title": "Dibuat Oleh",
             "type": "string"
           }
         }
@@ -3397,51 +3454,65 @@
         "description": "Hanya field yang dikirim yang ditulis.",
         "properties": {
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer",
             "minimum": 1
           },
           "dueDate": {
+            "title": "Jatuh Tempo",
             "type": "string",
             "format": "date"
           },
           "periodStart": {
+            "title": "Periode Mulai",
             "type": "string",
             "format": "date"
           },
           "periodEnd": {
+            "title": "Periode Selesai",
             "type": "string",
             "format": "date"
           },
           "status": {
+            "title": "Status",
             "$ref": "#/components/schemas/InvoiceStatus"
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "cancelReason": {
+            "title": "Alasan Pembatalan",
             "type": "string"
           },
           "cancelledBy": {
+            "title": "Dibatalkan Oleh",
             "type": "string"
           },
           "paperIdInvoiceId": {
+            "title": "ID Invoice Paper.id",
             "type": "string"
           },
           "paperIdInvoiceUrl": {
+            "title": "URL Invoice Paper.id",
             "type": "string"
           },
           "paperIdPaymentUrl": {
+            "title": "URL Pembayaran Paper.id",
             "type": "string"
           },
           "paperIdSentAt": {
+            "title": "Waktu Kirim ke Paper.id",
             "type": "string",
             "format": "date-time"
           },
           "actorId": {
+            "title": "ID Pelaku",
             "type": "string",
             "description": "Hanya melabeli baris audit; tidak disimpan pada invoice."
           },
           "actorName": {
+            "title": "Nama Pelaku",
             "type": "string",
             "description": "Hanya melabeli baris audit; tidak disimpan pada invoice."
           }
@@ -3468,14 +3539,17 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "format": "uuid"
           },
           "invoiceId": {
+            "title": "Invoice",
             "type": "string",
             "format": "uuid"
           },
           "action": {
+            "title": "Aksi",
             "$ref": "#/components/schemas/AuditAction"
           },
           "oldStatus": {
@@ -3485,12 +3559,15 @@
             "$ref": "#/components/schemas/InvoiceStatus"
           },
           "actorId": {
+            "title": "ID Pelaku",
             "type": "string"
           },
           "actorName": {
+            "title": "Nama Pelaku",
             "type": "string"
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "createdAt": {
@@ -3506,6 +3583,7 @@
         ],
         "properties": {
           "action": {
+            "title": "Aksi",
             "allOf": [
               {
                 "$ref": "#/components/schemas/AuditAction"
@@ -3514,12 +3592,15 @@
             "default": "updated"
           },
           "actorId": {
+            "title": "ID Pelaku",
             "type": "string"
           },
           "actorName": {
+            "title": "Nama Pelaku",
             "type": "string"
           },
           "notes": {
+            "title": "Catatan",
             "type": "string",
             "minLength": 1
           }
@@ -3536,21 +3617,26 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "format": "uuid"
           },
           "invoiceId": {
+            "title": "Invoice",
             "type": "string",
             "format": "uuid"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer"
           },
           "paidAt": {
+            "title": "Waktu Pembayaran",
             "type": "string",
             "format": "date-time"
           },
           "paymentMethod": {
+            "title": "Metode Pembayaran",
             "type": "string",
             "example": "bank_transfer"
           },
@@ -3567,10 +3653,12 @@
             "type": "string"
           },
           "proofUrl": {
+            "title": "Bukti Pembayaran (URL)",
             "type": "string",
             "description": "Path dari `POST /uploads`, mis. `/uploads/2026….png`."
           },
           "note": {
+            "title": "Catatan",
             "type": "string"
           },
           "createdAt": {
@@ -3587,28 +3675,35 @@
         ],
         "properties": {
           "invoiceId": {
+            "title": "Invoice",
             "type": "string",
             "format": "uuid"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer",
             "minimum": 1
           },
           "paidAt": {
+            "title": "Waktu Pembayaran",
             "type": "string",
             "format": "date-time",
             "description": "Default waktu server."
           },
           "paymentMethod": {
+            "title": "Metode Pembayaran",
             "type": "string"
           },
           "proofUrl": {
+            "title": "Bukti Pembayaran (URL)",
             "type": "string"
           },
           "note": {
+            "title": "Catatan",
             "type": "string"
           },
           "settleInvoice": {
+            "title": "Sekalian Lunasi Invoice",
             "type": "boolean",
             "default": true,
             "description": "Kirim `false` untuk mencatat tanpa melunasi invoice."
@@ -3619,25 +3714,31 @@
         "type": "object",
         "properties": {
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer",
             "minimum": 1
           },
           "paidAt": {
+            "title": "Waktu Pembayaran",
             "type": "string",
             "format": "date-time"
           },
           "paymentMethod": {
+            "title": "Metode Pembayaran",
             "type": "string"
           },
           "proofUrl": {
+            "title": "Bukti Pembayaran (URL)",
             "type": "string"
           },
           "note": {
+            "title": "Catatan",
             "type": "string"
           }
         }
       },
       "MemberStatus": {
+        "title": "Status Member",
         "type": "string",
         "enum": [
           "active",
@@ -3655,19 +3756,24 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "example": "ch-garuda"
           },
           "name": {
+            "title": "Nama",
             "type": "string"
           },
           "displayName": {
+            "title": "Nama Tampilan",
             "type": "string"
           },
           "areaName": {
+            "title": "Area",
             "type": "string"
           },
           "cityName": {
+            "title": "Kota",
             "type": "string"
           },
           "syncedAt": {
@@ -3683,21 +3789,26 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "description": "Dibuatkan database bila kosong."
           },
           "name": {
+            "title": "Nama",
             "type": "string",
             "minLength": 1
           },
           "displayName": {
+            "title": "Nama Tampilan",
             "type": "string",
             "description": "Jatuh ke `name` bila kosong."
           },
           "areaName": {
+            "title": "Area",
             "type": "string"
           },
           "cityName": {
+            "title": "Kota",
             "type": "string"
           }
         }
@@ -3706,17 +3817,21 @@
         "type": "object",
         "properties": {
           "name": {
+            "title": "Nama",
             "type": "string",
             "minLength": 1
           },
           "displayName": {
+            "title": "Nama Tampilan",
             "type": "string",
             "minLength": 1
           },
           "areaName": {
+            "title": "Area",
             "type": "string"
           },
           "cityName": {
+            "title": "Kota",
             "type": "string"
           }
         }
@@ -3734,31 +3849,40 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string"
           },
           "chapterId": {
+            "title": "Chapter",
             "type": "string"
           },
           "name": {
+            "title": "Nama",
             "type": "string"
           },
           "email": {
+            "title": "Email",
             "type": "string",
             "format": "email"
           },
           "phone": {
+            "title": "Nomor Telepon",
             "type": "string"
           },
           "company": {
+            "title": "Perusahaan",
             "type": "string"
           },
           "businessField": {
+            "title": "Bidang Usaha",
             "type": "string"
           },
           "status": {
+            "title": "Status",
             "$ref": "#/components/schemas/MemberStatus"
           },
           "joinedDate": {
+            "title": "Tanggal Bergabung",
             "type": [
               "string",
               "null"
@@ -3766,6 +3890,7 @@
             "format": "date"
           },
           "renewalDate": {
+            "title": "Tanggal Perpanjangan",
             "type": [
               "string",
               "null"
@@ -3813,30 +3938,38 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "description": "Dibuatkan database bila kosong."
           },
           "chapterId": {
+            "title": "Chapter",
             "type": "string"
           },
           "name": {
+            "title": "Nama",
             "type": "string",
             "minLength": 1
           },
           "email": {
+            "title": "Email",
             "type": "string",
             "format": "email"
           },
           "phone": {
+            "title": "Nomor Telepon",
             "type": "string"
           },
           "company": {
+            "title": "Perusahaan",
             "type": "string"
           },
           "businessField": {
+            "title": "Bidang Usaha",
             "type": "string"
           },
           "status": {
+            "title": "Status",
             "allOf": [
               {
                 "$ref": "#/components/schemas/MemberStatus"
@@ -3845,10 +3978,12 @@
             "default": "active"
           },
           "joinedDate": {
+            "title": "Tanggal Bergabung",
             "type": "string",
             "format": "date"
           },
           "renewalDate": {
+            "title": "Tanggal Perpanjangan",
             "type": "string",
             "format": "date"
           }
@@ -3858,32 +3993,41 @@
         "type": "object",
         "properties": {
           "chapterId": {
+            "title": "Chapter",
             "type": "string"
           },
           "name": {
+            "title": "Nama",
             "type": "string",
             "minLength": 1
           },
           "email": {
+            "title": "Email",
             "type": "string"
           },
           "phone": {
+            "title": "Nomor Telepon",
             "type": "string"
           },
           "company": {
+            "title": "Perusahaan",
             "type": "string"
           },
           "businessField": {
+            "title": "Bidang Usaha",
             "type": "string"
           },
           "status": {
+            "title": "Status",
             "$ref": "#/components/schemas/MemberStatus"
           },
           "joinedDate": {
+            "title": "Tanggal Bergabung",
             "type": "string",
             "format": "date"
           },
           "renewalDate": {
+            "title": "Tanggal Perpanjangan",
             "type": "string",
             "format": "date"
           }
@@ -3901,23 +4045,29 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "default": "default"
           },
           "registrationFee": {
+            "title": "Biaya Pendaftaran",
             "type": "integer"
           },
           "renewalFee": {
+            "title": "Biaya Perpanjangan",
             "type": "integer"
           },
           "currency": {
+            "title": "Mata Uang",
             "type": "string",
             "default": "IDR"
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "updatedBy": {
+            "title": "Diubah Oleh",
             "type": "string"
           },
           "updatedAt": {
@@ -3935,21 +4085,26 @@
         "description": "Minimal satu field harus dikirim.",
         "properties": {
           "registrationFee": {
+            "title": "Biaya Pendaftaran",
             "type": "integer",
             "minimum": 0
           },
           "renewalFee": {
+            "title": "Biaya Perpanjangan",
             "type": "integer",
             "minimum": 0
           },
           "currency": {
+            "title": "Mata Uang",
             "type": "string",
             "minLength": 1
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "updatedBy": {
+            "title": "Diubah Oleh",
             "type": "string"
           }
         }
@@ -3966,6 +4121,7 @@
             "example": "self_payment_mode"
           },
           "value": {
+            "title": "Nilai",
             "type": "string"
           },
           "updatedAt": {
@@ -3990,6 +4146,7 @@
             "type": "integer"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer"
           },
           "trend": {
@@ -4059,6 +4216,7 @@
               "type": "object",
               "properties": {
                 "status": {
+                  "title": "Status",
                   "$ref": "#/components/schemas/InvoiceStatus"
                 },
                 "count": {
@@ -4136,33 +4294,42 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string",
             "format": "uuid"
           },
           "number": {
+            "title": "Nomor Invoice",
             "type": "string"
           },
           "type": {
+            "title": "Jenis Invoice",
             "$ref": "#/components/schemas/InvoiceType"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer"
           },
           "currency": {
+            "title": "Mata Uang",
             "type": "string"
           },
           "status": {
+            "title": "Status",
             "$ref": "#/components/schemas/InvoiceStatus"
           },
           "dueDate": {
+            "title": "Jatuh Tempo",
             "type": "string",
             "format": "date"
           },
           "periodStart": {
+            "title": "Periode Mulai",
             "type": "string",
             "format": "date"
           },
           "periodEnd": {
+            "title": "Periode Selesai",
             "type": "string",
             "format": "date"
           },
@@ -4173,12 +4340,14 @@
             "type": "string"
           },
           "notes": {
+            "title": "Catatan",
             "type": "string"
           },
           "paymentProvider": {
             "type": "string"
           },
           "paperIdPaymentUrl": {
+            "title": "URL Pembayaran Paper.id",
             "type": "string"
           },
           "xenditPaymentMethod": {
@@ -4234,6 +4403,7 @@
         ],
         "properties": {
           "method": {
+            "title": "Metode",
             "type": "string",
             "enum": [
               "va",
@@ -4241,6 +4411,7 @@
             ]
           },
           "bank": {
+            "title": "Bank",
             "type": "string"
           },
           "vaNumber": {
@@ -4250,6 +4421,7 @@
             "type": "string"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer"
           },
           "expiresAt": {
@@ -4333,6 +4505,7 @@
             "type": "boolean"
           },
           "method": {
+            "title": "Metode",
             "type": "string"
           },
           "url": {
@@ -4358,6 +4531,7 @@
             "type": "string"
           },
           "number": {
+            "title": "Nomor Invoice",
             "type": "string"
           },
           "paymentUrl": {
@@ -4455,6 +4629,7 @@
         ],
         "properties": {
           "id": {
+            "title": "ID",
             "type": "string"
           },
           "time": {
@@ -4478,6 +4653,7 @@
             "description": "`outbound` = kita → pihak luar; `inbound` = pihak luar → kita."
           },
           "method": {
+            "title": "Metode",
             "type": "string",
             "example": "POST"
           },
@@ -4492,6 +4668,7 @@
             "description": "Body balasan sebagai JSON. String bila upstream membalas non-JSON."
           },
           "status": {
+            "title": "Status",
             "type": "integer",
             "example": 201
           },
@@ -4512,19 +4689,24 @@
         "description": "Payload callback pembayaran Paper.id.",
         "properties": {
           "ref_id": {
+            "title": "Ref ID",
             "type": "string"
           },
           "external_id": {
+            "title": "External ID",
             "type": "string"
           },
           "payment_date": {
+            "title": "Tanggal Pembayaran",
             "type": "string",
             "example": "2026-07-27"
           },
           "payment_info": {
+            "title": "Info Pembayaran",
             "type": "object",
             "properties": {
               "method": {
+                "title": "Metode",
                 "type": "string",
                 "example": "bank_transfer"
               },
@@ -4542,12 +4724,14 @@
                 "type": "string"
               },
               "status": {
+                "title": "Status",
                 "type": "string",
                 "example": "PAID"
               }
             }
           },
           "additional_info": {
+            "title": "Info Tambahan",
             "type": "object",
             "properties": {
               "invoices": {
@@ -4600,25 +4784,32 @@
         "description": "Xendit mengirim dua bentuk: callback VA memakai `external_id`,\ncallback QR memakai `reference_id`. Keduanya diterima.\n",
         "properties": {
           "external_id": {
+            "title": "External ID",
             "type": "string"
           },
           "reference_id": {
+            "title": "Reference ID",
             "type": "string"
           },
           "id": {
+            "title": "ID",
             "type": "string"
           },
           "payment_id": {
+            "title": "ID Pembayaran",
             "type": "string"
           },
           "amount": {
+            "title": "Nominal (Rp)",
             "type": "integer"
           },
           "status": {
+            "title": "Status",
             "type": "string",
             "example": "PAID"
           },
           "created": {
+            "title": "Waktu Dibuat",
             "type": "string",
             "format": "date-time"
           }

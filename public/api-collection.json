@@ -71,6 +71,7 @@
       "bodyFields": [
         {
           "name": "email",
+          "label": "Email",
           "type": "string",
           "format": "email",
           "required": true,
@@ -79,6 +80,7 @@
         },
         {
           "name": "password",
+          "label": "Kata Sandi",
           "type": "string",
           "required": true,
           "description": "",
@@ -115,6 +117,7 @@
       "bodyFields": [
         {
           "name": "name",
+          "label": "Nama",
           "type": "string",
           "required": false,
           "description": "",
@@ -141,6 +144,7 @@
       "bodyFields": [
         {
           "name": "currentPassword",
+          "label": "Kata Sandi Saat Ini",
           "type": "string",
           "required": true,
           "description": "",
@@ -148,6 +152,7 @@
         },
         {
           "name": "newPassword",
+          "label": "Kata Sandi Baru",
           "type": "string",
           "required": true,
           "description": "",
@@ -186,6 +191,7 @@
       "bodyFields": [
         {
           "name": "email",
+          "label": "Email",
           "type": "string",
           "format": "email",
           "required": true,
@@ -234,6 +240,7 @@
       "bodyFields": [
         {
           "name": "email",
+          "label": "Email",
           "type": "string",
           "format": "email",
           "required": true,
@@ -242,6 +249,7 @@
         },
         {
           "name": "password",
+          "label": "Kata Sandi",
           "type": "string",
           "required": true,
           "description": "",
@@ -249,6 +257,7 @@
         },
         {
           "name": "name",
+          "label": "Nama",
           "type": "string",
           "required": true,
           "description": "",
@@ -256,6 +265,7 @@
         },
         {
           "name": "role",
+          "label": "Peran",
           "type": "string",
           "required": false,
           "default": "user",
@@ -311,6 +321,7 @@
       "bodyFields": [
         {
           "name": "newPassword",
+          "label": "Kata Sandi Baru",
           "type": "string",
           "required": true,
           "description": "",
@@ -344,6 +355,7 @@
       "bodyFields": [
         {
           "name": "role",
+          "label": "Peran",
           "type": "string",
           "required": true,
           "enum": [
@@ -485,6 +497,7 @@
       "bodyFields": [
         {
           "name": "number",
+          "label": "Nomor Invoice",
           "type": "string",
           "required": false,
           "description": "Dibuat otomatis bila kosong.",
@@ -492,6 +505,7 @@
         },
         {
           "name": "memberId",
+          "label": "Member",
           "type": "string",
           "required": true,
           "description": "",
@@ -499,6 +513,7 @@
         },
         {
           "name": "chapterId",
+          "label": "Chapter",
           "type": "string",
           "required": true,
           "description": "",
@@ -506,6 +521,7 @@
         },
         {
           "name": "type",
+          "label": "Jenis Invoice",
           "type": "string",
           "required": true,
           "enum": [
@@ -517,6 +533,7 @@
         },
         {
           "name": "amount",
+          "label": "Nominal (Rp)",
           "type": "integer",
           "required": true,
           "description": "",
@@ -524,6 +541,7 @@
         },
         {
           "name": "currency",
+          "label": "Mata Uang",
           "type": "string",
           "required": false,
           "default": "IDR",
@@ -532,6 +550,7 @@
         },
         {
           "name": "dueDate",
+          "label": "Jatuh Tempo",
           "type": "string",
           "format": "date",
           "required": true,
@@ -540,6 +559,7 @@
         },
         {
           "name": "periodStart",
+          "label": "Periode Mulai",
           "type": "string",
           "format": "date",
           "required": true,
@@ -548,6 +568,7 @@
         },
         {
           "name": "periodEnd",
+          "label": "Periode Selesai",
           "type": "string",
           "format": "date",
           "required": true,
@@ -556,6 +577,7 @@
         },
         {
           "name": "notes",
+          "label": "Catatan",
           "type": "string",
           "required": false,
           "description": "",
@@ -563,6 +585,7 @@
         },
         {
           "name": "createdBy",
+          "label": "Dibuat Oleh",
           "type": "string",
           "required": false,
           "description": "",
@@ -636,6 +659,7 @@
       "bodyFields": [
         {
           "name": "amount",
+          "label": "Nominal (Rp)",
           "type": "integer",
           "required": false,
           "description": "",
@@ -643,6 +667,7 @@
         },
         {
           "name": "dueDate",
+          "label": "Jatuh Tempo",
           "type": "string",
           "format": "date",
           "required": false,
@@ -651,6 +676,7 @@
         },
         {
           "name": "periodStart",
+          "label": "Periode Mulai",
           "type": "string",
           "format": "date",
           "required": false,
@@ -659,6 +685,7 @@
         },
         {
           "name": "periodEnd",
+          "label": "Periode Selesai",
           "type": "string",
           "format": "date",
           "required": false,
@@ -667,6 +694,7 @@
         },
         {
           "name": "status",
+          "label": "Status Invoice",
           "type": "string",
           "required": false,
           "enum": [
@@ -681,6 +709,7 @@
         },
         {
           "name": "notes",
+          "label": "Catatan",
           "type": "string",
           "required": false,
           "description": "",
@@ -688,6 +717,7 @@
         },
         {
           "name": "cancelReason",
+          "label": "Alasan Pembatalan",
           "type": "string",
           "required": false,
           "description": "",
@@ -695,6 +725,7 @@
         },
         {
           "name": "cancelledBy",
+          "label": "Dibatalkan Oleh",
           "type": "string",
           "required": false,
           "description": "",
@@ -702,6 +733,7 @@
         },
         {
           "name": "paperIdInvoiceId",
+          "label": "ID Invoice Paper.id",
           "type": "string",
           "required": false,
           "description": "",
@@ -709,6 +741,7 @@
         },
         {
           "name": "paperIdInvoiceUrl",
+          "label": "URL Invoice Paper.id",
           "type": "string",
           "required": false,
           "description": "",
@@ -716,6 +749,7 @@
         },
         {
           "name": "paperIdPaymentUrl",
+          "label": "URL Pembayaran Paper.id",
           "type": "string",
           "required": false,
           "description": "",
@@ -723,6 +757,7 @@
         },
         {
           "name": "paperIdSentAt",
+          "label": "Waktu Kirim ke Paper.id",
           "type": "string",
           "format": "date-time",
           "required": false,
@@ -731,6 +766,7 @@
         },
         {
           "name": "actorId",
+          "label": "ID Pelaku",
           "type": "string",
           "required": false,
           "description": "Hanya melabeli baris audit; tidak disimpan pada invoice.",
@@ -738,6 +774,7 @@
         },
         {
           "name": "actorName",
+          "label": "Nama Pelaku",
           "type": "string",
           "required": false,
           "description": "Hanya melabeli baris audit; tidak disimpan pada invoice.",
@@ -809,6 +846,7 @@
       "bodyFields": [
         {
           "name": "action",
+          "label": "Aksi",
           "type": "string",
           "required": false,
           "default": "updated",
@@ -817,6 +855,7 @@
         },
         {
           "name": "actorId",
+          "label": "ID Pelaku",
           "type": "string",
           "required": false,
           "description": "",
@@ -824,6 +863,7 @@
         },
         {
           "name": "actorName",
+          "label": "Nama Pelaku",
           "type": "string",
           "required": false,
           "description": "",
@@ -831,6 +871,7 @@
         },
         {
           "name": "notes",
+          "label": "Catatan",
           "type": "string",
           "required": true,
           "description": "",
@@ -916,6 +957,7 @@
       "bodyFields": [
         {
           "name": "invoiceId",
+          "label": "Invoice",
           "type": "string",
           "format": "uuid",
           "required": true,
@@ -924,6 +966,7 @@
         },
         {
           "name": "amount",
+          "label": "Nominal (Rp)",
           "type": "integer",
           "required": true,
           "description": "",
@@ -931,6 +974,7 @@
         },
         {
           "name": "paidAt",
+          "label": "Waktu Pembayaran",
           "type": "string",
           "format": "date-time",
           "required": false,
@@ -939,6 +983,7 @@
         },
         {
           "name": "paymentMethod",
+          "label": "Metode Pembayaran",
           "type": "string",
           "required": false,
           "description": "",
@@ -946,6 +991,7 @@
         },
         {
           "name": "proofUrl",
+          "label": "Bukti Pembayaran (URL)",
           "type": "string",
           "required": false,
           "description": "",
@@ -953,6 +999,7 @@
         },
         {
           "name": "note",
+          "label": "Catatan",
           "type": "string",
           "required": false,
           "description": "",
@@ -960,6 +1007,7 @@
         },
         {
           "name": "settleInvoice",
+          "label": "Sekalian Lunasi Invoice",
           "type": "boolean",
           "required": false,
           "default": true,
@@ -1034,6 +1082,7 @@
       "bodyFields": [
         {
           "name": "amount",
+          "label": "Nominal (Rp)",
           "type": "integer",
           "required": false,
           "description": "",
@@ -1041,6 +1090,7 @@
         },
         {
           "name": "paidAt",
+          "label": "Waktu Pembayaran",
           "type": "string",
           "format": "date-time",
           "required": false,
@@ -1049,6 +1099,7 @@
         },
         {
           "name": "paymentMethod",
+          "label": "Metode Pembayaran",
           "type": "string",
           "required": false,
           "description": "",
@@ -1056,6 +1107,7 @@
         },
         {
           "name": "proofUrl",
+          "label": "Bukti Pembayaran (URL)",
           "type": "string",
           "required": false,
           "description": "",
@@ -1063,6 +1115,7 @@
         },
         {
           "name": "note",
+          "label": "Catatan",
           "type": "string",
           "required": false,
           "description": "",
@@ -1167,6 +1220,7 @@
       "bodyFields": [
         {
           "name": "id",
+          "label": "ID",
           "type": "string",
           "required": false,
           "description": "Dibuatkan database bila kosong.",
@@ -1174,6 +1228,7 @@
         },
         {
           "name": "chapterId",
+          "label": "Chapter",
           "type": "string",
           "required": true,
           "description": "",
@@ -1181,6 +1236,7 @@
         },
         {
           "name": "name",
+          "label": "Nama",
           "type": "string",
           "required": true,
           "description": "",
@@ -1188,6 +1244,7 @@
         },
         {
           "name": "email",
+          "label": "Email",
           "type": "string",
           "format": "email",
           "required": false,
@@ -1196,6 +1253,7 @@
         },
         {
           "name": "phone",
+          "label": "Nomor Telepon",
           "type": "string",
           "required": false,
           "description": "",
@@ -1203,6 +1261,7 @@
         },
         {
           "name": "company",
+          "label": "Perusahaan",
           "type": "string",
           "required": false,
           "description": "",
@@ -1210,6 +1269,7 @@
         },
         {
           "name": "businessField",
+          "label": "Bidang Usaha",
           "type": "string",
           "required": false,
           "description": "",
@@ -1217,6 +1277,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "default": "active",
@@ -1225,6 +1286,7 @@
         },
         {
           "name": "joinedDate",
+          "label": "Tanggal Bergabung",
           "type": "string",
           "format": "date",
           "required": false,
@@ -1233,6 +1295,7 @@
         },
         {
           "name": "renewalDate",
+          "label": "Tanggal Perpanjangan",
           "type": "string",
           "format": "date",
           "required": false,
@@ -1307,6 +1370,7 @@
       "bodyFields": [
         {
           "name": "chapterId",
+          "label": "Chapter",
           "type": "string",
           "required": false,
           "description": "",
@@ -1314,6 +1378,7 @@
         },
         {
           "name": "name",
+          "label": "Nama",
           "type": "string",
           "required": false,
           "description": "",
@@ -1321,6 +1386,7 @@
         },
         {
           "name": "email",
+          "label": "Email",
           "type": "string",
           "required": false,
           "description": "",
@@ -1328,6 +1394,7 @@
         },
         {
           "name": "phone",
+          "label": "Nomor Telepon",
           "type": "string",
           "required": false,
           "description": "",
@@ -1335,6 +1402,7 @@
         },
         {
           "name": "company",
+          "label": "Perusahaan",
           "type": "string",
           "required": false,
           "description": "",
@@ -1342,6 +1410,7 @@
         },
         {
           "name": "businessField",
+          "label": "Bidang Usaha",
           "type": "string",
           "required": false,
           "description": "",
@@ -1349,6 +1418,7 @@
         },
         {
           "name": "status",
+          "label": "Status Member",
           "type": "string",
           "required": false,
           "enum": [
@@ -1361,6 +1431,7 @@
         },
         {
           "name": "joinedDate",
+          "label": "Tanggal Bergabung",
           "type": "string",
           "format": "date",
           "required": false,
@@ -1369,6 +1440,7 @@
         },
         {
           "name": "renewalDate",
+          "label": "Tanggal Perpanjangan",
           "type": "string",
           "format": "date",
           "required": false,
@@ -1476,6 +1548,7 @@
       "bodyFields": [
         {
           "name": "id",
+          "label": "ID",
           "type": "string",
           "required": false,
           "description": "Dibuatkan database bila kosong.",
@@ -1483,6 +1556,7 @@
         },
         {
           "name": "name",
+          "label": "Nama",
           "type": "string",
           "required": true,
           "description": "",
@@ -1490,6 +1564,7 @@
         },
         {
           "name": "displayName",
+          "label": "Nama Tampilan",
           "type": "string",
           "required": false,
           "description": "Jatuh ke name bila kosong.",
@@ -1497,6 +1572,7 @@
         },
         {
           "name": "areaName",
+          "label": "Area",
           "type": "string",
           "required": false,
           "description": "",
@@ -1504,6 +1580,7 @@
         },
         {
           "name": "cityName",
+          "label": "Kota",
           "type": "string",
           "required": false,
           "description": "",
@@ -1577,6 +1654,7 @@
       "bodyFields": [
         {
           "name": "name",
+          "label": "Nama",
           "type": "string",
           "required": false,
           "description": "",
@@ -1584,6 +1662,7 @@
         },
         {
           "name": "displayName",
+          "label": "Nama Tampilan",
           "type": "string",
           "required": false,
           "description": "",
@@ -1591,6 +1670,7 @@
         },
         {
           "name": "areaName",
+          "label": "Area",
           "type": "string",
           "required": false,
           "description": "",
@@ -1598,6 +1678,7 @@
         },
         {
           "name": "cityName",
+          "label": "Kota",
           "type": "string",
           "required": false,
           "description": "",
@@ -1615,7 +1696,7 @@
       "path": "/api/v1/app-settings",
       "tag": "Pengaturan",
       "summary": "Semua konfigurasi key/value",
-      "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `false` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `false` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nKunci yang belum ada bernilai kosong, dan kosong berarti mati. Itu\ndisengaja: pengiriman ke member harus dinyalakan dengan sadar, bukan\nmenyala sendiri karena barisnya belum sempat dibuat.\n",
+      "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nUntuk kunci `paperid_send_*`, hanya nilai `false` yang mematikan —\nbaris yang belum ada tetap berarti mengantar. Untuk `self_payment_mode`\nsebaliknya: hanya `true` yang mengaktifkan.\n",
       "params": [],
       "bodyRequired": false,
       "multipart": false,
@@ -1686,6 +1767,7 @@
       "bodyFields": [
         {
           "name": "value",
+          "label": "Nilai",
           "type": "string",
           "required": true,
           "description": "",
@@ -1722,6 +1804,7 @@
       "bodyFields": [
         {
           "name": "registrationFee",
+          "label": "Biaya Pendaftaran",
           "type": "integer",
           "required": false,
           "description": "",
@@ -1729,6 +1812,7 @@
         },
         {
           "name": "renewalFee",
+          "label": "Biaya Perpanjangan",
           "type": "integer",
           "required": false,
           "description": "",
@@ -1736,6 +1820,7 @@
         },
         {
           "name": "currency",
+          "label": "Mata Uang",
           "type": "string",
           "required": false,
           "description": "",
@@ -1743,6 +1828,7 @@
         },
         {
           "name": "notes",
+          "label": "Catatan",
           "type": "string",
           "required": false,
           "description": "",
@@ -1750,6 +1836,7 @@
         },
         {
           "name": "updatedBy",
+          "label": "Diubah Oleh",
           "type": "string",
           "required": false,
           "description": "",
@@ -1836,7 +1923,7 @@
       "path": "/api/v1/invoices/{id}/send",
       "tag": "Paper.id",
       "summary": "Kirim invoice ke Paper.id",
-      "description": "**Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,\nURL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,\nlalu memindahkan status ke `sent` — semuanya dalam satu transaksi\nbeserta baris audit `sent`.\n\n`client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;\nseluruh pemanggilan terjadi di server.\n\n**Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan\nmengikuti kebijakan operasional di `app_settings`\n(`paperid_send_email`, `paperid_send_whatsapp`), bukan mati begitu saja\n— penerbitan invoice terjadi massal, dan bila tiap pemanggil harus\nmenyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke\nmember sambil tetap melaporkan sukses. Kunci yang belum diisi bernilai\nmati, sehingga instalasi baru dan staging tetap senyap sampai pengiriman\ndinyalakan dengan sengaja.\n\nMember tanpa alamat email dilewati untuk kanal email (WhatsApp tetap\njalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.\nNomor telepon tetap wajib (dipersyaratkan Paper.id).\n",
+      "description": "**Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,\nURL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,\nlalu memindahkan status ke `sent` — semuanya dalam satu transaksi\nbeserta baris audit `sent`.\n\n`client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;\nseluruh pemanggilan terjadi di server.\n\n**Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan\nmengikuti kebijakan operasional di `app_settings`\n(`paperid_send_email`, `paperid_send_whatsapp`) — penerbitan invoice\nterjadi massal, dan bila tiap pemanggil harus menyertakan flagnya, satu\njalur yang lupa akan berhenti mengantar ke member sambil tetap\nmelaporkan sukses.\n\n**Bawaannya nyala.** Hanya nilai `false` yang mematikan sebuah kanal;\nbaris yang belum ada, nilai kosong, maupun kegagalan membaca setting\ntetap mengantar. Invoice yang tidak pernah sampai ke member bukan hasil\nyang lebih ringan — itu kegagalan diam-diam yang tetap dilaporkan\nsukses.\n\nMember tanpa alamat email dilewati untuk kanal email (WhatsApp tetap\njalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.\nNomor telepon tetap wajib (dipersyaratkan Paper.id).\n",
       "params": [
         {
           "name": "id",
@@ -1850,6 +1937,7 @@
       "bodyFields": [
         {
           "name": "sendEmail",
+          "label": "Kirim via Email",
           "type": "boolean",
           "required": false,
           "description": "Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti",
@@ -1857,6 +1945,7 @@
         },
         {
           "name": "sendWhatsApp",
+          "label": "Kirim via WhatsApp",
           "type": "boolean",
           "required": false,
           "description": "Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,",
@@ -2086,6 +2175,7 @@
       "bodyFields": [
         {
           "name": "ref_id",
+          "label": "Ref ID",
           "type": "string",
           "required": false,
           "description": "",
@@ -2093,6 +2183,7 @@
         },
         {
           "name": "external_id",
+          "label": "External ID",
           "type": "string",
           "required": false,
           "description": "",
@@ -2100,6 +2191,7 @@
         },
         {
           "name": "payment_date",
+          "label": "Tanggal Pembayaran",
           "type": "string",
           "required": false,
           "description": "",
@@ -2107,6 +2199,7 @@
         },
         {
           "name": "payment_info",
+          "label": "Info Pembayaran",
           "type": "object",
           "required": false,
           "description": "",
@@ -2114,6 +2207,7 @@
         },
         {
           "name": "additional_info",
+          "label": "Info Tambahan",
           "type": "object",
           "required": false,
           "description": "",
@@ -2236,6 +2330,7 @@
       "bodyFields": [
         {
           "name": "method",
+          "label": "Metode",
           "type": "string",
           "required": true,
           "enum": [
@@ -2247,6 +2342,7 @@
         },
         {
           "name": "bank",
+          "label": "Bank",
           "type": "string",
           "required": false,
           "enum": [
@@ -2284,6 +2380,7 @@
       "bodyFields": [
         {
           "name": "external_id",
+          "label": "External ID",
           "type": "string",
           "required": false,
           "description": "",
@@ -2291,6 +2388,7 @@
         },
         {
           "name": "reference_id",
+          "label": "Reference ID",
           "type": "string",
           "required": false,
           "description": "",
@@ -2298,6 +2396,7 @@
         },
         {
           "name": "id",
+          "label": "ID",
           "type": "string",
           "required": false,
           "description": "",
@@ -2305,6 +2404,7 @@
         },
         {
           "name": "payment_id",
+          "label": "ID Pembayaran",
           "type": "string",
           "required": false,
           "description": "",
@@ -2312,6 +2412,7 @@
         },
         {
           "name": "amount",
+          "label": "Nominal (Rp)",
           "type": "integer",
           "required": false,
           "description": "",
@@ -2319,6 +2420,7 @@
         },
         {
           "name": "status",
+          "label": "Status",
           "type": "string",
           "required": false,
           "description": "",
@@ -2326,6 +2428,7 @@
         },
         {
           "name": "created",
+          "label": "Waktu Dibuat",
           "type": "string",
           "format": "date-time",
           "required": false,

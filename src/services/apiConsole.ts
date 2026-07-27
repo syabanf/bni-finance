@@ -117,15 +117,17 @@ export interface SendInput {
   queryValues: Record<string, string>
   /** Raw JSON text from the editor; empty means no body. */
   body?: string
+  /** For multipart endpoints (uploads) — sent instead of a JSON body. */
+  file?: File
 }
 
 export async function sendConsoleRequest(input: SendInput): Promise<ConsoleResult> {
-  const { method, path, queryValues, body } = input
+  const { method, path, queryValues, body, file } = input
   const search = buildQuery(queryValues)
   const query = new URLSearchParams(search)
 
   let parsedBody: unknown
-  if (body && body.trim()) {
+  if (!file && body && body.trim()) {
     try {
       parsedBody = JSON.parse(body)
     } catch (err) {
@@ -135,7 +137,7 @@ export async function sendConsoleRequest(input: SendInput): Promise<ConsoleResul
 
   if (isMockMode()) {
     const started = performance.now()
-    const res = await mockApiFetch(method, path, query, parsedBody)
+    const res = await mockApiFetch(method, path, query, file ? { fileName: file.name } : parsedBody)
     const raw = res.body === null ? '' : JSON.stringify(res.body, null, 2)
     return {
       status: res.status,
@@ -152,18 +154,25 @@ export async function sendConsoleRequest(input: SendInput): Promise<ConsoleResul
 
   const url = `${apiBaseUrl()}${path}${search}`
   const headers: Record<string, string> = {}
-  if (parsedBody !== undefined) headers['Content-Type'] = 'application/json'
+  // Never set Content-Type for multipart: the browser has to add its own
+  // boundary, and overriding it makes the server fail to parse the form.
+  if (!file && parsedBody !== undefined) headers['Content-Type'] = 'application/json'
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
+
+  let payload: BodyInit | undefined
+  if (file) {
+    const form = new FormData()
+    form.append('file', file)
+    payload = form
+  } else if (parsedBody !== undefined) {
+    payload = JSON.stringify(parsedBody)
+  }
 
   const started = performance.now()
   let response: Response
   try {
-    response = await fetch(url, {
-      method,
-      headers,
-      body: parsedBody === undefined ? undefined : JSON.stringify(parsedBody),
-    })
+    response = await fetch(url, { method, headers, body: payload })
   } catch (err) {
     return {
       status: 0,

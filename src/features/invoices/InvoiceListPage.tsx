@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, FileText, Mail, Plus, Search, Send, X } from 'lucide-react'
-import type { Chapter, InvoiceStatus, InvoiceType, InvoiceWithRelations } from '@/types'
+import type { Chapter, Invoice, InvoiceStatus, InvoiceType, InvoiceWithRelations } from '@/types'
 import {
   Button,
   Card,
@@ -198,14 +198,27 @@ export function InvoiceListPage() {
     if (selectedSendable.length === 0) return
     setBulkSending(true)
     try {
+      // Simpan hasil send: di situlah tautan pembayaran Paper.id datang.
+      // Objek `inv` di tangan kita masih versi draft, tanpa tautan itu.
+      const issued = new Map<string, Invoice>()
       for (const inv of selectedSendable) {
-        if (inv.status === 'draft') await invoiceService.send(inv.id)
+        if (inv.status === 'draft') issued.set(inv.id, await invoiceService.send(inv.id))
       }
       let opened = 0
       let blocked = 0
       let skipped = 0
       for (const inv of selectedSendable) {
-        const payUrl = `${window.location.origin}/pay/${inv.id}`
+        // Self Payment Mode ON → halaman kita; OFF → halaman Paper.id. Sebelumnya
+        // selalu /pay/:id, yang pada mode Paper.id menolak pembayaran — member
+        // menerima jalan buntu.
+        const fresh = issued.get(inv.id) ?? inv
+        const payUrl = selfPayment
+          ? `${window.location.origin}/pay/${inv.id}`
+          : fresh.paperIdPaymentUrl
+        if (!payUrl) {
+          skipped++
+          continue
+        }
         const name = inv.member?.name ?? 'Bapak/Ibu'
         if (channel === 'whatsapp') {
           const phone = normalizePhone(inv.member?.phone)

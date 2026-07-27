@@ -14,10 +14,10 @@ const DEFAULTS: Record<string, string> = {
   self_payment_mode: 'false',
   invoice_draft_days_before: '30',
   invoice_due_days_after: '30',
-  // Kanal pengiriman Paper.id mati secara bawaan: staging dan demo tidak boleh
-  // mengirim pesan ke member sungguhan hanya karena seseorang menekan Terbitkan.
-  paperid_send_email: 'false',
-  paperid_send_whatsapp: 'false',
+  // Kanal pengiriman Paper.id NYALA secara bawaan — mengantar invoice adalah
+  // tujuan menerbitkannya. Hanya nilai 'false' yang mematikan.
+  paperid_send_email: 'true',
+  paperid_send_whatsapp: 'true',
 }
 
 export async function getMockAppSetting(key: string): Promise<string | null> {

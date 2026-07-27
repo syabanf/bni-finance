@@ -144,9 +144,26 @@ export function InvoiceDetailPage() {
     if (!downloadInvoice(invoice)) toast('Izinkan popup di browser untuk mengunduh invoice.', 'error')
   }
 
-  const payUrl = `${window.location.origin}/pay/${invoice.id}`
+  /**
+   * Tautan yang dibagikan ke member harus tautan yang benar-benar bisa dibayar.
+   *
+   * Self Payment Mode ON  → halaman publik kita (`/pay/:id`) yang memproses
+   *                          pembayaran lewat Xendit.
+   * Self Payment Mode OFF → halaman pembayaran Paper.id, yaitu `payper_url`
+   *                          yang mereka kembalikan saat invoice diterbitkan.
+   *
+   * Sebelumnya selalu `/pay/:id`. Pada mode Paper.id halaman itu menolak
+   * pembayaran (`selfPaymentMode: false`), jadi member menerima tautan yang
+   * membuka halaman tanpa cara membayar — sementara tautan yang benar sudah
+   * tersimpan di invoice.
+   */
+  const payUrl = selfPayment
+    ? `${window.location.origin}/pay/${invoice.id}`
+    : invoice.paperIdPaymentUrl
+  const hasPayUrl = Boolean(payUrl)
 
   const copyPayLink = async () => {
+    if (!payUrl) return
     try {
       await navigator.clipboard.writeText(payUrl)
       setCopiedLink(true)
@@ -157,6 +174,7 @@ export function InvoiceDetailPage() {
   }
 
   const sendPayLinkWa = () => {
+    if (!payUrl) return
     const name = invoice.member?.name ?? 'Bapak/Ibu'
     const msg = [
       `Halo ${name},`,
@@ -336,23 +354,41 @@ export function InvoiceDetailPage() {
             <Card>
               <CardHeader
                 title="Link Pembayaran"
-                subtitle="Kirim tautan ini ke member untuk melihat invoice & membayar sendiri."
+                subtitle={
+                  selfPayment
+                    ? 'Halaman pembayaran mandiri kita — member bisa bayar via Virtual Account atau QRIS.'
+                    : 'Halaman pembayaran Paper.id untuk invoice ini.'
+                }
               />
               <CardBody className="space-y-3">
-                <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5">
-                  <Link2 className="h-4 w-4 flex-shrink-0 text-ink-400" />
-                  <span className="truncate text-sm text-ink-600">{payUrl}</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" onClick={copyPayLink}>
-                    {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copiedLink ? 'Tersalin' : 'Salin Link'}
-                  </Button>
-                  <Button onClick={sendPayLinkWa}>
-                    <WhatsAppIcon className="h-4 w-4" />
-                    Kirim via WhatsApp
-                  </Button>
-                </div>
+                {hasPayUrl ? (
+                  <>
+                    <div className="flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-3 py-2.5">
+                      <Link2 className="h-4 w-4 flex-shrink-0 text-ink-400" />
+                      <span className="truncate text-sm text-ink-600">{payUrl}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" onClick={copyPayLink}>
+                        {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {copiedLink ? 'Tersalin' : 'Salin Link'}
+                      </Button>
+                      <Button onClick={sendPayLinkWa}>
+                        <WhatsAppIcon className="h-4 w-4" />
+                        Kirim via WhatsApp
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  // Tanpa tautan Paper.id tidak ada yang bisa dibagikan. Menampilkan
+                  // /pay/:id di sini justru menyesatkan: pada mode Paper.id halaman
+                  // itu menolak pembayaran, jadi member menerima jalan buntu.
+                  <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+                    <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    Invoice ini belum punya tautan pembayaran Paper.id. Biasanya karena
+                    diterbitkan sebelum integrasi Paper.id aktif, atau pengirimannya gagal
+                    di tengah jalan — coba terbitkan ulang, atau catat pembayarannya manual.
+                  </div>
+                )}
               </CardBody>
             </Card>
           )}

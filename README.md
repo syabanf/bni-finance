@@ -48,9 +48,10 @@ mengubah UI.
   `paperid_send_whatsapp`). Sengaja bukan pilihan per-klik: penerbitan terjadi
   massal (Terbitkan, aksi massal, "buat + kirim"), dan bila tiap pemanggil harus
   menyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke member
-  sambil tetap melaporkan sukses. Bawaannya **mati**, jadi instalasi baru dan
-  staging senyap sampai dinyalakan dengan sadar. Member tanpa email dilewati
-  untuk kanal email; WhatsApp tetap jalan.
+  sambil tetap melaporkan sukses. Bawaannya **nyala** — hanya nilai `false` yang
+  mematikan, karena invoice yang tidak pernah sampai ke member bukan hasil yang
+  lebih ringan melainkan kegagalan diam-diam. Member tanpa email dilewati untuk
+  kanal email; WhatsApp tetap jalan.
 - **Xendit self-payment** — halaman pembayaran publik `/pay/:id` (Virtual Account / QRIS)
   tanpa perlu login. Mode aktif dipilih di **Metode Pembayaran**.
 

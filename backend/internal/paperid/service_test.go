@@ -3,6 +3,7 @@ package paperid
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,23 +141,27 @@ func TestSendHappyPath(t *testing.T) {
 	}}
 	svc := newService(store, gw, "tok")
 
-	on := true
-	inv, err := svc.Send(context.Background(), "inv-1", SendOptions{Email: &on})
+	on, off := true, false
+	inv, err := svc.Send(context.Background(), "inv-1", SendOptions{Email: &on, WhatsApp: &off})
 	if err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 	if inv.Status != domain.StatusSent {
 		t.Errorf("status harus sent, dapat %s", inv.Status)
 	}
-	// Customer id must be the member id, so repeat invoices reuse the customer.
-	if gw.gotIn.CustomerID != "mem-1" {
-		t.Errorf("customer id harus member id, dapat %q", gw.gotIn.CustomerID)
+	// Customer id carries the member id so the Paper.id dashboard ties back to
+	// our record; the suffix is what lets changed contact details through — see
+	// TestCustomerRefChangesWithContactDetails.
+	if !strings.HasPrefix(gw.gotIn.CustomerID, "mem-1-") {
+		t.Errorf("customer id harus diawali member id, dapat %q", gw.gotIn.CustomerID)
 	}
 	// Due date follows the app_settings value (45 days), not the default.
 	wantDue := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
 	if !gw.gotIn.DueDate.Equal(wantDue) {
 		t.Errorf("due date harus mengikuti setting 45 hari, dapat %v", gw.gotIn.DueDate)
 	}
+	// Both were passed explicitly, so both must arrive as given — the defaults
+	// have their own tests.
 	if !gw.gotIn.SendEmail || gw.gotIn.SendWhatsApp {
 		t.Errorf("opsi kirim tidak diteruskan benar: %+v", gw.gotIn)
 	}
@@ -282,17 +287,39 @@ func TestSendUsesDeliverySettings(t *testing.T) {
 	}
 }
 
-// Silence is the safe default: an unconfigured or staging environment must not
-// message real members just because someone clicked Terbitkan.
-func TestSendStaysSilentWithoutSettings(t *testing.T) {
+// Delivering is the default. An invoice the member never receives is not a
+// milder outcome than a noisy one — it is a silent failure that still reports
+// success, so a missing settings row must not be what causes it.
+func TestSendDeliversWhenNothingIsConfigured(t *testing.T) {
 	gw := &stubGateway{res: &CreateResult{PaperInvoiceID: "pp-1"}}
 	svc := newService(&stubStore{sendable: draftSendable()}, gw, "tok")
 
 	if _, err := svc.Send(context.Background(), "inv-1", SendOptions{}); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
+	if !gw.gotIn.SendEmail || !gw.gotIn.SendWhatsApp {
+		t.Errorf("tanpa setting harus tetap mengantar: %+v", gw.gotIn)
+	}
+}
+
+// Turning a channel off must be a decision, and only an explicit "false"
+// counts as one.
+func TestSendHonoursExplicitFalseSetting(t *testing.T) {
+	store := &stubStore{
+		sendable: draftSendable(),
+		settings: map[string]string{
+			sendEmailSettingKey:    "false",
+			sendWhatsAppSettingKey: "false",
+		},
+	}
+	gw := &stubGateway{res: &CreateResult{PaperInvoiceID: "pp-1"}}
+	svc := newService(store, gw, "tok")
+
+	if _, err := svc.Send(context.Background(), "inv-1", SendOptions{}); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
 	if gw.gotIn.SendEmail || gw.gotIn.SendWhatsApp {
-		t.Errorf("tanpa setting harus diam: %+v", gw.gotIn)
+		t.Errorf("setting false harus mematikan kanal: %+v", gw.gotIn)
 	}
 }
 
@@ -342,5 +369,58 @@ func TestSendDropsEmailChannelWhenMemberHasNoEmail(t *testing.T) {
 	}
 	if !gw.gotIn.SendWhatsApp {
 		t.Error("WhatsApp harus tetap jalan")
+	}
+}
+
+// --- customer reference ------------------------------------------------------
+
+// Paper.id binds customer.id to the customer's details on first use and refuses
+// the same id later with different ones ("Failed partner doesn't match", a 400
+// that never mentions contact data). BNI VM sync changes phones and names
+// routinely, so a bare member id would break every future invoice for that
+// member the first time their number changed — proven against staging.
+func TestCustomerRefChangesWithContactDetails(t *testing.T) {
+	base := draftSendable()
+	ref := customerRef(base)
+
+	same := draftSendable()
+	if customerRef(same) != ref {
+		t.Error("detail sama harus menghasilkan referensi sama — pelanggan lama dipakai ulang")
+	}
+
+	for _, mutate := range []struct {
+		what string
+		fn   func(*Sendable)
+	}{
+		{"telepon", func(s *Sendable) { s.Phone = "082240274833" }},
+		{"email", func(s *Sendable) { s.Email = "lain@example.com" }},
+		{"nama", func(s *Sendable) { s.Name = "Budi Santoso" }},
+	} {
+		changed := draftSendable()
+		mutate.fn(changed)
+		if customerRef(changed) == ref {
+			t.Errorf("%s berubah tapi referensi tetap — Paper.id akan menolak invoicenya", mutate.what)
+		}
+	}
+
+	// The member id must stay recognisable: it is what ties the Paper.id
+	// customer back to our record when someone reads the dashboard.
+	if !strings.HasPrefix(ref, base.MemberID+"-") {
+		t.Errorf("referensi harus diawali member id, dapat %q", ref)
+	}
+}
+
+// A 400 whose text says nothing about contact details must not reach the
+// operator as-is.
+func TestPartnerMismatchBecomesActionableConflict(t *testing.T) {
+	gw := &stubGateway{err: &apiError{Status: 400, Message: "Failed partner doesn't match"}}
+	svc := newService(&stubStore{sendable: draftSendable()}, gw, "tok")
+
+	_, err := svc.Send(context.Background(), "inv-1", SendOptions{})
+	if statusOf(err) != 409 {
+		t.Fatalf("partner mismatch harus 409, dapat %v", err)
+	}
+	if !strings.Contains(err.Error(), "telepon") {
+		t.Errorf("pesan harus menyebut penyebabnya: %v", err)
 	}
 }
