@@ -6,8 +6,9 @@
   "description": "BNI Finance System \u2014 invoice & membership payment management for BNI Grow Chapter Management",
   "scripts": {
     "dev": "vite",
+    "api-collection": "node scripts/build-api-collection.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/build-api-collection.mjs && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

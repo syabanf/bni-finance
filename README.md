@@ -40,7 +40,17 @@ mengubah UI.
   kota & jatuh tempo.
 
 ### Pembayaran
-- **Paper.id** — kirim invoice & terima pembayaran via webhook.
+- **Paper.id** — menerbitkan invoice mendorongnya ke Paper.id (invoice + link
+  bayar ter-hosting), pembayaran masuk lewat webhook. Kredensial di server;
+  aktif saat Self Payment Mode OFF.
+- **Pengiriman ke member** — kanal Email/WhatsApp diatur di **Metode Pembayaran**
+  dan dibaca **server** dari `app_settings` (`paperid_send_email`,
+  `paperid_send_whatsapp`). Sengaja bukan pilihan per-klik: penerbitan terjadi
+  massal (Terbitkan, aksi massal, "buat + kirim"), dan bila tiap pemanggil harus
+  menyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke member
+  sambil tetap melaporkan sukses. Bawaannya **mati**, jadi instalasi baru dan
+  staging senyap sampai dinyalakan dengan sadar. Member tanpa email dilewati
+  untuk kanal email; WhatsApp tetap jalan.
 - **Xendit self-payment** — halaman pembayaran publik `/pay/:id` (Virtual Account / QRIS)
   tanpa perlu login. Mode aktif dipilih di **Metode Pembayaran**.
 
@@ -52,11 +62,34 @@ mengubah UI.
 - **Profil** — ubah nama & kata sandi (butuh kata sandi lama, mode non-mock).
 - **PWA** — installable, navigasi bottom-tab di mobile, sadar safe-area.
 - **Pengaturan Biaya** — konfigurasi nominal pendaftaran & renewal.
+- **Konsol API** — halaman admin bergaya Postman untuk seluruh 56 endpoint.
+  Daftar endpointnya **dibangkitkan dari spesifikasi OpenAPI backend**
+  (`npm run api-collection`), jadi tidak bisa melenceng dari route sungguhan.
+  Ada **Isi Otomatis** yang mengambil id dan tanggal yang benar-benar ada lewat
+  sumber data yang sedang aktif — termasuk memenuhi prasyarat tiap endpoint
+  (mis. `/invoices/{id}/send` diberi invoice berstatus draft). Endpoint Paper.id
+  ikut di dalamnya, termasuk konsol uji yang menampilkan payload persis yang
+  dikirim ke Paper.id (default **dry-run**) dan simulasi callback pembayaran
+  yang menjalankan handler webhook sungguhan.
+  Pada mode **Data Contoh** seluruh endpoint dijawab di browser oleh store mock,
+  jadi konsol tetap jalan tanpa backend; pada mode **Backend API** setiap
+  permintaan yang mengubah data dikonfirmasi lebih dulu.
+- **Blackbox Integrasi** — halaman admin berisi rekaman tiap panggilan ke/dari
+  Paper.id, Xendit, dan BNI VM: request JSON, endpoint yang dihubungi, response
+  JSON, dan status berhasil/gagal. Berguna saat integrasi bermasalah.
 - **Sinkronisasi** — tarik manual data dari BNI VM. Berjalan di server, jadi
   tokennya tidak pernah ada di browser; member yang hilang dinonaktifkan, bukan
   dihapus, agar riwayat tagihan utuh.
 - **Auth** — login berbasis JWT dengan dua peran (Admin / User); di mode mock
   memakai localStorage.
+- **Masuk cepat** — tombol satu klik di halaman login, tersedia di **kedua**
+  mode. Di Data Contoh memakai akun mock. Di Backend API, akun yang boleh
+  ditentukan server lewat `AUTH_QUICK_LOGIN` (daftar email, kosong = mati) dan
+  **kata sandinya tidak pernah dikirim ke browser** — sebelumnya jalur ini
+  memakai `VITE_DEMO_PASSWORD`, yang Vite tanam ke bundel JS publik. Sengaja
+  daftar email alih-alih saklar on/off: saklar berarti sekali dinyalakan di
+  produksi, semua akun jadi bisa dimasuki tanpa kata sandi. Server mencatat
+  peringatan di setiap start selama fitur ini menyala.
 
 ---
 
@@ -207,6 +240,9 @@ pustaka standar (satu dependensi: driver `pgx/v5`).
 | Unggahan | `POST /api/v1/uploads` · `GET /uploads/{nama}` |
 | Publik | `GET /api/v1/public/invoices/{id}` · `POST /webhooks/xendit` |
 | Sinkronisasi | `POST /api/v1/sync` — tarik member & chapter dari BNI VM |
+| Paper.id | `POST /api/v1/invoices/{id}/send` · `POST /webhooks/paperid` |
+| Blackbox | `GET·DELETE /api/v1/blackbox` — rekaman lalu lintas integrasi |
+| Konsol uji | `/api/v1/paperid/status` · `/paperid/test-invoice` · `/paperid/test-callback` |
 
 Respons memakai **camelCase** yang identik dengan tipe di `src/types`, jadi bisa
 dikonsumsi klien TypeScript tanpa lapisan pemetaan.

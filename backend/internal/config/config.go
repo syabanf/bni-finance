@@ -31,11 +31,31 @@ type Config struct {
 	BNIVMURL   string
 	BNIVMToken string
 
+	// Paper.id: pushes invoices and receives payment callbacks. Credentials are
+	// secrets — server-side only, never in a VITE_* variable. PaperIDCallbackToken
+	// is embedded in the callback URL registered in Paper.id's dashboard, since
+	// their webhook carries no signature of its own.
+	PaperIDBaseURL       string
+	PaperIDClientID      string
+	PaperIDClientSecret  string
+	PaperIDCallbackToken string
+
+	// BlackboxSize is how many integration calls the in-memory recorder keeps.
+	BlackboxSize int
+
 	// Seed credentials create the first administrator on an empty users table,
 	// so a fresh database is reachable without hand-writing a password hash.
 	SeedAdminEmail    string
 	SeedAdminPassword string
 	SeedAdminName     string
+
+	// QuickLoginEmails allows those accounts to sign in WITHOUT a password, for
+	// demos and local development. Empty (the default) disables the feature.
+	//
+	// It is a list of emails rather than an on/off switch on purpose: a boolean
+	// would turn every account passwordless the moment someone set it in
+	// production. You must name the accounts you are willing to expose.
+	QuickLoginEmails []string
 }
 
 // Load reads configuration from the environment, first pulling in a .env file
@@ -60,9 +80,18 @@ func Load() (Config, error) {
 		BNIVMURL:   envOr("BNI_VM_URL", "https://www.bni-vh.com/api/external/v1"),
 		BNIVMToken: strings.TrimSpace(os.Getenv("BNI_VM_TOKEN")),
 
+		PaperIDBaseURL:       envOr("PAPER_ID_BASE_URL", "https://open-api.stag-v2.paper.id"),
+		PaperIDClientID:      strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_ID")),
+		PaperIDClientSecret:  strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_SECRET")),
+		PaperIDCallbackToken: strings.TrimSpace(os.Getenv("PAPER_ID_CALLBACK_TOKEN")),
+
+		BlackboxSize: int(bytesOr("BLACKBOX_SIZE", 200)),
+
 		SeedAdminEmail:    strings.TrimSpace(os.Getenv("SEED_ADMIN_EMAIL")),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminName:     envOr("SEED_ADMIN_NAME", "Administrator"),
+
+		QuickLoginEmails: splitAndTrim(os.Getenv("AUTH_QUICK_LOGIN")),
 	}
 
 	if cfg.DatabaseURL == "" {

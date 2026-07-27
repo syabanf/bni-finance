@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/syabanf/bni-finance/backend/internal/auth"
+	"github.com/syabanf/bni-finance/backend/internal/blackbox"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
 
@@ -38,14 +39,14 @@ type Service struct {
 	newFetcher func(baseURL, token string) Fetcher
 }
 
-func NewService(repo Store, baseURL, envToken string) *Service {
+func NewService(repo Store, baseURL, envToken string, rec *blackbox.Recorder) *Service {
 	return &Service{
 		repo:     repo,
 		baseURL:  baseURL,
 		envToken: envToken,
 		now:      time.Now,
 		newFetcher: func(baseURL, token string) Fetcher {
-			return NewClient(baseURL, token)
+			return NewClient(baseURL, token).WithRecorder(rec)
 		},
 	}
 }

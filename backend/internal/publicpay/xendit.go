@@ -6,8 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
+
+	"github.com/syabanf/bni-finance/backend/internal/blackbox"
 )
 
 // Xendit's REST API is two POSTs. Wrapping it here keeps the secret key on the
@@ -25,6 +28,9 @@ type xenditClient struct {
 	secretKey string
 	http      *http.Client
 	baseURL   string
+	// rec captures each call for the blackbox page; nil disables recording.
+	// Only bodies are captured — the secret key lives in a header.
+	rec *blackbox.Recorder
 }
 
 func newXenditClient(secretKey string) *xenditClient {
@@ -56,22 +62,41 @@ func (c *xenditClient) post(ctx context.Context, path string, body any, extraHea
 		req.Header.Set(k, v)
 	}
 
+	started := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
+		c.rec.Record(blackbox.Call{
+			Integration: "xendit", Direction: blackbox.Outbound,
+			Method: http.MethodPost, URL: c.baseURL + path,
+			Request: payload, Success: false, Duration: time.Since(started), Err: err,
+		})
 		return fmt.Errorf("hubungi Xendit: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Read once: the body serves both the caller and the recorder.
+	raw, readErr := io.ReadAll(resp.Body)
+	c.rec.Record(blackbox.Call{
+		Integration: "xendit", Direction: blackbox.Outbound,
+		Method: http.MethodPost, URL: c.baseURL + path,
+		Request: payload, Response: raw,
+		Status: resp.StatusCode, Success: resp.StatusCode < 300,
+		Duration: time.Since(started),
+	})
+	if readErr != nil {
+		return fmt.Errorf("baca balasan Xendit: %w", readErr)
+	}
+
 	if resp.StatusCode >= 300 {
 		var detail map[string]any
-		_ = json.NewDecoder(resp.Body).Decode(&detail)
+		_ = json.Unmarshal(raw, &detail)
 		msg, _ := detail["message"].(string)
 		if msg == "" {
 			msg = fmt.Sprintf("Xendit menolak permintaan (HTTP %d)", resp.StatusCode)
 		}
 		return &xenditError{Status: resp.StatusCode, Message: msg}
 	}
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	if err := json.Unmarshal(raw, out); err != nil {
 		return fmt.Errorf("baca balasan Xendit: %w", err)
 	}
 	return nil

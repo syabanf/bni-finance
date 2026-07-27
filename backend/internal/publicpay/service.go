@@ -5,11 +5,14 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
+	"github.com/syabanf/bni-finance/backend/internal/blackbox"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -33,17 +36,33 @@ type Service struct {
 	xendit        *xenditClient
 	callbackToken string
 	now           func() time.Time
+	rec           *blackbox.Recorder
+}
+
+// recordInbound captures a Xendit callback, so the blackbox shows both
+// directions of the integration.
+func (s *Service) recordInbound(in WebhookInput, status int, success bool, err error) {
+	if s.rec == nil {
+		return
+	}
+	body, _ := json.Marshal(in)
+	s.rec.Record(blackbox.Call{
+		Integration: "xendit", Direction: blackbox.Inbound,
+		Method: http.MethodPost, URL: "/api/v1/webhooks/xendit",
+		Request: body, Status: status, Success: success, Err: err,
+	})
 }
 
 // NewService wires the payment gateway. An empty secretKey leaves self-payment
 // unavailable rather than half-working: creating a charge returns a clear error
 // instead of a confusing failure from Xendit.
-func NewService(repo Store, xenditSecretKey, callbackToken string) *Service {
+func NewService(repo Store, xenditSecretKey, callbackToken string, rec *blackbox.Recorder) *Service {
 	var client *xenditClient
 	if xenditSecretKey != "" {
 		client = newXenditClient(xenditSecretKey)
+		client.rec = rec
 	}
-	return &Service{repo: repo, xendit: client, callbackToken: callbackToken, now: time.Now}
+	return &Service{repo: repo, xendit: client, callbackToken: callbackToken, now: time.Now, rec: rec}
 }
 
 // PublicView is what the /pay/:id page renders.
@@ -190,10 +209,14 @@ func (in WebhookInput) paymentIdentifier() string {
 // callback rather than accepting them all.
 func (s *Service) HandleWebhook(ctx context.Context, callbackToken string, in WebhookInput) (settled bool, err error) {
 	if s.callbackToken == "" {
-		return false, httpx.Unauthorized("webhook belum dikonfigurasi")
+		err := httpx.Unauthorized("webhook belum dikonfigurasi")
+		s.recordInbound(in, http.StatusUnauthorized, false, err)
+		return false, err
 	}
 	if subtle.ConstantTimeCompare([]byte(callbackToken), []byte(s.callbackToken)) != 1 {
-		return false, httpx.Unauthorized("callback token tidak valid")
+		err := httpx.Unauthorized("callback token tidak valid")
+		s.recordInbound(in, http.StatusUnauthorized, false, err)
+		return false, err
 	}
 	if in.reference() == "" {
 		return false, httpx.BadRequest("external_id atau reference_id wajib ada")
@@ -214,7 +237,13 @@ func (s *Service) HandleWebhook(ctx context.Context, callbackToken string, in We
 			paidAt = t
 		}
 	}
-	return s.repo.SettleByExternalID(ctx, in.reference(), in.paymentIdentifier(), status, in.Amount, paidAt)
+	settled, err = s.repo.SettleByExternalID(ctx, in.reference(), in.paymentIdentifier(), status, in.Amount, paidAt)
+	if err != nil {
+		s.recordInbound(in, http.StatusInternalServerError, false, err)
+		return false, err
+	}
+	s.recordInbound(in, http.StatusOK, true, nil)
+	return settled, nil
 }
 
 // gatewayError keeps Xendit's own message but reports it as a bad gateway, so

@@ -1,0 +1,1436 @@
+{
+  "version": "1.0.0",
+  "generatedFrom": "backend/internal/apidocs/openapi.json",
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Login, profil, dan pengelolaan pengguna"
+    },
+    {
+      "name": "Invoice",
+      "description": "CRUD invoice beserta jejak auditnya"
+    },
+    {
+      "name": "Pembayaran",
+      "description": "Pencatatan pembayaran; mencatat = melunasi invoice"
+    },
+    {
+      "name": "Member",
+      "description": "Anggota chapter, termasuk yang mendekati jatuh tempo renewal"
+    },
+    {
+      "name": "Chapter",
+      "description": "Chapter BNI"
+    },
+    {
+      "name": "Pengaturan",
+      "description": "Biaya keanggotaan dan konfigurasi aplikasi"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Agregat KPI, hanya baca"
+    },
+    {
+      "name": "Unggahan",
+      "description": "Bukti pembayaran"
+    },
+    {
+      "name": "Sinkronisasi",
+      "description": "Tarik data member & chapter dari BNI Visitor Management"
+    },
+    {
+      "name": "Paper.id",
+      "description": "Kirim invoice ke Paper.id & terima callback pembayaran"
+    },
+    {
+      "name": "Blackbox",
+      "description": "Rekaman lalu lintas integrasi (Paper.id, Xendit, BNI VM)"
+    },
+    {
+      "name": "Publik",
+      "description": "Dapat diakses tanpa token — pembayar bukan pengguna aplikasi"
+    },
+    {
+      "name": "Sistem",
+      "description": "Kesehatan layanan dan dokumentasi"
+    }
+  ],
+  "operations": [
+    {
+      "id": "post:/api/v1/auth/login",
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "tag": "Auth",
+      "summary": "Masuk dan dapatkan token",
+      "description": "Email dibandingkan tanpa membedakan huruf besar/kecil.\n\nEmail tak dikenal dan kata sandi salah menghasilkan **pesan yang sama\npersis** dan waktu pemrosesan yang setara — akun tidak bisa dienumerasi\nlewat endpoint ini.\n",
+      "params": [],
+      "body": {
+        "email": "nama@contoh.com",
+        "password": ""
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/auth/me",
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "tag": "Auth",
+      "summary": "Profil pengguna yang sedang masuk",
+      "description": "Dibaca ulang dari database, bukan dari isi token — perubahan peran\nterlihat pada request berikutnya, bukan pada login berikutnya.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "patch:/api/v1/auth/me",
+      "method": "PATCH",
+      "path": "/api/v1/auth/me",
+      "tag": "Auth",
+      "summary": "Ubah nama sendiri",
+      "description": "",
+      "params": [],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "put:/api/v1/auth/password",
+      "method": "PUT",
+      "path": "/api/v1/auth/password",
+      "tag": "Auth",
+      "summary": "Ubah kata sandi sendiri",
+      "description": "`currentPassword` **wajib**. Tanpa itu, token yang dicuri sudah cukup\nuntuk mengambil alih akun secara permanen.\n",
+      "params": [],
+      "body": {
+        "currentPassword": "",
+        "newPassword": ""
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/auth/quick-login",
+      "method": "GET",
+      "path": "/api/v1/auth/quick-login",
+      "tag": "Auth",
+      "summary": "Daftar akun masuk cepat",
+      "description": "Akun yang boleh masuk **tanpa kata sandi**, untuk demo dan pengembangan\nlokal. Hanya nama, email, dan peran — tidak pernah kredensial.\n\nDiatur lewat `AUTH_QUICK_LOGIN`, berisi daftar email dipisah koma dan\n**kosong secara bawaan**. Sengaja daftar email, bukan saklar on/off:\nsaklar berarti sekali dinyalakan di produksi, *semua* akun jadi bisa\ndimasuki tanpa kata sandi. Di sini akun yang boleh harus disebut satu\nper satu.\n\nMenjawab **404** saat fitur mati — produksi tidak memberi petunjuk\nbahwa rute ini ada.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/auth/quick-login",
+      "method": "POST",
+      "path": "/api/v1/auth/quick-login",
+      "tag": "Auth",
+      "summary": "Masuk cepat tanpa kata sandi",
+      "description": "Menerbitkan token biasa untuk akun yang ada di daftar izin. Tokennya\nsama persis dengan hasil `POST /auth/login` — tidak ada sesi kelas dua.\n\n**404** bila fitur mati, **403** bila email di luar daftar izin. Server\nmencatat peringatan saat start selama fitur ini menyala.\n",
+      "params": [],
+      "body": {
+        "email": "nama@contoh.com"
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/users",
+      "method": "GET",
+      "path": "/api/v1/users",
+      "tag": "Auth",
+      "summary": "Daftar pengguna",
+      "description": "**Admin saja.**",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "post:/api/v1/users",
+      "method": "POST",
+      "path": "/api/v1/users",
+      "tag": "Auth",
+      "summary": "Tambah pengguna",
+      "description": "**Admin saja.** Peran default `user` bila tidak dikirim.",
+      "params": [],
+      "body": {
+        "email": "nama@contoh.com",
+        "password": "",
+        "name": "",
+        "role": {
+          "0": "a",
+          "1": "d",
+          "2": "m",
+          "3": "i",
+          "4": "n"
+        }
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "delete:/api/v1/users/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/users/{id}",
+      "tag": "Auth",
+      "summary": "Hapus pengguna",
+      "description": "**Admin saja.** Menghapus diri sendiri atau admin terakhir ditolak\ndengan 409.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "put:/api/v1/users/{id}/password",
+      "method": "PUT",
+      "path": "/api/v1/users/{id}/password",
+      "tag": "Auth",
+      "summary": "Reset kata sandi pengguna lain",
+      "description": "**Admin saja.** Tidak perlu kata sandi lama, tapi **tidak bisa dipakai\npada diri sendiri** — untuk itu gunakan `PUT /auth/password`.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {
+        "newPassword": ""
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "patch:/api/v1/users/{id}/role",
+      "method": "PATCH",
+      "path": "/api/v1/users/{id}/role",
+      "tag": "Auth",
+      "summary": "Ubah peran pengguna",
+      "description": "**Admin saja.** Menurunkan admin **terakhir** ditolak dengan 409 —\nitu keadaan yang tidak bisa dipulihkan lewat API.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {
+        "role": "admin"
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/invoices",
+      "method": "GET",
+      "path": "/api/v1/invoices",
+      "tag": "Invoice",
+      "summary": "Daftar invoice",
+      "description": "",
+      "params": [
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "draft",
+            "sent",
+            "paid",
+            "overdue",
+            "cancelled",
+            "outstanding"
+          ],
+          "description": "Salah satu status, atau outstanding sebagai jalan pintas untuk"
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "registration",
+            "renewal"
+          ],
+          "description": ""
+        },
+        {
+          "name": "chapterId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "memberId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "q",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Pencarian pada nomor invoice saja (belum nama member)."
+        },
+        {
+          "name": "dueFrom",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "dueTo",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "issuedFrom",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Tanggal terbit paling awal (inklusif)."
+        },
+        {
+          "name": "issuedTo",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Tanggal terbit paling akhir (inklusif — mencakup seluruh hari itu)."
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 50,
+          "description": ""
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 0,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/invoices",
+      "method": "POST",
+      "path": "/api/v1/invoices",
+      "tag": "Invoice",
+      "summary": "Buat invoice",
+      "description": "**Admin saja.** Status awal selalu `draft`.\n\n`number` dibuat otomatis (`INV-2026-013`) bila tidak dikirim, sehingga\npemanggil tidak bisa membuat duplikat tanpa sengaja.\n\nInvoice dan entri audit pertamanya ditulis dalam **satu transaksi** —\ntidak ada invoice tanpa timeline.\n",
+      "params": [],
+      "body": {
+        "memberId": "",
+        "chapterId": "",
+        "type": "registration",
+        "amount": 1500000,
+        "currency": "IDR",
+        "dueDate": "2026-07-27",
+        "periodStart": "2026-07-27",
+        "periodEnd": "2026-07-27"
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "delete:/api/v1/invoices/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/invoices/{id}",
+      "tag": "Invoice",
+      "summary": "Hapus invoice",
+      "description": "**Admin saja.** Invoice yang sudah punya pembayaran **tidak bisa\ndihapus** — batalkan saja, supaya riwayatnya utuh.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/invoices/{id}",
+      "method": "GET",
+      "path": "/api/v1/invoices/{id}",
+      "tag": "Invoice",
+      "summary": "Detail invoice",
+      "description": "",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "patch:/api/v1/invoices/{id}",
+      "method": "PATCH",
+      "path": "/api/v1/invoices/{id}",
+      "tag": "Invoice",
+      "summary": "Ubah sebagian field invoice",
+      "description": "**Admin saja.** Hanya field yang dikirim yang ditulis.\n\n**Transisi status** mengikuti siklus di UI:\n`draft → sent → paid`, dan bisa dibatalkan selama belum lunas.\n`paid` serta `cancelled` bersifat final. Lompatan seperti\n`draft → paid` ditolak **409**.\n\nInvoice berstatus `paid` atau `cancelled` **tidak bisa diubah** nominal\nmaupun periodenya — itu catatan yang sudah tertutup.\n\nSetiap perubahan menulis satu baris audit di **transaksi yang sama**.\n`actorId`/`actorName` hanya melabeli baris audit itu; keduanya tidak\ndisimpan pada invoice.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/invoices/{id}/audit",
+      "method": "GET",
+      "path": "/api/v1/invoices/{id}/audit",
+      "tag": "Invoice",
+      "summary": "Timeline invoice",
+      "description": "Terbaru dulu.",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 50,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/invoices/{id}/audit",
+      "method": "POST",
+      "path": "/api/v1/invoices/{id}/audit",
+      "tag": "Invoice",
+      "summary": "Tambah catatan manual ke timeline",
+      "description": "**Admin saja.** Hanya untuk anotasi manusia — perubahan status dicatat\notomatis oleh sistem.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "body": {
+        "action": {
+          "0": "c",
+          "1": "r",
+          "2": "e",
+          "3": "a",
+          "4": "t",
+          "5": "e",
+          "6": "d"
+        },
+        "notes": ""
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/payments",
+      "method": "GET",
+      "path": "/api/v1/payments",
+      "tag": "Pembayaran",
+      "summary": "Daftar pembayaran",
+      "description": "",
+      "params": [
+        {
+          "name": "invoiceId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "method",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "paidFrom",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "paidTo",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Inklusif — mencakup seluruh hari itu."
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 50,
+          "description": ""
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 0,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/payments",
+      "method": "POST",
+      "path": "/api/v1/payments",
+      "tag": "Pembayaran",
+      "summary": "Catat pembayaran",
+      "description": "**Admin saja.**\n\n**Mencatat pembayaran = melunasi invoice.** Keduanya terjadi dalam satu\ntransaksi dengan `SELECT … FOR UPDATE`, jadi mustahil ada pembayaran\ntercatat pada invoice yang masih belum lunas. Kirim\n`\"settleInvoice\": false` untuk hanya mencatat tanpa melunasi.\n\nInvoice yang sudah dibatalkan menolak pembayaran (**409**).\n",
+      "params": [],
+      "body": {
+        "invoiceId": "",
+        "amount": 1500000,
+        "settleInvoice": true
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "delete:/api/v1/payments/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/payments/{id}",
+      "tag": "Pembayaran",
+      "summary": "Hapus pembayaran",
+      "description": "**Admin saja.** Perhatikan: ini **tidak** mengembalikan status invoice\ndari `paid`.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/payments/{id}",
+      "method": "GET",
+      "path": "/api/v1/payments/{id}",
+      "tag": "Pembayaran",
+      "summary": "Detail pembayaran",
+      "description": "",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "patch:/api/v1/payments/{id}",
+      "method": "PATCH",
+      "path": "/api/v1/payments/{id}",
+      "tag": "Pembayaran",
+      "summary": "Ubah sebagian field pembayaran",
+      "description": "**Admin saja.**",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/members",
+      "method": "GET",
+      "path": "/api/v1/members",
+      "tag": "Member",
+      "summary": "Daftar member",
+      "description": "Setiap member dibaca beserta chapter-nya (`LEFT JOIN`) — bentuknya sama\ndengan `MemberWithChapter` di frontend, jadi tidak perlu request kedua.\n",
+      "params": [
+        {
+          "name": "chapterId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "active",
+            "inactive",
+            "pending"
+          ],
+          "description": ""
+        },
+        {
+          "name": "q",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Pencarian pada nama, email, atau perusahaan."
+        },
+        {
+          "name": "renewalFrom",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "renewalTo",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 50,
+          "description": ""
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 0,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/members",
+      "method": "POST",
+      "path": "/api/v1/members",
+      "tag": "Member",
+      "summary": "Tambah member",
+      "description": "**Admin saja.** `id` opsional — database membuatkan bila kosong, yang\ntepat untuk member yang tidak berasal dari BNI VM.\n",
+      "params": [],
+      "body": {
+        "chapterId": "",
+        "name": "",
+        "status": {
+          "0": "a",
+          "1": "c",
+          "2": "t",
+          "3": "i",
+          "4": "v",
+          "5": "e"
+        }
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "delete:/api/v1/members/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/members/{id}",
+      "tag": "Member",
+      "summary": "Hapus member",
+      "description": "**Admin saja.** Member yang punya invoice tidak bisa dihapus — ubah\nstatusnya menjadi `inactive` supaya riwayat tagihannya utuh.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/members/{id}",
+      "method": "GET",
+      "path": "/api/v1/members/{id}",
+      "tag": "Member",
+      "summary": "Detail member",
+      "description": "",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "patch:/api/v1/members/{id}",
+      "method": "PATCH",
+      "path": "/api/v1/members/{id}",
+      "tag": "Member",
+      "summary": "Ubah sebagian field member",
+      "description": "**Admin saja.**",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/members/renewal-due",
+      "method": "GET",
+      "path": "/api/v1/members/renewal-due",
+      "tag": "Member",
+      "summary": "Member yang keanggotaannya segera berakhir",
+      "description": "Hanya member **aktif** dengan `renewalDate` antara hari ini dan\n`days` hari ke depan. Diurutkan dari yang paling dekat.\n",
+      "params": [
+        {
+          "name": "days",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 30,
+          "description": ""
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 100,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/chapters",
+      "method": "GET",
+      "path": "/api/v1/chapters",
+      "tag": "Chapter",
+      "summary": "Daftar chapter",
+      "description": "",
+      "params": [
+        {
+          "name": "q",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Pencarian pada nama, nama tampilan, atau kota."
+        },
+        {
+          "name": "cityName",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "areaName",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 100,
+          "description": ""
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 0,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/chapters",
+      "method": "POST",
+      "path": "/api/v1/chapters",
+      "tag": "Chapter",
+      "summary": "Tambah chapter",
+      "description": "**Admin saja.** `displayName` jatuh ke `name` bila tidak dikirim.\n",
+      "params": [],
+      "body": {
+        "name": ""
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "delete:/api/v1/chapters/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/chapters/{id}",
+      "tag": "Chapter",
+      "summary": "Hapus chapter",
+      "description": "**Admin saja.** Ditolak **409** bila masih dirujuk member atau invoice —\nbeserta jumlahnya, alih-alih pelanggaran foreign key yang membingungkan.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/chapters/{id}",
+      "method": "GET",
+      "path": "/api/v1/chapters/{id}",
+      "tag": "Chapter",
+      "summary": "Detail chapter",
+      "description": "",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "patch:/api/v1/chapters/{id}",
+      "method": "PATCH",
+      "path": "/api/v1/chapters/{id}",
+      "tag": "Chapter",
+      "summary": "Ubah sebagian field chapter",
+      "description": "**Admin saja.**",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/app-settings",
+      "method": "GET",
+      "path": "/api/v1/app-settings",
+      "tag": "Pengaturan",
+      "summary": "Semua konfigurasi key/value",
+      "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `false` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `false` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nKunci yang belum ada bernilai kosong, dan kosong berarti mati. Itu\ndisengaja: pengiriman ke member harus dinyalakan dengan sadar, bukan\nmenyala sendiri karena barisnya belum sempat dibuat.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "delete:/api/v1/app-settings/{key}",
+      "method": "DELETE",
+      "path": "/api/v1/app-settings/{key}",
+      "tag": "Pengaturan",
+      "summary": "Hapus konfigurasi",
+      "description": "**Admin saja.**",
+      "params": [
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "Dinormalkan menjadi huruf kecil."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/app-settings/{key}",
+      "method": "GET",
+      "path": "/api/v1/app-settings/{key}",
+      "tag": "Pengaturan",
+      "summary": "Satu konfigurasi",
+      "description": "",
+      "params": [
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "Dinormalkan menjadi huruf kecil."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "put:/api/v1/app-settings/{key}",
+      "method": "PUT",
+      "path": "/api/v1/app-settings/{key}",
+      "tag": "Pengaturan",
+      "summary": "Simpan konfigurasi (upsert)",
+      "description": "**Admin saja.** Tabel ini adalah sumber kebenaran untuk feature flag\nseperti `self_payment_mode`, jadi penulisan tidak bergantung pada\nbarisnya sudah ada atau belum.\n\nMengirim balik nilai tersamar (`••••••`) ditolak **400**, supaya tidak\nada yang menimpa kredensial asli dengan tanda bintang.\n",
+      "params": [
+        {
+          "name": "key",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "Dinormalkan menjadi huruf kecil."
+        }
+      ],
+      "body": {
+        "value": ""
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/fee-settings",
+      "method": "GET",
+      "path": "/api/v1/fee-settings",
+      "tag": "Pengaturan",
+      "summary": "Biaya keanggotaan yang berlaku",
+      "description": "",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "patch:/api/v1/fee-settings",
+      "method": "PATCH",
+      "path": "/api/v1/fee-settings",
+      "tag": "Pengaturan",
+      "summary": "Ubah biaya",
+      "description": "**Admin saja.** Body kosong ditolak **400** alih-alih diam-diam tidak\nmelakukan apa-apa.\n",
+      "params": [],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/dashboard/summary",
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary",
+      "tag": "Dashboard",
+      "summary": "Agregat KPI",
+      "description": "Bentuknya persis `DashboardSummary` di frontend.\n\nAngka `trend` membandingkan **30 hari terakhir** dengan 30 hari\nsebelumnya, dibulatkan satu desimal. Pertumbuhan dari nol dilaporkan\n`+100`, bukan tak hingga.\n",
+      "params": [
+        {
+          "name": "months",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 6,
+          "description": "Panjang grafik tren bulanan."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/uploads",
+      "method": "POST",
+      "path": "/api/v1/uploads",
+      "tag": "Unggahan",
+      "summary": "Unggah bukti pembayaran",
+      "description": "**Admin saja.** Menerima JPG, PNG, WebP, HEIC, dan PDF — allowlist,\nbukan blocklist.\n\nNama berkas **dibuat server**, tidak pernah diambil dari klien: nama\npilihan pemanggil adalah jalan menuju path traversal atau berkas\ntertimpa. Batas ukuran default 5 MB (`MAX_UPLOAD_SIZE`).\n\nSimpan `url` yang dikembalikan pada `proofUrl` saat mencatat pembayaran.\n",
+      "params": [],
+      "bodyRequired": true,
+      "multipart": true,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/uploads/{filename}",
+      "method": "GET",
+      "path": "/uploads/{filename}",
+      "tag": "Unggahan",
+      "summary": "Ambil berkas yang tersimpan",
+      "description": "**Tanpa token.** URL sengaja dibuat tak tertebak alih-alih dijaga\nautentikasi, karena halaman bayar publik harus bisa menampilkannya\nuntuk orang yang tidak punya akun. Direktori tidak bisa dijelajahi.\n",
+      "params": [
+        {
+          "name": "filename",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/sync",
+      "method": "POST",
+      "path": "/api/v1/sync",
+      "tag": "Sinkronisasi",
+      "summary": "Tarik member & chapter dari BNI Visitor Management",
+      "description": "**Admin saja.** Satu panggilan menyegarkan **keduanya** — BNI VM tidak\npunya endpoint chapter tersendiri, jadi chapter diturunkan dari daftar\nmember.\n\nToken diambil dari `app_settings.bni_vm_token` lebih dulu (bisa diganti\ndari halaman Pengaturan tanpa redeploy), lalu jatuh ke variabel\nlingkungan `BNI_VM_TOKEN`. Token **tidak pernah** sampai ke browser:\nseluruh proses berjalan di server.\n\nSeluruh snapshot ditulis dalam **satu transaksi**. Penulisan sebagian\nbisa meninggalkan member yang menunjuk chapter yang belum ada.\n\n**Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**\nMenghapusnya akan melanggar foreign key begitu mereka punya invoice, dan\nmembuang riwayat tagihan meski berhasil.\n\n**Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan\nseluruh member — jauh lebih mungkin BNI VM sedang bermasalah daripada\norganisasi kehilangan semua anggotanya sekaligus.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "post:/api/v1/invoices/{id}/send",
+      "method": "POST",
+      "path": "/api/v1/invoices/{id}/send",
+      "tag": "Paper.id",
+      "summary": "Kirim invoice ke Paper.id",
+      "description": "**Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,\nURL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,\nlalu memindahkan status ke `sent` — semuanya dalam satu transaksi\nbeserta baris audit `sent`.\n\n`client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;\nseluruh pemanggilan terjadi di server.\n\n**Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan\nmengikuti kebijakan operasional di `app_settings`\n(`paperid_send_email`, `paperid_send_whatsapp`), bukan mati begitu saja\n— penerbitan invoice terjadi massal, dan bila tiap pemanggil harus\nmenyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke\nmember sambil tetap melaporkan sukses. Kunci yang belum diisi bernilai\nmati, sehingga instalasi baru dan staging tetap senyap sampai pengiriman\ndinyalakan dengan sengaja.\n\nMember tanpa alamat email dilewati untuk kanal email (WhatsApp tetap\njalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.\nNomor telepon tetap wajib (dipersyaratkan Paper.id).\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "body": {},
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/paperid/status",
+      "method": "GET",
+      "path": "/api/v1/paperid/status",
+      "tag": "Paper.id",
+      "summary": "Status konfigurasi Paper.id",
+      "description": "**Admin saja.** Hanya boolean dan base URL — **tidak pernah** memuat\n`client_id`, `client_secret`, maupun callback token.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "post:/api/v1/paperid/test-callback",
+      "method": "POST",
+      "path": "/api/v1/paperid/test-callback",
+      "tag": "Paper.id",
+      "summary": "Konsol uji — simulasikan callback pembayaran",
+      "description": "**Admin saja.** Menyusun payload callback Paper.id untuk salah satu\ninvoice kita, lalu (opsional) menjalankannya lewat **handler webhook yang\nsebenarnya** — jadi yang diuji adalah jalur produksi, bukan tiruannya.\nMenunggu pembayaran sungguhan di staging tidak praktis.\n\n**`dryRun` default `true`.** Bila dijalankan sungguhan, invoice benar-benar\n**ditandai lunas** beserta baris pembayarannya.\n\nInvoice harus sudah dikirim ke Paper.id — yang masih `draft` ditolak 409.\n",
+      "params": [],
+      "body": {
+        "invoiceId": "",
+        "method": "bank_transfer",
+        "channel": "bni",
+        "status": "PAID",
+        "dryRun": true
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "post:/api/v1/paperid/test-invoice",
+      "method": "POST",
+      "path": "/api/v1/paperid/test-invoice",
+      "tag": "Paper.id",
+      "summary": "Konsol uji — buat invoice percobaan",
+      "description": "**Admin saja.** Menyusun payload `store-invoice` dan (opsional)\nmengirimkannya, lalu mengembalikan request beserta response apa adanya.\nBerguna untuk memastikan kredensial bekerja tanpa perlu menyiapkan\ninvoice dan member sungguhan.\n\n**`dryRun` default `true`** — payload disusun tetapi **tidak** dikirim.\nPanggilan sungguhan membuat invoice nyata di Paper.id dan memakai\nnomornya secara permanen, jadi mengirim harus menjadi pilihan sadar.\n\nNomor uji selalu ber-prefix `TEST-` dengan stempel waktu + acak, sehingga\ntidak pernah menghabiskan nomor invoice sungguhan maupun bentrok satu\nsama lain.\n\nKonsol ini **tidak menyentuh tabel invoice** — murni uji kontrak.\n",
+      "params": [],
+      "body": {
+        "amount": 1500000,
+        "sendEmail": false,
+        "sendWhatsApp": false,
+        "dryRun": true
+      },
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "post:/api/v1/webhooks/paperid",
+      "method": "POST",
+      "path": "/api/v1/webhooks/paperid",
+      "tag": "Paper.id",
+      "summary": "Callback pembayaran dari Paper.id",
+      "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
+      "params": [
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Secret bersama, alternatif dari header."
+        },
+        {
+          "name": "x-paper-callback-token",
+          "in": "header",
+          "required": false,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "delete:/api/v1/blackbox",
+      "method": "DELETE",
+      "path": "/api/v1/blackbox",
+      "tag": "Blackbox",
+      "summary": "Kosongkan rekaman",
+      "description": "**Admin saja.**",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/blackbox",
+      "method": "GET",
+      "path": "/api/v1/blackbox",
+      "tag": "Blackbox",
+      "summary": "Rekaman panggilan integrasi",
+      "description": "**Admin saja.** Perekam \"kotak hitam\": setiap panggilan **keluar** ke API\neksternal (Paper.id, Xendit, BNI VM) dan setiap **callback masuk**\nterekam dengan body request, endpoint yang dihubungi, body response, dan\nstatus berhasil/gagal.\n\nDisimpan di **memori** sebagai ring buffer (default 200 entri, atur lewat\n`BLACKBOX_SIZE`), terbaru dulu — bukan tabel database. Ini alat\ndiagnosis: hanya lalu lintas terkini yang berguna, dan menyimpannya di\nmemori menghindari satu penulisan DB pada tiap panggilan integrasi.\n**Isinya hilang saat server restart** — memang disengaja.\n\n**Kredensial tidak pernah terekam.** Hanya body yang dicatat; `client_id`,\n`client_secret`, dan bearer token ada di header, jadi secara konstruksi\ntidak bisa masuk ke sini.\n",
+      "params": [
+        {
+          "name": "integration",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "paper_id",
+            "xendit",
+            "bni_vm"
+          ],
+          "description": "Saring per integrasi."
+        },
+        {
+          "name": "direction",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "outbound",
+            "inbound"
+          ],
+          "description": "outbound = permintaan kita ke pihak luar."
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "failed"
+          ],
+          "description": "Isi failed untuk hanya menampilkan yang gagal."
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 100,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/public/invoices/{id}",
+      "method": "GET",
+      "path": "/api/v1/public/invoices/{id}",
+      "tag": "Publik",
+      "summary": "Invoice untuk halaman pembayaran",
+      "description": "**Tanpa token** — pembayar bukan pengguna aplikasi.\n\nProyeksinya sempit dengan sengaja: hanya **nama** member, tidak pernah\nemail, telepon, perusahaan, atau bidang usaha. Penyaringan terjadi di\nserver, sehingga data pribadi tidak bisa bocor ke siapa pun yang\nmemegang tautannya.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/public/invoices/{id}/payment",
+      "method": "POST",
+      "path": "/api/v1/public/invoices/{id}/payment",
+      "tag": "Publik",
+      "summary": "Buat pembayaran Xendit (VA / QRIS)",
+      "description": "**Tanpa token.**\n\nSelf Payment Mode diperiksa ulang **di server**, bukan dipercaya dari\nklien: mematikan sakelar harus benar-benar menghentikan pembuatan\ntagihan, bukan sekadar menyembunyikan tombolnya.\n\nReferensi Xendit dibuat baru setiap kali, karena Xendit menolak\n`external_id` yang masih punya VA atau QR aktif.\n\nQRIS dibatasi Rp 10.000.000 per transaksi oleh Xendit — di atas itu\nbalasannya **422** dan pemanggil harus memakai Virtual Account.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "body": {
+        "method": "va"
+      },
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/webhooks/xendit",
+      "method": "POST",
+      "path": "/api/v1/webhooks/xendit",
+      "tag": "Publik",
+      "summary": "Callback pembayaran dari Xendit",
+      "description": "Diautentikasi dengan header `x-callback-token`, dibandingkan\nconstant-time. Token yang belum dikonfigurasi menolak **setiap**\ncallback, bukan menerima semuanya.\n\n**Idempoten**: Xendit mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa membuat baris pembayaran\nkedua.\n\nEvent yang bukan pembayaran selesai dijawab **200** dengan\n`settled: false` — membalas non-2xx hanya membuat Xendit mengulang\nperistiwa yang memang sengaja tidak ditindaklanjuti.\n",
+      "params": [
+        {
+          "name": "x-callback-token",
+          "in": "header",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/docs",
+      "method": "GET",
+      "path": "/docs",
+      "tag": "Sistem",
+      "summary": "Dokumentasi API yang bisa dibaca di browser",
+      "description": "Halaman mandiri — seluruh CSS dan JS tertanam, jadi tetap berfungsi\ntanpa koneksi jaringan.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/healthz",
+      "method": "GET",
+      "path": "/healthz",
+      "tag": "Sistem",
+      "summary": "Cek kesehatan",
+      "description": "Tanpa autentikasi, supaya probe tidak perlu kredensial.",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/openapi.json",
+      "method": "GET",
+      "path": "/openapi.json",
+      "tag": "Sistem",
+      "summary": "Spesifikasi yang sama dalam bentuk JSON",
+      "description": "Dihasilkan dari YAML oleh `make docs`. Halaman `/docs` merender bentuk\nini, karena browser bisa mem-parsing JSON tanpa pustaka apa pun.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/openapi.yaml",
+      "method": "GET",
+      "path": "/openapi.yaml",
+      "tag": "Sistem",
+      "summary": "Spesifikasi OpenAPI ini",
+      "description": "",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    }
+  ]
+}

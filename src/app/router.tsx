@@ -13,6 +13,8 @@ import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { SyncPage } from '@/features/settings/SyncPage'
+import { BlackboxPage } from '@/features/blackbox/BlackboxPage'
+import { ApiConsolePage } from '@/features/apiconsole/ApiConsolePage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
 import { RouteErrorPage } from '@/features/misc/RouteErrorPage'
 import { RequirePermission } from '@/features/auth/RequirePermission'
@@ -82,6 +84,23 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission="sync:run">
                 <SyncPage />
+              </RequirePermission>
+            ),
+          },
+
+          {
+            path: '/blackbox',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <BlackboxPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: '/api-console',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <ApiConsolePage />
               </RequirePermission>
             ),
           },

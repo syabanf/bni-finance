@@ -11,6 +11,11 @@ const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/
 const TOKEN_KEY = 'bni.auth.token'
 const USER_KEY = 'bni.auth.user'
 
+/** Where the backend lives. Empty string means same-origin. */
+export function apiBaseUrl(): string {
+  return BASE_URL
+}
+
 /** An error carrying the HTTP status, so callers can branch on 401 vs 409. */
 export class ApiError extends Error {
   constructor(

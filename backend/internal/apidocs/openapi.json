@@ -52,6 +52,14 @@
       "description": "Tarik data member & chapter dari BNI Visitor Management"
     },
     {
+      "name": "Paper.id",
+      "description": "Kirim invoice ke Paper.id & terima callback pembayaran"
+    },
+    {
+      "name": "Blackbox",
+      "description": "Rekaman lalu lintas integrasi (Paper.id, Xendit, BNI VM)"
+    },
+    {
       "name": "Publik",
       "description": "Dapat diakses tanpa token — pembayar bukan pengguna aplikasi"
     },
@@ -115,6 +123,112 @@
                 },
                 "example": {
                   "error": "email atau kata sandi salah"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/quick-login": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Daftar akun masuk cepat",
+        "description": "Akun yang boleh masuk **tanpa kata sandi**, untuk demo dan pengembangan\nlokal. Hanya nama, email, dan peran — tidak pernah kredensial.\n\nDiatur lewat `AUTH_QUICK_LOGIN`, berisi daftar email dipisah koma dan\n**kosong secara bawaan**. Sengaja daftar email, bukan saklar on/off:\nsaklar berarti sekali dinyalakan di produksi, *semua* akun jadi bisa\ndimasuki tanpa kata sandi. Di sini akun yang boleh harus disebut satu\nper satu.\n\nMenjawab **404** saat fitur mati — produksi tidak memberi petunjuk\nbahwa rute ini ada.\n",
+        "security": [
+
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar akun yang diizinkan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AuthUser"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Quick login tidak aktif",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Masuk cepat tanpa kata sandi",
+        "description": "Menerbitkan token biasa untuk akun yang ada di daftar izin. Tokennya\nsama persis dengan hasil `POST /auth/login` — tidak ada sesi kelas dua.\n\n**404** bila fitur mati, **403** bila email di luar daftar izin. Server\nmencatat peringatan saat start selama fitur ini menyala.\n",
+        "security": [
+
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              },
+              "example": {
+                "email": "admin@bnifinance.local"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Akun tidak terdaftar untuk quick login",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Quick login tidak aktif, atau akunnya belum ada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -1689,7 +1803,7 @@
           "Pengaturan"
         ],
         "summary": "Semua konfigurasi key/value",
-        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n",
+        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `false` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `false` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nKunci yang belum ada bernilai kosong, dan kosong berarti mati. Itu\ndisengaja: pengiriman ke member harus dinyalakan dengan sadar, bukan\nmenyala sendiri karena barisnya belum sempat dibuat.\n",
         "responses": {
           "200": {
             "description": "Konfigurasi",
@@ -1861,6 +1975,180 @@
         }
       }
     },
+    "/api/v1/invoices/{id}/send": {
+      "post": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Kirim invoice ke Paper.id",
+        "description": "**Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,\nURL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,\nlalu memindahkan status ke `sent` — semuanya dalam satu transaksi\nbeserta baris audit `sent`.\n\n`client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;\nseluruh pemanggilan terjadi di server.\n\n**Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan\nmengikuti kebijakan operasional di `app_settings`\n(`paperid_send_email`, `paperid_send_whatsapp`), bukan mati begitu saja\n— penerbitan invoice terjadi massal, dan bila tiap pemanggil harus\nmenyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke\nmember sambil tetap melaporkan sukses. Kunci yang belum diisi bernilai\nmati, sehingga instalasi baru dan staging tetap senyap sampai pengiriman\ndinyalakan dengan sengaja.\n\nMember tanpa alamat email dilewati untuk kanal email (WhatsApp tetap\njalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.\nNomor telepon tetap wajib (dipersyaratkan Paper.id).\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sendEmail": {
+                    "type": "boolean",
+                    "description": "Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti\n`paperid_send_email` di app_settings.\n"
+                  },
+                  "sendWhatsApp": {
+                    "type": "boolean",
+                    "description": "Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,\nmengikuti `paperid_send_whatsapp` di app_settings.\n"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invoice setelah dikirim (status `sent`, field Paper.id terisi)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Member belum punya nomor telepon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Invoice bukan berstatus draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Paper.id menolak atau tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Paper.id belum dikonfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/paperid": {
+      "post": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Callback pembayaran dari Paper.id",
+        "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
+        "security": [
+
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "description": "Secret bersama, alternatif dari header.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-paper-callback-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaperWebhook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Callback diterima",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settled": {
+                      "type": "boolean",
+                      "description": "Apakah callback ini benar-benar melunasi invoice."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "description": "Token callback tidak valid atau belum dikonfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tidak ada invoice yang cocok dengan callback",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sync": {
       "post": {
         "tags": [
@@ -1904,6 +2192,251 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/paperid/status": {
+      "get": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Status konfigurasi Paper.id",
+        "description": "**Admin saja.** Hanya boolean dan base URL — **tidak pernah** memuat\n`client_id`, `client_secret`, maupun callback token.\n",
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                      "description": "Kredensial Paper.id terisi."
+                    },
+                    "baseUrl": {
+                      "type": "string"
+                    },
+                    "callbackConfigured": {
+                      "type": "boolean"
+                    },
+                    "selfPaymentMode": {
+                      "type": "boolean",
+                      "description": "Bila `true`, penerbitan invoice memakai Xendit, bukan Paper.id."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/paperid/test-invoice": {
+      "post": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Konsol uji — buat invoice percobaan",
+        "description": "**Admin saja.** Menyusun payload `store-invoice` dan (opsional)\nmengirimkannya, lalu mengembalikan request beserta response apa adanya.\nBerguna untuk memastikan kredensial bekerja tanpa perlu menyiapkan\ninvoice dan member sungguhan.\n\n**`dryRun` default `true`** — payload disusun tetapi **tidak** dikirim.\nPanggilan sungguhan membuat invoice nyata di Paper.id dan memakai\nnomornya secara permanen, jadi mengirim harus menjadi pilihan sadar.\n\nNomor uji selalu ber-prefix `TEST-` dengan stempel waktu + acak, sehingga\ntidak pernah menghabiskan nomor invoice sungguhan maupun bentrok satu\nsama lain.\n\nKonsol ini **tidak menyentuh tabel invoice** — murni uji kontrak.\n",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaperTestInvoiceInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hasil uji (periksa `success` di dalam body)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperTestInvoiceResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "503": {
+            "description": "Paper.id belum dikonfigurasi (hanya untuk mode kirim)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/paperid/test-callback": {
+      "post": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Konsol uji — simulasikan callback pembayaran",
+        "description": "**Admin saja.** Menyusun payload callback Paper.id untuk salah satu\ninvoice kita, lalu (opsional) menjalankannya lewat **handler webhook yang\nsebenarnya** — jadi yang diuji adalah jalur produksi, bukan tiruannya.\nMenunggu pembayaran sungguhan di staging tidak praktis.\n\n**`dryRun` default `true`.** Bila dijalankan sungguhan, invoice benar-benar\n**ditandai lunas** beserta baris pembayarannya.\n\nInvoice harus sudah dikirim ke Paper.id — yang masih `draft` ditolak 409.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaperTestCallbackInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hasil simulasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaperTestCallbackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Invoice masih draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/blackbox": {
+      "get": {
+        "tags": [
+          "Blackbox"
+        ],
+        "summary": "Rekaman panggilan integrasi",
+        "description": "**Admin saja.** Perekam \"kotak hitam\": setiap panggilan **keluar** ke API\neksternal (Paper.id, Xendit, BNI VM) dan setiap **callback masuk**\nterekam dengan body request, endpoint yang dihubungi, body response, dan\nstatus berhasil/gagal.\n\nDisimpan di **memori** sebagai ring buffer (default 200 entri, atur lewat\n`BLACKBOX_SIZE`), terbaru dulu — bukan tabel database. Ini alat\ndiagnosis: hanya lalu lintas terkini yang berguna, dan menyimpannya di\nmemori menghindari satu penulisan DB pada tiap panggilan integrasi.\n**Isinya hilang saat server restart** — memang disengaja.\n\n**Kredensial tidak pernah terekam.** Hanya body yang dicatat; `client_id`,\n`client_secret`, dan bearer token ada di header, jadi secara konstruksi\ntidak bisa masuk ke sini.\n",
+        "parameters": [
+          {
+            "name": "integration",
+            "in": "query",
+            "description": "Saring per integrasi.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "paper_id",
+                "xendit",
+                "bni_vm"
+              ]
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "description": "`outbound` = permintaan kita ke pihak luar.\n`inbound` = callback dari pihak luar ke kita.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "outbound",
+                "inbound"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Isi `failed` untuk hanya menampilkan yang gagal.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "failed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rekaman, terbaru dulu",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ListEnvelope"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/BlackboxEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Blackbox"
+        ],
+        "summary": "Kosongkan rekaman",
+        "description": "**Admin saja.**",
+        "responses": {
+          "204": {
+            "description": "Rekaman dikosongkan"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }
@@ -3725,6 +4258,284 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "PaperTestInvoiceInput": {
+        "type": "object",
+        "description": "Semua field opsional — kosongkan untuk memakai data contoh.",
+        "properties": {
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "customerEmail": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "default": 1500000
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "sendEmail": {
+            "type": "boolean",
+            "default": false
+          },
+          "sendWhatsApp": {
+            "type": "boolean",
+            "default": false
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": true,
+            "description": "`true` = susun payload tanpa mengirim."
+          }
+        }
+      },
+      "PaperTestInvoiceResult": {
+        "type": "object",
+        "required": [
+          "dryRun",
+          "method",
+          "url",
+          "request",
+          "success"
+        ],
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "method": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "request": {
+            "description": "Payload persis seperti yang dikirim ke Paper.id."
+          },
+          "response": {
+            "description": "Balasan Paper.id. Kosong saat `dryRun`."
+          },
+          "success": {
+            "type": "boolean",
+            "description": "Saat `dryRun`, artinya payload berhasil disusun — bukan diterima upstream."
+          },
+          "durationMs": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string"
+          },
+          "paperInvoiceId": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "paymentUrl": {
+            "type": "string"
+          },
+          "invoicePdfUrl": {
+            "type": "string"
+          }
+        }
+      },
+      "PaperTestCallbackInput": {
+        "type": "object",
+        "required": [
+          "invoiceId"
+        ],
+        "properties": {
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Invoice **kita**, harus sudah dikirim ke Paper.id."
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Default nominal invoice."
+          },
+          "method": {
+            "type": "string",
+            "default": "bank_transfer"
+          },
+          "channel": {
+            "type": "string",
+            "default": "bni"
+          },
+          "status": {
+            "type": "string",
+            "default": "PAID"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "default": true,
+            "description": "`true` = susun payload tanpa melunasi."
+          }
+        }
+      },
+      "PaperTestCallbackResult": {
+        "type": "object",
+        "required": [
+          "dryRun",
+          "url",
+          "request",
+          "success"
+        ],
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "request": {
+            "description": "Payload callback yang disusun."
+          },
+          "settled": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "BlackboxEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "time",
+          "integration",
+          "direction",
+          "method",
+          "url",
+          "status",
+          "success",
+          "durationMs"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "integration": {
+            "type": "string",
+            "enum": [
+              "paper_id",
+              "xendit",
+              "bni_vm"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "outbound",
+              "inbound"
+            ],
+            "description": "`outbound` = kita → pihak luar; `inbound` = pihak luar → kita."
+          },
+          "method": {
+            "type": "string",
+            "example": "POST"
+          },
+          "url": {
+            "type": "string",
+            "description": "Endpoint yang dihubungi (atau path callback kita, untuk inbound)."
+          },
+          "request": {
+            "description": "Body permintaan sebagai JSON. String bila upstream membalas non-JSON."
+          },
+          "response": {
+            "description": "Body balasan sebagai JSON. String bila upstream membalas non-JSON."
+          },
+          "status": {
+            "type": "integer",
+            "example": 201
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "durationMs": {
+            "type": "integer"
+          },
+          "error": {
+            "type": "string",
+            "description": "Terisi bila panggilan gagal sebelum dapat balasan (mis. timeout)."
+          }
+        }
+      },
+      "PaperWebhook": {
+        "type": "object",
+        "description": "Payload callback pembayaran Paper.id.",
+        "properties": {
+          "ref_id": {
+            "type": "string"
+          },
+          "external_id": {
+            "type": "string"
+          },
+          "payment_date": {
+            "type": "string",
+            "example": "2026-07-27"
+          },
+          "payment_info": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string",
+                "example": "bank_transfer"
+              },
+              "channel": {
+                "type": "string",
+                "example": "bni"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "paid_amount": {
+                "type": "number"
+              },
+              "paid_at": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "example": "PAID"
+              }
+            }
+          },
+          "additional_info": {
+            "type": "object",
+            "properties": {
+              "invoices": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "uuid": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },

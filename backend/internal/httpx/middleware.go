@@ -91,6 +91,12 @@ func Recoverer(log *slog.Logger) Middleware {
 	}
 }
 
+// AllowedMethods is the CORS preflight answer. Exported so a test can assert it
+// covers every method the router registers — a method missing here fails ONLY
+// in a browser, never in curl or in a handler test, which is exactly how PUT
+// went unnoticed.
+const AllowedMethods = "GET, POST, PATCH, PUT, DELETE, OPTIONS"
+
 // CORS allows the configured origins ("*" allows any).
 func CORS(allowed []string) Middleware {
 	allowAll := len(allowed) == 1 && allowed[0] == "*"
@@ -104,7 +110,11 @@ func CORS(allowed []string) Middleware {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Add("Vary", "Origin")
 			}
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+			// Must list every method the router actually serves. PUT was missing
+			// here, so the browser's preflight blocked all three PUT routes —
+			// saving any app setting and changing a password silently failed
+			// with a network error, while curl worked fine.
+			w.Header().Set("Access-Control-Allow-Methods", AllowedMethods)
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-Id")
 
 			if r.Method == http.MethodOptions {

@@ -82,6 +82,8 @@ backend/
     ├── upload/                # bukti pembayaran di disk
     ├── publicpay/             # halaman bayar publik + Xendit
     ├── sync/                  # tarik member & chapter dari BNI VM
+    ├── paperid/               # kirim invoice ke Paper.id + callback bayar
+    ├── blackbox/              # perekam lalu lintas integrasi (in-memory)
     └── apidocs/               # spesifikasi OpenAPI + halaman /docs
 ```
 
@@ -254,6 +256,58 @@ chapter diturunkan dari daftar member. Token diambil dari
 | `POST` | `/public/invoices/{id}/payment` | Buat pembayaran Xendit (VA/QRIS) |
 | `POST` | `/webhooks/xendit` | Callback Xendit — butuh `x-callback-token` |
 
+### Paper.id
+
+| Method | Path | Akses |
+|---|---|---|
+| `POST` | `/invoices/{id}/send` | admin — dorong invoice draft ke Paper.id, simpan link & PDF, status → `sent` |
+| `POST` | `/webhooks/paperid` | **publik** — callback pembayaran (secret di URL callback) |
+
+Dipakai saat Self Payment Mode **OFF**. `client_id`/`client_secret` hanya di
+server. Callback dicocokkan ke invoice lewat `uuid` Paper.id lalu `number`, dan
+bersifat idempoten. Endpoint lookup `GET /sales-invoices?number=…` tersedia di
+Paper.id untuk rekonsiliasi manual bila sebuah pengiriman timeout di sisi kita
+(nomornya bisa "terbakar" — lihat Aturan bisnis).
+
+### Konsol Uji Paper.id
+
+| Method | Path | Akses |
+|---|---|---|
+| `GET` | `/paperid/status` | admin — status konfigurasi (tanpa rahasia) |
+| `POST` | `/paperid/test-invoice` | admin — uji buat invoice |
+| `POST` | `/paperid/test-callback` | admin — simulasi callback pembayaran |
+
+**`dryRun` default `true` pada keduanya.** Mengirim sungguhan membuat invoice
+nyata di Paper.id dan memakai nomornya permanen; menjalankan callback sungguhan
+menandai invoice lunas. Keduanya harus menjadi pilihan sadar, bukan efek samping
+klik pertama.
+
+Nomor uji selalu ber-prefix `TEST-` + stempel waktu + acak, jadi tidak pernah
+menghabiskan nomor invoice sungguhan maupun bentrok satu sama lain. Konsol
+**tidak menyentuh tabel invoice** — murni uji kontrak.
+
+Simulasi callback menjalankan **handler webhook yang sebenarnya**, jadi yang
+diuji jalur produksi, bukan tiruannya.
+
+### Blackbox
+
+| Method | Path | Akses |
+|---|---|---|
+| `GET` | `/blackbox` | admin — rekaman panggilan integrasi |
+| `DELETE` | `/blackbox` | admin — kosongkan rekaman |
+
+Perekam "kotak hitam": setiap panggilan **keluar** ke Paper.id/Xendit/BNI VM dan
+setiap **callback masuk** tercatat dengan body request, endpoint, body response,
+dan status berhasil/gagal. Ring buffer **di memori** (`BLACKBOX_SIZE`, default
+200), terbaru dulu — hilang saat restart, memang disengaja: ini alat diagnosis,
+bukan audit trail.
+
+**Kredensial tidak pernah terekam** — hanya body yang dicatat, sedangkan
+`client_id`, `client_secret`, dan bearer token ada di header.
+
+Filter: `?integration=paper_id|xendit|bni_vm` · `?direction=outbound|inbound` ·
+`?status=failed`.
+
 ### Lain-lain
 
 | Method | Path | Keterangan |
@@ -292,6 +346,11 @@ Ini bukan CRUD telanjang — beberapa aturan domain dijaga di lapis service:
   menerapkannya berarti menonaktifkan seluruh member sekaligus.
 - **Nama tampilan chapter yang diubah lokal tidak ditimpa** sinkronisasi; hanya
   nama kanonik yang mengikuti BNI VM.
+- **Menerbitkan invoice ke Paper.id** hanya untuk status `draft`, ditulis dalam
+  satu transaksi (field Paper.id + status `sent` + audit). Callback pembayaran
+  idempoten. Timeout klien 60 detik: bila sebuah create timeout di sisi kita
+  tapi sebenarnya berhasil di Paper.id, nomornya jadi tak bisa dipakai ulang —
+  pengiriman ulang membalas **409** yang jelas, bukan kegagalan generik.
 
 ---
 

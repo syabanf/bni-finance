@@ -71,6 +71,10 @@ tags:
     description: Bukti pembayaran
   - name: Sinkronisasi
     description: Tarik data member & chapter dari BNI Visitor Management
+  - name: Paper.id
+    description: Kirim invoice ke Paper.id & terima callback pembayaran
+  - name: Blackbox
+    description: Rekaman lalu lintas integrasi (Paper.id, Xendit, BNI VM)
   - name: Publik
     description: Dapat diakses tanpa token — pembayar bukan pengguna aplikasi
   - name: Sistem
@@ -113,6 +117,76 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
               example: { error: "email atau kata sandi salah" }
+
+  /api/v1/auth/quick-login:
+    get:
+      tags: [Auth]
+      summary: Daftar akun masuk cepat
+      description: |
+        Akun yang boleh masuk **tanpa kata sandi**, untuk demo dan pengembangan
+        lokal. Hanya nama, email, dan peran — tidak pernah kredensial.
+
+        Diatur lewat `AUTH_QUICK_LOGIN`, berisi daftar email dipisah koma dan
+        **kosong secara bawaan**. Sengaja daftar email, bukan saklar on/off:
+        saklar berarti sekali dinyalakan di produksi, *semua* akun jadi bisa
+        dimasuki tanpa kata sandi. Di sini akun yang boleh harus disebut satu
+        per satu.
+
+        Menjawab **404** saat fitur mati — produksi tidak memberi petunjuk
+        bahwa rute ini ada.
+      security: []
+      responses:
+        "200":
+          description: Daftar akun yang diizinkan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/AuthUser" }
+        "404":
+          description: Quick login tidak aktif
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    post:
+      tags: [Auth]
+      summary: Masuk cepat tanpa kata sandi
+      description: |
+        Menerbitkan token biasa untuk akun yang ada di daftar izin. Tokennya
+        sama persis dengan hasil `POST /auth/login` — tidak ada sesi kelas dua.
+
+        **404** bila fitur mati, **403** bila email di luar daftar izin. Server
+        mencatat peringatan saat start selama fitur ini menyala.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+            example: { email: "admin@bnifinance.local" }
+      responses:
+        "200":
+          description: Berhasil
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResult" }
+        "403":
+          description: Akun tidak terdaftar untuk quick login
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Quick login tidak aktif, atau akunnya belum ada
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
 
   /api/v1/auth/me:
     get:
@@ -920,6 +994,21 @@ paths:
       description: |
         Nilai yang namanya berbau kredensial **selalu tersamar** — lihat
         `AppSetting.masked`.
+
+        Kunci yang dipakai sistem:
+
+        | Kunci | Arti | Bawaan |
+        |---|---|---|
+        | `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |
+        | `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |
+        | `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |
+        | `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `false` |
+        | `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `false` |
+        | `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |
+
+        Kunci yang belum ada bernilai kosong, dan kosong berarti mati. Itu
+        disengaja: pengiriman ke member harus dinyalakan dengan sadar, bukan
+        menyala sendiri karena barisnya belum sempat dibuat.
       responses:
         "200":
           description: Konfigurasi
@@ -1013,6 +1102,139 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   # ===========================================================================
+  # Paper.id
+  # ===========================================================================
+  /api/v1/invoices/{id}/send:
+    post:
+      tags: [Paper.id]
+      summary: Kirim invoice ke Paper.id
+      description: |
+        **Admin saja.** Mendorong invoice **draft** ke Paper.id, menyimpan id,
+        URL pembayaran (`payper_url`), dan PDF (`pdf_url`) yang dikembalikan,
+        lalu memindahkan status ke `sent` — semuanya dalam satu transaksi
+        beserta baris audit `sent`.
+
+        `client_id`/`client_secret` Paper.id tidak pernah menyentuh browser;
+        seluruh pemanggilan terjadi di server.
+
+        **Kanal pengiriman.** Body opsional. Kanal yang tidak disebutkan
+        mengikuti kebijakan operasional di `app_settings`
+        (`paperid_send_email`, `paperid_send_whatsapp`), bukan mati begitu saja
+        — penerbitan invoice terjadi massal, dan bila tiap pemanggil harus
+        menyertakan flagnya, satu jalur yang lupa akan berhenti mengantar ke
+        member sambil tetap melaporkan sukses. Kunci yang belum diisi bernilai
+        mati, sehingga instalasi baru dan staging tetap senyap sampai pengiriman
+        dinyalakan dengan sengaja.
+
+        Member tanpa alamat email dilewati untuk kanal email (WhatsApp tetap
+        jalan) — meminta Paper.id mengirim ke alamat kosong pasti ditolak.
+        Nomor telepon tetap wajib (dipersyaratkan Paper.id).
+      parameters: [{ $ref: "#/components/parameters/InvoiceId" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sendEmail:
+                  type: boolean
+                  description: |
+                    Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti
+                    `paperid_send_email` di app_settings.
+                sendWhatsApp:
+                  type: boolean
+                  description: |
+                    Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,
+                    mengikuti `paperid_send_whatsapp` di app_settings.
+      responses:
+        "200":
+          description: Invoice setelah dikirim (status `sent`, field Paper.id terisi)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "400":
+          description: Member belum punya nomor telepon
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Invoice bukan berstatus draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: Paper.id menolak atau tidak bisa dihubungi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Paper.id belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid:
+    post:
+      tags: [Paper.id]
+      summary: Callback pembayaran dari Paper.id
+      description: |
+        **Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda
+        tangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa
+        secret bersama (lewat `?token=…` atau header `x-paper-callback-token`)
+        yang dibandingkan **constant-time** di sini. Secret yang belum
+        dikonfigurasi menolak **setiap** callback, bukan menerima semuanya.
+
+        **Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice
+        yang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.
+
+        Event yang bukan `PAID` dijawab **200** dengan `settled: false`.
+
+        Invoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id
+        yang kita simpan), lalu fallback ke `number`.
+      # Bearer global tidak berlaku: Paper.id memanggil tanpa sesi kita.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          description: Secret bersama, alternatif dari header.
+          schema: { type: string }
+        - name: x-paper-callback-token
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PaperWebhook" }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settled:
+                    type: boolean
+                    description: Apakah callback ini benar-benar melunasi invoice.
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
+          description: Token callback tidak valid atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: Tidak ada invoice yang cocok dengan callback
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ===========================================================================
   # Sinkronisasi
   # ===========================================================================
   /api/v1/sync:
@@ -1057,6 +1279,167 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/paperid/status:
+    get:
+      tags: [Paper.id]
+      summary: Status konfigurasi Paper.id
+      description: |
+        **Admin saja.** Hanya boolean dan base URL — **tidak pernah** memuat
+        `client_id`, `client_secret`, maupun callback token.
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  configured:
+                    type: boolean
+                    description: Kredensial Paper.id terisi.
+                  baseUrl: { type: string }
+                  callbackConfigured: { type: boolean }
+                  selfPaymentMode:
+                    type: boolean
+                    description: Bila `true`, penerbitan invoice memakai Xendit, bukan Paper.id.
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/v1/paperid/test-invoice:
+    post:
+      tags: [Paper.id]
+      summary: Konsol uji — buat invoice percobaan
+      description: |
+        **Admin saja.** Menyusun payload `store-invoice` dan (opsional)
+        mengirimkannya, lalu mengembalikan request beserta response apa adanya.
+        Berguna untuk memastikan kredensial bekerja tanpa perlu menyiapkan
+        invoice dan member sungguhan.
+
+        **`dryRun` default `true`** — payload disusun tetapi **tidak** dikirim.
+        Panggilan sungguhan membuat invoice nyata di Paper.id dan memakai
+        nomornya secara permanen, jadi mengirim harus menjadi pilihan sadar.
+
+        Nomor uji selalu ber-prefix `TEST-` dengan stempel waktu + acak, sehingga
+        tidak pernah menghabiskan nomor invoice sungguhan maupun bentrok satu
+        sama lain.
+
+        Konsol ini **tidak menyentuh tabel invoice** — murni uji kontrak.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PaperTestInvoiceInput" }
+      responses:
+        "200":
+          description: Hasil uji (periksa `success` di dalam body)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaperTestInvoiceResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503":
+          description: Paper.id belum dikonfigurasi (hanya untuk mode kirim)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/paperid/test-callback:
+    post:
+      tags: [Paper.id]
+      summary: Konsol uji — simulasikan callback pembayaran
+      description: |
+        **Admin saja.** Menyusun payload callback Paper.id untuk salah satu
+        invoice kita, lalu (opsional) menjalankannya lewat **handler webhook yang
+        sebenarnya** — jadi yang diuji adalah jalur produksi, bukan tiruannya.
+        Menunggu pembayaran sungguhan di staging tidak praktis.
+
+        **`dryRun` default `true`.** Bila dijalankan sungguhan, invoice benar-benar
+        **ditandai lunas** beserta baris pembayarannya.
+
+        Invoice harus sudah dikirim ke Paper.id — yang masih `draft` ditolak 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PaperTestCallbackInput" }
+      responses:
+        "200":
+          description: Hasil simulasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaperTestCallbackResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Invoice masih draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  # ===========================================================================
+  # Blackbox
+  # ===========================================================================
+  /api/v1/blackbox:
+    get:
+      tags: [Blackbox]
+      summary: Rekaman panggilan integrasi
+      description: |
+        **Admin saja.** Perekam "kotak hitam": setiap panggilan **keluar** ke API
+        eksternal (Paper.id, Xendit, BNI VM) dan setiap **callback masuk**
+        terekam dengan body request, endpoint yang dihubungi, body response, dan
+        status berhasil/gagal.
+
+        Disimpan di **memori** sebagai ring buffer (default 200 entri, atur lewat
+        `BLACKBOX_SIZE`), terbaru dulu — bukan tabel database. Ini alat
+        diagnosis: hanya lalu lintas terkini yang berguna, dan menyimpannya di
+        memori menghindari satu penulisan DB pada tiap panggilan integrasi.
+        **Isinya hilang saat server restart** — memang disengaja.
+
+        **Kredensial tidak pernah terekam.** Hanya body yang dicatat; `client_id`,
+        `client_secret`, dan bearer token ada di header, jadi secara konstruksi
+        tidak bisa masuk ke sini.
+      parameters:
+        - name: integration
+          in: query
+          description: Saring per integrasi.
+          schema: { type: string, enum: [paper_id, xendit, bni_vm] }
+        - name: direction
+          in: query
+          description: |
+            `outbound` = permintaan kita ke pihak luar.
+            `inbound` = callback dari pihak luar ke kita.
+          schema: { type: string, enum: [outbound, inbound] }
+        - name: status
+          in: query
+          description: Isi `failed` untuk hanya menampilkan yang gagal.
+          schema: { type: string, enum: [failed] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        "200":
+          description: Rekaman, terbaru dulu
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ListEnvelope"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/BlackboxEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    delete:
+      tags: [Blackbox]
+      summary: Kosongkan rekaman
+      description: "**Admin saja.**"
+      responses:
+        "204": { description: Rekaman dikosongkan }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   # ===========================================================================
   # Unggahan
@@ -1907,6 +2290,125 @@ components:
         qrString: { type: string }
         amount: { type: integer }
         expiresAt: { type: [string, "null"], format: date-time }
+
+    PaperTestInvoiceInput:
+      type: object
+      description: Semua field opsional — kosongkan untuk memakai data contoh.
+      properties:
+        customerName: { type: string }
+        customerPhone: { type: string }
+        customerEmail: { type: string }
+        amount: { type: integer, default: 1500000 }
+        itemName: { type: string }
+        notes: { type: string }
+        sendEmail: { type: boolean, default: false }
+        sendWhatsApp: { type: boolean, default: false }
+        dryRun:
+          type: boolean
+          default: true
+          description: "`true` = susun payload tanpa mengirim."
+
+    PaperTestInvoiceResult:
+      type: object
+      required: [dryRun, method, url, request, success]
+      properties:
+        dryRun: { type: boolean }
+        method: { type: string }
+        url: { type: string }
+        request:
+          description: Payload persis seperti yang dikirim ke Paper.id.
+        response:
+          description: Balasan Paper.id. Kosong saat `dryRun`.
+        success:
+          type: boolean
+          description: Saat `dryRun`, artinya payload berhasil disusun — bukan diterima upstream.
+        durationMs: { type: integer }
+        error: { type: string }
+        paperInvoiceId: { type: string }
+        number: { type: string }
+        paymentUrl: { type: string }
+        invoicePdfUrl: { type: string }
+
+    PaperTestCallbackInput:
+      type: object
+      required: [invoiceId]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+          description: Invoice **kita**, harus sudah dikirim ke Paper.id.
+        amount: { type: integer, description: Default nominal invoice. }
+        method: { type: string, default: bank_transfer }
+        channel: { type: string, default: bni }
+        status: { type: string, default: PAID }
+        dryRun:
+          type: boolean
+          default: true
+          description: "`true` = susun payload tanpa melunasi."
+
+    PaperTestCallbackResult:
+      type: object
+      required: [dryRun, url, request, success]
+      properties:
+        dryRun: { type: boolean }
+        url: { type: string }
+        request: { description: Payload callback yang disusun. }
+        settled: { type: boolean }
+        success: { type: boolean }
+        error: { type: string }
+
+    BlackboxEntry:
+      type: object
+      required: [id, time, integration, direction, method, url, status, success, durationMs]
+      properties:
+        id: { type: string }
+        time: { type: string, format: date-time }
+        integration: { type: string, enum: [paper_id, xendit, bni_vm] }
+        direction:
+          type: string
+          enum: [outbound, inbound]
+          description: "`outbound` = kita → pihak luar; `inbound` = pihak luar → kita."
+        method: { type: string, example: POST }
+        url:
+          type: string
+          description: Endpoint yang dihubungi (atau path callback kita, untuk inbound).
+        request:
+          description: Body permintaan sebagai JSON. String bila upstream membalas non-JSON.
+        response:
+          description: Body balasan sebagai JSON. String bila upstream membalas non-JSON.
+        status: { type: integer, example: 201 }
+        success: { type: boolean }
+        durationMs: { type: integer }
+        error:
+          type: string
+          description: Terisi bila panggilan gagal sebelum dapat balasan (mis. timeout).
+
+    PaperWebhook:
+      type: object
+      description: Payload callback pembayaran Paper.id.
+      properties:
+        ref_id: { type: string }
+        external_id: { type: string }
+        payment_date: { type: string, example: "2026-07-27" }
+        payment_info:
+          type: object
+          properties:
+            method: { type: string, example: bank_transfer }
+            channel: { type: string, example: bni }
+            amount: { type: number }
+            paid_amount: { type: number }
+            paid_at: { type: string }
+            status: { type: string, example: PAID }
+        additional_info:
+          type: object
+          properties:
+            invoices:
+              type: array
+              items:
+                type: object
+                properties:
+                  uuid: { type: string }
+                  number: { type: string }
 
     SyncResult:
       type: object

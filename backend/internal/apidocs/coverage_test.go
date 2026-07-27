@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
 
 // Documentation rots the moment it stops being checked. This test compares the
@@ -26,6 +28,58 @@ import (
 // routePattern matches the Go 1.22 method+path form: "GET /api/v1/invoices".
 var routePattern = regexp.MustCompile(`^(GET|POST|PATCH|PUT|DELETE|HEAD|OPTIONS) (/\S*)$`)
 
+// publicRegistrars reads router.go and returns the "package.Method" pairs that
+// are handed the ROOT mux — the one outside the auth middleware. Deriving this
+// from the composition root beats restating it in the test: the previous
+// hand-kept list drifted, leaving the Paper.id callback public in code while
+// the spec documented it as requiring a bearer token.
+func publicRegistrars(t *testing.T, root string) map[string]bool {
+	t.Helper()
+
+	path := filepath.Join(root, "api", "router.go")
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, path, nil, 0)
+	if err != nil {
+		t.Fatalf("parse router.go: %v", err)
+	}
+
+	out := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		// Shape we're after: pkg.NewHandler(...).Method(root)
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) != 1 {
+			return true
+		}
+		arg, ok := call.Args[0].(*ast.Ident)
+		if !ok || arg.Name != "root" {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		inner, ok := sel.X.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		innerSel, ok := inner.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		pkg, ok := innerSel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		out[pkg.Name+"."+sel.Sel.Name] = true
+		return true
+	})
+
+	if len(out) == 0 {
+		t.Fatal("tidak menemukan satu pun registrasi publik di router.go — pemindai rusak")
+	}
+	return out
+}
+
 // undocumented lists routes that are deliberately absent from the spec.
 var undocumented = map[string]bool{
 	// Registered as a prefix handler for the file server; the spec documents
@@ -37,6 +91,12 @@ type route struct {
 	method string
 	path   string
 	file   string
+	// public is true when the route was registered from a RegisterPublic /
+	// RegisterFileServer function — the handlers that sit OUTSIDE the auth
+	// middleware in router.go. Derived from source rather than a hand-kept
+	// list, because a hand-kept list drifts: the Paper.id callback was public
+	// for weeks while the spec documented it as needing a bearer token.
+	public bool
 }
 
 func (r route) String() string { return r.method + " " + r.path }
@@ -50,6 +110,8 @@ func collectRoutes(t *testing.T) []route {
 	if err != nil {
 		t.Fatalf("resolve direktori: %v", err)
 	}
+
+	publicPairs := publicRegistrars(t, root)
 
 	var routes []route
 	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -66,7 +128,13 @@ func collectRoutes(t *testing.T) []route {
 			return fmt.Errorf("parse %s: %w", path, err)
 		}
 
+		// Track which function each call sits in, so registration intent is
+		// read from the code instead of restated in the test.
+		enclosing := ""
 		ast.Inspect(file, func(n ast.Node) bool {
+			if fn, ok := n.(*ast.FuncDecl); ok {
+				enclosing = fn.Name.Name
+			}
 			call, ok := n.(*ast.CallExpr)
 			if !ok || len(call.Args) == 0 {
 				return true
@@ -87,7 +155,11 @@ func collectRoutes(t *testing.T) []route {
 			}
 			if m := routePattern.FindStringSubmatch(value); m != nil {
 				rel, _ := filepath.Rel(root, path)
-				routes = append(routes, route{method: m[1], path: m[2], file: rel})
+				pkg := filepath.Base(filepath.Dir(path))
+				routes = append(routes, route{
+					method: m[1], path: m[2], file: rel,
+					public: publicPairs[pkg+"."+enclosing],
+				})
 			}
 			return true
 		})
@@ -234,17 +306,21 @@ func TestPublicOperationsAreExplicit(t *testing.T) {
 		t.Fatalf("parse spec: %v", err)
 	}
 
-	// Routes registered outside the auth middleware, from router.go.
+	// Public routes come from the source: anything registered on the root mux
+	// in router.go, plus the docs and health endpoints that live there too.
 	publicPaths := map[string]bool{
-		"/healthz":                             true,
-		"/openapi.yaml":                        true,
-		"/openapi.json":                        true,
-		"/docs":                                true,
-		"/uploads/{filename}":                  true,
-		"/api/v1/auth/login":                   true,
-		"/api/v1/public/invoices/{id}":         true,
-		"/api/v1/public/invoices/{id}/payment": true,
-		"/api/v1/webhooks/xendit":              true,
+		"/healthz":      true,
+		"/openapi.yaml": true,
+		"/openapi.json": true,
+		"/docs":         true,
+		// The file server registers "GET /uploads/"; the spec documents the
+		// per-file shape, so map it across by hand.
+		"/uploads/{filename}": true,
+	}
+	for _, r := range collectRoutes(t) {
+		if r.public {
+			publicPaths[r.path] = true
+		}
 	}
 
 	for path, item := range s.Paths {
@@ -260,6 +336,30 @@ func TestPublicOperationsAreExplicit(t *testing.T) {
 				t.Errorf("%s %s ditandai publik di spec, padahal berada di balik autentikasi",
 					strings.ToUpper(method), path)
 			}
+		}
+	}
+}
+
+// A route the browser cannot preflight is a route the SPA cannot call, no
+// matter how correct the handler is. PUT was absent from the CORS allow-list
+// while three PUT routes were registered, so saving any app setting and
+// changing a password failed in the browser with an opaque network error —
+// and passed every curl check and handler test.
+func TestCORSAllowsEveryRegisteredMethod(t *testing.T) {
+	allowed := map[string]bool{}
+	for _, m := range strings.Split(httpx.AllowedMethods, ",") {
+		allowed[strings.TrimSpace(m)] = true
+	}
+
+	seen := map[string]bool{}
+	for _, r := range collectRoutes(t) {
+		if seen[r.method] {
+			continue
+		}
+		seen[r.method] = true
+		if !allowed[r.method] {
+			t.Errorf("%s dipakai oleh %s %s tetapi tidak ada di httpx.AllowedMethods (%q) — "+
+				"browser akan memblokir preflightnya", r.method, r.method, r.path, httpx.AllowedMethods)
 		}
 	}
 }
