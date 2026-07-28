@@ -12,7 +12,17 @@
 
 import { store, nowISO } from './store'
 import { getMockAppSetting, setMockAppSetting } from './appSettings'
+import { clearMockCalls, listMockCalls, recordMockCall } from './blackbox'
 import type { Invoice, Payment } from '@/types'
+
+/** Paper.id memakai DD-MM-YYYY, bukan ISO. */
+function ddmmyyyy(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`
+}
+
+function itemNameFor(type: Invoice['type']): string {
+  return type === 'registration' ? 'Pendaftaran Keanggotaan BNI Grow' : 'Perpanjangan Keanggotaan BNI Grow'
+}
 
 export interface MockResponse {
   status: number
@@ -100,6 +110,27 @@ export async function mockApiFetch(
       const b = (body ?? {}) as { name?: string }
       if (!b.name?.trim()) return fail(400, 'nama tidak boleh kosong')
       return ok({ id: 'mock-admin', name: b.name, email: 'admin@bni-finance.com', role: 'admin' })
+    }
+    // Masuk cepat. Di server ini dikunci daftar izin AUTH_QUICK_LOGIN dan
+    // menjawab 404 saat kosong; pada Data Contoh akunnya memang akun contoh,
+    // jadi selalu tersedia — sekaligus membuat endpointnya bisa dicoba dari
+    // Konsol API alih-alih muncul sebagai "belum tersedia".
+    if (seg[1] === 'quick-login') {
+      const demo = [
+        { id: 'mock-admin', name: 'Administrator', email: 'admin@bni-finance.com', role: 'admin' },
+        { id: 'mock-user', name: 'Staf Keuangan', email: 'staf@bni-finance.com', role: 'user' },
+      ]
+      if (m === 'GET') return ok({ data: demo })
+      if (m === 'POST') {
+        const b = (body ?? {}) as { email?: string }
+        const user = demo.find((u) => u.email === (b.email ?? '').toLowerCase())
+        if (!user) return fail(403, 'akun ini tidak terdaftar untuk quick login')
+        return ok({
+          token: 'mock.jwt.token',
+          expiresAt: new Date(Date.now() + 12 * 3600_000).toISOString(),
+          user,
+        })
+      }
     }
     if (seg[1] === 'password' && m === 'PUT') {
       const b = (body ?? {}) as { currentPassword?: string; newPassword?: string }
@@ -203,12 +234,48 @@ export async function mockApiFetch(
       const setting = async (key: string) => (await getMockAppSetting(key)) !== 'false'
       const sendEmail = (b.sendEmail ?? (await setting('paperid_send_email'))) && Boolean(member?.email)
       const sendWhatsApp = b.sendWhatsApp ?? (await setting('paperid_send_whatsapp'))
+
+      const paperInvoiceID = `mock-paper-${invoice.id.slice(-6)}`
+      const paymentURL = `https://stg-v2.paper.id/MOCK${invoice.number.slice(-3)}`
+      // Payload wire yang sama bentuknya dengan yang dikirim server sungguhan,
+      // supaya halaman Blackbox pada demo memperlihatkan hal yang sama.
+      recordMockCall({
+        integration: 'paper_id',
+        direction: 'outbound',
+        method: 'POST',
+        url: 'https://open-api.stag-v2.paper.id/api/v1/store-invoice',
+        status: 201,
+        durationMs: 812,
+        success: true,
+        request: {
+          invoice_date: ddmmyyyy(new Date()),
+          due_date: ddmmyyyy(new Date(invoice.dueDate)),
+          number: invoice.number,
+          customer: {
+            id: `${invoice.memberId}-mock`,
+            name: member?.name ?? '',
+            email: member?.email ?? '',
+            phone: member?.phone ?? '',
+          },
+          items: [{ name: itemNameFor(invoice.type), quantity: 1, price: invoice.amount }],
+          send: { email: sendEmail, whatsapp: sendWhatsApp, sms: false },
+        },
+        response: {
+          data: {
+            id: paperInvoiceID,
+            number: invoice.number,
+            payper_url: paymentURL,
+            status_send: { email: sendEmail, whatsapp: sendWhatsApp, sms: false },
+          },
+        },
+      })
+
       return ok({
         ...invoice,
         status: 'sent',
         paymentProvider: 'paper_id',
-        paperIdInvoiceId: 'mock-paper-uuid',
-        paperIdPaymentUrl: 'https://stg-v2.paper.id/MOCK123',
+        paperIdInvoiceId: paperInvoiceID,
+        paperIdPaymentUrl: paymentURL,
         paperIdInvoiceUrl: 'https://storage.googleapis.com/mock/INV.pdf',
         paperIdSentAt: nowISO(),
         deliveredVia: [sendEmail && 'email', sendWhatsApp && 'whatsapp'].filter(Boolean),
@@ -467,12 +534,24 @@ export async function mockApiFetch(
 
   // --- sync ----------------------------------------------------------------
   if (seg[0] === 'sync' && m === 'POST') {
-    return ok({
+    const result = {
       chapters: store.chapters.length,
       members: store.members.length,
       deactivated: 0,
       syncedAt: nowISO(),
+    }
+    recordMockCall({
+      integration: 'bni_vm',
+      direction: 'outbound',
+      method: 'GET',
+      url: 'https://www.bni-vh.com/api/external/v1/members?page=1',
+      status: 200,
+      durationMs: 1_240,
+      success: true,
+      request: { page: 1, perPage: 100 },
+      response: { total: store.members.length, data: '(dipangkas — daftar member)' },
     })
+    return ok(result)
   }
 
   // --- uploads -------------------------------------------------------------
@@ -482,8 +561,18 @@ export async function mockApiFetch(
 
   // --- blackbox ------------------------------------------------------------
   if (seg[0] === 'blackbox') {
-    if (m === 'GET') return list([], num('limit', 100))
-    if (m === 'DELETE') return { status: 204, body: null }
+    if (m === 'GET') {
+      const calls = listMockCalls({
+        integration: query.get('integration') ?? undefined,
+        direction: query.get('direction') ?? undefined,
+        status: query.get('status') ?? undefined,
+      })
+      return list(calls, num('limit', 100))
+    }
+    if (m === 'DELETE') {
+      clearMockCalls()
+      return { status: 204, body: null }
+    }
   }
 
   // --- Paper.id console ----------------------------------------------------
@@ -580,6 +669,20 @@ export async function mockApiFetch(
   if (seg[0] === 'webhooks' && m === 'POST') {
     // Both webhooks reject an unsigned call — the mock keeps that boundary
     // visible rather than pretending callbacks are open.
+    //
+    // Direkam sebagai panggilan MASUK yang gagal, sehingga demo memperlihatkan
+    // kedua arah di Blackbox — dan filter "Gagal saja" punya isi.
+    recordMockCall({
+      integration: seg[1] === 'xendit' ? 'xendit' : 'paper_id',
+      direction: 'inbound',
+      method: 'POST',
+      url: `/api/v1/webhooks/${seg[1] ?? ''}`,
+      status: 401,
+      durationMs: 2,
+      success: false,
+      request: body ?? {},
+      error: 'token callback tidak valid',
+    })
     return fail(401, 'token callback tidak valid')
   }
 

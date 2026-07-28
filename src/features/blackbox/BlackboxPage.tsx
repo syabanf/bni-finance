@@ -95,28 +95,6 @@ export function BlackboxPage() {
     }
   }
 
-  // The recorder lives on the server, where the integration calls actually
-  // happen — there is nothing to show when the app runs on mock data.
-  if (useMock) {
-    return (
-      <div>
-        <PageHeader
-          title="Blackbox Integrasi"
-          description="Rekaman panggilan ke Paper.id, Xendit, dan BNI VM."
-        />
-        <Card>
-          <CardBody>
-            <EmptyState
-              icon={Radio}
-              title="Tidak tersedia pada Data Contoh"
-              description="Perekam berjalan di server, tempat panggilan integrasi benar-benar terjadi. Beralihlah ke sumber data Backend API di halaman Pengaturan."
-            />
-          </CardBody>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div>
       <PageHeader
@@ -182,7 +160,7 @@ export function BlackboxPage() {
             <EmptyState
               icon={Radio}
               title="Belum ada panggilan terekam"
-              description="Terbitkan invoice ke Paper.id, jalankan sinkronisasi BNI VM, atau tunggu callback pembayaran — panggilannya akan muncul di sini."
+              description="Terbitkan invoice, jalankan sinkronisasi BNI VM, atau kirim callback pembayaran — panggilannya akan muncul di sini."
             />
           </CardBody>
         </Card>
@@ -201,7 +179,9 @@ export function BlackboxPage() {
 
       {entries && entries.length > 0 && (
         <p className="mt-5 text-xs text-ink-400">
-          Rekaman disimpan di memori server (ring buffer) dan hilang saat server dimulai ulang.
+          {useMock
+            ? 'Pada Data Contoh, panggilan tidak benar-benar keluar — rekaman dibuat di browser dengan bentuk yang sama seperti di server, dan disimpan di localStorage.'
+            : 'Rekaman disimpan di memori server (ring buffer) dan hilang saat server dimulai ulang.'}{' '}
           Kredensial tidak pernah terekam — hanya body yang dicatat, sementara token dan
           client secret berada di header.
         </p>

@@ -490,9 +490,9 @@
         "type": "registration",
         "amount": 1500000,
         "currency": "IDR",
-        "dueDate": "2026-07-27",
-        "periodStart": "2026-07-27",
-        "periodEnd": "2026-07-27"
+        "dueDate": "2026-07-28",
+        "periodStart": "2026-07-28",
+        "periodEnd": "2026-07-28"
       },
       "bodyFields": [
         {
