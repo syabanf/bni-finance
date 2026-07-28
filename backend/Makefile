@@ -15,9 +15,14 @@ test:     ## Jalankan unit test (integration test dilewati)
 ## pakai — test ini me-TRUNCATE tabel, dan menolak nama yang tidak mengandung
 ## 'test'/'dev'.
 ##   make test-integration TEST_DATABASE_URL=postgres://…/bni_finance_dev
+## -p 1 WAJIB: paket-paket ini berbagi satu database dan masing-masing
+## mem-TRUNCATE tabel di awal. Go menjalankan paket berbeda secara paralel,
+## jadi tanpa ini mereka saling menghapus data di tengah jalan dan gagal
+## dengan cara yang terlihat seperti bug produk.
 test-integration:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "set TEST_DATABASE_URL dulu" && exit 1)
-	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test ./internal/api/ ./internal/sync/ -run TestLive -v -count=1
+	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -p 1 -count=1 -v \
+		./internal/api/ ./internal/sync/ ./internal/paperid/
 
 ## Hasilkan ulang openapi.json dari openapi.yaml. YAML adalah sumbernya; JSON
 ## yang disajikan ke halaman /docs, karena browser bisa mem-parsing JSON tanpa
