@@ -10,8 +10,8 @@ Dibangun dengan **Vite + React + TypeScript + Tailwind CSS**, dapat dipasang seb
 ditukar dengan backend nyata (**REST API Go** / BNI VM API / Paper.id / Xendit) tanpa
 mengubah UI.
 
-> 📖 **Dokumentasi sistem lengkap (arsitektur, payment Xendit, edge functions, deploy):**
-> [`docs/SYSTEM.md`](./docs/SYSTEM.md)
+> 📖 **Ringkasan sistem dalam satu dokumen** — arsitektur, alur bisnis, konfigurasi,
+> pengujian, deploy, dan jebakan yang pernah menggigit: [`docs/OVERVIEW.md`](./docs/OVERVIEW.md)
 >
 > Default berjalan di atas **mock repository** (data in-memory) — tanpa backend.
 > Berpindah ke backend Go dilakukan lewat **tombol _Sumber Data_** di halaman
@@ -63,7 +63,7 @@ mengubah UI.
 - **Profil** — ubah nama & kata sandi (butuh kata sandi lama, mode non-mock).
 - **PWA** — installable, navigasi bottom-tab di mobile, sadar safe-area.
 - **Pengaturan Biaya** — konfigurasi nominal pendaftaran & renewal.
-- **Konsol API** — halaman admin bergaya Postman untuk seluruh 56 endpoint.
+- **Konsol API** — halaman admin bergaya Postman untuk seluruh 58 endpoint.
   Daftar endpointnya **dibangkitkan dari spesifikasi OpenAPI backend**
   (`npm run api-collection`), jadi tidak bisa melenceng dari route sungguhan.
   Ada **Isi Otomatis** yang mengambil id dan tanggal yang benar-benar ada lewat
