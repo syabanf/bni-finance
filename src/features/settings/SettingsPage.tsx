@@ -17,10 +17,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
 import { formatCurrency, formatDateTime } from '@/lib/format'
-import { isMockMode } from '@/services/dataSource'
 import { DataSourceCard } from './components/DataSourceCard'
 
-const useMock = isMockMode()
 
 export function SettingsPage() {
   const { toast } = useToast()
@@ -132,8 +130,9 @@ export function SettingsPage() {
 
         <DataSourceCard />
 
-        {/* Invoice Timing */}
-        {!useMock && (
+        {/* Invoice Timing — nilainya bertahan di localStorage pada mode mock,
+            jadi tidak ada alasan menyembunyikannya dari demo. */}
+        {(
           <Card className="lg:col-span-2">
             <CardHeader
               title={

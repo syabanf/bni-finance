@@ -1,10 +1,15 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
+import { isMockMode } from '@/services/dataSource'
+import { clearMockCalls, listMockCalls } from '@/services/mock/blackbox'
 
 /**
  * Rekaman "kotak hitam" lalu lintas integrasi.
  *
- * Hanya tersedia di mode Backend API — perekamnya hidup di server, tempat
- * panggilan ke Paper.id/Xendit/BNI VM benar-benar terjadi.
+ * Di mode Backend API perekamnya hidup di server, tempat panggilan ke
+ * Paper.id/Xendit/BNI VM benar-benar terjadi. Di mode Data Contoh panggilan itu
+ * tidak pergi ke mana-mana, tetapi bentuk rekamannya dibuat identik oleh
+ * `mock/blackbox` — sebelumnya halaman ini mati total pada mode yang justru
+ * dipakai untuk demo.
  */
 export type BlackboxIntegration = 'paper_id' | 'xendit' | 'bni_vm'
 export type BlackboxDirection = 'outbound' | 'inbound'
@@ -34,6 +39,13 @@ export interface BlackboxFilters {
 }
 
 export async function listBlackbox(filters: BlackboxFilters = {}): Promise<BlackboxEntry[]> {
+  if (isMockMode()) {
+    return listMockCalls({
+      integration: filters.integration,
+      direction: filters.direction,
+      status: filters.status,
+    }).slice(0, filters.limit ?? 200)
+  }
   const res = await api.get<ListResponse<BlackboxEntry>>(
     `/blackbox${query({
       integration: filters.integration && filters.integration !== 'all' ? filters.integration : undefined,
@@ -46,6 +58,10 @@ export async function listBlackbox(filters: BlackboxFilters = {}): Promise<Black
 }
 
 export function clearBlackbox(): Promise<void> {
+  if (isMockMode()) {
+    clearMockCalls()
+    return Promise.resolve()
+  }
   return api.delete<void>('/blackbox')
 }
 

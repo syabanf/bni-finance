@@ -16,9 +16,6 @@ import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDateTime } from '@/lib/format'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
-import { isMockMode } from '@/services/dataSource'
-
-const useMock = isMockMode()
 
 interface SyncCardState {
   count: number
@@ -122,7 +119,7 @@ export function SyncPage() {
       </Card>
 
       {/* Token config */}
-      {!useMock && (
+      {(
         <Card className="mb-5">
           <CardHeader
             title={

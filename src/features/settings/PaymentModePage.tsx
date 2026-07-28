@@ -97,7 +97,7 @@ export function PaymentModePage() {
             <button
               role="switch"
               aria-checked={selfPayment}
-              disabled={saving || useMock}
+              disabled={saving}
               onClick={toggle}
               className={`relative inline-flex h-8 w-14 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
                 selfPayment ? 'bg-emerald-500' : 'bg-ink-200'
