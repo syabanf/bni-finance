@@ -98,8 +98,17 @@ mengubah UI.
 
 ```bash
 npm install
+npm run setup      # buat .env.local + backend/.env, rahasia dibangkitkan
 npm run dev        # http://localhost:5173
 ```
+
+`npm run setup` menyalin kedua berkas `.env.example` lalu mengisi yang bisa
+diisi sendiri: `JWT_SECRET`, token callback Paper.id, dan kata sandi admin awal
+— semuanya dibangkitkan acak, karena itu satu-satunya cara menaruh rahasia yang
+benar-benar dipakai tanpa pernah menulisnya ke berkas yang ikut ter-commit.
+Kredensial pihak ketiga dibiarkan kosong; fitur yang bersangkutan menjawab 503
+dengan pesan yang jelas selama belum diisi. Berkas yang sudah ada tidak pernah
+ditimpa.
 
 **Mode mock** (default) — login dengan kredensial **apa pun** (mis. `admin@bni-finance.com`
 / `admin123`), atau pakai tombol **Login Cepat**.
