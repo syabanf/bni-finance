@@ -44,7 +44,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={{ toast }}>
       {children}
       {createPortal(
-        <div className="pointer-events-none fixed bottom-5 right-5 z-[60] flex w-full max-w-sm flex-col gap-2.5">
+        // `w-full max-w-sm` sendirian meleset di ponsel: max-w-sm itu 384px,
+        // lebih lebar dari layar 375px, jadi toast menonjol keluar tepi kanan.
+        // Di layar sempit toast dikurung oleh inset kiri+kanan; mulai sm ia
+        // kembali menempel di kanan dengan lebar maksimum semula.
+        <div className="pointer-events-none fixed bottom-4 left-3 right-3 z-[60] flex flex-col gap-2.5 sm:bottom-5 sm:left-auto sm:right-5 sm:w-full sm:max-w-sm">
           {toasts.map((t) => {
             const c = config[t.tone]
             const Icon = c.icon

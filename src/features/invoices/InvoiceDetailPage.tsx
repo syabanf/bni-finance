@@ -247,7 +247,9 @@ export function InvoiceDetailPage() {
           </span>
         }
         action={
-          <div className="flex items-center gap-2">
+          // flex-wrap: sampai empat tombol berlabel panjang di sini; tanpa itu
+          // barisnya memaksa lebar 599px dan menggeser halaman di ponsel.
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => setDialog('preview')}>
               <Eye className="h-4 w-4" />
               Preview

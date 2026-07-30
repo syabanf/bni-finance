@@ -5,16 +5,17 @@ import type { Chapter, Invoice, InvoiceStatus, InvoiceType, InvoiceWithRelations
 import {
   Button,
   Card,
+  DateRangeFilter,
   EmptyState,
+  ErrorState,
   ExportMenu,
   Input,
   PageHeader,
   Select,
-  ErrorState,
   SummaryCard,
   TableSkeleton,
-  useToast,
   WhatsAppIcon,
+  useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
@@ -327,7 +328,7 @@ export function InvoiceListPage() {
         title="Invoice"
         description="Kelola seluruh invoice pendaftaran dan renewal."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
             {canCreate && (
               <Button onClick={() => navigate('/invoices/new')}>
@@ -461,74 +462,30 @@ export function InvoiceListPage() {
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
             {/* Filter jatuh tempo (rentang tanggal) */}
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] text-ink-500">Jatuh tempo</span>
-              <Input
-                type="date"
-                value={dueFrom}
-                max={dueTo || undefined}
-                onChange={(e) => setDueFrom(e.target.value)}
-                className="w-[150px]"
-                aria-label="Jatuh tempo dari"
-              />
-              <span className="text-ink-400">–</span>
-              <Input
-                type="date"
-                value={dueTo}
-                min={dueFrom || undefined}
-                onChange={(e) => setDueTo(e.target.value)}
-                className="w-[150px]"
-                aria-label="Jatuh tempo sampai"
-              />
-              {(dueFrom || dueTo) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDueFrom('')
-                    setDueTo('')
-                  }}
-                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
-                  aria-label="Reset filter jatuh tempo"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <DateRangeFilter
+              label="Jatuh tempo"
+              from={dueFrom}
+              to={dueTo}
+              onFrom={setDueFrom}
+              onTo={setDueTo}
+              onReset={() => {
+                setDueFrom('')
+                setDueTo('')
+              }}
+            />
 
             {/* Filter tanggal terbit (createdAt) — sumbu waktu Laporan */}
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] text-ink-500">Tanggal terbit</span>
-              <Input
-                type="date"
-                value={issuedFrom}
-                max={issuedTo || undefined}
-                onChange={(e) => setIssuedFrom(e.target.value)}
-                className="w-[150px]"
-                aria-label="Tanggal terbit dari"
-              />
-              <span className="text-ink-400">–</span>
-              <Input
-                type="date"
-                value={issuedTo}
-                min={issuedFrom || undefined}
-                onChange={(e) => setIssuedTo(e.target.value)}
-                className="w-[150px]"
-                aria-label="Tanggal terbit sampai"
-              />
-              {(issuedFrom || issuedTo) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIssuedFrom('')
-                    setIssuedTo('')
-                  }}
-                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
-                  aria-label="Reset filter tanggal terbit"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <DateRangeFilter
+              label="Tanggal terbit"
+              from={issuedFrom}
+              to={issuedTo}
+              onFrom={setIssuedFrom}
+              onTo={setIssuedTo}
+              onReset={() => {
+                setIssuedFrom('')
+                setIssuedTo('')
+              }}
+            />
           </div>
         </div>
 
