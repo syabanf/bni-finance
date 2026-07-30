@@ -5,15 +5,15 @@ import type { Chapter, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
 import {
   Card,
   CardHeader,
+  DateRangeFilter,
   DonutChart,
-  type DonutSegment,
   EmptyState,
   ErrorState,
   ExportMenu,
-  Input,
   PageHeader,
   StatCard,
   TableSkeleton,
+  type DonutSegment,
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
@@ -311,25 +311,13 @@ export function ReportPage() {
             ))}
           </div>
           {preset === 'custom' && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={customFrom}
-                max={customTo || undefined}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="w-[150px]"
-                aria-label="Dari tanggal"
-              />
-              <span className="text-ink-400">–</span>
-              <Input
-                type="date"
-                value={customTo}
-                min={customFrom || undefined}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="w-[150px]"
-                aria-label="Sampai tanggal"
-              />
-            </div>
+            <DateRangeFilter
+              label=""
+              from={customFrom}
+              to={customTo}
+              onFrom={setCustomFrom}
+              onTo={setCustomTo}
+            />
           )}
           <span className="ml-auto text-xs text-ink-400">
             {range.from || 'awal'} – {range.to || todayISO()}

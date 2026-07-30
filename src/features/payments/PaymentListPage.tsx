@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Search, Wallet, X } from 'lucide-react'
+import { ArrowRight, Search, Wallet } from 'lucide-react'
 import type { Chapter, PaymentWithInvoice } from '@/types'
 import {
   Avatar,
   Badge,
   Card,
+  DateRangeFilter,
   EmptyState,
   ErrorState,
   ExportMenu,
@@ -13,13 +14,13 @@ import {
   PageHeader,
   Select,
   SummaryCard,
-  Table,
   TBody,
+  THead,
+  Table,
+  TableSkeleton,
   Td,
   Th,
-  THead,
   Tr,
-  TableSkeleton,
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
@@ -181,39 +182,17 @@ export function PaymentListPage() {
                 ))}
               </Select>
               {/* Filter waktu bayar (rentang tanggal) */}
-              <div className="flex items-center gap-2">
-                <span className="text-[13px] text-ink-500">Waktu bayar</span>
-                <Input
-                  type="date"
-                  value={dueFrom}
-                  max={dueTo || undefined}
-                  onChange={(e) => setDueFrom(e.target.value)}
-                  className="w-[150px]"
-                  aria-label="Waktu bayar dari"
-                />
-                <span className="text-ink-400">–</span>
-                <Input
-                  type="date"
-                  value={dueTo}
-                  min={dueFrom || undefined}
-                  onChange={(e) => setDueTo(e.target.value)}
-                  className="w-[150px]"
-                  aria-label="Waktu bayar sampai"
-                />
-                {(dueFrom || dueTo) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDueFrom('')
-                      setDueTo('')
-                    }}
-                    className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
-                    aria-label="Reset filter waktu bayar"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              <DateRangeFilter
+                label="Waktu bayar"
+                from={dueFrom}
+                to={dueTo}
+                onFrom={setDueFrom}
+                onTo={setDueTo}
+                onReset={() => {
+                  setDueFrom('')
+                  setDueTo('')
+                }}
+              />
             </div>
           </div>
         )}

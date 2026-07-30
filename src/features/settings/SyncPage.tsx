@@ -101,17 +101,22 @@ export function SyncPage() {
 
       {/* Source info */}
       <Card className="mb-5">
-        <CardBody className="flex items-center gap-4 p-5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-ink-900 text-white">
+        <CardBody className="flex flex-wrap items-center gap-4 p-5">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-ink-900 text-white">
             <Database className="h-6 w-6" />
           </div>
-          <div className="flex-1">
+          {/* min-w-0 + break-all: tanpa keduanya, URL panjang menolak menyusut
+              dan mendorong badge status keluar dari layar. */}
+          <div className="min-w-0 flex-1">
             <div className="font-semibold text-ink-900">BNI Visitor Management</div>
             <div className="text-sm text-ink-500">
-              Sumber data · <span className="font-mono text-[13px]">{apiUrl || 'bni-vh.com/api/external/v1'}</span>
+              Sumber data ·{' '}
+              <span className="break-all font-mono text-[13px]">
+                {apiUrl || 'bni-vh.com/api/external/v1'}
+              </span>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600">
+          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Terhubung
           </span>

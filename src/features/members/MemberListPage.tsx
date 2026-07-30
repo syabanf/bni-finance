@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Users, X } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Users } from 'lucide-react'
 import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Avatar,
   Card,
+  DateRangeFilter,
   EmptyState,
   ErrorState,
   ExportMenu,
@@ -13,13 +14,13 @@ import {
   PageHeader,
   Select,
   SummaryCard,
-  Table,
   TBody,
+  THead,
+  Table,
+  TableSkeleton,
   Td,
   Th,
-  THead,
   Tr,
-  TableSkeleton,
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
@@ -205,39 +206,17 @@ export function MemberListPage() {
               ))}
             </Select>
             {/* Filter due date (rentang tanggal renewal) */}
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] text-ink-500">Due date</span>
-              <Input
-                type="date"
-                value={dueFrom}
-                max={dueTo || undefined}
-                onChange={(e) => setDueFrom(e.target.value)}
-                className="w-[150px]"
-                aria-label="Due date dari"
-              />
-              <span className="text-ink-400">–</span>
-              <Input
-                type="date"
-                value={dueTo}
-                min={dueFrom || undefined}
-                onChange={(e) => setDueTo(e.target.value)}
-                className="w-[150px]"
-                aria-label="Due date sampai"
-              />
-              {(dueFrom || dueTo) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDueFrom('')
-                    setDueTo('')
-                  }}
-                  className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
-                  aria-label="Reset filter due date"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <DateRangeFilter
+              label="Due date"
+              from={dueFrom}
+              to={dueTo}
+              onFrom={setDueFrom}
+              onTo={setDueTo}
+              onReset={() => {
+                setDueFrom('')
+                setDueTo('')
+              }}
+            />
             <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-ink-600">
               <input
                 type="checkbox"

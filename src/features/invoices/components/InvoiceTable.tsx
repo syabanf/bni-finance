@@ -184,7 +184,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                     <DueHint dueDate={inv.dueDate} status={inv.status} />
                   </div>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   <InvoiceStatusBadge status={inv.status} />
                   <InvoiceTypeBadge type={inv.type} />
                   {waUrl && (

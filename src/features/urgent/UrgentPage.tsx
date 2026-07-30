@@ -130,7 +130,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                       <div className="text-xs text-ink-400 mt-0.5">{formatDate(inv.dueDate)}</div>
                     </div>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <DaysOverdueBadge dueDate={inv.dueDate} />
                     <button
                       onClick={(e) => { e.stopPropagation(); downloadInvoice(inv) }}
@@ -777,11 +777,11 @@ export function UrgentPage() {
         title="Perlu Tindakan"
         description="Tagihan overdue, renewal jatuh tempo, dan pendaftaran yang belum diproses."
         action={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Select
               value={chapterId}
               onChange={(e) => setChapterId(e.target.value)}
-              className="w-44"
+              className="w-full sm:w-44"
             >
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (
