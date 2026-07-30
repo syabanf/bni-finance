@@ -54,10 +54,16 @@ perekam blackbox versi browser dengan bentuk rekaman yang identik.
 
 ```bash
 npm install
+npm run setup      # buat .env.local + backend/.env, rahasia dibangkitkan
 npm run dev        # http://localhost:5173
 ```
 
 Masuk dengan kredensial apa pun, atau tekan tombol **Masuk Cepat**.
+
+`npm run setup` menyalin kedua `.env.example` lalu membangkitkan `JWT_SECRET`,
+token callback Paper.id, dan kata sandi admin awal. Kredensial pihak ketiga
+dibiarkan kosong — fitur terkait menjawab 503 dengan pesan jelas sampai diisi.
+Berkas yang sudah ada tidak pernah ditimpa.
 
 ### Backend API
 
@@ -246,10 +252,22 @@ kegagalan diam-diam.
 
 **Frontend** — satu-satunya yang boleh ada di sisi klien:
 
+| Berkas | Status | Isi |
+|---|---|---|
+| `.env.example` | ter-commit | Templat, disalin oleh `npm run setup` |
+| `.env.local` | di-gitignore | Env kerja Anda |
+| `.env.production` | **ter-commit** | Dimuat `vite build`; tertanam ke bundel publik |
+
 ```
 VITE_API_URL=http://localhost:8080
 VITE_USE_MOCK=true          # hanya nilai awal
 ```
+
+> `.env.production` pernah menyetel `VITE_USE_MOCK=false` tanpa `VITE_API_URL`
+> — warisan era Supabase. Pengunjung pertama mendarat di mode Backend API yang
+> menunjuk ke origin Vercel sendiri, dan karena semua path diarahkan ke
+> `index.html`, permintaan API dijawab HTML berstatus 200. Sekarang bawaannya
+> Data Contoh, jadi deployment langsung bisa dipakai.
 
 **Backend** (`backend/.env`) — seluruhnya server-side:
 
