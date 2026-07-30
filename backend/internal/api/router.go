@@ -19,6 +19,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
+	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/publicpay"
@@ -46,6 +47,9 @@ type Services struct {
 	Sync      *sync.Service
 	PaperID   *paperid.Service
 	Blackbox  *blackbox.Recorder
+
+	// Metrics is optional; nil disables /metrics and all instrumentation.
+	Metrics *metrics.Registry
 }
 
 // NewHandler builds the fully-wrapped HTTP handler.
@@ -97,12 +101,27 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 	// Everything else under /api/ needs a valid token.
 	root.Handle("/api/", auth.RequireAuth(signer)(protected))
 
-	return httpx.Chain(root,
+	chain := []httpx.Middleware{
 		httpx.RequestID,
 		httpx.Logger(log),
 		httpx.Recoverer(log),
 		httpx.CORS(cfg.AllowedOrigins),
-	)
+	}
+
+	if svc.Metrics != nil {
+		// Unauthenticated, like /healthz: a scraper has no session, and the
+		// route inventory it reveals is already public via /openapi.json. Set
+		// METRICS_TOKEN to require a bearer token.
+		root.Handle("GET /metrics", metrics.Handler(svc.Metrics, cfg.MetricsToken))
+
+		// Instrumentation sits INSIDE Recoverer so a panicking handler is still
+		// counted — a 500 that never reaches the metrics is the one you most
+		// need to see. It also runs after the mux has matched, which is what
+		// makes r.Pattern available as the route label.
+		chain = append(chain, metrics.NewHTTP(svc.Metrics).Middleware(protected, root))
+	}
+
+	return httpx.Chain(root, chain...)
 }
 
 func registerProtected(mux *http.ServeMux, svc Services) {

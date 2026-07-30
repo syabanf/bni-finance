@@ -80,6 +80,50 @@ func publicRegistrars(t *testing.T, root string) map[string]bool {
 	return out
 }
 
+// directPublicPaths finds routes registered straight onto the root mux —
+// `root.HandleFunc("GET /healthz", …)` — which publicRegistrars cannot see
+// because they go through no handler package. /metrics arrived this way and
+// tripped the guard, which is the guard working: a new public route must be
+// declared public in the spec too.
+func directPublicPaths(t *testing.T, root string) map[string]bool {
+	t.Helper()
+
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filepath.Join(root, "api", "router.go"), nil, 0)
+	if err != nil {
+		t.Fatalf("parse router.go: %v", err)
+	}
+
+	out := map[string]bool{}
+	ast.Inspect(file, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok || len(call.Args) == 0 {
+			return true
+		}
+		sel, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || (sel.Sel.Name != "Handle" && sel.Sel.Name != "HandleFunc") {
+			return true
+		}
+		recv, ok := sel.X.(*ast.Ident)
+		if !ok || recv.Name != "root" {
+			return true
+		}
+		lit, ok := call.Args[0].(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			return true
+		}
+		value, err := strconv.Unquote(lit.Value)
+		if err != nil {
+			return true
+		}
+		if m := routePattern.FindStringSubmatch(value); m != nil {
+			out[m[2]] = true
+		}
+		return true
+	})
+	return out
+}
+
 // undocumented lists routes that are deliberately absent from the spec.
 var undocumented = map[string]bool{
 	// Registered as a prefix handler for the file server; the spec documents
@@ -306,22 +350,22 @@ func TestPublicOperationsAreExplicit(t *testing.T) {
 		t.Fatalf("parse spec: %v", err)
 	}
 
-	// Public routes come from the source: anything registered on the root mux
-	// in router.go, plus the docs and health endpoints that live there too.
-	publicPaths := map[string]bool{
-		"/healthz":      true,
-		"/openapi.yaml": true,
-		"/openapi.json": true,
-		"/docs":         true,
-		// The file server registers "GET /uploads/"; the spec documents the
-		// per-file shape, so map it across by hand.
-		"/uploads/{filename}": true,
+	// Public routes come from the source, not from a list kept here: anything
+	// handed the root mux in router.go, whether through a handler package or
+	// registered on it directly.
+	root, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolve direktori: %v", err)
 	}
+	publicPaths := directPublicPaths(t, root)
 	for _, r := range collectRoutes(t) {
 		if r.public {
 			publicPaths[r.path] = true
 		}
 	}
+	// The file server registers the prefix "GET /uploads/"; the spec documents
+	// the per-file shape. The only mapping that cannot be derived.
+	publicPaths["/uploads/{filename}"] = true
 
 	for path, item := range s.Paths {
 		for method, op := range item {

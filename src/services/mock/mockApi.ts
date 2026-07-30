@@ -688,6 +688,18 @@ export async function mockApiFetch(
 
   // --- routes outside /api/v1 ---------------------------------------------
   if (fullPath === '/healthz' && m === 'GET') return ok({ status: 'ok' })
+  if (fullPath === '/metrics' && m === 'GET') {
+    // Metrik menghitung lalu lintas HTTP, pool database, dan panggilan
+    // integrasi milik SERVER. Tidak ada satu pun di browser, jadi angka
+    // karangan di sini akan lebih menyesatkan daripada jujur mengatakan
+    // tempatnya bukan di sini.
+    return {
+      status: 200,
+      body:
+        '# Metrik dihitung di server; mode Data Contoh tidak punya proses yang\n' +
+        '# bisa diukur. Beralihlah ke Backend API, lalu scrape /metrics di sana.\n',
+    }
+  }
   if (fullPath === '/openapi.json' && m === 'GET') {
     return ok({ note: 'Spesifikasi lengkap hanya dilayani backend — jalankan mode Backend API.' })
   }

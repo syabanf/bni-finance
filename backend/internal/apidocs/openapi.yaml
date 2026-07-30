@@ -1653,6 +1653,54 @@ paths:
   # ===========================================================================
   # Sistem
   # ===========================================================================
+  /metrics:
+    get:
+      tags: [Sistem]
+      summary: Metrik Prometheus
+      description: |
+        Format eksposisi teks Prometheus (`version=0.0.4`), untuk di-scrape.
+
+        **Akses.** Terbuka bila `METRICS_TOKEN` kosong; bila diisi, setiap scrape
+        wajib membawa `Authorization: Bearer <token>` dan dibandingkan
+        constant-time. Terbuka sebagai bawaan karena endpoint metrik yang tak
+        bisa di-scrape bukan hardening melainkan hiasan — dan inventaris route
+        yang ia ungkap memang sudah publik lewat `/docs` dan `/openapi.json`.
+        Volume permintaan dan tingkat error tetap layak dilindungi di produksi:
+        isi `METRICS_TOKEN`, atau blokir `/metrics` di ingress.
+
+        **Yang TIDAK pernah ada di sini:** id member, nomor invoice, email,
+        nominal. Label dibatasi pada pola route, method, status, mitra
+        integrasi, arah, dan hasil — dijamin oleh konstruksi, bukan konfigurasi.
+
+        **Kardinalitas.** Label `route` memakai *pola* route
+        (`/api/v1/invoices/{id}`), bukan URL. URL berarti satu series per
+        invoice, dan Prometheus menyimpan setiap series yang pernah dilihatnya
+        di memori — lalu lintas normal akan menghabiskan heap scraper sampai
+        mati. Path yang tidak cocok route mana pun dikumpulkan ke `other`.
+
+        | Metrik | Tipe | Label |
+        |---|---|---|
+        | `http_requests_total` | counter | `method`, `route`, `status` |
+        | `http_request_duration_seconds` | histogram | `method`, `route` |
+        | `http_requests_in_flight` | gauge | — |
+        | `integration_calls_total` | counter | `integration`, `direction`, `outcome` |
+        | `integration_call_duration_seconds` | histogram | `integration`, `direction` |
+        | `db_pool_conns_*` | gauge | — |
+        | `db_pool_acquire_empty_total` | gauge | — |
+        | `go_goroutines`, `go_memstats_*`, `go_gc_cycles_total` | gauge | — |
+      security: []
+      responses:
+        "200":
+          description: Metrik dalam format eksposisi teks
+          content:
+            text/plain:
+              schema: { type: string }
+        "401":
+          description: METRICS_TOKEN diisi tetapi token pada permintaan salah
+          content:
+            text/plain:
+              schema: { type: string }
+
   /healthz:
     get:
       tags: [Sistem]

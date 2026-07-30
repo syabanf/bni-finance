@@ -63,7 +63,7 @@ mengubah UI.
 - **Profil** — ubah nama & kata sandi (butuh kata sandi lama, mode non-mock).
 - **PWA** — installable, navigasi bottom-tab di mobile, sadar safe-area.
 - **Pengaturan Biaya** — konfigurasi nominal pendaftaran & renewal.
-- **Konsol API** — halaman admin bergaya Postman untuk seluruh 58 endpoint.
+- **Konsol API** — halaman admin bergaya Postman untuk seluruh 59 endpoint.
   Daftar endpointnya **dibangkitkan dari spesifikasi OpenAPI backend**
   (`npm run api-collection`), jadi tidak bisa melenceng dari route sungguhan.
   Ada **Isi Otomatis** yang mengambil id dan tanggal yang benar-benar ada lewat

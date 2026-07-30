@@ -43,7 +43,7 @@ Pilihan tersimpan di browser, jadi berpindah tidak perlu menjalankan ulang dev s
 > adalah satu-satunya layar yang bisa dijangkau — tanpa tombol di sana Anda terkunci.
 
 **Seluruh fitur hidup di kedua mode**, termasuk Konsol API dan Blackbox. Di Data Contoh,
-58 endpoint dijawab di browser oleh store mock dan panggilan integrasi direkam oleh
+59 endpoint dijawab di browser oleh store mock dan panggilan integrasi direkam oleh
 perekam blackbox versi browser dengan bentuk rekaman yang identik.
 
 ---
@@ -139,14 +139,14 @@ Member tanpa alamat email dilewati untuk kanal email; WhatsApp tetap jalan.
 
 ## 6. API
 
-**58 endpoint**, terbagi per tag:
+**59 endpoint**, terbagi per tag:
 
 | Tag | Jml | Tag | Jml |
 |---|---|---|---|
 | Auth | 11 | Pengaturan | 6 |
 | Invoice | 7 | Member | 6 |
 | Pembayaran | 5 | Chapter | 5 |
-| Paper.id | 5 | Sistem | 4 |
+| Paper.id | 5 | Sistem | 5 |
 | Publik | 3 | Unggahan | 2 |
 | Blackbox | 2 | Dashboard | 1 |
 | Sinkronisasi | 1 | | |
@@ -172,6 +172,7 @@ Cek peran di UI hanya menyembunyikan tombol — batas sebenarnya ada di backend.
 | `/openapi.yaml` · `/openapi.json` | Backend | Spesifikasi OpenAPI 3.1 |
 | **Konsol API** | Aplikasi → Alat Teknis | Postman built-in; body berupa form berlabel |
 | **Blackbox** | Aplikasi → Alat Teknis | Rekaman tiap panggilan integrasi, dua arah |
+| **`/metrics`** | Backend | Metrik Prometheus — lihat bagian di bawah |
 
 Daftar endpoint Konsol API **dibangkitkan dari spesifikasi** (`npm run api-collection`,
 ikut jalan pada `npm run build`), jadi tidak bisa melenceng dari route sungguhan.
@@ -186,6 +187,42 @@ Spesifikasinya sendiri dijaga lima tes di `internal/apidocs`, yang memindai sumb
 | `TestSpecJSONMatchesYAML` | `openapi.json` basi — lupa `make docs` |
 | `TestPublicOperationsAreExplicit` | Rute publik yang tidak menandai `security: []`, dan sebaliknya |
 | `TestCORSAllowsEveryRegisteredMethod` | Method yang dipakai router tapi hilang dari allow-list CORS |
+
+---
+
+### Metrik Prometheus
+
+`GET /metrics` menyajikan format eksposisi teks, siap di-scrape.
+
+| Metrik | Tipe | Label |
+|---|---|---|
+| `http_requests_total` | counter | `method`, `route`, `status` |
+| `http_request_duration_seconds` | histogram | `method`, `route` |
+| `http_requests_in_flight` | gauge | — |
+| `integration_calls_total` | counter | `integration`, `direction`, `outcome` |
+| `integration_call_duration_seconds` | histogram | `integration`, `direction` |
+| `db_pool_conns_*`, `db_pool_acquire_*` | gauge | — |
+| `go_goroutines`, `go_memstats_*`, `go_gc_cycles_total` | gauge | — |
+
+Ditulis tanpa `prometheus/client_golang` — pustaka itu menarik ~10 paket
+transitif ke modul yang justru dijaga hanya punya satu dependensi langsung.
+Yang dibutuhkan cuma counter, histogram, dan format eksposisi. Konsekuensinya
+tidak ada exemplar, native histogram, atau pushgateway; semua scraper membaca
+format teks, jadi tak satu pun dari itu diperlukan untuk di-scrape.
+
+**Label `route` memakai POLA route, bukan URL.** `/api/v1/invoices/{id}` adalah
+satu series; URL berarti satu series per invoice, dan Prometheus menyimpan
+setiap series yang pernah dilihatnya di memori — lalu lintas normal akan
+menghabiskan heap scraper sampai mati. Path yang tak cocok route mana pun
+dikumpulkan ke `other`, karena path 404 dipilih oleh pemanggil.
+
+**Tidak ada data bisnis di label.** Tidak ada id member, nomor invoice, email,
+atau nominal — dijamin konstruksi, bukan konfigurasi, dan dijaga tes.
+
+Metrik integrasi diturunkan dari perekam blackbox, satu-satunya titik yang
+sudah dilewati keempat integrasi. Blackbox menyimpan N panggilan terakhir;
+counter ini bertahan lebih lama dan bisa memicu alert, yang ring buffer tidak
+bisa.
 
 ---
 
@@ -223,6 +260,7 @@ XENDIT_SECRET_KEY, XENDIT_CALLBACK_TOKEN
 BNI_VM_URL, BNI_VM_TOKEN
 SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
 AUTH_QUICK_LOGIN                       # kosong = mati
+METRICS_TOKEN                          # kosong = /metrics terbuka
 ```
 
 > ⚠️ **Vite menyisipkan setiap nilai `VITE_*` ke bundel JavaScript publik.** Rahasia apa pun
