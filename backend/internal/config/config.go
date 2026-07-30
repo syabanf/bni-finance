@@ -56,6 +56,10 @@ type Config struct {
 	// would turn every account passwordless the moment someone set it in
 	// production. You must name the accounts you are willing to expose.
 	QuickLoginEmails []string
+
+	// MetricsToken guards /metrics when set. Empty leaves the endpoint open —
+	// see internal/metrics.Handler for why that is the default.
+	MetricsToken string
 }
 
 // Load reads configuration from the environment, first pulling in a .env file
@@ -92,6 +96,7 @@ func Load() (Config, error) {
 		SeedAdminName:     envOr("SEED_ADMIN_NAME", "Administrator"),
 
 		QuickLoginEmails: splitAndTrim(os.Getenv("AUTH_QUICK_LOGIN")),
+		MetricsToken:     strings.TrimSpace(os.Getenv("METRICS_TOKEN")),
 	}
 
 	if cfg.DatabaseURL == "" {

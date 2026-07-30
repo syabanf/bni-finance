@@ -490,9 +490,9 @@
         "type": "registration",
         "amount": 1500000,
         "currency": "IDR",
-        "dueDate": "2026-07-28",
-        "periodStart": "2026-07-28",
-        "periodEnd": "2026-07-28"
+        "dueDate": "2026-07-30",
+        "periodStart": "2026-07-30",
+        "periodEnd": "2026-07-30"
       },
       "bodyFields": [
         {
@@ -2461,6 +2461,19 @@
       "tag": "Sistem",
       "summary": "Cek kesehatan",
       "description": "Tanpa autentikasi, supaya probe tidak perlu kredensial.",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
+      "id": "get:/metrics",
+      "method": "GET",
+      "path": "/metrics",
+      "tag": "Sistem",
+      "summary": "Metrik Prometheus",
+      "description": "Format eksposisi teks Prometheus (`version=0.0.4`), untuk di-scrape.\n\n**Akses.** Terbuka bila `METRICS_TOKEN` kosong; bila diisi, setiap scrape\nwajib membawa `Authorization: Bearer <token>` dan dibandingkan\nconstant-time. Terbuka sebagai bawaan karena endpoint metrik yang tak\nbisa di-scrape bukan hardening melainkan hiasan — dan inventaris route\nyang ia ungkap memang sudah publik lewat `/docs` dan `/openapi.json`.\nVolume permintaan dan tingkat error tetap layak dilindungi di produksi:\nisi `METRICS_TOKEN`, atau blokir `/metrics` di ingress.\n\n**Yang TIDAK pernah ada di sini:** id member, nomor invoice, email,\nnominal. Label dibatasi pada pola route, method, status, mitra\nintegrasi, arah, dan hasil — dijamin oleh konstruksi, bukan konfigurasi.\n\n**Kardinalitas.** Label `route` memakai *pola* route\n(`/api/v1/invoices/{id}`), bukan URL. URL berarti satu series per\ninvoice, dan Prometheus menyimpan setiap series yang pernah dilihatnya\ndi memori — lalu lintas normal akan menghabiskan heap scraper sampai\nmati. Path yang tidak cocok route mana pun dikumpulkan ke `other`.\n\n| Metrik | Tipe | Label |\n|---|---|---|\n| `http_requests_total` | counter | `method`, `route`, `status` |\n| `http_request_duration_seconds` | histogram | `method`, `route` |\n| `http_requests_in_flight` | gauge | — |\n| `integration_calls_total` | counter | `integration`, `direction`, `outcome` |\n| `integration_call_duration_seconds` | histogram | `integration`, `direction` |\n| `db_pool_conns_*` | gauge | — |\n| `db_pool_acquire_empty_total` | gauge | — |\n| `go_goroutines`, `go_memstats_*`, `go_gc_cycles_total` | gauge | — |\n",
       "params": [],
       "bodyRequired": false,
       "multipart": false,

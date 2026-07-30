@@ -23,6 +23,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/database"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
+	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/publicpay"
@@ -73,6 +74,19 @@ func run(log *slog.Logger) error {
 	// traffic in a single timeline.
 	recorder := blackbox.New(cfg.BlackboxSize)
 
+	// Metrics. The registry is per-process and passed explicitly rather than
+	// kept in a package global, so tests get a clean one each time.
+	reg := metrics.NewRegistry()
+	metrics.RegisterRuntime(reg)
+	metrics.RegisterPool(reg, func() metrics.PoolStats { return pool.Stat() })
+
+	// The blackbox keeps the last N calls; these counters survive it and can
+	// raise an alert, which a ring buffer cannot.
+	integrationMetrics := metrics.NewIntegrations(reg)
+	recorder.WithObserver(func(c blackbox.Call) {
+		integrationMetrics.Record(c.Integration, c.Direction, c.Success, c.Duration.Seconds())
+	})
+
 	// Wire: repository → service → handler, one chain per resource.
 	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...)
 
@@ -115,6 +129,7 @@ func run(log *slog.Logger) error {
 			cfg.PaperIDBaseURL, cfg.PaperIDClientID, cfg.PaperIDClientSecret,
 			cfg.PaperIDCallbackToken, recorder),
 		Blackbox: recorder,
+		Metrics:  reg,
 	}, pool.Ping)
 
 	srv := &http.Server{

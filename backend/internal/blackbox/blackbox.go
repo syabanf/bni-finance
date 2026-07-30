@@ -51,6 +51,23 @@ type Recorder struct {
 	max     int
 	seq     uint64
 	now     func() time.Time
+
+	// observe is notified of every recorded call. It exists so metrics can be
+	// derived from the ONE place all four integrations already funnel through,
+	// instead of adding a counter to each client and eventually forgetting one.
+	observe func(Call)
+}
+
+// WithObserver attaches a callback invoked on every Record. The callback runs
+// while the recorder's lock is held, so it must not block or call back in.
+func (r *Recorder) WithObserver(fn func(Call)) *Recorder {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	r.observe = fn
+	r.mu.Unlock()
+	return r
 }
 
 // New returns a recorder holding at most max entries.
@@ -85,6 +102,10 @@ func (r *Recorder) Record(c Call) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	if r.observe != nil {
+		r.observe(c)
+	}
 
 	r.seq++
 	e := Entry{
