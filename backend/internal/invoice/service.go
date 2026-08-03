@@ -72,18 +72,11 @@ func (s *Service) Update(ctx context.Context, id string, in domain.UpdateInvoice
 		return nil, err
 	}
 
-	if in.Status != nil && !current.Status.CanTransitionTo(*in.Status) {
-		return nil, httpx.Conflict(
-			"transisi status tidak diizinkan: " + string(current.Status) + " → " + string(*in.Status),
-		)
-	}
-
-	// A paid or cancelled invoice is a closed record — don't let amounts or
-	// periods be rewritten after the fact.
-	if current.Status == domain.StatusPaid || current.Status == domain.StatusCancelled {
-		if in.Amount != nil || in.DueDate != nil || in.PeriodStart != nil || in.PeriodEnd != nil {
-			return nil, httpx.Conflict("invoice berstatus " + string(current.Status) + " tidak bisa diubah nominal/periodenya")
-		}
+	// Penolakan cepat dengan pesan yang jelas. Pemeriksaan yang MENGIKAT ada di
+	// dalam transaksi repository, setelah barisnya dikunci — status di sini
+	// sudah bisa basi sebelum penulisan terjadi.
+	if err := current.Status.ValidateUpdateFrom(in); err != nil {
+		return nil, httpx.Conflict(err.Error())
 	}
 
 	return s.repo.Update(ctx, id, in)

@@ -43,8 +43,12 @@ func (f *fakeUsers) UpdateRole(context.Context, string, domain.UserRole) (*domai
 	return nil, nil
 }
 func (f *fakeUsers) UpdatePasswordHash(context.Context, string, string) error { return nil }
-func (f *fakeUsers) Delete(context.Context, string) error                     { return nil }
-func (f *fakeUsers) CountAdmins(context.Context) (int, error)                 { return 1, nil }
+func (f *fakeUsers) UpdateRoleGuarded(context.Context, string, domain.UserRole) (*domain.User, error) {
+	return nil, nil
+}
+func (f *fakeUsers) DeleteGuarded(context.Context, string) error { return nil }
+func (f *fakeUsers) Delete(context.Context, string) error        { return nil }
+func (f *fakeUsers) CountAdmins(context.Context) (int, error)    { return 1, nil }
 
 func seededUsers() *fakeUsers {
 	return &fakeUsers{byEmail: map[string]domain.User{

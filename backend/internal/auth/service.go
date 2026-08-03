@@ -17,6 +17,10 @@ type Store interface {
 	Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole) (*domain.User, error)
 	UpdateName(ctx context.Context, id, name string) (*domain.User, error)
 	UpdateRole(ctx context.Context, id string, role domain.UserRole) (*domain.User, error)
+	// Guarded: pemeriksaan admin-terakhir dan penulisannya terjadi dalam satu
+	// transaksi. Memisahkannya adalah balapan yang pernah menyisakan nol admin.
+	UpdateRoleGuarded(ctx context.Context, id string, role domain.UserRole) (*domain.User, error)
+	DeleteGuarded(ctx context.Context, id string) error
 	UpdatePasswordHash(ctx context.Context, id, hash string) error
 	Delete(ctx context.Context, id string) error
 	CountAdmins(ctx context.Context) (int, error)
@@ -185,18 +189,9 @@ func (s *Service) SetRole(ctx context.Context, id string, role domain.UserRole) 
 	if !role.Valid() {
 		return nil, httpx.BadRequest("role harus 'admin' atau 'user'")
 	}
-	current, err := s.repo.GetByID(ctx, id)
+	user, err := s.repo.UpdateRoleGuarded(ctx, id, role)
 	if err != nil {
-		return nil, err
-	}
-	if current.Role == domain.RoleAdmin && role != domain.RoleAdmin {
-		if err := s.guardLastAdmin(ctx); err != nil {
-			return nil, err
-		}
-	}
-	user, err := s.repo.UpdateRole(ctx, id, role)
-	if err != nil {
-		return nil, err
+		return nil, lastAdminAsConflict(err)
 	}
 	out := user.AsAuthUser()
 	return &out, nil
@@ -206,29 +201,16 @@ func (s *Service) Delete(ctx context.Context, id, actorID string) error {
 	if id == actorID {
 		return httpx.Conflict("tidak bisa menghapus akun sendiri")
 	}
-	user, err := s.repo.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	if user.Role == domain.RoleAdmin {
-		if err := s.guardLastAdmin(ctx); err != nil {
-			return err
-		}
-	}
-	return s.repo.Delete(ctx, id)
+	return lastAdminAsConflict(s.repo.DeleteGuarded(ctx, id))
 }
 
-// guardLastAdmin refuses any change that would leave the system with no
-// administrator — an unrecoverable state through the API alone.
-func (s *Service) guardLastAdmin(ctx context.Context) error {
-	n, err := s.repo.CountAdmins(ctx)
-	if err != nil {
-		return err
-	}
-	if n <= 1 {
+// lastAdminAsConflict memetakan sentinel repository ke 409 dengan pesan yang
+// bisa ditindak operator.
+func lastAdminAsConflict(err error) error {
+	if errors.Is(err, ErrLastAdmin) {
 		return httpx.Conflict("ini satu-satunya admin — angkat admin lain lebih dulu")
 	}
-	return nil
+	return err
 }
 
 // EnsureSeedAdmin creates the first administrator when the table is empty, so a

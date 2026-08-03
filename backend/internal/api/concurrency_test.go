@@ -1,6 +1,7 @@
 package api_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -361,4 +362,172 @@ func uniqueStrings(in []string, max int) []string {
 		}
 	}
 	return out
+}
+
+// --- penjaga admin terakhir --------------------------------------------------
+
+// Sistem harus selalu menyisakan minimal satu admin. guardLastAdmin menghitung
+// admin lalu menolak bila tinggal satu — tetapi menghitung dan menurunkan
+// peran adalah dua pernyataan terpisah tanpa kunci di antaranya.
+//
+// Dua penurunan yang berjalan bersamaan sama-sama membaca "masih ada 2", dua-
+// duanya lolos, dan keduanya menulis. Hasilnya nol admin. Kode itu sendiri
+// menyebutnya "keadaan yang tak bisa dipulihkan lewat API" — dan memang: tanpa
+// admin, tidak ada yang bisa mengangkat admin baru.
+func TestLastAdminGuardHoldsUnderConcurrency(t *testing.T) {
+	s := newE2EStack(t)
+
+	// Dua admin tambahan, sehingga totalnya persis di ambang penjaga: keduanya
+	// boleh turun satu per satu, tetapi tidak boleh turun bersamaan.
+	ids := make([]string, 0, 2)
+	for i := 0; i < 2; i++ {
+		email := fmt.Sprintf("adm-race-%d@contoh.local", i)
+		s.pool.Exec(t.Context(), "DELETE FROM users WHERE email = $1", email)
+		var created struct {
+			ID string `json:"id"`
+		}
+		s.do(t, "POST", "/api/v1/users", s.adminToken,
+			fmt.Sprintf(`{"email":%q,"password":"kata-sandi-uji-panjang","name":"Admin Race","role":"admin"}`, email),
+			http.StatusCreated, &created)
+		ids = append(ids, created.ID)
+		t.Cleanup(func() {
+			s.pool.Exec(t.Context(), "DELETE FROM users WHERE email = $1", email)
+		})
+	}
+
+	// Kembalikan peran semula setelah tes. Tanpa ini, tes ini meninggalkan
+	// database bersama TANPA ADMIN — persis keadaan yang ia jaga agar tidak
+	// terjadi — dan menjalankannya dua kali membuat preconditionnya sendiri
+	// tidak terpenuhi. Ketahuan setelah memeriksa tabel users usai tes lulus.
+	before := map[string]string{}
+	if rows, err := s.pool.Query(t.Context(), "SELECT id, role FROM users"); err == nil {
+		for rows.Next() {
+			var id, role string
+			rows.Scan(&id, &role)
+			before[id] = role
+		}
+		rows.Close()
+	}
+	t.Cleanup(func() {
+		for id, role := range before {
+			s.pool.Exec(context.Background(), "UPDATE users SET role = $2 WHERE id = $1", id, role)
+		}
+	})
+
+	// Turunkan SEMUA admin serentak, termasuk yang dibuat newE2EStack.
+	var all []string
+	rows, err := s.pool.Query(t.Context(), "SELECT id FROM users WHERE role = 'admin'")
+	if err != nil {
+		t.Fatalf("baca admin: %v", err)
+	}
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		all = append(all, id)
+	}
+	rows.Close()
+	if len(all) < 3 {
+		t.Fatalf("butuh minimal 3 admin untuk menguji, ada %d", len(all))
+	}
+
+	var wg sync.WaitGroup
+	gate := make(chan struct{})
+	for _, id := range all {
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			<-gate
+			req, _ := http.NewRequest("PATCH", s.srv.URL+"/api/v1/users/"+id+"/role",
+				strings.NewReader(`{"role":"user"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+s.adminToken)
+			res, err := http.DefaultClient.Do(req)
+			if err == nil {
+				io.Copy(io.Discard, res.Body)
+				res.Body.Close()
+			}
+		}(id)
+	}
+	close(gate)
+	wg.Wait()
+
+	var remaining int
+	if err := s.pool.QueryRow(t.Context(),
+		"SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&remaining); err != nil {
+		t.Fatalf("hitung admin: %v", err)
+	}
+	if remaining < 1 {
+		t.Errorf("tersisa %d admin — sistem tidak bisa dipulihkan lewat API", remaining)
+	}
+	_ = ids
+}
+
+// --- transisi status invoice -------------------------------------------------
+
+// Transisi status divalidasi terhadap status yang BARU SAJA dibaca, lalu ditulis
+// lewat pernyataan terpisah. Dua permintaan bersamaan pada invoice `sent` — satu
+// melunasi, satu membatalkan — sama-sama membaca `sent`, sama-sama lolos
+// validasi, dan sama-sama menulis.
+//
+// Hasilnya invoice lunas yang berstatus dibatalkan, atau sebaliknya: uang
+// diterima atas invoice yang tercatat batal. Jalur webhook aman karena
+// SettleByRef mengunci barisnya FOR UPDATE dan memeriksa ulang; jalur PATCH
+// manual inilah yang tidak.
+//
+// Tepat satu dari keduanya harus berhasil; yang kalah harus menerima 409.
+func TestConflictingStatusTransitionsResolveToOne(t *testing.T) {
+	s := concurrentStack(t)
+
+	rounds := scale(t, 12)
+	var bothWon, neitherWon int
+
+	for i := 0; i < rounds; i++ {
+		var inv e2eInvoice
+		s.do(t, "POST", "/api/v1/invoices", s.adminToken,
+			invoiceBody(fmt.Sprintf("TRANS-%d-%d", time.Now().UnixNano(), i), 400_000),
+			http.StatusCreated, &inv)
+		s.do(t, "PATCH", "/api/v1/invoices/"+inv.ID, s.adminToken,
+			`{"status":"sent"}`, http.StatusOK, nil)
+
+		var okCount atomic.Int64
+		var wg sync.WaitGroup
+		gate := make(chan struct{})
+		for _, target := range []string{`{"status":"paid"}`, `{"status":"cancelled","cancelReason":"uji"}`} {
+			wg.Add(1)
+			go func(body string) {
+				defer wg.Done()
+				<-gate
+				req, _ := http.NewRequest("PATCH", s.srv.URL+"/api/v1/invoices/"+inv.ID,
+					strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+s.adminToken)
+				res, err := http.DefaultClient.Do(req)
+				if err != nil {
+					return
+				}
+				io.Copy(io.Discard, res.Body)
+				res.Body.Close()
+				if res.StatusCode == http.StatusOK {
+					okCount.Add(1)
+				}
+			}(target)
+		}
+		close(gate)
+		wg.Wait()
+
+		switch okCount.Load() {
+		case 2:
+			bothWon++
+		case 0:
+			neitherWon++
+		}
+	}
+
+	if bothWon > 0 {
+		t.Errorf("%d dari %d ronde: KEDUA transisi berhasil — status akhirnya sekadar siapa menulis terakhir",
+			bothWon, rounds)
+	}
+	if neitherWon > 0 {
+		t.Errorf("%d dari %d ronde: tidak ada yang berhasil", neitherWon, rounds)
+	}
 }

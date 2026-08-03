@@ -221,6 +221,12 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvo
 		return nil, fmt.Errorf("kunci invoice: %w", err)
 	}
 
+	// Pemeriksaan yang mengikat, di bawah lock baris. Service sudah memeriksa
+	// hal yang sama sebelum transaksi, tetapi status bisa berubah di antaranya.
+	if err := oldStatus.ValidateUpdateFrom(in); err != nil {
+		return nil, httpx.Conflict(err.Error())
+	}
+
 	sets := []string{"updated_at = now()"}
 	args := []any{}
 	set := func(col string, value any) {
