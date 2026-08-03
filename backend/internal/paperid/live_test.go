@@ -2,6 +2,8 @@ package paperid
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
+
+	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
 // MarkSent and SettleByRef are pure SQL, so the stub store proves nothing about
@@ -35,6 +39,8 @@ func livePool(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("sambung: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	// Satu proses tes pada satu waktu — lihat internal/testdb.
+	testdb.Serialize(t, pool)
 	if _, err := pool.Exec(context.Background(),
 		"TRUNCATE invoice_audit_log, payments, invoices, members, chapters RESTART IDENTITY CASCADE"); err != nil {
 		t.Fatalf("bersihkan: %v", err)
@@ -158,22 +164,39 @@ func TestLivePaperIDStaging(t *testing.T) {
 	}
 
 	c := NewClient(os.Getenv("PAPER_ID_BASE_URL"), id, secret)
-	res, err := c.CreateInvoice(context.Background(), CreateInput{
-		Number:        "INV-GOTEST-" + time.Now().Format("20060102-150405"),
-		InvoiceDate:   time.Now(),
-		DueDate:       time.Now().AddDate(0, 0, 30),
-		Amount:        1_500_000,
-		ItemName:      "Renewal Keanggotaan BNI Grow",
-		ItemDesc:      "Perpanjangan tahunan",
-		CustomerID:    "wit-gotest-001",
-		CustomerName:  "Budi Santoso",
-		CustomerEmail: "budi@example.com",
-		CustomerPhone: "081200000001",
-		// Never actually message anyone from a test.
-		SendEmail: false, SendWhatsApp: false,
-	})
+
+	// Staging berayun lebar — 5 dtk sampai 52 dtk terukur untuk panggilan yang
+	// sama — dan 5xx sesaat bukan kabar tentang kode kita. Ulang maksimal tiga
+	// kali dengan nomor SEGAR tiap percobaan (timeout yang berhasil di hulu
+	// membakar nomor lama). Kegagalan 4xx tetap fatal seketika: itu bug nyata.
+	var res *CreateResult
+	var err error
+	for attempt := 1; attempt <= 3; attempt++ {
+		res, err = c.CreateInvoice(context.Background(), CreateInput{
+			Number:        fmt.Sprintf("INV-GOTEST-%s-%d", time.Now().Format("20060102-150405"), attempt),
+			InvoiceDate:   time.Now(),
+			DueDate:       time.Now().AddDate(0, 0, 30),
+			Amount:        1_500_000,
+			ItemName:      "Renewal Keanggotaan BNI Grow",
+			ItemDesc:      "Perpanjangan tahunan",
+			CustomerID:    "wit-gotest-001",
+			CustomerName:  "Budi Santoso",
+			CustomerEmail: "budi@example.com",
+			CustomerPhone: "081200000001",
+			// Never actually message anyone from a test.
+			SendEmail: false, SendWhatsApp: false,
+		})
+		if err == nil {
+			break
+		}
+		var ae *apiError
+		if errors.As(err, &ae) && ae.Status < 500 {
+			t.Fatalf("Paper.id staging menolak (bukan transien): %v", err)
+		}
+		t.Logf("PERCOBAAN %d GAGAL TRANSIEN: %v", attempt, err)
+	}
 	if err != nil {
-		t.Fatalf("Paper.id staging create: %v", err)
+		t.Fatalf("Paper.id staging create setelah 3 percobaan: %v", err)
 	}
 	if res.PaperInvoiceID == "" || res.PaymentURL == "" {
 		t.Errorf("respons Paper.id tidak lengkap: %+v", res)

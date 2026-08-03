@@ -92,6 +92,41 @@ func percentile(sorted []time.Duration, p float64) time.Duration {
 }
 
 // TestStressMixedWorkload hammers the API with a realistic read-heavy mix.
+// loadClient adalah klien untuk tes beban — JANGAN pakai &http.Client{} polos
+// di sini.
+//
+// http.DefaultTransport punya MaxIdleConnsPerHost = 2. Dengan 64 worker
+// menghantam satu host, hanya 2 koneksi yang dipakai ulang; 62 sisanya ditutup
+// tiap request dan mendekam di TIME_WAIT selama 2×MSL = 30 detik di macOS.
+// Satu run tes ini terukur meninggalkan 5.703 soket TIME_WAIT — dan rentang
+// port ephemeral hanya 49152–65535, yaitu 16.384 port.
+//
+// Tiga run berurutan dalam jendela 30 detik itu menghabiskan seluruh rentang.
+// Akibatnya bukan hanya tes ini yang gagal: SIAPA PUN di mesin itu tidak bisa
+// membuka koneksi keluar, termasuk pgx. Itulah sebab paket sync dan paperid —
+// yang tidak pernah menyentuh jalur ini — ikut gagal berbarengan dengan pesan
+// "failed to connect to user=postgres", dan mengapa kegagalannya tidak pernah
+// bisa direproduksi dengan menjalankan satu paket saja.
+//
+// Membatasi idle conn ke jumlah worker membuat koneksi dipakai ulang, bukan
+// dibuang. Verifikasi: 5.703 → 71 soket TIME_WAIT per run.
+//
+// timeout wajib eksplisit. Pemanggil yang jalurnya melewati Paper.id butuh
+// jauh lebih longgar daripada tes beban lokal: staging pernah terukur 52 detik
+// untuk satu panggilan, dan batas yang lebih ketat daripada timeout 60 detik
+// milik backend akan menghasilkan timeout di sisi klien — menutupi error
+// sebenarnya dengan flake baru.
+func loadClient(t *testing.T, workers int, timeout time.Duration) *http.Client {
+	t.Helper()
+	tr := &http.Transport{
+		MaxIdleConns:        workers,
+		MaxIdleConnsPerHost: workers,
+		IdleConnTimeout:     90 * time.Second,
+	}
+	t.Cleanup(tr.CloseIdleConnections)
+	return &http.Client{Timeout: timeout, Transport: tr}
+}
+
 // Run with -race to also prove there are no data races in the HTTP layer.
 func TestStressMixedWorkload(t *testing.T) {
 	if testing.Short() {
@@ -99,7 +134,7 @@ func TestStressMixedWorkload(t *testing.T) {
 	}
 
 	srv, invStore, payStore := newTestServer(t)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := loadClient(t, 64, 10*time.Second)
 
 	// Seed so list/get have something to work with.
 	for i := 0; i < 200; i++ {
@@ -211,7 +246,7 @@ func TestStressMixedWorkload(t *testing.T) {
 // end up paid exactly once.
 func TestConcurrentSettleSameInvoice(t *testing.T) {
 	srv, invStore, payStore := newTestServer(t)
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := loadClient(t, 32, 10*time.Second)
 
 	resp, err := authedPost(client, srv.URL+"/api/v1/invoices", createInvoiceBody(1))
 	if err != nil {

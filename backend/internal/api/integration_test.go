@@ -25,6 +25,8 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
+
+	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
 // The tests above run against in-memory fakes, which by construction cannot
@@ -65,6 +67,11 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("ping database: %v", err)
 	}
 	t.Cleanup(pool.Close)
+
+	// Satu proses tes pada satu waktu — lihat internal/testdb. Tanpa ini,
+	// `go test ./...` dengan TEST_DATABASE_URL terpasang menjalankan tiga
+	// paket paralel yang saling TRUNCATE di tengah run.
+	testdb.Serialize(t, pool)
 
 	_, err = pool.Exec(context.Background(),
 		"TRUNCATE invoice_audit_log, payments, invoices, members, chapters RESTART IDENTITY CASCADE")

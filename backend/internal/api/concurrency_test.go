@@ -88,7 +88,7 @@ func (s *e2eStack) post(path, token, body string) (int, string) {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := s.client.Do(req)
 	if err != nil {
 		return 0, err.Error()
 	}
@@ -314,7 +314,7 @@ func TestMixedLoadAgainstPostgres(t *testing.T) {
 				} else {
 					req, _ := http.NewRequest("GET", s.srv.URL+reads[(w+i)%len(reads)], nil)
 					req.Header.Set("Authorization", "Bearer "+s.adminToken)
-					res, err := http.DefaultClient.Do(req)
+					res, err := s.client.Do(req)
 					if err != nil {
 						serverErr.Add(1)
 						continue
@@ -441,7 +441,7 @@ func TestLastAdminGuardHoldsUnderConcurrency(t *testing.T) {
 				strings.NewReader(`{"role":"user"}`))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+s.adminToken)
-			res, err := http.DefaultClient.Do(req)
+			res, err := s.client.Do(req)
 			if err == nil {
 				io.Copy(io.Discard, res.Body)
 				res.Body.Close()
@@ -501,7 +501,7 @@ func TestConflictingStatusTransitionsResolveToOne(t *testing.T) {
 					strings.NewReader(body))
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", "Bearer "+s.adminToken)
-				res, err := http.DefaultClient.Do(req)
+				res, err := s.client.Do(req)
 				if err != nil {
 					return
 				}
