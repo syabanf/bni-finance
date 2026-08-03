@@ -40,3 +40,6 @@ dev-dist
 # Supabase CLI local artifacts (project-ref, pooler-url, versions — not for git)
 supabase/.temp/
 .vercel
+
+# Laporan hasil uji — snapshot sesaat, dibuat ulang oleh make test-integration.
+test-report/

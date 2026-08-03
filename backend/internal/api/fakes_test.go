@@ -75,6 +75,11 @@ func (s *fakeInvoiceStore) Create(_ context.Context, in domain.CreateInvoiceInpu
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.seq++
+	// Kontraknya sama dengan repository sungguhan: kosong = bangkitkan, dan
+	// pembangkitannya terjadi di bawah lock yang sama dengan penyisipan.
+	if number == "" {
+		number = fmt.Sprintf("INV-%d-%03d", in.DueDate.Time.Year(), len(s.items)+1)
+	}
 	now := time.Now().UTC()
 	inv := domain.Invoice{
 		ID:          fmt.Sprintf("inv-%06d", s.seq),
