@@ -314,6 +314,29 @@ make test-integration TEST_DATABASE_URL=postgres://…/bni_finance_dev
 > `-p 1` wajib — paket-paketnya berbagi satu database dan Go menjalankan paket berbeda
 > secara paralel.
 
+### Uji beban — k6
+
+```bash
+brew install k6
+BASE_URL=http://127.0.0.1:8123 ADMIN_EMAIL=… ADMIN_PASSWORD=… k6 run loadtest/api.js
+```
+
+Tiga skenario berjalan bersamaan, meniru lalu lintas nyata: `baca` (admin
+menjelajah, ramping 0→30 VU), `tulis` (penerbitan invoice 10/dtk — jalur yang
+dulu punya balapan penomoran), dan `publik` (halaman bayar tanpa token, yang
+sekaligus memeriksa tidak ada kontak member yang bocor).
+
+**Threshold-nya menggagalkan run** (exit ≠ 0), jadi skrip ini bisa jadi gerbang
+CI: <1% error, p95 per skenario, nol nomor invoice ganda, dan >99% check lulus.
+Angkanya sengaja longgar — batas "jelas rusak", bukan target performa; batas
+ketat milik pengukuran di perangkat produksi.
+
+Login terjadi sekali di `setup()`, bukan per-VU: 100 VU yang login sendiri-
+sendiri berarti 100 PBKDF2 600 ribu iterasi, dan yang terukur jadi hashing.
+
+> Skenario `tulis` benar-benar membuat invoice. Jalankan hanya ke database
+> sekali pakai, dan muat ulang `db/seed.sql` setelahnya.
+
 **Tes E2E** (`internal/api/e2e_test.go`) menelusuri seluruh perjalanan lewat HTTP: masuk →
 tolak tanpa token → tolak peran user untuk menulis → daftarkan chapter & member → terbitkan
 draft → periksa audit → dorong ke Paper.id sungguhan → pastikan member yang ganti nomor
