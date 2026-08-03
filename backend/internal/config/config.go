@@ -60,6 +60,10 @@ type Config struct {
 	// MetricsToken guards /metrics when set. Empty leaves the endpoint open —
 	// see internal/metrics.Handler for why that is the default.
 	MetricsToken string
+
+	// DBMaxConns membatasi ukuran connection pool. 0 = DefaultMaxConns.
+	// Naikkan bila db_pool_acquire_empty_total di /metrics terus bertambah.
+	DBMaxConns int
 }
 
 // Load reads configuration from the environment, first pulling in a .env file
@@ -97,6 +101,7 @@ func Load() (Config, error) {
 
 		QuickLoginEmails: splitAndTrim(os.Getenv("AUTH_QUICK_LOGIN")),
 		MetricsToken:     strings.TrimSpace(os.Getenv("METRICS_TOKEN")),
+		DBMaxConns:       int(bytesOr("DB_MAX_CONNS", 0)),
 	}
 
 	if cfg.DatabaseURL == "" {

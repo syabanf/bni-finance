@@ -9,6 +9,8 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 )
 
 // Minimal in-memory stores for the resources added alongside invoices and
@@ -495,4 +497,48 @@ func (s *fakeUserStore) CountAdmins(context.Context) (int, error) {
 		}
 	}
 	return n, nil
+}
+
+// Varian Guarded meniru kontrak repository sungguhan: pemeriksaan
+// admin-terakhir dan penulisannya terjadi di bawah SATU lock, tidak terpisah.
+// Kalau fake memisahkannya, tes in-memory akan menguji perilaku yang berbeda
+// dari produksi — persis celah yang membuat balapan ini lolos selama ini.
+func (s *fakeUserStore) UpdateRoleGuarded(_ context.Context, id string, role domain.UserRole) (*domain.User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.items[id]
+	if !ok {
+		return nil, httpx.ErrNotFound
+	}
+	if u.Role == domain.RoleAdmin && role != domain.RoleAdmin && s.countAdminsLocked() <= 1 {
+		return nil, auth.ErrLastAdmin
+	}
+	u.Role = role
+	s.items[id] = u
+	out := u
+	return &out, nil
+}
+
+func (s *fakeUserStore) DeleteGuarded(_ context.Context, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.items[id]
+	if !ok {
+		return httpx.ErrNotFound
+	}
+	if u.Role == domain.RoleAdmin && s.countAdminsLocked() <= 1 {
+		return auth.ErrLastAdmin
+	}
+	delete(s.items, id)
+	return nil
+}
+
+func (s *fakeUserStore) countAdminsLocked() int {
+	n := 0
+	for _, u := range s.items {
+		if u.Role == domain.RoleAdmin {
+			n++
+		}
+	}
+	return n
 }

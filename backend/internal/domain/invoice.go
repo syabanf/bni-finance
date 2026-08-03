@@ -192,3 +192,29 @@ type InvoiceFilter struct {
 	Limit      int
 	Offset     int
 }
+
+// ValidateUpdateFrom memeriksa apakah patch boleh diterapkan pada invoice yang
+// sedang berstatus current.
+//
+// Dipanggil DUA kali dengan sengaja: sekali di service supaya permintaan yang
+// jelas salah ditolak cepat dengan pesan yang jelas, dan sekali lagi di dalam
+// transaksi repository setelah barisnya dikunci. Yang kedua itu yang mengikat.
+//
+// Sebelumnya hanya ada pemeriksaan pertama, dan itu memvalidasi status yang
+// dibaca SEBELUM transaksi dimulai. Dua permintaan bersamaan pada invoice
+// `sent` — satu melunasi, satu membatalkan — sama-sama lolos, dan status
+// akhirnya sekadar siapa yang menulis belakangan: invoice lunas bisa berakhir
+// dibatalkan. Terukur: 11 dari 12 ronde.
+func (s InvoiceStatus) ValidateUpdateFrom(in UpdateInvoiceInput) error {
+	if in.Status != nil && !s.CanTransitionTo(*in.Status) {
+		return fmt.Errorf("transisi status tidak diizinkan: %s → %s", s, *in.Status)
+	}
+	// Invoice lunas atau batal adalah catatan tertutup — nominal dan periodenya
+	// tidak boleh ditulis ulang setelah fakta.
+	if s == StatusPaid || s == StatusCancelled {
+		if in.Amount != nil || in.DueDate != nil || in.PeriodStart != nil || in.PeriodEnd != nil {
+			return fmt.Errorf("invoice berstatus %s tidak bisa diubah nominal/periodenya", s)
+		}
+	}
+	return nil
+}
