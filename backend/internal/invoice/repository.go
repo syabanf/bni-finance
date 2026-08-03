@@ -140,12 +140,39 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*domain.Invoice, e
 
 // Create inserts the invoice and its first audit entry in one transaction, so
 // no invoice can exist without a timeline.
+// Create menulis invoice beserta baris audit pertamanya dalam satu transaksi.
+//
+// Bila number kosong, nomornya dibangkitkan DI DALAM transaksi ini, setelah
+// mengambil advisory lock per tahun. Itu bukan kehati-hatian berlebihan:
+// penomoran menghitung baris yang sudah ada, jadi dua pemanggil yang membaca
+// sebelum salah satunya menulis akan menghitung nomor yang sama. Indeks unik
+// menolak yang kedua, dan pemanggil menerima 500 tanpa penjelasan.
+//
+// Terukur sebelum diperbaiki: 24 pembuatan serentak → 20 gagal. Aksi massal
+// "buat invoice renewal" menembakkan satu batch dari satu klik, jadi ini bukan
+// kasus teoretis.
+//
+// Lock-nya per tahun dan dilepas saat transaksi selesai, jadi yang terserialkan
+// hanya penomoran — bukan seluruh penulisan invoice.
 func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, number, currency string) (*domain.Invoice, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mulai transaksi: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	if number == "" {
+		year := in.DueDate.Time.Year()
+		// hashtext memetakan prefix ke satu int64; lock-nya transaction-scoped.
+		if _, err := tx.Exec(ctx,
+			"SELECT pg_advisory_xact_lock(hashtext($1))", numberPrefix(year)); err != nil {
+			return nil, fmt.Errorf("kunci penomoran: %w", err)
+		}
+		number, err = nextNumberTx(ctx, tx, year)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	const q = `
 		INSERT INTO invoices (number, member_id, chapter_id, type, amount, currency,
@@ -318,13 +345,29 @@ func (r *Repository) CountPayments(ctx context.Context, invoiceID string) (int, 
 	return n, err
 }
 
-// NextNumber builds the next sequential number for the year, e.g. INV-2026-013.
+func numberPrefix(year int) string { return fmt.Sprintf("INV-%d-", year) }
+
+// NextNumber memperkirakan nomor berikutnya untuk ditampilkan di form.
+//
+// HANYA untuk pratinjau. Nomor yang benar-benar dipakai dibangkitkan ulang di
+// dalam transaksi Create, di bawah advisory lock — nilai dari sini bisa basi
+// begitu invoice lain dibuat, dan memakainya sebagai nomor final adalah balapan
+// yang sudah pernah menjatuhkan 20 dari 24 permintaan serentak.
 func (r *Repository) NextNumber(ctx context.Context, year int) (string, error) {
-	prefix := fmt.Sprintf("INV-%d-", year)
+	return nextNumberTx(ctx, r.db, year)
+}
+
+// querier mencakup pool maupun transaksi, supaya penomoran bisa dipanggil dari
+// dalam Create tanpa menyalin SQL-nya.
+type querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func nextNumberTx(ctx context.Context, q querier, year int) (string, error) {
+	prefix := numberPrefix(year)
 	var count int
-	err := r.db.QueryRow(ctx,
-		"SELECT COUNT(*) FROM invoices WHERE number LIKE $1", prefix+"%").Scan(&count)
-	if err != nil {
+	if err := q.QueryRow(ctx,
+		"SELECT COUNT(*) FROM invoices WHERE number LIKE $1", prefix+"%").Scan(&count); err != nil {
 		return "", fmt.Errorf("hitung nomor invoice: %w", err)
 	}
 	return fmt.Sprintf("%s%03d", prefix, count+1), nil

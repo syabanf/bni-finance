@@ -48,15 +48,13 @@ func (s *Service) Create(ctx context.Context, in domain.CreateInvoiceInput) (*do
 		currency = *in.Currency
 	}
 
+	// Nomor kosong berarti "bangkitkan". Sengaja TIDAK dibangkitkan di sini:
+	// membaca nomor berikutnya lalu menulisnya lewat panggilan terpisah adalah
+	// balapan — dua pembuatan serentak membaca hitungan yang sama. Repository
+	// membangkitkannya di dalam transaksi Create, di bawah advisory lock.
 	number := ""
-	if in.Number != nil && *in.Number != "" {
+	if in.Number != nil {
 		number = *in.Number
-	} else {
-		generated, err := s.repo.NextNumber(ctx, in.DueDate.Year())
-		if err != nil {
-			return nil, err
-		}
-		number = generated
 	}
 
 	return s.repo.Create(ctx, in, number, currency)
