@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -105,4 +106,65 @@ func TestLoadClientLimitsAreReal(t *testing.T) {
 	if tr.MaxIdleConns < workers {
 		t.Errorf("MaxIdleConns = %d, harus >= %d", tr.MaxIdleConns, workers)
 	}
+}
+
+// t.Context() TIDAK BOLEH dipakai di dalam t.Cleanup.
+//
+// Sejak Go 1.24 context milik tes dibatalkan tepat sebelum fungsi Cleanup
+// dijalankan (dibuktikan langsung: ctx.Err() == "context canceled" di dalam
+// Cleanup). Setiap query pembersih yang memakainya diam-diam tidak pernah
+// jalan, dan bila nilai balik Exec ikut dibuang, tesnya tetap hijau sambil
+// meninggalkan barisnya di database bersama.
+//
+// Itu yang terjadi pada pembersih adm-race-*: dua akun ADMIN berkata sandi
+// tetap tertinggal di database dev setiap kali tes dijalankan, dan tidak ada
+// satu pun tes yang merah karenanya. Kegagalan sunyi seperti ini harus dijaga
+// di sumber, bukan diharapkan ketahuan lagi secara kebetulan.
+func TestCleanupTidakMemakaiTestContext(t *testing.T) {
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatalf("baca direktori: %v", err)
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if !strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatalf("baca %s: %v", name, err)
+		}
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, name, src, 0)
+		if err != nil {
+			t.Fatalf("parse %s: %v", name, err)
+		}
+		ast.Inspect(f, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok || !isSelector(call.Fun, "t", "Cleanup") {
+				return true
+			}
+			ast.Inspect(call, func(m ast.Node) bool {
+				inner, ok := m.(*ast.CallExpr)
+				if ok && isSelector(inner.Fun, "t", "Context") {
+					t.Errorf("%s: t.Context() di dalam t.Cleanup — "+
+						"context tes sudah dibatalkan saat Cleanup jalan, "+
+						"query-nya tidak akan pernah dieksekusi; "+
+						"pakai context.Background() dan periksa error-nya",
+						fset.Position(inner.Pos()))
+				}
+				return true
+			})
+			return true
+		})
+	}
+}
+
+func isSelector(e ast.Expr, recv, sel string) bool {
+	s, ok := e.(*ast.SelectorExpr)
+	if !ok || s.Sel.Name != sel {
+		return false
+	}
+	id, ok := s.X.(*ast.Ident)
+	return ok && id.Name == recv
 }

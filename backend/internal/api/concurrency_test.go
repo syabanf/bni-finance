@@ -390,8 +390,18 @@ func TestLastAdminGuardHoldsUnderConcurrency(t *testing.T) {
 			fmt.Sprintf(`{"email":%q,"password":"kata-sandi-uji-panjang","name":"Admin Race","role":"admin"}`, email),
 			http.StatusCreated, &created)
 		ids = append(ids, created.ID)
+		// context.Background(), BUKAN t.Context(): sejak Go 1.24 context milik
+		// tes dibatalkan tepat SEBELUM fungsi Cleanup dijalankan, jadi DELETE
+		// dengan t.Context() tidak pernah sampai ke database. Errornya pun
+		// dibuang karena nilai baliknya tidak diperiksa — dan akibatnya tiap
+		// run meninggalkan dua akun ADMIN berkata sandi tetap di database
+		// bersama. Ketahuan saat mendaftar isi tabel users: adm-race-0 dan
+		// adm-race-1 masih di sana, padahal tesnya lulus.
 		t.Cleanup(func() {
-			s.pool.Exec(t.Context(), "DELETE FROM users WHERE email = $1", email)
+			if _, err := s.pool.Exec(context.Background(),
+				"DELETE FROM users WHERE email = $1", email); err != nil {
+				t.Errorf("bersihkan %s: %v", email, err)
+			}
 		})
 	}
 
