@@ -19,10 +19,17 @@ test:     ## Jalankan unit test (integration test dilewati)
 ## mem-TRUNCATE tabel di awal. Go menjalankan paket berbeda secara paralel,
 ## jadi tanpa ini mereka saling menghapus data di tengah jalan dan gagal
 ## dengan cara yang terlihat seperti bug produk.
+##
+## Keluaran lengkap SELALU tersimpan ke ../test-report/integration-<waktu>.log.
+## Pernah terjadi satu run yang ketiga paketnya gagal bersamaan dan tidak bisa
+## direproduksi — dan lognya sudah tertimpa sebelum sempat dibaca. Bukti yang
+## hilang tidak bisa didiagnosis; sejak itu tiap run meninggalkan berkasnya.
 test-integration:
 	@test -n "$(TEST_DATABASE_URL)" || (echo "set TEST_DATABASE_URL dulu" && exit 1)
-	TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -p 1 -count=1 -v \
-		./internal/api/ ./internal/sync/ ./internal/paperid/
+	@mkdir -p ../test-report
+	@set -o pipefail; TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -p 1 -count=1 -v \
+		./internal/api/ ./internal/sync/ ./internal/paperid/ 2>&1 \
+		| tee ../test-report/integration-$$(date +%Y%m%d-%H%M%S).log
 
 ## Hasilkan ulang openapi.json dari openapi.yaml. YAML adalah sumbernya; JSON
 ## yang disajikan ke halaman /docs, karena browser bisa mem-parsing JSON tanpa

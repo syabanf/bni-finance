@@ -88,7 +88,7 @@ func (s *e2eStack) post(path, token, body string) (int, string) {
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	res, err := http.DefaultClient.Do(req)
+	res, err := s.client.Do(req)
 	if err != nil {
 		return 0, err.Error()
 	}
@@ -314,7 +314,7 @@ func TestMixedLoadAgainstPostgres(t *testing.T) {
 				} else {
 					req, _ := http.NewRequest("GET", s.srv.URL+reads[(w+i)%len(reads)], nil)
 					req.Header.Set("Authorization", "Bearer "+s.adminToken)
-					res, err := http.DefaultClient.Do(req)
+					res, err := s.client.Do(req)
 					if err != nil {
 						serverErr.Add(1)
 						continue
@@ -390,8 +390,18 @@ func TestLastAdminGuardHoldsUnderConcurrency(t *testing.T) {
 			fmt.Sprintf(`{"email":%q,"password":"kata-sandi-uji-panjang","name":"Admin Race","role":"admin"}`, email),
 			http.StatusCreated, &created)
 		ids = append(ids, created.ID)
+		// context.Background(), BUKAN t.Context(): sejak Go 1.24 context milik
+		// tes dibatalkan tepat SEBELUM fungsi Cleanup dijalankan, jadi DELETE
+		// dengan t.Context() tidak pernah sampai ke database. Errornya pun
+		// dibuang karena nilai baliknya tidak diperiksa — dan akibatnya tiap
+		// run meninggalkan dua akun ADMIN berkata sandi tetap di database
+		// bersama. Ketahuan saat mendaftar isi tabel users: adm-race-0 dan
+		// adm-race-1 masih di sana, padahal tesnya lulus.
 		t.Cleanup(func() {
-			s.pool.Exec(t.Context(), "DELETE FROM users WHERE email = $1", email)
+			if _, err := s.pool.Exec(context.Background(),
+				"DELETE FROM users WHERE email = $1", email); err != nil {
+				t.Errorf("bersihkan %s: %v", email, err)
+			}
 		})
 	}
 
@@ -441,7 +451,7 @@ func TestLastAdminGuardHoldsUnderConcurrency(t *testing.T) {
 				strings.NewReader(`{"role":"user"}`))
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+s.adminToken)
-			res, err := http.DefaultClient.Do(req)
+			res, err := s.client.Do(req)
 			if err == nil {
 				io.Copy(io.Discard, res.Body)
 				res.Body.Close()
@@ -501,7 +511,7 @@ func TestConflictingStatusTransitionsResolveToOne(t *testing.T) {
 					strings.NewReader(body))
 				req.Header.Set("Content-Type", "application/json")
 				req.Header.Set("Authorization", "Bearer "+s.adminToken)
-				res, err := http.DefaultClient.Do(req)
+				res, err := s.client.Do(req)
 				if err != nil {
 					return
 				}

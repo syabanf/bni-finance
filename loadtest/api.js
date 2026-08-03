@@ -65,6 +65,34 @@ export const options = {
     'http_req_duration{scenario:publik}': ['p(95)<500'],
     invoice_duplicate_numbers: ['count==0'],
     checks: ['rate>0.99'],
+
+    // --- lantai volume: "tidak ada data" harus GAGAL, bukan lulus -------------
+    //
+    // k6 menilai threshold atas metrik KOSONG sebagai lulus. Terbukti: sebuah
+    // skrip yang tidak mengirim satu request pun tetap keluar dengan exit code
+    // 0 dan menampilkan ✓ untuk semuanya — termasuk `checks rate>0.99` yang
+    // dilaporkan rate=0.00%, dan `p(95)<500` pada {scenario:baca} di skrip yang
+    // bahkan tidak punya skenario bernama baca.
+    //
+    // Konsekuensinya bukan teoretis. Tiga threshold di atas di-tag per NAMA
+    // skenario. Salah ketik atau rename satu nama membuat metriknya tidak
+    // pernah terisi, thresholdnya ✓ selamanya, dan latensi jalur itu berhenti
+    // dijaga tanpa ada yang merah. Gerbang CI-nya hijau justru karena tidak
+    // mengukur apa-apa.
+    //
+    // Ini kelas bug yang sama dengan benchmark yang dulu terbaca "9.606 req/s"
+    // padahal seluruh 1.000 request-nya 401: angka tanpa bukti bahwa kerjanya
+    // benar-benar terjadi tidak bernilai.
+    //
+    // Angkanya sengaja rendah — tugasnya menangkap NOL, bukan menetapkan target
+    // throughput. baca 30 VU dan publik 10 VU selama 45 detik menghasilkan
+    // ratusan ribu iterasi di mesin pengembang; mesin CI paling lambat pun jauh
+    // melewati 100. tulis memakai constant-arrival-rate 10/detik × 45 detik =
+    // 450 iterasi yang deterministik, jadi lantainya bisa lebih dekat.
+    'iterations{scenario:baca}': ['count>100'],
+    'iterations{scenario:tulis}': ['count>300'],
+    'iterations{scenario:publik}': ['count>100'],
+    http_reqs: ['count>500'],
   },
 };
 

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
 // Apply() is pure SQL, so a fake store proves nothing about it. These tests run
@@ -34,6 +36,9 @@ func livePool(t *testing.T) *pgxpool.Pool {
 		t.Fatalf("sambung ke database: %v", err)
 	}
 	t.Cleanup(pool.Close)
+
+	// Satu proses tes pada satu waktu — lihat internal/testdb.
+	testdb.Serialize(t, pool)
 
 	_, err = pool.Exec(context.Background(),
 		"TRUNCATE invoice_audit_log, payments, invoices, members, chapters RESTART IDENTITY CASCADE")

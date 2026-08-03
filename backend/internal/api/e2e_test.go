@@ -58,10 +58,17 @@ const e2eCallbackToken = "token-callback-e2e"
 
 type e2eStack struct {
 	srv        *httptest.Server
+	client     *http.Client
 	pool       *pgxpool.Pool
 	adminToken string
 	userToken  string
 	paperLive  bool
+
+	// invoicesMade menghitung invoice yang dibuat sepanjang perjalanan.
+	// Dashboard menegaskan Total.Count sama persis dengan ini — dan karena
+	// retry transien Paper.id membuat invoice segar, angka tetapnya "2" akan
+	// bohong tepat pada run yang paling perlu dipercaya.
+	invoicesMade int
 }
 
 func newE2EStack(t *testing.T) *e2eStack {
@@ -95,7 +102,11 @@ func newE2EStack(t *testing.T) *e2eStack {
 	}, pool.Ping)
 
 	st := &e2eStack{
-		srv:       httptest.NewServer(h),
+		srv: httptest.NewServer(h),
+		// 90 detik: lebih longgar daripada timeout 60 detik yang dipakai
+		// backend ke Paper.id, supaya yang terlihat adalah error backend,
+		// bukan timeout klien tes.
+		client:    loadClient(t, 1024, 90*time.Second),
 		pool:      pool,
 		paperLive: clientID != "" && clientSecret != "",
 	}
@@ -157,7 +168,7 @@ func (s *e2eStack) do(t *testing.T, method, path, token, body string, wantStatus
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := s.client.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
 	}
@@ -171,6 +182,68 @@ func (s *e2eStack) do(t *testing.T, method, path, token, body string, wantStatus
 		if err := json.Unmarshal(raw, out); err != nil {
 			t.Fatalf("%s %s: body bukan JSON — %s", method, path, raw)
 		}
+	}
+}
+
+// freshDraft membuat satu invoice draft bernomor segar dan mencatatnya.
+func (s *e2eStack) freshDraft(t *testing.T) e2eInvoice {
+	t.Helper()
+	var inv e2eInvoice
+	s.do(t, "POST", "/api/v1/invoices", s.adminToken,
+		fmt.Sprintf(`{"number":"E2E-%d","memberId":"mem-e2e","chapterId":"ch-e2e","type":"renewal",`+
+			`"amount":250000,"dueDate":"2026-12-31","periodStart":"2026-07-27",`+
+			`"periodEnd":"2027-07-27"}`, time.Now().UnixNano()),
+		http.StatusCreated, &inv)
+	s.invoicesMade++
+	return inv
+}
+
+// transientPaperFailure memutuskan apakah kegagalan kirim layak diulang dengan
+// invoice SEGAR — bukan invoice yang sama, karena timeout klien yang sebenarnya
+// berhasil di hulu membakar nomornya secara permanen.
+//
+// Paper.id staging bukan lawan yang stabil: pada lima run hari ini, langkah
+// yang sama memakan 5 dtk empat kali lalu 52 dtk sekali; run sebelumnya pernah
+// 45 dtk, dan timeout klien 60 dtk. Tanpa retry, satu ayunan menjatuhkan
+// seluruh paket — kandidat terkuat untuk kegagalan tunggal yang tidak pernah
+// bisa direproduksi itu.
+//
+// 409 hanya diulang bila pesannya menyebut nomor terpakai. 409 partner
+// mismatch TIDAK diulang: itu persis bug customerRef yang dijaga langkah
+// "ganti nomor", dan mengulangnya hanya mengaburkan kegagalan yang sah.
+func transientPaperFailure(status int, body string) bool {
+	switch status {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	case http.StatusConflict:
+		return strings.Contains(body, "nomor sudah dipakai")
+	}
+	return false
+}
+
+// sendRetrying mengirim inv ke Paper.id; kegagalan transien diulang dengan
+// invoice segar, maksimal tiga percobaan. Setiap pengulangan dicatat KERAS —
+// flake yang bersembunyi adalah flake yang tidak pernah diperbaiki.
+func (s *e2eStack) sendRetrying(t *testing.T, inv e2eInvoice) e2eInvoice {
+	t.Helper()
+	const attempts = 3
+	for i := 1; ; i++ {
+		status, body := s.post("/api/v1/invoices/"+inv.ID+"/send", s.adminToken,
+			`{"sendEmail":false,"sendWhatsApp":false}`)
+		if status == http.StatusOK {
+			var sent e2eInvoice
+			if err := json.Unmarshal([]byte(body), &sent); err != nil {
+				t.Fatalf("respons kirim bukan JSON: %s", body)
+			}
+			return sent
+		}
+		if i >= attempts || !transientPaperFailure(status, body) {
+			t.Fatalf("kirim ke Paper.id gagal (HTTP %d) pada percobaan %d: %s",
+				status, i, strings.TrimSpace(body))
+		}
+		t.Logf("PERCOBAAN %d GAGAL TRANSIEN (HTTP %d): %s — ulang dengan invoice segar",
+			i, status, strings.TrimSpace(body))
+		inv = s.freshDraft(t)
 	}
 }
 
@@ -247,6 +320,7 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		if inv.Number != number {
 			t.Errorf("nomor tidak dipakai apa adanya: %q", inv.Number)
 		}
+		s.invoicesMade++
 	})
 
 	t.Run("audit mencatat pembuatan", func(t *testing.T) {
@@ -271,13 +345,11 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 	}
 
 	t.Run("invoice terkirim ke Paper.id", func(t *testing.T) {
-		var sent e2eInvoice
 		// Kanal dimatikan SECARA EKSPLISIT, tidak dibiarkan mengikuti
-		// app_settings. Sebuah tes otomatis tidak boleh mengirim email dan
-		// WhatsApp ke orang sungguhan setiap kali dijalankan — dan ini sekaligus
-		// menguji jalur override, yang memang ada untuk keperluan seperti ini.
-		s.do(t, "POST", "/api/v1/invoices/"+inv.ID+"/send", s.adminToken,
-			`{"sendEmail":false,"sendWhatsApp":false}`, http.StatusOK, &sent)
+		// app_settings — tes otomatis tidak boleh mengirim email/WhatsApp ke
+		// orang sungguhan. Kegagalan transien staging diulang dengan invoice
+		// segar oleh sendRetrying; lihat transientPaperFailure untuk batasnya.
+		sent := s.sendRetrying(t, inv)
 
 		if sent.Status != "sent" {
 			t.Errorf("status harus sent, dapat %q", sent.Status)
@@ -309,9 +381,11 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 				`"amount":250000,"dueDate":"2026-12-31","periodStart":"2027-07-28",`+
 				`"periodEnd":"2028-07-28"}`, number+"-B"),
 			http.StatusCreated, &second)
+		s.invoicesMade++
 
-		s.do(t, "POST", "/api/v1/invoices/"+second.ID+"/send", s.adminToken,
-			`{"sendEmail":false,"sendWhatsApp":false}`, http.StatusOK, &second)
+		// sendRetrying TIDAK mengulang 409 partner-mismatch — itu persis bug
+		// customerRef yang dijaga langkah ini, dan harus gagal seketika.
+		second = s.sendRetrying(t, second)
 		if second.PaperIDInvoiceID == "" {
 			t.Fatal("invoice kedua tidak tersimpan id Paper.id-nya")
 		}
@@ -409,10 +483,12 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 			Paid  struct{ Count int } `json:"paid"`
 		}
 		s.do(t, "GET", "/api/v1/dashboard/summary", s.adminToken, "", http.StatusOK, &sum)
-		// Dua invoice dibuat sepanjang perjalanan ini — satu ditagih dan dilunasi,
-		// satu lagi untuk membuktikan member yang ganti nomor masih bisa ditagih.
-		if sum.Total.Count != 2 || sum.Paid.Count != 1 {
-			t.Errorf("ringkasan salah: total=%d lunas=%d, diharapkan 2/1", sum.Total.Count, sum.Paid.Count)
+		// Jumlah totalnya mengikuti hitungan nyata, bukan angka mati: retry
+		// transien Paper.id membuat invoice segar, dan "harus 2" akan bohong
+		// tepat pada run yang paling perlu dipercaya.
+		if sum.Total.Count != s.invoicesMade || sum.Paid.Count != 1 {
+			t.Errorf("ringkasan salah: total=%d lunas=%d, diharapkan %d/1",
+				sum.Total.Count, sum.Paid.Count, s.invoicesMade)
 		}
 	})
 
@@ -427,4 +503,33 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Klasifikasi transien-vs-nyata adalah keputusan paling berbahaya di retry ini:
+// salah ke satu arah, flake staging menjatuhkan suite; salah ke arah lain,
+// regresi customerRef (partner mismatch, juga 409) ikut diulang-ulang sampai
+// kegagalannya kabur. Tabel ini mengunci batasnya.
+func TestTransientPaperFailureClassification(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   bool
+	}{
+		{"502 gateway", 502, `{"error":"Paper.id menolak: internal"}`, true},
+		{"503 unavailable", 503, `{"error":"Paper.id belum dikonfigurasi"}`, true},
+		{"504 timeout", 504, `{"error":"timeout"}`, true},
+		{"409 nomor terbakar", 409, `{"error":"invoice ini sudah pernah dibuat di Paper.id (nomor sudah dipakai) — periksa dashboard"}`, true},
+		{"409 partner mismatch — bug customerRef, JANGAN diulang", 409,
+			`{"error":"Paper.id sudah menyimpan member ini dengan nama/email/telepon yang berbeda"}`, false},
+		{"400 telepon kosong — bug nyata", 400, `{"error":"member belum punya nomor telepon"}`, false},
+		{"500 kita sendiri", 500, `{"error":"terjadi kesalahan pada server"}`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := transientPaperFailure(c.status, c.body); got != c.want {
+				t.Errorf("status=%d body=%q → %v, harusnya %v", c.status, c.body, got, c.want)
+			}
+		})
+	}
 }
