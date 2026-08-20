@@ -201,7 +201,7 @@ Tidak ada lagi ketergantungan Supabase.
 
 | Kebutuhan | Dulu (Supabase) | Sekarang |
 |---|---|---|
-| Database | Supabase Postgres | Postgres lokal — `db/schema.sql` |
+| Database | Supabase Postgres | Postgres lokal — `db/init.sql` |
 | Autentikasi | Supabase Auth | Tabel `users` + JWT (PBKDF2 + HS256, stdlib) |
 | Otorisasi | RLS per baris | Middleware peran di backend |
 | Penyimpanan berkas | Storage bucket | Berkas di disk (`UPLOAD_DIR`) |
@@ -296,7 +296,7 @@ menyembunyikan tombol — batas sebenarnya ada di backend.
 | Ikon | lucide-react |
 | Ekspor | CSV (BOM UTF-8) + PDF (dokumen cetak berlabel BNI) |
 | Backend | Go 1.25 (`net/http`) + `pgx/v5` — lihat `backend/` |
-| Database | Postgres 14+ — skema di `db/schema.sql` |
+| Database | Postgres 14+ — skema di `db/init.sql` |
 | Autentikasi | JWT HS256 + PBKDF2, seluruhnya pustaka standar Go |
 | Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
 | Data | Mock in-memory (default) ↔ REST API Go (`VITE_USE_MOCK=false`) |
