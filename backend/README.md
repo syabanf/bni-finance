@@ -38,7 +38,7 @@ Perintah database lain (`DB_NAME`, `DB_PORT`, `PSQL` bisa ditimpa):
 
 ```bash
 make db-create   # buat database saja
-make db-schema   # terapkan ../db/schema.sql (idempoten)
+make db-init     # terapkan ../db/init.sql — skema + akun awal + data contoh
 make db-seed     # isi data contoh
 make db-drop     # hapus database — minta konfirmasi
 ```

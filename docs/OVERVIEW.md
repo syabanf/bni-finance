@@ -19,7 +19,7 @@ seluruhnya terekam dengan jejak audit.
 |---|---|
 | Frontend | Vite 5 · React 18 · TypeScript · Tailwind 3 · React Router 6 · PWA |
 | Backend | Go 1.25, pustaka standar (satu dependensi: `pgx/v5`) |
-| Database | Postgres 14+ — skema di [`db/schema.sql`](../db/schema.sql) |
+| Database | Postgres 14+ — skema di [`db/init.sql`](../db/init.sql) |
 | Autentikasi | JWT HS256 + PBKDF2, seluruhnya stdlib Go |
 | Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
 | Hosting | Vercel (frontend) · backend server-side terpisah |
@@ -310,7 +310,7 @@ make test-integration TEST_DATABASE_URL=postgres://…/bni_finance_dev
 ```
 
 > ⚠️ Integration test **meng-`TRUNCATE` tabel bisnis** dan menolak database yang namanya
-> tidak mengandung `test`/`dev`. Muat ulang `db/seed.sql` setelahnya.
+> tidak mengandung `test`/`dev`. Muat ulang `db/init.sql` setelahnya.
 > `-p 1` wajib — paket-paketnya berbagi satu database dan Go menjalankan paket berbeda
 > secara paralel.
 
@@ -335,7 +335,7 @@ Login terjadi sekali di `setup()`, bukan per-VU: 100 VU yang login sendiri-
 sendiri berarti 100 PBKDF2 600 ribu iterasi, dan yang terukur jadi hashing.
 
 > Skenario `tulis` benar-benar membuat invoice. Jalankan hanya ke database
-> sekali pakai, dan muat ulang `db/seed.sql` setelahnya.
+> sekali pakai, dan muat ulang `db/init.sql` setelahnya.
 
 **Tes E2E** (`internal/api/e2e_test.go`) menelusuri seluruh perjalanan lewat HTTP: masuk →
 tolak tanpa token → tolak peran user untuk menulis → daftarkan chapter & member → terbitkan
@@ -408,7 +408,7 @@ Halaman `/docs`, `/openapi.yaml`, dan `/openapi.json` dilayani backend, bukan Ve
 |---|---|---|
 | [`README.md`](../README.md) | ✅ berlaku | Fitur lengkap, arsitektur frontend, cara menjalankan |
 | [`backend/README.md`](../backend/README.md) | ✅ berlaku | Endpoint, aturan bisnis, keamanan, performa, hasil stress test |
-| [`db/schema.sql`](../db/schema.sql) | ✅ berlaku | Skema database — sumber kebenaran |
+| [`db/init.sql`](../db/init.sql) | ✅ berlaku | Skema database — sumber kebenaran |
 | `/docs` di backend | ✅ berlaku | Referensi API, dibangkitkan dari `openapi.yaml` |
 | [`docs/SYSTEM.md`](./SYSTEM.md) | ⚠️ **sebagian usang** | Alur bisnis & Xendit masih berlaku; bagian Supabase (PostgREST, RLS, Edge Functions, Storage) sudah tidak menggambarkan sistem yang berjalan |
 | [`docs/bni-finance-system-plan.md`](./bni-finance-system-plan.md) | 📜 historis | Rencana teknis awal |

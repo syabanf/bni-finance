@@ -26,9 +26,20 @@ Jenis: Happy path · Negatif · Keamanan · Balapan (concurrency) · Integrasi �
 ## Prasyarat lingkungan
 
 - `backend/.env` terisi (`npm run setup`)
-- Postgres siap dan termigrasi, `db/seed.sql` dimuat
+- Database disiapkan dengan satu perintah: `cd backend && make db-reset`
 - Kredensial Paper.id staging terpasang untuk skenario Integrasi
-- Dua akun: satu admin, satu user biasa
+
+`db/init.sql` sudah membuat dua akun, dan emailnya sama persis dengan akun demo
+pada mode Data Contoh — jadi skenario yang sama berlaku di kedua mode:
+
+| Peran | Email | Kata sandi |
+| --- | --- | --- |
+| Admin | `admin@bni-finance.com` | `admin123` |
+| User | `user@bni-finance.com` | `user123` |
+
+> **Kredensial pengembangan.** Kata sandi di atas tertulis di dalam repo dan
+> sama di setiap salinan. Jangan pernah menjalankan `db/init.sql` pada database
+> produksi yang masih kosong; produksi memakai `SEED_ADMIN_*` dari environment.
 
 > **Kanal pengiriman.** Skenario Integrasi yang mengirim email/WhatsApp akan
 > menghubungi kontak SUNGGUHAN di data. Pada lingkungan uji, arahkan seluruh

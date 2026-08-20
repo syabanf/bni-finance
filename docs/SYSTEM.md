@@ -11,7 +11,7 @@ member.
 >
 > - Arsitektur & cara menjalankan → [`../README.md`](../README.md)
 > - Backend, endpoint, dan model keamanan → [`../backend/README.md`](../backend/README.md)
-> - Skema database → [`../db/schema.sql`](../db/schema.sql)
+> - Skema database → [`../db/init.sql`](../db/init.sql)
 >
 > Bagian tentang alur bisnis, siklus invoice, dan integrasi Xendit masih berlaku.
 

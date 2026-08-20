@@ -75,15 +75,16 @@ db-create: ## Buat database bila belum ada
 		|| $(PSQL) "postgresql://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres" -c "CREATE DATABASE $(DB_NAME)"
 	@echo "database $(DB_NAME) siap"
 
-db-schema: ## Terapkan skema (idempoten)
-	$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/schema.sql
-	@echo "skema diterapkan"
+db-init:  ## Terapkan skema + akun awal + data contoh (satu berkas, idempoten)
+	$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/init.sql
+	@echo "db/init.sql diterapkan"
 
-db-seed:  ## Isi data contoh untuk pengembangan
-	$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/seed.sql
-	@echo "data contoh dimuat"
-
-db-reset: db-create db-schema db-seed ## Siapkan database lokal dari nol
+db-reset: db-create db-init ## Siapkan database lokal dari nol — MENGOSONGKAN tabel bisnis
+	@echo "mengosongkan tabel bisnis lalu memuat ulang data contoh…"
+	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -c \
+		"truncate invoice_audit_log, payments, invoices, members, chapters restart identity cascade"
+	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/init.sql
+	@echo "data contoh disegarkan (tabel users tidak disentuh)"
 
 db-drop:  ## Hapus database — menghapus SEMUA data di dalamnya
 	@printf 'Hapus database %s beserta seluruh isinya? [y/N] ' "$(DB_NAME)"; \
