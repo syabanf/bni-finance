@@ -40,8 +40,14 @@ type Config struct {
 	PaperIDClientSecret  string
 	PaperIDCallbackToken string
 
-	// BlackboxSize is how many integration calls the in-memory recorder keeps.
+	// BlackboxSize is how many integration calls the in-memory recorder keeps,
+	// and how many rows the blackbox page reads back at once.
 	BlackboxSize int
+
+	// BlackboxRetain membatasi berapa banyak baris riwayat integrasi disimpan
+	// di database. Tanpa batas, tabelnya tumbuh selamanya — tiap penerbitan
+	// invoice menambah dua baris dan tidak ada yang pernah menghapusnya.
+	BlackboxRetain int
 
 	// Seed credentials create the first administrator on an empty users table,
 	// so a fresh database is reachable without hand-writing a password hash.
@@ -93,7 +99,8 @@ func Load() (Config, error) {
 		PaperIDClientSecret:  strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_SECRET")),
 		PaperIDCallbackToken: strings.TrimSpace(os.Getenv("PAPER_ID_CALLBACK_TOKEN")),
 
-		BlackboxSize: int(bytesOr("BLACKBOX_SIZE", 200)),
+		BlackboxSize:   int(bytesOr("BLACKBOX_SIZE", 200)),
+		BlackboxRetain: int(bytesOr("BLACKBOX_RETAIN", 10_000)),
 
 		SeedAdminEmail:    strings.TrimSpace(os.Getenv("SEED_ADMIN_EMAIL")),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),

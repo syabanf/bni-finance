@@ -71,7 +71,12 @@ func run(log *slog.Logger) error {
 
 	// One recorder shared by every integration, so the blackbox page shows all
 	// traffic in a single timeline.
-	recorder := blackbox.New(cfg.BlackboxSize)
+	//
+	// Riwayatnya disimpan ke Postgres: pertanyaan yang benar-benar diajukan
+	// orang — "invoice ini dikirim kapan, dan Paper.id menjawab apa" — hampir
+	// selalu datang berhari-hari setelah prosesnya di-restart.
+	recorder := blackbox.New(cfg.BlackboxSize).
+		WithStore(blackbox.NewRepository(pool, cfg.BlackboxRetain), log)
 
 	// Metrics. The registry is per-process and passed explicitly rather than
 	// kept in a package global, so tests get a clean one each time.
