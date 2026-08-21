@@ -45,9 +45,7 @@ import { paymentMethodLabel } from '@/lib/paymentMethod'
 import { todayISO } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
-import { PaymentPanel } from './components/PaymentPanel'
 import { downloadInvoice } from './lib/invoiceDocument'
-import { isSelfPaymentMode } from '@/services/api/paymentGateway'
 
 const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> = {
   created: { icon: FilePlus2, tone: 'bg-ink-100 text-ink-500' },
@@ -95,7 +93,6 @@ export function InvoiceDetailPage() {
     () => paymentService.listByInvoice(id),
     [id],
   )
-  const { data: selfPayment } = useAsync<boolean>(() => isSelfPaymentMode(), [id])
 
   const [dialog, setDialog] = useState<DialogKind>(null)
   const [cancelReason, setCancelReason] = useState('')
@@ -145,21 +142,15 @@ export function InvoiceDetailPage() {
   }
 
   /**
-   * Tautan yang dibagikan ke member harus tautan yang benar-benar bisa dibayar.
+   * Tautan yang dibagikan ke member selalu halaman pembayaran Paper.id
+   * (`payper_url`) yang mereka kembalikan saat invoice diterbitkan.
    *
-   * Self Payment Mode ON  → halaman publik kita (`/pay/:id`) yang memproses
-   *                          pembayaran lewat Xendit.
-   * Self Payment Mode OFF → halaman pembayaran Paper.id, yaitu `payper_url`
-   *                          yang mereka kembalikan saat invoice diterbitkan.
-   *
-   * Sebelumnya selalu `/pay/:id`. Pada mode Paper.id halaman itu menolak
-   * pembayaran (`selfPaymentMode: false`), jadi member menerima tautan yang
-   * membuka halaman tanpa cara membayar — sementara tautan yang benar sudah
-   * tersimpan di invoice.
+   * Dulu ada percabangan ke halaman publik kita sendiri untuk pembayaran
+   * mandiri lewat Xendit. Jalur itu dihapus, jadi hanya tersisa satu tautan
+   * yang benar — dan tidak ada lagi cara mengirim tautan yang tidak bisa
+   * dibayar.
    */
-  const payUrl = selfPayment
-    ? `${window.location.origin}/pay/${invoice.id}`
-    : invoice.paperIdPaymentUrl
+  const payUrl = invoice.paperIdPaymentUrl
   const hasPayUrl = Boolean(payUrl)
 
   const copyPayLink = async () => {
@@ -356,11 +347,7 @@ export function InvoiceDetailPage() {
             <Card>
               <CardHeader
                 title="Link Pembayaran"
-                subtitle={
-                  selfPayment
-                    ? 'Halaman pembayaran mandiri kita — member bisa bayar via Virtual Account atau QRIS.'
-                    : 'Halaman pembayaran Paper.id untuk invoice ini.'
-                }
+                subtitle="Halaman pembayaran Paper.id untuk invoice ini."
               />
               <CardBody className="space-y-3">
                 {hasPayUrl ? (
@@ -381,9 +368,10 @@ export function InvoiceDetailPage() {
                     </div>
                   </>
                 ) : (
-                  // Tanpa tautan Paper.id tidak ada yang bisa dibagikan. Menampilkan
-                  // /pay/:id di sini justru menyesatkan: pada mode Paper.id halaman
-                  // itu menolak pembayaran, jadi member menerima jalan buntu.
+                  // Tanpa tautan Paper.id tidak ada yang bisa dibagikan, dan
+                  // sekarang itu satu-satunya halaman yang benar-benar bisa
+                  // dibayar — jadi ketiadaannya harus dinyatakan, bukan ditutupi
+                  // dengan tautan lain yang berujung jalan buntu.
                   <div className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
                     <TriangleAlert className="mt-0.5 h-4 w-4 flex-shrink-0" />
                     Invoice ini belum punya tautan pembayaran Paper.id. Biasanya karena
@@ -437,10 +425,6 @@ export function InvoiceDetailPage() {
               </div>
             </CardBody>
           </Card>
-
-          {selfPayment && (status === 'sent' || status === 'overdue') && (
-            <PaymentPanel invoice={invoice} onUpdated={refresh} />
-          )}
 
           {payments && payments.length > 0 && (
             <Card>

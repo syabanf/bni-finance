@@ -1,6 +1,6 @@
 # Skenario QA End-to-End — BNI Finance Hub
 
-67 skenario di 12 modul. Diturunkan dari kode yang benar-benar ada: rute di
+61 skenario di 12 modul. Diturunkan dari kode yang benar-benar ada: rute di
 `src/app/router.tsx`, endpoint yang terdaftar di mux, dan aturan transisi di
 `backend/internal/domain/invoice.go` — bukan daftar generik.
 
@@ -49,6 +49,11 @@ pada mode Data Contoh — jadi skenario yang sama berlaku di kedua mode:
 > secara permanen begitu dipakai. Membersihkan database lokal tidak
 > mengembalikannya.
 
+> **Pembayaran mandiri (Xendit) dihapus.** Seluruh permukaan bayar publik —
+> `/pay/:id`, endpoint publik, webhook Xendit, dan halaman Metode Pembayaran —
+> sudah tidak ada. Member membayar lewat tautan Paper.id. Skenario PAY-03
+> sampai PAY-07 dan SET-03 dihapus bersamanya.
+
 ## Penjaga regresi
 
 Sembilan skenario memuat catatan bug yang PERNAH benar-benar terjadi di proyek
@@ -65,14 +70,14 @@ layak dijalankan lebih dulu: `ROLE-06`, `INV-02`, `INV-06`, `MEM-03`, `INV-07`,
 | Member | 5 | 2 | 3 | 0 |
 | Chapter | 2 | 1 | 1 | 0 |
 | Invoice | 12 | 7 | 4 | 1 |
-| Pembayaran | 8 | 6 | 2 | 0 |
+| Pembayaran | 3 | 2 | 1 | 0 |
 | Dashboard & Laporan | 4 | 1 | 3 | 0 |
-| Pengaturan | 5 | 2 | 3 | 0 |
+| Pengaturan | 4 | 2 | 2 | 0 |
 | Alat Admin | 6 | 0 | 4 | 2 |
 | Sumber Data | 3 | 3 | 0 | 0 |
 | Responsif | 4 | 1 | 2 | 1 |
 | Lintas Fungsi | 4 | 1 | 2 | 1 |
-| **TOTAL** | **67** | **34** | **28** | **5** |
+| **TOTAL** | **61** | **30** | **26** | **5** |
 
 ## Skenario
 
@@ -116,11 +121,6 @@ Sel multi-baris memakai `<br>`. Kolom dibaca apa adanya oleh
 | INV-12 | Invoice | P3 | Hapus invoice draft | Invoice draft yang belum pernah dikirim. | 1. Hapus invoice tersebut<br>2. Coba hapus invoice yang sudah sent/paid | Draft terhapus. Yang sudah sent/paid ditolak — riwayat keuangan tidak boleh hilang. | Negatif |
 | PAY-01 | Pembayaran | P1 | Catat pembayaran manual | Invoice berstatus sent. | 1. Buka /payments atau detail invoice<br>2. Catat pembayaran penuh<br>3. Simpan | Pembayaran tercatat, invoice menjadi paid, dashboard ikut berubah. | Happy path |
 | PAY-02 | Pembayaran | P1 | Pembayaran ganda pada invoice yang sama | Invoice sent. | 1. Kirim 30+ pencatatan pembayaran untuk invoice yang sama, bersamaan | Tidak ada 5xx. Invoice berakhir paid. Jumlah pembayaran tercatat masuk akal dan tidak ada nominal ganda yang tidak dijelaskan. | Balapan |
-| PAY-03 | Pembayaran | P1 | Halaman bayar publik dapat diakses tanpa login | Invoice sent dengan id diketahui. | 1. Buka /pay/{id} di jendela penyamaran | Halaman tampil berisi nominal, nomor invoice, dan cara bayar. Tidak perlu masuk. | Happy path |
-| PAY-04 | Pembayaran | P1 | Halaman bayar publik TIDAK membocorkan kontak member | Invoice sent milik member dengan email dan telepon terisi. | 1. Buka /pay/{id}<br>2. Periksa tampilan DAN respons GET /api/v1/public/invoices/{id} (view-source / DevTools) | Tidak ada email maupun nomor telepon member di mana pun, termasuk di JSON mentah. Siapa pun pemegang id tidak boleh bisa memanen kontak. | Keamanan |
-| PAY-05 | Pembayaran | P2 | Halaman bayar untuk invoice tidak dikenal | — | 1. Buka /pay/id-yang-tidak-ada | Pesan ramah "invoice tidak ditemukan", bukan galat mentah atau layar putih. | Negatif |
-| PAY-06 | Pembayaran | P1 | Webhook Xendit melunasi tepat satu kali | Invoice sent dengan tagihan Xendit. | 1. Kirim webhook pelunasan yang SAMA sebanyak 10 kali bersamaan | Invoice paid. Tepat SATU pembayaran tercatat. Idempoten. | Balapan |
-| PAY-07 | Pembayaran | P1 | Webhook ditolak tanpa token callback yang benar | — | 1. POST /api/v1/webhooks/xendit tanpa header token<br>2. Ulangi dengan token salah | Keduanya ditolak (401/403). Tidak ada invoice yang berubah status. | Keamanan |
 | PAY-08 | Pembayaran | P2 | Webhook Paper.id memperbarui status | Invoice sudah dikirim ke Paper.id. | 1. Kirim callback Paper.id dengan token yang benar | Status invoice terbarui sesuai payload. Tercatat di jejak audit. | Integrasi |
 | DSH-01 | Dashboard & Laporan | P1 | Ringkasan dashboard cocok dengan data | Beberapa invoice dengan status beragam. | 1. Buka /dashboard<br>2. Bandingkan total & jumlah dengan /invoices dan /payments | Angka ringkasan sama persis dengan hitungan manual dari daftar. Tidak ada angka hardcoded. | Happy path |
 | DSH-02 | Dashboard & Laporan | P2 | Filter rentang tanggal pada laporan | Data tersebar di beberapa bulan. | 1. Buka /reports<br>2. Pilih rentang tanggal<br>3. Ganti ke rentang tanpa data | Hasil berubah sesuai rentang. Rentang kosong menampilkan keadaan kosong yang jelas, bukan galat. | Happy path |
@@ -128,7 +128,6 @@ Sel multi-baris memakai `<br>`. Kolom dibaca apa adanya oleh
 | DSH-04 | Dashboard & Laporan | P2 | Halaman mendesak (urgent) | Ada invoice lewat jatuh tempo. | 1. Buka /urgent | Menampilkan invoice yang benar-benar terlambat, terurut paling mendesak lebih dulu. | Happy path |
 | SET-01 | Pengaturan | P1 | Menyimpan pengaturan aplikasi | Masuk sebagai admin. | 1. Buka /settings<br>2. Ubah salah satu nilai<br>3. Simpan<br>4. Muat ulang halaman | Nilai bertahan setelah muat ulang.<br>CATATAN: jalur PUT — dulu gagal senyap di peramban karena PUT tidak ada di Access-Control-Allow-Methods, padahal curl berhasil. | Happy path |
 | SET-02 | Pengaturan | P2 | Pengaturan biaya (fee) | Admin. | 1. Ubah fee-settings<br>2. Terbitkan invoice baru | Perhitungan pada invoice baru memakai nilai fee yang baru. | Happy path |
-| SET-03 | Pengaturan | P2 | Mode pembayaran | Admin. | 1. Buka /settings/payment<br>2. Ganti mode<br>3. Buka halaman bayar publik | Cara bayar yang ditampilkan mengikuti mode yang dipilih. | Happy path |
 | SET-04 | Pengaturan | P1 | Rahasia gateway tidak pernah tampil di API | Admin. | 1. GET /api/v1/app-settings<br>2. Cari kunci gateway (Xendit, Paper.id, BNI VM) | Rahasia tidak ada dalam respons — disimpan di environment, bukan app_settings. Nilai tersamar pun tetap nilai yang bisa salah dirotasi. | Keamanan |
 | SET-05 | Pengaturan | P2 | Sinkronisasi | Admin. | 1. Buka /settings/sync<br>2. Jalankan sinkronisasi<br>3. Jalankan lagi segera | Berjalan sampai selesai dengan ringkasan hasil. Menjalankan dua kali tidak menggandakan data. | Integrasi |
 | TOOL-01 | Alat Admin | P2 | API Console mengisi parameter otomatis | Admin, mode Backend API. | 1. Buka /api-console<br>2. Pilih beberapa endpoint berbeda | Parameter dan body terisi otomatis dengan data yang benar-benar ada. Body tampil sebagai field berlabel, bukan JSON mentah. | Happy path |
@@ -144,7 +143,7 @@ Sel multi-baris memakai `<br>`. Kolom dibaca apa adanya oleh
 | RSP-02 | Responsif | P2 | Navigasi ponsel | Lebar 375px. | 1. Buka menu<br>2. Pindah halaman<br>3. Tutup menu | Menu terbuka menutup rapi, tidak terpotong, dan tidak menutupi konten setelah navigasi. | Happy path |
 | RSP-03 | Responsif | P2 | Tablet dan orientasi | Lebar 768px dan 1024px. | 1. Periksa dashboard, daftar invoice, form invoice baru<br>2. Putar orientasi | Tata letak menyesuaikan tanpa elemen bertumpuk atau terpotong. | Happy path |
 | RSP-04 | Responsif | P3 | Verifikasi dilakukan pada halaman yang benar-benar ter-render | — | 1. Sebelum menilai apa pun, pastikan tidak ada overlay galat Vite dan #root berisi teks | Pemeriksaan hanya sah bila halamannya benar-benar tampil.<br>CATATAN: audit responsif pernah dinyatakan "semua ok" padahal build sedang rusak — overlay galat tidak punya gulir horizontal. | Negatif |
-| X-01 | Lintas Fungsi | P1 | Perjalanan penuh: member → invoice → kirim → bayar → dashboard | Sistem bersih. Admin siap. | 1. Buat chapter<br>2. Buat member<br>3. Terbitkan invoice<br>4. Kirim ke Paper.id<br>5. Buka halaman bayar publik<br>6. Lunasi (manual atau webhook)<br>7. Periksa dashboard dan laporan | Setiap langkah berhasil dan status akhir konsisten di semua halaman. Ini skenario penerimaan utama. | Happy path |
+| X-01 | Lintas Fungsi | P1 | Perjalanan penuh: member → invoice → kirim → bayar → dashboard | Sistem bersih. Admin siap. | 1. Buat chapter<br>2. Buat member<br>3. Terbitkan invoice<br>4. Kirim ke Paper.id<br>5. Buka tautan pembayaran Paper.id dari detail invoice<br>6. Lunasi (catat manual atau webhook Paper.id)<br>7. Periksa dashboard dan laporan | Setiap langkah berhasil dan status akhir konsisten di semua halaman. Ini skenario penerimaan utama. | Happy path |
 | X-02 | Lintas Fungsi | P2 | Perjalanan diulang dua kali berturut-turut | Baru saja menyelesaikan X-01. | 1. Ulangi X-01 dari awal tanpa membersihkan database | Putaran kedua juga berhasil. Nomor invoice tidak bentrok.<br>CATATAN: dulu putaran kedua gagal 403 karena penomoran di-reset sementara Paper.id membakar nomor selamanya. | Negatif |
 | X-03 | Lintas Fungsi | P2 | Beban campuran tetap stabil | Backend jalan, kredensial uji siap. | 1. Jalankan k6: BASE_URL=... ADMIN_EMAIL=... ADMIN_PASSWORD=... k6 run loadtest/api.js | Exit code 0. Seluruh threshold lulus, termasuk empat lantai volume. Nol nomor invoice ganda. | Beban |
 | X-04 | Lintas Fungsi | P3 | Halaman tidak dikenal | — | 1. Buka /rute-yang-tidak-ada | Halaman 404 milik aplikasi dengan jalan kembali, bukan layar kosong. | Negatif |

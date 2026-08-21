@@ -449,7 +449,6 @@ export async function mockApiFetch(
 
   if (seg[0] === 'app-settings') {
     const KEYS = [
-      'self_payment_mode',
       'invoice_draft_days_before',
       'invoice_due_days_after',
       'paperid_send_email',
@@ -582,7 +581,6 @@ export async function mockApiFetch(
         configured: false,
         baseUrl: 'https://open-api.stag-v2.paper.id',
         callbackConfigured: false,
-        selfPaymentMode: (await getMockAppSetting('self_payment_mode')) === 'true',
       })
     }
     if (seg[1] === 'test-invoice' && m === 'POST') {
@@ -603,7 +601,10 @@ export async function mockApiFetch(
           customer: {
             id: 'console-test',
             name: (b.customerName as string) || 'Uji Coba BNI Finance',
-            phone: (b.customerPhone as string) || '081200000000',
+            // Nomor milik tim, bukan angka karangan: bila uji ini dijalankan
+            // dengan kanal menyala, pesannya harus mendarat di ponsel kita —
+            // bukan di ponsel orang lain yang kebetulan memiliki nomor itu.
+            phone: (b.customerPhone as string) || '082240274833',
           },
           items: [
             {
@@ -637,34 +638,6 @@ export async function mockApiFetch(
   }
 
   // --- public --------------------------------------------------------------
-  if (seg[0] === 'public' && seg[1] === 'invoices') {
-    const invoice = store.invoices.find((i) => i.id === seg[2])
-    if (!invoice) return fail(404, 'invoice tidak ditemukan')
-    if (seg[3] === 'payment' && m === 'POST') {
-      return fail(403, 'pembayaran mandiri sedang dinonaktifkan')
-    }
-    if (m === 'GET') {
-      const member = memberOf(invoice)
-      // The narrow projection: member NAME only, never contact details.
-      return ok({
-        invoice: {
-          id: invoice.id,
-          number: invoice.number,
-          type: invoice.type,
-          amount: invoice.amount,
-          currency: invoice.currency,
-          status: invoice.status,
-          dueDate: invoice.dueDate,
-          periodStart: invoice.periodStart,
-          periodEnd: invoice.periodEnd,
-          memberName: member?.name ?? '—',
-          chapterName: chapterOf(invoice.chapterId)?.displayName,
-          createdAt: invoice.createdAt,
-        },
-        selfPaymentMode: (await getMockAppSetting('self_payment_mode')) === 'true',
-      })
-    }
-  }
 
   if (seg[0] === 'webhooks' && m === 'POST') {
     // Both webhooks reject an unsigned call — the mock keeps that boundary
@@ -673,7 +646,7 @@ export async function mockApiFetch(
     // Direkam sebagai panggilan MASUK yang gagal, sehingga demo memperlihatkan
     // kedua arah di Blackbox — dan filter "Gagal saja" punya isi.
     recordMockCall({
-      integration: seg[1] === 'xendit' ? 'xendit' : 'paper_id',
+      integration: 'paper_id',
       direction: 'inbound',
       method: 'POST',
       url: `/api/v1/webhooks/${seg[1] ?? ''}`,

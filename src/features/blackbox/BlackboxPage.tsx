@@ -35,7 +35,6 @@ const useMock = isMockMode()
 const INTEGRATIONS = [
   { value: 'all', label: 'Semua Integrasi' },
   { value: 'paper_id', label: 'Paper.id' },
-  { value: 'xendit', label: 'Xendit' },
   { value: 'bni_vm', label: 'BNI VM' },
 ] as const
 
@@ -99,7 +98,7 @@ export function BlackboxPage() {
     <div>
       <PageHeader
         title="Blackbox Integrasi"
-        description="Setiap panggilan ke dan dari Paper.id, Xendit, dan BNI VM — request, endpoint, response, dan statusnya."
+        description="Setiap panggilan ke dan dari Paper.id dan BNI VM — request, endpoint, response, dan statusnya."
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={reload} disabled={loading}>

@@ -26,7 +26,6 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
-	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
@@ -107,12 +106,6 @@ func run(log *slog.Logger) error {
 		}
 	}
 
-	// Gateway secrets stay in the environment, never in app_settings — that
-	// table is readable through the API, and a masked value is still a value
-	// somebody could rotate by accident.
-	xenditKey := os.Getenv("XENDIT_SECRET_KEY")
-	callbackToken := os.Getenv("XENDIT_CALLBACK_TOKEN")
-
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
 		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
@@ -122,7 +115,6 @@ func run(log *slog.Logger) error {
 		Settings:  settings.NewService(settings.NewRepository(pool)),
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
-		Public:    publicpay.NewService(publicpay.NewRepository(pool), xenditKey, callbackToken, recorder),
 		Upload:    uploads,
 		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder),
 		PaperID: paperid.NewService(paperid.NewRepository(pool),
@@ -144,8 +136,7 @@ func run(log *slog.Logger) error {
 	go func() {
 		log.Info("server berjalan",
 			"port", cfg.Port,
-			"uploads", uploads.Dir(),
-			"gateway", xenditKey != "")
+			"uploads", uploads.Dir())
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}

@@ -3,13 +3,15 @@
 //   BASE_URL=http://127.0.0.1:8123 ADMIN_EMAIL=… ADMIN_PASSWORD=… \
 //     k6 run loadtest/api.js
 //
-// Tiga skenario yang meniru tiga jenis lalu lintas nyata, berjalan BERSAMAAN
+// Dua skenario yang meniru dua jenis lalu lintas nyata, berjalan BERSAMAAN
 // karena begitulah produksi: admin membaca dashboard sementara batch penagihan
-// berjalan dan member membuka halaman bayar.
+// berjalan.
 //
 //   baca     admin menjelajah: daftar invoice, member, dashboard, laporan
 //   tulis    penerbitan invoice — jalur yang dulu punya balapan penomoran
-//   publik   halaman bayar member, tanpa token — jalur tanpa autentikasi
+//
+// Skenario "publik" dihapus bersama permukaan bayar publik: tidak ada lagi
+// endpoint tanpa autentikasi untuk dibebani.
 //
 // Threshold di bawah MENGGAGALKAN run (exit code ≠ 0), jadi skrip ini bisa
 // dipasang di CI sebagai gerbang, bukan sekadar penghasil angka.
@@ -51,18 +53,12 @@ export const options = {
       rate: 10, timeUnit: '1s', duration: '45s',
       preAllocatedVUs: 20, maxVUs: 60,
     },
-    publik: {
-      executor: 'constant-vus',
-      exec: 'publik',
-      vus: 10, duration: '45s',
-    },
   },
   thresholds: {
     // Gagalkan run bila salah satu dilanggar.
     http_req_failed: ['rate<0.01'],                          // <1% error
     'http_req_duration{scenario:baca}': ['p(95)<500'],
     'http_req_duration{scenario:tulis}': ['p(95)<800'],      // tulis = transaksi + lock
-    'http_req_duration{scenario:publik}': ['p(95)<500'],
     invoice_duplicate_numbers: ['count==0'],
     checks: ['rate>0.99'],
 
@@ -74,7 +70,7 @@ export const options = {
     // dilaporkan rate=0.00%, dan `p(95)<500` pada {scenario:baca} di skrip yang
     // bahkan tidak punya skenario bernama baca.
     //
-    // Konsekuensinya bukan teoretis. Tiga threshold di atas di-tag per NAMA
+    // Konsekuensinya bukan teoretis. Dua threshold latensi di atas di-tag per NAMA
     // skenario. Salah ketik atau rename satu nama membuat metriknya tidak
     // pernah terisi, thresholdnya ✓ selamanya, dan latensi jalur itu berhenti
     // dijaga tanpa ada yang merah. Gerbang CI-nya hijau justru karena tidak
@@ -85,13 +81,12 @@ export const options = {
     // benar-benar terjadi tidak bernilai.
     //
     // Angkanya sengaja rendah — tugasnya menangkap NOL, bukan menetapkan target
-    // throughput. baca 30 VU dan publik 10 VU selama 45 detik menghasilkan
-    // ratusan ribu iterasi di mesin pengembang; mesin CI paling lambat pun jauh
-    // melewati 100. tulis memakai constant-arrival-rate 10/detik × 45 detik =
+    // throughput. baca 30 VU selama 45 detik menghasilkan ratusan ribu iterasi
+    // di mesin pengembang; mesin CI paling lambat pun jauh melewati 100.
+    // tulis memakai constant-arrival-rate 10/detik × 45 detik =
     // 450 iterasi yang deterministik, jadi lantainya bisa lebih dekat.
     'iterations{scenario:baca}': ['count>100'],
     'iterations{scenario:tulis}': ['count>300'],
-    'iterations{scenario:publik}': ['count>100'],
     http_reqs: ['count>500'],
   },
 };
@@ -114,13 +109,9 @@ export function setup() {
 
   const members = http.get(`${BASE}/api/v1/members?status=active&limit=1`, auth);
   const member = members.json('data.0');
-  if (!member) fail('tidak ada member aktif — muat db/seed.sql dulu');
+  if (!member) fail('tidak ada member aktif — jalankan `make db-reset` dulu');
 
-  const invoices = http.get(`${BASE}/api/v1/invoices?limit=5`, auth);
-  const invoiceIds = (invoices.json('data') || []).map((i) => i.id);
-  if (invoiceIds.length === 0) fail('tidak ada invoice — muat db/seed.sql dulu');
-
-  return { token, memberId: member.id, chapterId: member.chapterId, invoiceIds };
+  return { token, memberId: member.id, chapterId: member.chapterId };
 }
 
 const authHeaders = (data) => ({
@@ -165,19 +156,5 @@ export function tulis(data) {
     const number = res.json('number');
     if (seen.has(number)) duplicateNumbers.add(1);
     seen.add(number);
-  }
-}
-
-export function publik(data) {
-  const id = data.invoiceIds[Math.floor(Math.random() * data.invoiceIds.length)];
-  const res = http.get(`${BASE}/api/v1/public/invoices/${id}`);
-  const ok = check(res, { 'publik 200': (r) => r.status === 200 });
-  if (ok) {
-    // Halaman ini terbuka tanpa login; kebocoran kontak member di sini berarti
-    // siapa pun pemegang id invoice bisa memanen email dan nomor telepon.
-    check(res, {
-      'publik tanpa kontak member': (r) =>
-        !r.body.includes('@wit.id') && !r.body.includes('082240274833'),
-    });
   }
 }

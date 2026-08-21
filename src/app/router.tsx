@@ -19,8 +19,6 @@ import { NotFoundPage } from '@/features/misc/NotFoundPage'
 import { RouteErrorPage } from '@/features/misc/RouteErrorPage'
 import { RequirePermission } from '@/features/auth/RequirePermission'
 import { UrgentPage } from '@/features/urgent/UrgentPage'
-import { PaymentModePage } from '@/features/settings/PaymentModePage'
-import { PublicPaymentPage } from '@/features/pay/PublicPaymentPage'
 import { NotificationsPage } from '@/features/notifications/NotificationsPage'
 import { ProfilePage } from '@/features/profile/ProfilePage'
 import { ReportPage } from '@/features/reports/ReportPage'
@@ -33,7 +31,6 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorPage />,
     children: [
       { path: '/login', element: <LoginPage /> },
-      { path: '/pay/:id', element: <PublicPaymentPage /> },
       {
         element: <AppLayout />,
         children: [
@@ -68,14 +65,6 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission="settings:manage">
                 <SettingsPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            path: '/settings/payment',
-            element: (
-              <RequirePermission permission="settings:manage">
-                <PaymentModePage />
               </RequirePermission>
             ),
           },

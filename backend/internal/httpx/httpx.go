@@ -82,19 +82,40 @@ func List[T any](items []T, total, limit, offset int) ListResponse[T] {
 	return ListResponse[T]{Data: items, Meta: ListMeta{Total: total, Limit: limit, Offset: offset}}
 }
 
+// StatusOf melaporkan status yang akan dikirim Fail untuk err.
+//
+// Dipisahkan supaya pemanggil yang perlu MENGETAHUI statusnya tanpa menulis
+// respons — perekam blackbox, misalnya — memakai keputusan yang sama persis,
+// bukan salinannya. Dua salinan aturan ini akan menyimpang, dan yang menyimpang
+// justru catatan yang dipakai orang untuk mendiagnosis kegagalan.
+func StatusOf(err error) int {
+	var he *Error
+	switch {
+	case err == nil:
+		return http.StatusOK
+	case errors.As(err, &he):
+		return he.Status
+	case errors.Is(err, ErrNotFound), isBadIdentifier(err):
+		return http.StatusNotFound
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
 // Fail maps an error to a status code + JSON body.
 func Fail(w http.ResponseWriter, err error) {
+	status := StatusOf(err)
 	var he *Error
 	switch {
 	case errors.As(err, &he):
-		JSON(w, he.Status, errorBody{Error: he.Message})
-	case errors.Is(err, ErrNotFound), isBadIdentifier(err):
-		JSON(w, http.StatusNotFound, errorBody{Error: ErrNotFound.Error()})
+		JSON(w, status, errorBody{Error: he.Message})
+	case status == http.StatusNotFound:
+		JSON(w, status, errorBody{Error: ErrNotFound.Error()})
 	default:
 		// The cause never reaches the client, so log it here or it is lost
 		// entirely — a 500 with no trail is close to undebuggable.
 		slog.Error("kesalahan tak tertangani", "error", err)
-		JSON(w, http.StatusInternalServerError, errorBody{Error: "terjadi kesalahan pada server"})
+		JSON(w, status, errorBody{Error: "terjadi kesalahan pada server"})
 	}
 }
 

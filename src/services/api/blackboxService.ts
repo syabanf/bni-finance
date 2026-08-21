@@ -6,7 +6,7 @@ import { clearMockCalls, listMockCalls } from '@/services/mock/blackbox'
  * Rekaman "kotak hitam" lalu lintas integrasi.
  *
  * Di mode Backend API perekamnya hidup di server, tempat panggilan ke
- * Paper.id/Xendit/BNI VM benar-benar terjadi. Di mode Data Contoh panggilan itu
+ * Paper.id/BNI VM benar-benar terjadi. Di mode Data Contoh panggilan itu
  * tidak pergi ke mana-mana, tetapi bentuk rekamannya dibuat identik oleh
  * `mock/blackbox` — sebelumnya halaman ini mati total pada mode yang justru
  * dipakai untuk demo.

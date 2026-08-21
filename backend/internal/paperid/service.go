@@ -129,8 +129,48 @@ func (s *Service) resolve(ctx context.Context, opts SendOptions) (email, whatsap
 	return email, whatsapp
 }
 
+// recordSend mencatat HASIL OPERASI pengiriman — bukan panggilan HTTP-nya.
+//
+// Keduanya perlu, dan bedanya penting. client.go merekam percakapan dengan
+// Paper.id; entri ini merekam apa yang terjadi pada permintaan bisnisnya. Tanpa
+// entri ini, setiap kegagalan yang terjadi SEBELUM panggilan keluar tidak
+// meninggalkan jejak apa pun di blackbox:
+//
+//   - gateway belum dikonfigurasi          -> 503, tidak pernah menyentuh HTTP
+//   - invoice tidak ditemukan / galat DB   -> tidak pernah menyentuh HTTP
+//   - invoice bukan draft                  -> 409, tidak pernah menyentuh HTTP
+//
+// Dari dashboard, ketiganya tampak sebagai "kirim gagal" tetapi halaman
+// blackbox kosong — persis keluhan yang membuat perbaikan ini ada. Blackbox
+// dipakai untuk menjawab "tadi kenapa gagal", jadi diam bukan jawaban.
+func (s *Service) recordSend(invoiceID string, opts SendOptions, started time.Time, err error) {
+	if s.rec == nil {
+		return
+	}
+	req, _ := json.Marshal(struct {
+		InvoiceID string `json:"invoiceId"`
+		Email     *bool  `json:"sendEmail"`
+		WhatsApp  *bool  `json:"sendWhatsApp"`
+	}{invoiceID, opts.Email, opts.WhatsApp})
+
+	s.rec.Record(blackbox.Call{
+		Integration: "paper_id", Direction: blackbox.Outbound,
+		Method: http.MethodPost, URL: "/api/v1/invoices/" + invoiceID + "/send",
+		Request: req, Status: httpx.StatusOf(err), Success: err == nil,
+		Duration: time.Since(started), Err: err,
+	})
+}
+
 // Send pushes a draft invoice to Paper.id and records the result.
-func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) (*domain.Invoice, error) {
+//
+// Nilai balik diberi nama supaya defer di bawah melihat error dari JALUR MANA
+// PUN — termasuk return awal yang tidak pernah mencapai gateway. Menaruh
+// pemanggilan Record di setiap titik return akan bekerja hari ini dan bocor
+// lagi pada return berikutnya yang ditambahkan orang.
+func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) (_ *domain.Invoice, err error) {
+	started := s.now()
+	defer func() { s.recordSend(invoiceID, opts, started, err) }()
+
 	if s.gateway == nil {
 		return nil, httpx.NewError(http.StatusServiceUnavailable,
 			"Paper.id belum dikonfigurasi — isi PAPER_ID_CLIENT_ID & PAPER_ID_CLIENT_SECRET", nil)

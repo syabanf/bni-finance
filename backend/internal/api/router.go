@@ -22,7 +22,6 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
-	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
@@ -42,7 +41,6 @@ type Services struct {
 	Settings  *settings.Service
 	Audit     *audit.Service
 	Dashboard *dashboard.Service
-	Public    *publicpay.Service
 	Upload    *upload.Store
 	Sync      *sync.Service
 	PaperID   *paperid.Service
@@ -87,9 +85,6 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 
 	if svc.Auth != nil {
 		auth.NewHandler(svc.Auth).RegisterPublic(root)
-	}
-	if svc.Public != nil {
-		publicpay.NewHandler(svc.Public).Register(root)
 	}
 	if svc.PaperID != nil {
 		paperid.NewHandler(svc.PaperID).RegisterPublic(root)

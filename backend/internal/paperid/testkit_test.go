@@ -228,7 +228,7 @@ func TestStatusHidesSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if !st.Configured || !st.CallbackConfigured || !st.SelfPaymentMode {
+	if !st.Configured || !st.CallbackConfigured {
 		t.Errorf("status salah: %+v", st)
 	}
 	// Only booleans and the base URL — never the token itself.

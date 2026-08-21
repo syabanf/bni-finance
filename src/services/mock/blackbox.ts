@@ -13,7 +13,7 @@
  * hidup di header dan tidak pernah lewat jalur ini.
  */
 
-export type BlackboxIntegration = 'paper_id' | 'xendit' | 'bni_vm'
+export type BlackboxIntegration = 'paper_id' | 'bni_vm'
 export type BlackboxDirection = 'outbound' | 'inbound'
 
 export interface MockBlackboxCall {
