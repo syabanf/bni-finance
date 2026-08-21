@@ -28,7 +28,7 @@ import { chapterService, memberService } from '@/services'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
 
-/** Kelengkapan kontak — menentukan siapa yang bisa dikirimi WhatsApp/Email. */
+/** Kelengkapan kontak — menentukan siapa yang bisa dijangkau Paper.id. */
 type ContactFilter = 'all' | 'no-phone' | 'no-email' | 'no-contact'
 
 const CONTACT_OPTIONS: { value: ContactFilter; label: string }[] = [
@@ -75,7 +75,10 @@ export function MemberListPage() {
       if (dueTo && (!m.renewalDate || m.renewalDate > dueTo)) return false
       if (q && !m.name.toLowerCase().includes(q) && !m.id.toLowerCase().includes(q) && !(m.email ?? '').toLowerCase().includes(q))
         return false
-      // Kelengkapan kontak — bulk WhatsApp/Email diam-diam melewati member ini.
+      // Kelengkapan kontak. Paper.id MEWAJIBKAN nomor telepon: member tanpa
+      // nomor ditolak saat penerbitan invoice, dan member tanpa email hanya
+      // menerima WhatsApp. Filter ini yang membuat mereka bisa ditemukan
+      // sebelum batch penagihan berjalan, bukan sesudahnya.
       const hasPhone = Boolean(m.phone?.trim())
       const hasEmail = Boolean(m.email?.trim())
       if (contact === 'no-phone' && hasPhone) return false
