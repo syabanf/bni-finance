@@ -12,7 +12,7 @@ Dokumen ini **ringkasan**, bukan pengganti. Rujukan mendalam ada di bagian
 
 Platform pengelolaan **invoice keanggotaan BNI Grow Chapter** — pendaftaran dan
 perpanjangan tahunan. Data member ditarik dari BNI Visitor Management, invoice diterbitkan
-ke **Paper.id** atau dibayar mandiri lewat **Xendit**, pembayaran masuk lewat webhook, dan
+ke **Paper.id**, pembayaran masuk lewat webhook, dan
 seluruhnya terekam dengan jejak audit.
 
 | Lapisan | Pilihan |
@@ -21,7 +21,7 @@ seluruhnya terekam dengan jejak audit.
 | Backend | Go 1.25, pustaka standar (satu dependensi: `pgx/v5`) |
 | Database | Postgres 14+ — skema di [`db/init.sql`](../db/init.sql) |
 | Autentikasi | JWT HS256 + PBKDF2, seluruhnya stdlib Go |
-| Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
+| Pembayaran | Paper.id |
 | Hosting | Vercel (frontend) · backend server-side terpisah |
 
 ---
@@ -124,10 +124,9 @@ Draft ──Terbitkan──▶ Outstanding ──pembayaran──▶ Lunas
 
 Yang terjadi saat **Terbitkan** bergantung pada `self_payment_mode`:
 
-| Mode | Perilaku |
-|---|---|
-| `false` — **Paper.id** | Invoice didorong ke Paper.id, link bayar & PDF disimpan, kanal Email/WhatsApp dijalankan, status → `sent` |
-| `true` — **Xendit** | Paper.id **tidak dipanggil sama sekali**; member bayar mandiri di `/pay/:id` (VA / QRIS) |
+Invoice didorong ke Paper.id, link bayar & PDF disimpan, kanal Email/WhatsApp
+dijalankan, status → `sent`. Pembayaran mandiri lewat Xendit sudah dihapus —
+member membayar di halaman Paper.id.
 
 Invoice dan baris audit pertamanya ditulis dalam **satu transaksi** — tidak ada invoice
 tanpa jejak.
@@ -238,7 +237,6 @@ bisa.
 
 | Kunci | Arti | Bawaan |
 |---|---|---|
-| `self_payment_mode` | `true` → Xendit, Paper.id tidak dipanggil | `false` |
 | `invoice_draft_days_before` | Draft renewal disusun H-N | `30` |
 | `invoice_due_days_after` | Jatuh tempo = terbit + N hari | `30` |
 | `paperid_send_email` | Paper.id mengantar invoice via email | `true` |
@@ -274,7 +272,6 @@ VITE_USE_MOCK=true          # hanya nilai awal
 ```
 DATABASE_URL, JWT_SECRET               # wajib
 PAPER_ID_CLIENT_ID, PAPER_ID_CLIENT_SECRET, PAPER_ID_CALLBACK_TOKEN
-XENDIT_SECRET_KEY, XENDIT_CALLBACK_TOKEN
 BNI_VM_URL, BNI_VM_TOKEN
 SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
 AUTH_QUICK_LOGIN                       # kosong = mati
@@ -410,7 +407,7 @@ Halaman `/docs`, `/openapi.yaml`, dan `/openapi.json` dilayani backend, bukan Ve
 | [`backend/README.md`](../backend/README.md) | ✅ berlaku | Endpoint, aturan bisnis, keamanan, performa, hasil stress test |
 | [`db/init.sql`](../db/init.sql) | ✅ berlaku | Skema database — sumber kebenaran |
 | `/docs` di backend | ✅ berlaku | Referensi API, dibangkitkan dari `openapi.yaml` |
-| [`docs/SYSTEM.md`](./SYSTEM.md) | ⚠️ **sebagian usang** | Alur bisnis & Xendit masih berlaku; bagian Supabase (PostgREST, RLS, Edge Functions, Storage) sudah tidak menggambarkan sistem yang berjalan |
+| [`docs/SYSTEM.md`](./SYSTEM.md) | ⚠️ **sebagian usang** | Alur bisnis masih berlaku; bagian Supabase (PostgREST, RLS, Edge Functions, Storage) dan seluruh bagian Xendit / pembayaran mandiri sudah tidak menggambarkan sistem yang berjalan |
 | [`docs/bni-finance-system-plan.md`](./bni-finance-system-plan.md) | 📜 historis | Rencana teknis awal |
-| [`docs/BACKLOG.md`](./BACKLOG.md) · [`docs/epics/`](./epics) · [`docs/features/`](./features) | 📜 historis | User story & acceptance criteria per fitur |
+| [`docs/BACKLOG.md`](./BACKLOG.md) · [`docs/epics/`](./epics) · [`docs/features/`](./features) | 📜 historis | User story & acceptance criteria per fitur. `EPIC-001` dan `11-public-payment` menggambarkan pembayaran mandiri Xendit yang sudah dihapus. |
 | [`docs/AGENTIC-WORKFLOW.md`](./AGENTIC-WORKFLOW.md) · [`AGENTS.md`](../AGENTS.md) | ✅ berlaku | Cara kerja agen pada repo ini |

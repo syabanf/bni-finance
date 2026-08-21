@@ -70,9 +70,7 @@
   ],
   "security": [
     {
-      "bearerAuth": [
-
-      ]
+      "bearerAuth": []
     }
   ],
   "paths": {
@@ -83,9 +81,7 @@
         ],
         "summary": "Masuk dan dapatkan token",
         "description": "Email dibandingkan tanpa membedakan huruf besar/kecil.\n\nEmail tak dikenal dan kata sandi salah menghasilkan **pesan yang sama\npersis** dan waktu pemrosesan yang setara — akun tidak bisa dienumerasi\nlewat endpoint ini.\n",
-        "security": [
-
-        ],
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -137,9 +133,7 @@
         ],
         "summary": "Daftar akun masuk cepat",
         "description": "Akun yang boleh masuk **tanpa kata sandi**, untuk demo dan pengembangan\nlokal. Hanya nama, email, dan peran — tidak pernah kredensial.\n\nDiatur lewat `AUTH_QUICK_LOGIN`, berisi daftar email dipisah koma dan\n**kosong secara bawaan**. Sengaja daftar email, bukan saklar on/off:\nsaklar berarti sekali dinyalakan di produksi, *semua* akun jadi bisa\ndimasuki tanpa kata sandi. Di sini akun yang boleh harus disebut satu\nper satu.\n\nMenjawab **404** saat fitur mati — produksi tidak memberi petunjuk\nbahwa rute ini ada.\n",
-        "security": [
-
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Daftar akun yang diizinkan",
@@ -177,9 +171,7 @@
         ],
         "summary": "Masuk cepat tanpa kata sandi",
         "description": "Menerbitkan token biasa untuk akun yang ada di daftar izin. Tokennya\nsama persis dengan hasil `POST /auth/login` — tidak ada sesi kelas dua.\n\n**404** bila fitur mati, **403** bila email di luar daftar izin. Server\nmencatat peringatan saat start selama fitur ini menyala.\n",
-        "security": [
-
-        ],
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -2081,9 +2073,7 @@
         ],
         "summary": "Callback pembayaran dari Paper.id",
         "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
-        "security": [
-
-        ],
+        "security": [],
         "parameters": [
           {
             "name": "token",
@@ -2227,10 +2217,6 @@
                     },
                     "callbackConfigured": {
                       "type": "boolean"
-                    },
-                    "selfPaymentMode": {
-                      "type": "boolean",
-                      "description": "Bila `true`, penerbitan invoice memakai Xendit, bukan Paper.id."
                     }
                   }
                 }
@@ -2356,7 +2342,6 @@
               "type": "string",
               "enum": [
                 "paper_id",
-                "xendit",
                 "bni_vm"
               ]
             }
@@ -2514,9 +2499,7 @@
         ],
         "summary": "Ambil berkas yang tersimpan",
         "description": "**Tanpa token.** URL sengaja dibuat tak tertebak alih-alih dijaga\nautentikasi, karena halaman bayar publik harus bisa menampilkannya\nuntuk orang yang tidak punya akun. Direktori tidak bisa dijelajahi.\n",
-        "security": [
-
-        ],
+        "security": [],
         "parameters": [
           {
             "name": "filename",
@@ -2545,230 +2528,6 @@
         }
       }
     },
-    "/api/v1/public/invoices/{id}": {
-      "get": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Invoice untuk halaman pembayaran",
-        "description": "**Tanpa token** — pembayar bukan pengguna aplikasi.\n\nProyeksinya sempit dengan sengaja: hanya **nama** member, tidak pernah\nemail, telepon, perusahaan, atau bidang usaha. Penyaringan terjadi di\nserver, sehingga data pribadi tidak bisa bocor ke siapa pun yang\nmemegang tautannya.\n",
-        "security": [
-
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/InvoiceId"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Invoice publik + status Self Payment Mode",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PublicInvoiceView"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          }
-        }
-      }
-    },
-    "/api/v1/public/invoices/{id}/payment": {
-      "post": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Buat pembayaran Xendit (VA / QRIS)",
-        "description": "**Tanpa token.**\n\nSelf Payment Mode diperiksa ulang **di server**, bukan dipercaya dari\nklien: mematikan sakelar harus benar-benar menghentikan pembuatan\ntagihan, bukan sekadar menyembunyikan tombolnya.\n\nReferensi Xendit dibuat baru setiap kali, karena Xendit menolak\n`external_id` yang masih punya VA atau QR aktif.\n\nQRIS dibatasi Rp 10.000.000 per transaksi oleh Xendit — di atas itu\nbalasannya **422** dan pemanggil harus memakai Virtual Account.\n",
-        "security": [
-
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/InvoiceId"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "method"
-                ],
-                "properties": {
-                  "method": {
-                    "title": "Metode",
-                    "type": "string",
-                    "enum": [
-                      "va",
-                      "qris"
-                    ]
-                  },
-                  "bank": {
-                    "title": "Bank",
-                    "type": "string",
-                    "enum": [
-                      "BCA",
-                      "BNI",
-                      "MANDIRI",
-                      "BRI"
-                    ],
-                    "description": "Wajib bila `method` = `va`."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Tagihan dibuat",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PaymentResult"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "403": {
-            "description": "Pembayaran mandiri sedang dinonaktifkan",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "description": "Invoice sudah lunas atau dibatalkan",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Nominal melebihi batas QRIS",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Gateway pembayaran menolak atau tidak bisa dihubungi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Gateway pembayaran belum dikonfigurasi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/webhooks/xendit": {
-      "post": {
-        "tags": [
-          "Publik"
-        ],
-        "summary": "Callback pembayaran dari Xendit",
-        "description": "Diautentikasi dengan header `x-callback-token`, dibandingkan\nconstant-time. Token yang belum dikonfigurasi menolak **setiap**\ncallback, bukan menerima semuanya.\n\n**Idempoten**: Xendit mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa membuat baris pembayaran\nkedua.\n\nEvent yang bukan pembayaran selesai dijawab **200** dengan\n`settled: false` — membalas non-2xx hanya membuat Xendit mengulang\nperistiwa yang memang sengaja tidak ditindaklanjuti.\n",
-        "security": [
-
-        ],
-        "parameters": [
-          {
-            "name": "x-callback-token",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/XenditWebhook"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Callback diterima",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "settled": {
-                      "type": "boolean",
-                      "description": "Apakah callback ini benar-benar melunasi invoice."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "description": "Callback token tidak valid atau belum dikonfigurasi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Tidak ada invoice dengan referensi tersebut",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/metrics": {
       "get": {
         "tags": [
@@ -2776,9 +2535,7 @@
         ],
         "summary": "Metrik Prometheus",
         "description": "Format eksposisi teks Prometheus (`version=0.0.4`), untuk di-scrape.\n\n**Akses.** Terbuka bila `METRICS_TOKEN` kosong; bila diisi, setiap scrape\nwajib membawa `Authorization: Bearer <token>` dan dibandingkan\nconstant-time. Terbuka sebagai bawaan karena endpoint metrik yang tak\nbisa di-scrape bukan hardening melainkan hiasan — dan inventaris route\nyang ia ungkap memang sudah publik lewat `/docs` dan `/openapi.json`.\nVolume permintaan dan tingkat error tetap layak dilindungi di produksi:\nisi `METRICS_TOKEN`, atau blokir `/metrics` di ingress.\n\n**Yang TIDAK pernah ada di sini:** id member, nomor invoice, email,\nnominal. Label dibatasi pada pola route, method, status, mitra\nintegrasi, arah, dan hasil — dijamin oleh konstruksi, bukan konfigurasi.\n\n**Kardinalitas.** Label `route` memakai *pola* route\n(`/api/v1/invoices/{id}`), bukan URL. URL berarti satu series per\ninvoice, dan Prometheus menyimpan setiap series yang pernah dilihatnya\ndi memori — lalu lintas normal akan menghabiskan heap scraper sampai\nmati. Path yang tidak cocok route mana pun dikumpulkan ke `other`.\n\n| Metrik | Tipe | Label |\n|---|---|---|\n| `http_requests_total` | counter | `method`, `route`, `status` |\n| `http_request_duration_seconds` | histogram | `method`, `route` |\n| `http_requests_in_flight` | gauge | — |\n| `integration_calls_total` | counter | `integration`, `direction`, `outcome` |\n| `integration_call_duration_seconds` | histogram | `integration`, `direction` |\n| `db_pool_conns_*` | gauge | — |\n| `db_pool_acquire_empty_total` | gauge | — |\n| `go_goroutines`, `go_memstats_*`, `go_gc_cycles_total` | gauge | — |\n",
-        "security": [
-
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Metrik dalam format eksposisi teks",
@@ -2810,9 +2567,7 @@
         ],
         "summary": "Cek kesehatan",
         "description": "Tanpa autentikasi, supaya probe tidak perlu kredensial.",
-        "security": [
-
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Layanan dan database siap",
@@ -2857,9 +2612,7 @@
           "Sistem"
         ],
         "summary": "Spesifikasi OpenAPI ini",
-        "security": [
-
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Spesifikasi",
@@ -2881,9 +2634,7 @@
         ],
         "summary": "Spesifikasi yang sama dalam bentuk JSON",
         "description": "Dihasilkan dari YAML oleh `make docs`. Halaman `/docs` merender bentuk\nini, karena browser bisa mem-parsing JSON tanpa pustaka apa pun.\n",
-        "security": [
-
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Spesifikasi",
@@ -2905,9 +2656,7 @@
         ],
         "summary": "Dokumentasi API yang bisa dibaca di browser",
         "description": "Halaman mandiri — seluruh CSS dan JS tertanam, jadi tetap berfungsi\ntanpa koneksi jaringan.\n",
-        "security": [
-
-        ],
+        "security": [],
         "responses": {
           "200": {
             "description": "Halaman HTML",
@@ -3090,8 +2839,7 @@
           "data": {
             "type": "array",
             "description": "Selalu larik — tidak pernah `null`, meski kosong.",
-            "items": {
-            }
+            "items": {}
           },
           "meta": {
             "type": "object",
@@ -4422,10 +4170,6 @@
         "properties": {
           "invoice": {
             "$ref": "#/components/schemas/PublicInvoice"
-          },
-          "selfPaymentMode": {
-            "type": "boolean",
-            "description": "Apakah pembayaran mandiri lewat Xendit sedang aktif."
           }
         }
       },
@@ -4674,7 +4418,6 @@
             "type": "string",
             "enum": [
               "paper_id",
-              "xendit",
               "bni_vm"
             ]
           },

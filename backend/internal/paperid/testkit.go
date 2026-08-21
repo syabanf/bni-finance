@@ -31,20 +31,14 @@ type ConfigStatus struct {
 	Configured         bool   `json:"configured"`
 	BaseURL            string `json:"baseUrl"`
 	CallbackConfigured bool   `json:"callbackConfigured"`
-	SelfPaymentMode    bool   `json:"selfPaymentMode"`
 }
 
 // Status describes the current Paper.id wiring for the test page.
-func (s *Service) Status(ctx context.Context) (*ConfigStatus, error) {
-	mode, err := s.repo.GetSetting(ctx, "self_payment_mode")
-	if err != nil {
-		return nil, err
-	}
+func (s *Service) Status(context.Context) (*ConfigStatus, error) {
 	return &ConfigStatus{
 		Configured:         s.gateway != nil,
 		BaseURL:            s.baseURL,
 		CallbackConfigured: s.callbackToken != "",
-		SelfPaymentMode:    mode == "true",
 	}, nil
 }
 

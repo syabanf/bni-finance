@@ -1306,9 +1306,6 @@ paths:
                     description: Kredensial Paper.id terisi.
                   baseUrl: { type: string }
                   callbackConfigured: { type: boolean }
-                  selfPaymentMode:
-                    type: boolean
-                    description: Bila `true`, penerbitan invoice memakai Xendit, bukan Paper.id.
         "403": { $ref: "#/components/responses/Forbidden" }
 
   /api/v1/paperid/test-invoice:
@@ -1409,7 +1406,7 @@ paths:
         - name: integration
           in: query
           description: Saring per integrasi.
-          schema: { type: string, enum: [paper_id, xendit, bni_vm] }
+          schema: { type: string, enum: [paper_id, bni_vm] }
         - name: direction
           in: query
           description: |
@@ -1513,143 +1510,6 @@ paths:
   # ===========================================================================
   # Publik
   # ===========================================================================
-  /api/v1/public/invoices/{id}:
-    get:
-      tags: [Publik]
-      summary: Invoice untuk halaman pembayaran
-      description: |
-        **Tanpa token** — pembayar bukan pengguna aplikasi.
-
-        Proyeksinya sempit dengan sengaja: hanya **nama** member, tidak pernah
-        email, telepon, perusahaan, atau bidang usaha. Penyaringan terjadi di
-        server, sehingga data pribadi tidak bisa bocor ke siapa pun yang
-        memegang tautannya.
-      security: []
-      parameters: [{ $ref: "#/components/parameters/InvoiceId" }]
-      responses:
-        "200":
-          description: Invoice publik + status Self Payment Mode
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/PublicInvoiceView" }
-        "404": { $ref: "#/components/responses/NotFound" }
-
-  /api/v1/public/invoices/{id}/payment:
-    post:
-      tags: [Publik]
-      summary: Buat pembayaran Xendit (VA / QRIS)
-      description: |
-        **Tanpa token.**
-
-        Self Payment Mode diperiksa ulang **di server**, bukan dipercaya dari
-        klien: mematikan sakelar harus benar-benar menghentikan pembuatan
-        tagihan, bukan sekadar menyembunyikan tombolnya.
-
-        Referensi Xendit dibuat baru setiap kali, karena Xendit menolak
-        `external_id` yang masih punya VA atau QR aktif.
-
-        QRIS dibatasi Rp 10.000.000 per transaksi oleh Xendit — di atas itu
-        balasannya **422** dan pemanggil harus memakai Virtual Account.
-      security: []
-      parameters: [{ $ref: "#/components/parameters/InvoiceId" }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [method]
-              properties:
-                method: { title: Metode, type: string, enum: [va, qris] }
-                bank:
-                  title: Bank
-                  type: string
-                  enum: [BCA, BNI, MANDIRI, BRI]
-                  description: Wajib bila `method` = `va`.
-      responses:
-        "201":
-          description: Tagihan dibuat
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/PaymentResult" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "403":
-          description: Pembayaran mandiri sedang dinonaktifkan
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409":
-          description: Invoice sudah lunas atau dibatalkan
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "422":
-          description: Nominal melebihi batas QRIS
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "502":
-          description: Gateway pembayaran menolak atau tidak bisa dihubungi
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "503":
-          description: Gateway pembayaran belum dikonfigurasi
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-
-  /api/v1/webhooks/xendit:
-    post:
-      tags: [Publik]
-      summary: Callback pembayaran dari Xendit
-      description: |
-        Diautentikasi dengan header `x-callback-token`, dibandingkan
-        constant-time. Token yang belum dikonfigurasi menolak **setiap**
-        callback, bukan menerima semuanya.
-
-        **Idempoten**: Xendit mengulang pengiriman, jadi callback untuk invoice
-        yang sudah lunas dijawab `settled: false` tanpa membuat baris pembayaran
-        kedua.
-
-        Event yang bukan pembayaran selesai dijawab **200** dengan
-        `settled: false` — membalas non-2xx hanya membuat Xendit mengulang
-        peristiwa yang memang sengaja tidak ditindaklanjuti.
-      security: []
-      parameters:
-        - name: x-callback-token
-          in: header
-          required: true
-          schema: { type: string }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/XenditWebhook" }
-      responses:
-        "200":
-          description: Callback diterima
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  settled:
-                    type: boolean
-                    description: Apakah callback ini benar-benar melunasi invoice.
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401":
-          description: Callback token tidak valid atau belum dikonfigurasi
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-        "404":
-          description: Tidak ada invoice dengan referensi tersebut
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Error" }
-
   # ===========================================================================
   # Sistem
   # ===========================================================================
@@ -2360,10 +2220,6 @@ components:
       required: [invoice, selfPaymentMode]
       properties:
         invoice: { $ref: "#/components/schemas/PublicInvoice" }
-        selfPaymentMode:
-          type: boolean
-          description: Apakah pembayaran mandiri lewat Xendit sedang aktif.
-
     PaymentResult:
       type: object
       required: [method, amount]
@@ -2522,7 +2378,7 @@ components:
       properties:
         id: { title: ID, type: string }
         time: { type: string, format: date-time }
-        integration: { type: string, enum: [paper_id, xendit, bni_vm] }
+        integration: { type: string, enum: [paper_id, bni_vm] }
         direction:
           type: string
           enum: [outbound, inbound]

@@ -2,12 +2,12 @@
 
 Sistem finance untuk **BNI Grow Chapter Management** — mengelola invoice pendaftaran &
 renewal keanggotaan, sinkronisasi data dari BNI Visitor Management, pembayaran
-(**Paper.id** atau **Xendit self-payment**), pelaporan keuangan, dan ekspor data.
+(**Paper.id**), pelaporan keuangan, dan ekspor data.
 
 Dibangun dengan **Vite + React + TypeScript + Tailwind CSS**, dapat dipasang sebagai
 **PWA**, mengikuti [rencana teknis](./docs/bni-finance-system-plan.md) dan menerapkan
 **clean architecture** (presentation → application → data) sehingga data layer mock dapat
-ditukar dengan backend nyata (**REST API Go** / BNI VM API / Paper.id / Xendit) tanpa
+ditukar dengan backend nyata (**REST API Go** / BNI VM API / Paper.id) tanpa
 mengubah UI.
 
 > 📖 **Ringkasan sistem dalam satu dokumen** — arsitektur, alur bisnis, konfigurasi,
@@ -52,7 +52,6 @@ mengubah UI.
   mematikan, karena invoice yang tidak pernah sampai ke member bukan hasil yang
   lebih ringan melainkan kegagalan diam-diam. Member tanpa email dilewati untuk
   kanal email; WhatsApp tetap jalan.
-- **Xendit self-payment** — halaman pembayaran publik `/pay/:id` (Virtual Account / QRIS)
   tanpa perlu login. Mode aktif dipilih di **Metode Pembayaran**.
 
 ### Lainnya
@@ -76,7 +75,7 @@ mengubah UI.
   jadi konsol tetap jalan tanpa backend; pada mode **Backend API** setiap
   permintaan yang mengubah data dikonfirmasi lebih dulu.
 - **Blackbox Integrasi** — halaman admin berisi rekaman tiap panggilan ke/dari
-  Paper.id, Xendit, dan BNI VM: request JSON, endpoint yang dihubungi, response
+  Paper.id dan BNI VM: request JSON, endpoint yang dihubungi, response
   JSON, dan status berhasil/gagal. Berguna saat integrasi bermasalah.
 - **Sinkronisasi** — tarik manual data dari BNI VM. Berjalan di server, jadi
   tokennya tidak pernah ada di browser; member yang hilang dinonaktifkan, bukan
@@ -170,7 +169,6 @@ src/
 └── features/            # 🟧 Presentation — satu folder per domain
     ├── auth/  dashboard/  invoices/  members/  chapters/
     ├── payments/  reports/  notifications/  profile/
-    ├── pay/             #    Halaman pembayaran publik (Xendit, tanpa login)
     ├── urgent/  settings/  misc/
 
 db/                      # Skema Postgres + data contoh
@@ -206,7 +204,6 @@ Tidak ada lagi ketergantungan Supabase.
 | Otorisasi | RLS per baris | Middleware peran di backend |
 | Penyimpanan berkas | Storage bucket | Berkas di disk (`UPLOAD_DIR`) |
 | Halaman bayar publik | Edge Function | Endpoint `/public/**` |
-| Webhook Xendit | Edge Function | Endpoint `/webhooks/xendit` |
 
 ```bash
 # 1. database + backend
@@ -248,7 +245,7 @@ pustaka standar (satu dependensi: driver `pgx/v5`).
 | Dashboard | `GET /api/v1/dashboard/summary` |
 | Autentikasi | `POST /api/v1/auth/login` · `/auth/me` · `/auth/password` · `/users/**` |
 | Unggahan | `POST /api/v1/uploads` · `GET /uploads/{nama}` |
-| Publik | `GET /api/v1/public/invoices/{id}` · `POST /webhooks/xendit` |
+| Publik | *(tidak ada — seluruh endpoint memerlukan token)* |
 | Sinkronisasi | `POST /api/v1/sync` — tarik member & chapter dari BNI VM |
 | Paper.id | `POST /api/v1/invoices/{id}/send` · `POST /webhooks/paperid` |
 | Blackbox | `GET·DELETE /api/v1/blackbox` — rekaman lalu lintas integrasi |
@@ -298,6 +295,6 @@ menyembunyikan tombol — batas sebenarnya ada di backend.
 | Backend | Go 1.25 (`net/http`) + `pgx/v5` — lihat `backend/` |
 | Database | Postgres 14+ — skema di `db/init.sql` |
 | Autentikasi | JWT HS256 + PBKDF2, seluruhnya pustaka standar Go |
-| Pembayaran | Paper.id · Xendit (Virtual Account / QRIS) |
+| Pembayaran | Paper.id |
 | Data | Mock in-memory (default) ↔ REST API Go (`VITE_USE_MOCK=false`) |
 | Hosting | Vercel |

@@ -27,7 +27,6 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
-	"github.com/syabanf/bni-finance/backend/internal/publicpay"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 )
 
@@ -96,7 +95,6 @@ func newE2EStack(t *testing.T) *e2eStack {
 		Settings:  settings.NewService(settings.NewRepository(pool)),
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
-		Public:    publicpay.NewService(publicpay.NewRepository(pool), "", "", recorder),
 		PaperID:   paperSvc,
 		Blackbox:  recorder,
 	}, pool.Ping)
@@ -492,17 +490,10 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		}
 	})
 
-	t.Run("halaman publik tidak membocorkan kontak member", func(t *testing.T) {
-		var raw json.RawMessage
-		s.do(t, "GET", "/api/v1/public/invoices/"+inv.ID, "", "", http.StatusOK, &raw)
-		// Halaman ini terbuka tanpa login: siapa pun yang punya id invoice bisa
-		// membacanya, jadi tidak boleh memuat email atau telepon.
-		for _, leak := range []string{"fahmi@wit.id", "082240274833"} {
-			if strings.Contains(string(raw), leak) {
-				t.Errorf("halaman publik membocorkan %q", leak)
-			}
-		}
-	})
+	// Langkah "halaman publik tidak membocorkan kontak member" dihapus bersama
+	// permukaan bayar publik. Tidak ada lagi endpoint tanpa autentikasi yang
+	// memaparkan invoice, jadi tidak ada lagi yang bisa bocor dari sana —
+	// member membayar lewat tautan Paper.id, bukan halaman kita.
 }
 
 // Klasifikasi transien-vs-nyata adalah keputusan paling berbahaya di retry ini:
