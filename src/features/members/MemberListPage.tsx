@@ -176,8 +176,8 @@ export function MemberListPage() {
         />
       </div>
 
-      <Card>
-        <div className="space-y-3 border-b border-ink-100 p-4">
+      <Card data-tour="member-table">
+        <div data-tour="member-filters" className="space-y-3 border-b border-ink-100 p-4">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
             <Input

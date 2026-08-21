@@ -289,12 +289,14 @@ export function ReportPage() {
         title="Laporan Keuangan"
         description="Ringkasan penagihan dan penerimaan per periode."
         action={
-          <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
+          <span data-tour="report-export">
+            <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
+          </span>
         }
       />
 
       {/* Period filter */}
-      <Card className="mb-5">
+      <Card data-tour="report-range" className="mb-5">
         <div className="flex flex-wrap items-center gap-3 p-4">
           <div className="flex flex-wrap gap-1.5">
             {PRESETS.map((p) => (

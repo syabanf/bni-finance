@@ -95,7 +95,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
   const navigate = useNavigate()
 
   return (
-    <Card>
+    <Card data-tour="urgent-overdue">
       <CardHeader
         title={
           <span className="flex items-center gap-2">
@@ -294,7 +294,7 @@ function RenewalSection({
   const selectedTotal = fees ? selected.size * fees.renewalFee : 0
 
   return (
-    <Card>
+    <Card data-tour="urgent-renewal">
       <CardHeader
         title={
           <span className="flex items-center gap-2">

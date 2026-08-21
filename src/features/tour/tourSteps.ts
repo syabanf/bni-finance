@@ -187,8 +187,421 @@ export const TOURS: Tour[] = [
       },
     ],
   },
+  {
+    path: '/urgent',
+    label: 'Perlu Tindakan',
+    steps: [
+      {
+        title: 'Daftar kerja hari ini',
+        body:
+          'Halaman ini mengumpulkan dua hal yang tidak sebaiknya menunggu: ' +
+          'tagihan yang sudah lewat jatuh tempo, dan keanggotaan yang sebentar lagi habis. ' +
+          'Kalau Anda hanya sempat membuka satu halaman pagi ini, bukalah yang ini.',
+      },
+      {
+        anchor: 'urgent-overdue',
+        title: 'Tagihan yang terlambat',
+        body:
+          'Setiap baris menunjukkan sudah berapa lama tagihan itu lewat jatuh tempo. ' +
+          'Tombol Ingatkan mengirim pengingat lewat Paper.id, jadi member menerimanya ' +
+          'dari saluran yang sama dengan tagihan aslinya, dan pengingat itu tercatat. ' +
+          'Anda tidak perlu mengirim pesan sendiri dari nomor pribadi.',
+      },
+      {
+        anchor: 'urgent-renewal',
+        title: 'Keanggotaan yang akan habis',
+        body:
+          'Bagian ini menampilkan member yang masa keanggotaannya mendekati akhir. ' +
+          'Menerbitkan tagihan perpanjangan lebih awal memberi mereka waktu membayar ' +
+          'sebelum keanggotaannya benar-benar lewat, dan itu jauh lebih mudah ' +
+          'daripada menagih setelah terlambat.',
+      },
+    ],
+  },
+  {
+    path: '/notifications',
+    label: 'Notifikasi',
+    steps: [
+      {
+        title: 'Pemberitahuan sistem',
+        body:
+          'Halaman ini mengumpulkan hal-hal yang sistem anggap perlu Anda ketahui, ' +
+          'misalnya tagihan yang mendekati jatuh tempo atau keanggotaan yang perlu diperpanjang. ' +
+          'Isinya dihitung dari data yang sama dengan halaman lain, jadi tidak akan ada ' +
+          'pemberitahuan tentang sesuatu yang sudah Anda selesaikan.',
+      },
+      {
+        anchor: 'notifications-list',
+        title: 'Menindaklanjuti',
+        body:
+          'Menekan sebuah pemberitahuan membawa Anda ke tempat yang bisa ditindaklanjuti, ' +
+          'bukan sekadar menandainya sudah dibaca. ' +
+          'Yang belum dibaca ditandai lebih tegas supaya mudah dibedakan sekilas.',
+      },
+    ],
+  },
+  {
+    path: '/profile',
+    label: 'Profil',
+    steps: [
+      {
+        title: 'Akun Anda',
+        body: 'Halaman ini untuk memeriksa data akun sendiri dan mengganti kata sandi.',
+      },
+      {
+        anchor: 'profile-account',
+        title: 'Informasi akun',
+        body:
+          'Nama dan email akun Anda beserta perannya. ' +
+          'Peran menentukan apa yang bisa Anda lakukan: admin bisa menerbitkan dan mengirim tagihan, ' +
+          'sementara peran pengguna hanya bisa melihat dan mengekspor.',
+      },
+      {
+        anchor: 'profile-password',
+        title: 'Mengganti kata sandi',
+        body:
+          'Isi kata sandi lama dan yang baru, lalu simpan. ' +
+          'Setelah tersimpan, kata sandi lama langsung tidak berlaku, ' +
+          'jadi pastikan yang baru sudah Anda catat di tempat aman.',
+      },
+    ],
+  },
+  {
+    path: '/invoices/new',
+    label: 'Buat Invoice',
+    steps: [
+      {
+        title: 'Menerbitkan tagihan',
+        body:
+          'Formulir ini disusun berurutan dari atas ke bawah. ' +
+          'Isi dari langkah pertama, dan bagian berikutnya menyesuaikan pilihan Anda.',
+      },
+      {
+        anchor: 'invoice-new-form',
+        title: 'Mengisi tagihan',
+        body:
+          'Pilih jenis tagihan lebih dulu, apakah pendaftaran baru atau perpanjangan, ' +
+          'karena itu menentukan nominal dan periode yang disarankan. ' +
+          'Lalu pilih membernya, periksa nominalnya, dan tentukan jatuh tempo. ' +
+          'Tanggal jatuh tempo inilah yang akan muncul di dokumen yang diterima member.',
+      },
+      {
+        title: 'Setelah disimpan',
+        body:
+          'Tagihan tersimpan sebagai draft dan belum sampai ke member. ' +
+          'Anda bisa mengirimnya langsung dari sini, atau menyimpannya dulu ' +
+          'lalu mengirim beberapa sekaligus dari daftar invoice. ' +
+          'Draft masih bisa diubah; yang sudah terkirim tidak.',
+      },
+    ],
+  },
+  {
+    path: '/invoices/renewal-due',
+    label: 'Renewal Due',
+    steps: [
+      {
+        title: 'Menyiapkan perpanjangan',
+        body:
+          'Halaman ini memperlihatkan member yang keanggotaannya akan berakhir, ' +
+          'supaya tagihan perpanjangan bisa disiapkan sebelum masanya lewat.',
+      },
+      {
+        anchor: 'renewal-range',
+        title: 'Mengatur rentang waktu',
+        body:
+          'Ubah rentang tanggal untuk melihat lebih jauh ke depan atau lebih dekat. ' +
+          'Menagih terlalu awal membuat member bingung, menagih terlalu lambat ' +
+          'membuat keanggotaan sempat kosong. Rentang inilah yang mengatur keseimbangannya.',
+      },
+      {
+        anchor: 'renewal-list',
+        title: 'Menerbitkan sekaligus',
+        body:
+          'Pilih beberapa member, lalu terbitkan tagihan perpanjangan untuk semuanya. ' +
+          'Semua tagihan itu dibuat sebagai draft dulu, jadi Anda masih sempat memeriksanya ' +
+          'sebelum satu pun dikirim.',
+      },
+    ],
+  },
+  {
+    path: '/invoices/:id',
+    label: 'Detail Invoice',
+    steps: [
+      {
+        title: 'Satu tagihan, seluruh riwayatnya',
+        body:
+          'Halaman ini menampilkan segalanya tentang satu tagihan: isinya, statusnya, ' +
+          'tautan pembayarannya, dan setiap perubahan yang pernah terjadi padanya.',
+      },
+      {
+        anchor: 'detail-status',
+        title: 'Status dan tindakan',
+        body:
+          'Tindakan yang tersedia mengikuti status. Tagihan draft bisa diubah dan dikirim. ' +
+          'Yang sudah terkirim bisa diingatkan atau dicatat pembayarannya. ' +
+          'Yang sudah lunas atau dibatalkan adalah catatan tertutup — nominal dan periodenya ' +
+          'tidak bisa ditulis ulang setelah fakta.',
+      },
+      {
+        anchor: 'detail-audit',
+        title: 'Jejak audit',
+        body:
+          'Setiap perubahan status tercatat di sini beserta waktu dan pelakunya, ' +
+          'termasuk setiap pengingat yang pernah dikirim. ' +
+          'Kalau seorang member bertanya sudah berapa kali ditagih, jawabannya ada di bagian ini.',
+      },
+    ],
+  },
+  {
+    path: '/members',
+    label: 'Member',
+    steps: [
+      {
+        title: 'Data keanggotaan',
+        body:
+          'Semua member beserta chapter, status, dan kelengkapan kontaknya. ' +
+          'Data ini yang dipakai saat tagihan dikirim, jadi ketepatannya berpengaruh langsung ' +
+          'pada apakah pesannya sampai.',
+      },
+      {
+        anchor: 'member-filters',
+        title: 'Menemukan yang bermasalah',
+        body:
+          'Saringan kelengkapan kontak adalah yang paling berguna di sini. ' +
+          'Paper.id mewajibkan nomor telepon, jadi member tanpa nomor akan ditolak ' +
+          'saat tagihannya diterbitkan. Menyaring mereka sekarang jauh lebih baik ' +
+          'daripada menemukannya saat batch penagihan sedang berjalan.',
+      },
+      {
+        anchor: 'member-table',
+        title: 'Membuka satu member',
+        body:
+          'Menekan sebuah baris membuka halaman detailnya, ' +
+          'lengkap dengan riwayat tagihan member tersebut.',
+      },
+      {
+        title: 'Mengubah kontak',
+        body:
+          'Satu hal yang perlu diketahui: Paper.id menyimpan data kontak member di sisi mereka. ' +
+          'Kalau Anda mengubah nomor telepon atau email, tagihan berikutnya akan mengirim ' +
+          'kontak yang baru, dan sistem sudah menangani perbedaan itu secara otomatis.',
+      },
+    ],
+  },
+  {
+    path: '/members/:id',
+    label: 'Detail Member',
+    steps: [
+      {
+        title: 'Profil satu member',
+        body:
+          'Halaman ini menggabungkan data member dengan seluruh riwayat tagihannya, ' +
+          'sehingga Anda bisa menjawab pertanyaan mereka tanpa berpindah halaman.',
+      },
+      {
+        anchor: 'member-detail-info',
+        title: 'Data dan kontak',
+        body:
+          'Nama, chapter, status keanggotaan, dan kontak. ' +
+          'Kontak inilah yang dipakai Paper.id untuk mengantar tagihan, ' +
+          'jadi kalau member mengeluh tidak menerima apa-apa, mulailah memeriksa dari sini.',
+      },
+      {
+        anchor: 'member-detail-invoices',
+        title: 'Riwayat tagihan',
+        body:
+          'Seluruh tagihan member ini beserta statusnya. ' +
+          'Berguna saat mereka bertanya sudah membayar apa saja, atau saat Anda perlu ' +
+          'memastikan tidak ada tagihan ganda untuk periode yang sama.',
+      },
+    ],
+  },
+  {
+    path: '/chapters',
+    label: 'Chapter',
+    steps: [
+      {
+        title: 'Pengelompokan member',
+        body:
+          'Chapter adalah kelompok wilayah tempat member bernaung. ' +
+          'Setiap member harus punya chapter, dan laporan bisa disaring per chapter.',
+      },
+      {
+        anchor: 'chapter-list',
+        title: 'Menambah dan mengubah',
+        body:
+          'Tambahkan chapter baru, atau ubah namanya di sini. ' +
+          'Chapter yang masih punya member tidak bisa dihapus — ' +
+          'kalau bisa, member-membernya akan kehilangan induk tanpa pemberitahuan.',
+      },
+    ],
+  },
+  {
+    path: '/payments',
+    label: 'Pembayaran',
+    steps: [
+      {
+        title: 'Catatan uang masuk',
+        body:
+          'Setiap pembayaran yang tercatat, baik yang datang otomatis dari Paper.id ' +
+          'maupun yang Anda catat manual setelah menerima transfer.',
+      },
+      {
+        anchor: 'payment-table',
+        title: 'Membaca satu pembayaran',
+        body:
+          'Tiap baris menunjukkan tagihan mana yang dilunasi, berapa nominalnya, ' +
+          'kapan, dan lewat cara apa. ' +
+          'Mencatat pembayaran akan melunasi tagihannya dalam satu langkah, ' +
+          'jadi tidak ada status yang perlu Anda ubah terpisah.',
+      },
+    ],
+  },
+  {
+    path: '/reports',
+    label: 'Laporan',
+    steps: [
+      {
+        title: 'Laporan keuangan',
+        body:
+          'Halaman ini merangkum penerimaan dan tunggakan dalam rentang waktu yang Anda pilih, ' +
+          'siap untuk dibawa ke rapat atau diarsipkan.',
+      },
+      {
+        anchor: 'report-range',
+        title: 'Menentukan periode',
+        body:
+          'Semua angka dan grafik di bawah mengikuti rentang tanggal ini. ' +
+          'Ubah rentangnya lebih dulu sebelum membaca angkanya, ' +
+          'karena angka yang benar untuk periode yang salah tetap menyesatkan.',
+      },
+      {
+        anchor: 'report-export',
+        title: 'Mengekspor',
+        body:
+          'Ekspor tersedia dalam Excel, CSV, dan PDF. ' +
+          'Yang diekspor selalu mengikuti rentang dan saringan yang sedang tampil, ' +
+          'bukan seluruh data — jadi periksa dulu apa yang di layar sebelum menekan ekspor.',
+      },
+    ],
+  },
+  {
+    path: '/settings',
+    label: 'Pengaturan',
+    steps: [
+      {
+        title: 'Pengaturan operasional',
+        body:
+          'Nilai-nilai di halaman ini memengaruhi tagihan yang diterbitkan setelahnya. ' +
+          'Tagihan yang sudah ada tidak ikut berubah, dan itu memang disengaja: ' +
+          'mengubah nominal tagihan yang sudah dikirim akan membuat catatan tidak lagi ' +
+          'cocok dengan dokumen yang diterima member.',
+      },
+      {
+        anchor: 'settings-fee',
+        title: 'Nominal biaya',
+        body:
+          'Biaya pendaftaran dan perpanjangan. Nilai inilah yang otomatis terisi ' +
+          'saat Anda membuat tagihan baru, dan masih bisa diubah per tagihan bila perlu.',
+      },
+      {
+        anchor: 'settings-schedule',
+        title: 'Jadwal penagihan',
+        body:
+          'Dua angka ini mengatur ritme penagihan. Yang pertama menentukan berapa hari ' +
+          'sebelum keanggotaan berakhir draft perpanjangan mulai disiapkan. ' +
+          'Yang kedua menentukan berapa hari setelah diterbitkan sebuah tagihan jatuh tempo. ' +
+          'Menagih terlalu awal membingungkan member, terlalu lambat membuat keanggotaan ' +
+          'sempat kosong — dua angka inilah yang mengatur keseimbangannya.',
+      },
+    ],
+  },
+  {
+    path: '/settings/sync',
+    label: 'Sinkronisasi',
+    steps: [
+      {
+        title: 'Menarik data member',
+        body:
+          'Halaman ini menarik data keanggotaan dari sistem BNI VM ' +
+          'supaya daftar member di sini tidak perlu dijaga manual.',
+      },
+      {
+        anchor: 'sync-source',
+        title: 'Dari mana datanya',
+        body:
+          'Bagian ini menunjukkan sumber datanya beserta status sambungannya. ' +
+          'Kalau sinkronisasi gagal, periksa di sini lebih dulu sebelum mencoba lagi.',
+      },
+      {
+        anchor: 'sync-run',
+        title: 'Member dan chapter, terpisah',
+        body:
+          'Keduanya disinkronkan sendiri-sendiri, dan setiap kartu menunjukkan ' +
+          'kapan terakhir kali datanya ditarik. ' +
+          'Menjalankan dua kali berturut-turut tidak menggandakan data — ' +
+          'yang sudah ada diperbarui, bukan ditambahkan lagi, jadi aman mengulang ' +
+          'bila Anda ragu apakah yang tadi berhasil. ' +
+          'Member yang hilang dari sumber dinonaktifkan, bukan dihapus, ' +
+          'karena tagihan lama mereka harus tetap bisa ditelusuri.',
+      },
+    ],
+  },
+  {
+    path: '/api-console',
+    label: 'Konsol API',
+    steps: [
+      {
+        title: 'Alat teknis',
+        body:
+          'Konsol ini untuk menguji endpoint API secara langsung. ' +
+          'Ditujukan bagi yang sedang menelusuri masalah teknis, ' +
+          'bukan untuk pekerjaan penagihan sehari-hari.',
+      },
+      {
+        anchor: 'console-endpoint',
+        title: 'Memilih endpoint',
+        body:
+          'Pilih endpoint, dan parameternya terisi otomatis dengan data yang benar-benar ada, ' +
+          'jadi Anda tidak perlu mencari id yang valid lebih dulu. ' +
+          'Isian body ditampilkan sebagai kolom berlabel, bukan JSON mentah.',
+      },
+      {
+        anchor: 'console-send',
+        title: 'Hati-hati dengan yang mengubah data',
+        body:
+          'Permintaan dari konsol ini berjalan sungguhan. ' +
+          'Menjalankan pengiriman tagihan dari sini benar-benar mengirim ke member ' +
+          'dan membakar satu nomor tagihan di Paper.id secara permanen. ' +
+          'Untuk membaca data, konsol ini aman sepenuhnya.',
+      },
+    ],
+  },
 ]
 
+/**
+ * Cocokkan rute, termasuk yang berparameter.
+ *
+ * Pencocokan persis saja tidak cukup: `/invoices/:id` tidak akan pernah sama
+ * dengan `/invoices/abc-123`, sehingga halaman detail — yang justru paling
+ * banyak tombolnya — tidak akan pernah punya panduan.
+ *
+ * Rute yang lebih spesifik diperiksa lebih dulu, karena `/invoices/new` dan
+ * `/invoices/:id` sama-sama cocok dengan dua segmen: tanpa urutan ini, halaman
+ * Buat Invoice akan mendapat panduan halaman Detail.
+ */
 export function tourFor(pathname: string): Tour | null {
-  return TOURS.find((t) => t.path === pathname) ?? null
+  const segs = pathname.split('/').filter(Boolean)
+  const cocok = TOURS.filter((t) => {
+    const pat = t.path.split('/').filter(Boolean)
+    if (pat.length !== segs.length) return false
+    return pat.every((p, i) => p.startsWith(':') || p === segs[i])
+  })
+  if (cocok.length === 0) return null
+  // Yang paling sedikit parameternya = paling spesifik.
+  return cocok.sort(
+    (a, b) =>
+      a.path.split('/').filter((x) => x.startsWith(':')).length -
+      b.path.split('/').filter((x) => x.startsWith(':')).length,
+  )[0]
 }

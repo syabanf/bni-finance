@@ -37,7 +37,7 @@ export function MemberDetailPage() {
   if (loading) return <LoadingState label="Memuat member…" />
   if (!member)
     return (
-      <Card>
+      <Card data-tour="member-detail-info">
         <CardBody>
           <p className="py-10 text-center text-ink-500">Member tidak ditemukan.</p>
         </CardBody>
@@ -117,7 +117,7 @@ export function MemberDetailPage() {
         </div>
 
         {/* Invoice history */}
-        <Card className="lg:col-span-2">
+        <Card data-tour="member-detail-invoices" className="lg:col-span-2">
           <CardHeader
             title="Riwayat Invoice"
             subtitle={

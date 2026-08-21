@@ -147,7 +147,7 @@ export function RenewalDuePage() {
       <PageHeader
         title="Renewal Due"
         description="Member yang masa keanggotaannya berakhir dalam 30 hari ke depan."
-        action={<ExportMenu {...exportHandlers} disabled={filtered.length === 0} />}
+        action={<span data-tour="renewal-range"><ExportMenu {...exportHandlers} disabled={filtered.length === 0} /></span>}
         breadcrumb={
           <button
             onClick={() => navigate('/invoices')}
@@ -159,7 +159,7 @@ export function RenewalDuePage() {
         }
       />
 
-      <Card>
+      <Card data-tour="renewal-list">
         {/* Filter: pencarian + urgensi */}
         <div className="space-y-3 border-b border-ink-100 p-4">
           <div className="relative">
