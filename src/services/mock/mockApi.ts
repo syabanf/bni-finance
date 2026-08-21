@@ -601,7 +601,10 @@ export async function mockApiFetch(
           customer: {
             id: 'console-test',
             name: (b.customerName as string) || 'Uji Coba BNI Finance',
-            phone: (b.customerPhone as string) || '081200000000',
+            // Nomor milik tim, bukan angka karangan: bila uji ini dijalankan
+            // dengan kanal menyala, pesannya harus mendarat di ponsel kita —
+            // bukan di ponsel orang lain yang kebetulan memiliki nomor itu.
+            phone: (b.customerPhone as string) || '082240274833',
           },
           items: [
             {

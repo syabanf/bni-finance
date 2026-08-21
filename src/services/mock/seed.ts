@@ -117,15 +117,21 @@ export const seedFeeSettings: FeeSettings = {
 // ---------------------------------------------------------------------------
 
 /**
- * Satu alamat untuk seluruh member seed, alasannya sama dengan [SEED_PHONE]:
- * menerbitkan invoice dengan kanal email menyala membuat Paper.id benar-benar
- * mengirim ke alamat yang tertulis di member. Alamat karangan bisa saja milik
- * orang lain; dengan satu alamat milik tim, uji coba hanya sampai ke kita.
+ * Dua alamat milik tim, dipakai berselang-seling untuk seluruh member seed.
+ *
+ * Alasannya sama dengan [SEED_PHONE]: menerbitkan invoice dengan kanal email
+ * menyala membuat Paper.id benar-benar mengirim ke alamat yang tertulis di
+ * member. Alamat karangan bisa saja milik orang lain; dengan alamat milik tim,
+ * uji coba hanya sampai ke kita.
+ *
+ * Dua dan bukan satu supaya kedua kotak masuk benar-benar teruji — pengantaran
+ * bisa berhasil ke satu domain dan tersaring di domain lain, dan itu hanya
+ * ketahuan bila keduanya dipakai.
  *
  * Ganti bila kotak masuk ujinya berganti — jangan dikembalikan menjadi
  * per-nama.
  */
-const SEED_EMAIL = 'fahmi@wit.id'
+const SEED_EMAILS = ['muhfahmifm@gmail.com', 'fahmi@wit.id'] as const
 
 /**
  * Satu nomor untuk seluruh member seed, dan itu disengaja.
@@ -137,7 +143,7 @@ const SEED_EMAIL = 'fahmi@wit.id'
  * kita sendiri.
  *
  * Ganti bila ponsel ujinya berganti — jangan dikembalikan menjadi acak.
- * Alamat email mengikuti alasan yang sama; lihat SEED_EMAIL.
+ * Alamat email mengikuti alasan yang sama; lihat SEED_EMAILS.
  */
 const SEED_PHONE = '082240274833'
 
@@ -164,7 +170,7 @@ export function buildSeedData(): BuiltData {
       id: memberId,
       chapterId: seed.chapterId,
       name: seed.name,
-      email: SEED_EMAIL,
+      email: SEED_EMAILS[idx % SEED_EMAILS.length],
       phone: SEED_PHONE,
       status: seed.status ?? (seed.history.includes('overdue') ? 'pending' : 'active'),
       joinedDate: seed.joined,
