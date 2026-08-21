@@ -295,7 +295,7 @@ export function InvoiceListPage() {
           <div className="flex flex-wrap items-center gap-2">
             <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
             {canCreate && (
-              <Button onClick={() => navigate('/invoices/new')}>
+              <Button data-tour="invoice-new" onClick={() => navigate('/invoices/new')}>
                 <Plus className="h-4 w-4" />
                 Buat Invoice
               </Button>
@@ -305,7 +305,7 @@ export function InvoiceListPage() {
       />
 
       {/* Summary cards (also filter the table by status) */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div data-tour="invoice-filters" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
           label="Total Invoice"
           value={summary.total.count}
@@ -340,7 +340,7 @@ export function InvoiceListPage() {
         />
       </div>
 
-      <Card>
+      <Card data-tour="invoice-table">
         {/* Status tab pills */}
         <div className="flex gap-1 overflow-x-auto border-b border-ink-100 px-4 pt-3 pb-0">
           {STATUS_TABS.map((tab) => {
