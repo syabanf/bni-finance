@@ -293,7 +293,7 @@ export function InvoiceDetailPage() {
           </Card>
 
           {/* Details */}
-          <Card>
+          <Card data-tour="detail-status">
             <CardHeader title="Detail Invoice" />
             <div className="grid grid-cols-1 gap-px overflow-hidden rounded-b-2xl bg-ink-100 sm:grid-cols-2">
               <DetailItem label="Nomor Invoice" value={invoice.number} mono />
@@ -460,7 +460,7 @@ export function InvoiceDetailPage() {
             </Card>
           )}
 
-          <Card>
+          <Card data-tour="detail-audit">
             <CardHeader title="Riwayat" subtitle="Audit trail perubahan status" />
             <CardBody>
               <ol className="relative space-y-5">

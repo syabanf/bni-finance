@@ -91,7 +91,7 @@ export function SettingsPage() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card>
+          <Card data-tour="settings-fee">
             <CardHeader title="Nominal Biaya" subtitle="Nilai ini otomatis terisi saat membuat invoice baru." />
             <CardBody className="space-y-5">
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -133,7 +133,7 @@ export function SettingsPage() {
         {/* Invoice Timing — nilainya bertahan di localStorage pada mode mock,
             jadi tidak ada alasan menyembunyikannya dari demo. */}
         {(
-          <Card className="lg:col-span-2">
+          <Card data-tour="settings-schedule" className="lg:col-span-2">
             <CardHeader
               title={
                 <span className="flex items-center gap-2.5">

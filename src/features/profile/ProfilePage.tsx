@@ -76,7 +76,7 @@ export function ProfilePage() {
       </Card>
 
       {/* Account info */}
-      <Card className="mb-5">
+      <Card data-tour="profile-account" className="mb-5">
         <CardHeader title="Informasi Akun" />
         <div className="space-y-4 border-t border-ink-100 p-5">
           <Field label="Nama">
@@ -94,7 +94,7 @@ export function ProfilePage() {
       </Card>
 
       {/* Security */}
-      <Card className="mb-5">
+      <Card data-tour="profile-password" className="mb-5">
         <CardHeader title="Ubah Kata Sandi" />
         <div className="space-y-4 border-t border-ink-100 p-5">
           {useMock ? (

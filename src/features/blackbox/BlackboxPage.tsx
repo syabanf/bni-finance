@@ -119,7 +119,7 @@ export function BlackboxPage() {
       />
 
       {/* Filters */}
-      <Card className="mb-5">
+      <Card data-tour="blackbox-filters" className="mb-5">
         <CardBody className="flex flex-wrap items-center gap-3">
           <Select
             value={filters.integration ?? 'all'}
@@ -165,7 +165,7 @@ export function BlackboxPage() {
         </Card>
       )}
 
-      <div className="space-y-2">
+      <div data-tour="blackbox-list" className="space-y-2">
         {entries?.map((entry) => (
           <EntryRow
             key={entry.id}

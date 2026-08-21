@@ -5,6 +5,7 @@ import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useNotifications } from '@/features/notifications/NotificationsContext'
 import { cn } from '@/lib/cn'
+import { TourButton } from '@/features/tour/TourButton'
 import { ROLE_LABEL } from '@/lib/rbac'
 
 export function Topbar() {
@@ -45,6 +46,7 @@ export function Topbar() {
             navigate(q ? `/invoices?q=${encodeURIComponent(q)}` : '/invoices')
           }}
           className="relative ml-auto hidden w-full max-w-xs sm:block"
+          data-tour="topbar-search"
         >
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
           <input
@@ -58,9 +60,16 @@ export function Topbar() {
         </form>
 
         {/* Notifications */}
+        {/* ml-auto pindah ke sini: di ponsel pencarian disembunyikan, jadi
+            kelompok tombol inilah yang harus terdorong ke kanan. */}
+        <div className="ml-auto flex items-center gap-1 sm:ml-0">
+          <TourButton />
+        </div>
+
         <Link
           to="/notifications"
-          className="relative ml-auto rounded-xl p-2 text-ink-500 transition-colors hover:bg-ink-100 sm:ml-0"
+          data-tour="topbar-notifications"
+          className="relative rounded-xl p-2 text-ink-500 transition-colors hover:bg-ink-100"
           aria-label={`Notifikasi${unreadCount > 0 ? ` (${unreadCount} belum dibaca)` : ''}`}
         >
           <Bell className="h-5 w-5" />

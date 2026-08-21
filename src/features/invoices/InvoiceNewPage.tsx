@@ -125,7 +125,7 @@ export function InvoiceNewPage() {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
         {/* Left: type + member picker */}
         <div className="space-y-5 lg:col-span-3">
-          <Card>
+          <Card data-tour="invoice-new-form">
             <CardHeader title="1. Tipe Invoice" />
             <div className="grid grid-cols-2 gap-3 px-5 pb-5">
               {(['registration', 'renewal'] as InvoiceType[]).map((t) => (

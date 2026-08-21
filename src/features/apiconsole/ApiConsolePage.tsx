@@ -302,7 +302,7 @@ export function ApiConsolePage() {
 
       <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         {/* --- collection sidebar --- */}
-        <Card className="h-fit lg:sticky lg:top-4">
+        <Card data-tour="console-endpoint" className="h-fit lg:sticky lg:top-4">
           <div className="border-b border-ink-100 p-3">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
@@ -367,7 +367,7 @@ export function ApiConsolePage() {
                     Isi Otomatis
                   </Button>
                 )}
-                <Button onClick={handleSend} loading={sending} disabled={missingPathParam}>
+                <Button data-tour="console-send" onClick={handleSend} loading={sending} disabled={missingPathParam}>
                   <Play className="h-4 w-4" />
                   Kirim
                 </Button>

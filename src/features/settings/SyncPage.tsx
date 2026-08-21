@@ -100,7 +100,7 @@ export function SyncPage() {
       />
 
       {/* Source info */}
-      <Card className="mb-5">
+      <Card data-tour="sync-source" className="mb-5">
         <CardBody className="flex flex-wrap items-center gap-4 p-5">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-ink-900 text-white">
             <Database className="h-6 w-6" />
@@ -171,7 +171,7 @@ export function SyncPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      <div data-tour="sync-run" className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <SyncCard
           icon={Users}
           title="Member"

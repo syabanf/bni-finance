@@ -146,7 +146,7 @@ export function PaymentListPage() {
         </div>
       )}
 
-      <Card>
+      <Card data-tour="payment-table">
         {/* Filter bar */}
         {hasData && (
           <div className="space-y-3 border-b border-ink-100 p-4">

@@ -127,7 +127,7 @@ export function NotificationsPage() {
           />
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card data-tour="notifications-list" className="overflow-hidden">
           {/* Filter: jenis + pencarian */}
           <div className="flex gap-1 overflow-x-auto border-b border-ink-100 px-4 pt-3 pb-0">
             {TYPE_TABS.map((tab) => {
