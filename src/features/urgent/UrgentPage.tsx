@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowRight,
+  BellRing,
   CalendarClock,
   CheckCircle2,
   Download,
-  MessageCircle,
   Search,
   UserPlus,
 } from 'lucide-react'
@@ -57,23 +57,38 @@ function DaysUntilBadge({ days }: { days: number }) {
 // Section: Overdue
 // ---------------------------------------------------------------------------
 
-function sendOverdueWa(inv: InvoiceWithRelations) {
-  const name = inv.member?.name ?? 'Bapak/Ibu'
-  const msg = [
-    `Halo ${name},`,
-    ``,
-    `Kami mengingatkan bahwa tagihan BNI Grow Anda telah *melewati jatuh tempo*:`,
-    `📋 No. Invoice: *${inv.number}*`,
-    `💰 Nominal: *${formatCurrency(inv.amount)}*`,
-    `📅 Jatuh Tempo: *${formatDate(inv.dueDate)}*`,
-    ``,
-    inv.paperIdPaymentUrl
-      ? `Silakan segera lakukan pembayaran melalui:\n${inv.paperIdPaymentUrl}`
-      : `Silakan segera hubungi kami untuk melakukan pembayaran.`,
-    ``,
-    `Terima kasih. 🙏`,
-  ].join('\n')
-  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer')
+/**
+ * Pengingat tunggakan — lewat Paper.id, bukan WhatsApp manual.
+ *
+ * Dulu tombol ini menyusun pesan lalu membuka wa.me: admin mengirim sendiri
+ * dari nomornya sendiri, tidak ada catatan bahwa pengingat pernah dikirim, dan
+ * tidak ada satu pun jejak di blackbox. Halaman inilah tempat pengingat paling
+ * sering dipakai, jadi justru di sini jejaknya paling dibutuhkan.
+ */
+function RemindButton({ invoice, className }: { invoice: InvoiceWithRelations; className: string }) {
+  const [busy, setBusy] = useState(false)
+  const { toast } = useToast()
+
+  const click = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(true)
+    try {
+      await invoiceService.resend(invoice.id)
+      toast(`Pengingat ${invoice.number} dikirim lewat Paper.id.`, 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Pengingat gagal dikirim.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button onClick={click} disabled={busy} className={className}>
+      <BellRing className="h-3 w-3" />
+      {busy ? 'Mengirim…' : 'Ingatkan'}
+    </button>
+  )
 }
 
 function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[] | null; loading: boolean }) {
@@ -139,13 +154,10 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                       <Download className="h-3 w-3" />
                       Invoice
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); sendOverdueWa(inv) }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#128C7E]"
-                    >
-                      <MessageCircle className="h-3 w-3" />
-                      WA
-                    </button>
+                    <RemindButton
+                      invoice={inv}
+                      className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600 disabled:opacity-50"
+                    />
                     <button
                       onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${inv.id}`) }}
                       className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-brand-500"
@@ -197,13 +209,10 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                           <Download className="h-3 w-3" />
                           Invoice
                         </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); sendOverdueWa(inv) }}
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-[#128C7E] bg-[#25D366]/10 hover:bg-[#25D366]/20"
-                        >
-                          <MessageCircle className="h-3 w-3" />
-                          WA
-                        </button>
+                        <RemindButton
+                          invoice={inv}
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-600 bg-brand-50 hover:bg-brand-100 disabled:opacity-50"
+                        />
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${inv.id}`) }}
                           className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium text-brand-500 hover:bg-brand-50"
