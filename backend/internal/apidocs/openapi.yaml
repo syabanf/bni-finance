@@ -1104,6 +1104,89 @@ paths:
   # ===========================================================================
   # Paper.id
   # ===========================================================================
+  /api/v1/invoices/{id}/remind:
+    post:
+      tags: [Paper.id]
+      summary: Kirim ulang invoice sebagai pengingat
+      description: |
+        **Admin saja.** Mengirim ULANG invoice yang sudah diterbitkan, sehingga
+        Paper.id mengantar pesan lagi ke member.
+
+        **Kenapa menerbitkan dokumen baru.** Paper.id tidak punya endpoint
+        pengingat. Diperiksa langsung terhadap API staging dengan probe yang
+        dikalibrasi lebih dulu (`store-invoice` menjawab 400 karena validasi,
+        path ngawur menjawab 404): kedelapan kandidat nama endpoint pengingat
+        menjawab 404. Satu-satunya cara membuat Paper.id mengantar pesan lagi
+        adalah menerbitkan dokumen lain.
+
+        **Nomornya berbeda, tagihannya sama.** Paper.id membakar nomor secara
+        permanen; mengirim ulang dengan nomor yang sama ditolak "nomor sudah
+        dipakai". Pengingat memakai nomor turunan `INV-2026-001-R1`, `-R2`, dan
+        seterusnya, sementara nomor kanonik invoice tidak berubah sehingga
+        rekonsiliasi tetap menunjuk satu tagihan.
+
+        **Konsekuensi yang harus disadari:** setiap pengingat membuat dokumen
+        baru di Paper.id untuk tagihan yang sama, jadi member melihat beberapa
+        invoice bernominal identik di riwayat Paper.id mereka.
+
+        **Jatuh tempo tidak dihitung ulang** — pengingat atas tunggakan harus
+        tetap menampilkan tanggal aslinya, karena memundurkannya membuat
+        tunggakan tampak belum jatuh tempo.
+
+        Status invoice TIDAK berubah: yang `overdue` tetap `overdue`. Setiap
+        pengingat menambah baris audit `reminded` beserta nomor dokumennya.
+      parameters: [{ $ref: "#/components/parameters/InvoiceId" }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sendEmail:
+                  title: Kirim via Email
+                  type: boolean
+                  description: |
+                    Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti
+                    `paperid_send_email` di app_settings.
+                sendWhatsApp:
+                  title: Kirim via WhatsApp
+                  type: boolean
+                  description: |
+                    Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,
+                    mengikuti `paperid_send_whatsapp` di app_settings.
+      responses:
+        "200":
+          description: Invoice setelah pengingat dikirim (status tidak berubah)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "400":
+          description: Member belum punya nomor telepon
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: |
+            Invoice masih draft (pakai Kirim), atau sudah lunas/batal —
+            mengingatkan tagihan tertutup berarti menagih orang atas sesuatu
+            yang tidak mereka hutangi.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: Paper.id menolak atau tidak bisa dihubungi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: Paper.id belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /api/v1/invoices/{id}/send:
     post:
       tags: [Paper.id]

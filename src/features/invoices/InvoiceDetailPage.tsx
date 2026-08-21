@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import {
+import { BellRing,
   ArrowLeft,
   Ban,
   Check,
@@ -35,7 +35,6 @@ import {
   Select,
   Textarea,
   useToast,
-  WhatsAppIcon,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
@@ -164,20 +163,19 @@ export function InvoiceDetailPage() {
     }
   }
 
-  const sendPayLinkWa = () => {
-    if (!payUrl) return
-    const name = invoice.member?.name ?? 'Bapak/Ibu'
-    const msg = [
-      `Halo ${name},`,
-      ``,
-      `Berikut tagihan BNI Anda *${invoice.number}* sebesar *${formatCurrency(invoice.amount)}*.`,
-      `Silakan lihat invoice & lakukan pembayaran melalui tautan berikut:`,
-      payUrl,
-      ``,
-      `Terima kasih. 🙏`,
-    ].join('\n')
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer')
-  }
+  /**
+   * Pengingat lewat Paper.id.
+   *
+   * Dulu tombol ini membuka wa.me dengan pesan terisi — admin mengirim sendiri
+   * dari nomornya sendiri, dan tidak ada catatan bahwa pengingat pernah
+   * dikirim. Sekarang Paper.id yang mengantar lewat kanal yang sama dengan
+   * penerbitan invoice, dan setiap pengingat meninggalkan baris audit.
+   */
+  const kirimPengingat = () =>
+    runAction(
+      () => invoiceService.resend(invoice.id),
+      `Pengingat ${invoice.number} dikirim lewat Paper.id.`,
+    )
 
   const openManual = () => {
     setMpAmount(invoice.amount)
@@ -361,10 +359,12 @@ export function InvoiceDetailPage() {
                         {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         {copiedLink ? 'Tersalin' : 'Salin Link'}
                       </Button>
-                      <Button onClick={sendPayLinkWa}>
-                        <WhatsAppIcon className="h-4 w-4" />
-                        Kirim via WhatsApp
-                      </Button>
+                      {(status === 'sent' || status === 'overdue') && (
+                        <Button onClick={kirimPengingat}>
+                          <BellRing className="h-4 w-4" />
+                          Kirim Pengingat
+                        </Button>
+                      )}
                     </div>
                   </>
                 ) : (

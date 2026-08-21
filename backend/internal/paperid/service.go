@@ -24,6 +24,7 @@ const defaultDueDays = 30
 type Store interface {
 	GetSendable(ctx context.Context, invoiceID string) (*Sendable, error)
 	MarkSent(ctx context.Context, invoiceID string, res CreateResult, dueDate, sentAt time.Time, actor string) (*domain.Invoice, error)
+	MarkReminded(ctx context.Context, invoiceID string, res CreateResult, at time.Time, actor string) (*domain.Invoice, error)
 	SettleByRef(ctx context.Context, paperInvoiceID, number, method, status string, amount int64, paidAt time.Time) (bool, error)
 	GetSetting(ctx context.Context, key string) (string, error)
 	PaperInvoiceID(ctx context.Context, invoiceID string) (string, error)
@@ -414,4 +415,121 @@ func customerRef(inv *Sendable) string {
 		strings.ToLower(strings.TrimSpace(inv.Email)) + "\x00" +
 		strings.TrimSpace(inv.Phone)))
 	return inv.MemberID + "-" + hex.EncodeToString(sum[:4])
+}
+
+// --- pengingat ----------------------------------------------------------------
+
+// Remind mengirim ULANG invoice yang sudah diterbitkan sebagai pengingat.
+//
+// Paper.id tidak punya endpoint pengingat. Diperiksa langsung terhadap API
+// staging, dengan probe yang dikalibrasi lebih dulu (store-invoice menjawab 400
+// karena validasi, path ngawur menjawab 404): kedelapan kandidat nama endpoint
+// pengingat menjawab 404. Jadi satu-satunya cara membuat Paper.id mengantar
+// pesan lagi adalah menerbitkan dokumen lain.
+//
+// Nomornya harus berbeda. Paper.id membakar nomor secara permanen; mengirim
+// ulang dengan nomor yang sama ditolak "nomor sudah dipakai". Pengingat karena
+// itu memakai nomor turunan — INV-2026-001-R1, -R2 — sementara nomor kanonik di
+// sistem kita tidak berubah, sehingga rekonsiliasi tetap menunjuk satu tagihan.
+//
+// KONSEKUENSI YANG HARUS DISADARI: setiap pengingat membuat DOKUMEN BARU di
+// Paper.id untuk tagihan yang sama. Member akan melihat beberapa invoice dengan
+// nominal identik di riwayat Paper.id mereka. Itu harga dari "pengingat lewat
+// Paper.id" selama endpoint pengingatnya belum ada, dan bukan sesuatu yang bisa
+// disembunyikan di sisi kita.
+func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions) (_ *domain.Invoice, err error) {
+	started := s.now()
+	defer func() { s.recordRemind(invoiceID, opts, started, err) }()
+
+	if s.gateway == nil {
+		return nil, httpx.NewError(http.StatusServiceUnavailable,
+			"Paper.id belum dikonfigurasi — isi PAPER_ID_CLIENT_ID & PAPER_ID_CLIENT_SECRET", nil)
+	}
+
+	inv, err := s.repo.GetSendable(ctx, invoiceID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Pengingat hanya masuk akal untuk tagihan yang sudah dikirim dan belum
+	// dibayar. Draft belum pernah sampai ke member — itu Send, bukan pengingat.
+	// Lunas dan batal adalah catatan tertutup; mengingatkannya berarti menagih
+	// orang atas sesuatu yang tidak mereka hutangi.
+	switch inv.Status {
+	case domain.StatusSent, domain.StatusOverdue:
+	case domain.StatusDraft:
+		return nil, httpx.Conflict("invoice belum pernah dikirim — pakai Kirim, bukan Pengingat")
+	default:
+		return nil, httpx.Conflict(
+			"invoice berstatus " + string(inv.Status) + " tidak bisa diingatkan")
+	}
+
+	if strings.TrimSpace(inv.Phone) == "" {
+		return nil, httpx.BadRequest("member belum punya nomor telepon — Paper.id mewajibkannya")
+	}
+
+	now := s.now()
+	sendEmail, sendWhatsApp := s.resolve(ctx, opts)
+	if strings.TrimSpace(inv.Email) == "" {
+		sendEmail = false
+	}
+
+	// Jatuh tempo TIDAK dihitung ulang dari hari ini. Pengingat atas tagihan
+	// yang sudah lewat jatuh tempo harus tetap menampilkan tanggal aslinya —
+	// memundurkannya akan membuat tunggakan tampak belum jatuh tempo.
+	res, err := s.gateway.CreateInvoice(ctx, CreateInput{
+		Number:        reminderNumber(inv.Number, inv.ReminderCount+1),
+		InvoiceDate:   now,
+		DueDate:       inv.DueDate,
+		Amount:        inv.Amount,
+		ItemName:      itemName(inv.Type),
+		ItemDesc:      itemDesc(inv.Type),
+		CustomerID:    customerRef(inv),
+		CustomerName:  inv.Name,
+		CustomerEmail: inv.Email,
+		CustomerPhone: inv.Phone,
+		SendEmail:     sendEmail,
+		SendWhatsApp:  sendWhatsApp,
+		Notes:         "Pengingat pembayaran untuk invoice " + inv.Number,
+	})
+	if err != nil {
+		return nil, gatewayError(err)
+	}
+	return s.repo.MarkReminded(ctx, invoiceID, *res, now, "sistem")
+}
+
+// reminderNumber menurunkan nomor dokumen pengingat dari nomor kanonik.
+func reminderNumber(base string, n int) string {
+	return fmt.Sprintf("%s-R%d", base, n)
+}
+
+// recordRemind mencerminkan recordSend: setiap hasil, berhasil maupun gagal,
+// meninggalkan satu entri di blackbox lengkap dengan request dan response.
+func (s *Service) recordRemind(invoiceID string, opts SendOptions, started time.Time, err error) {
+	if s.rec == nil {
+		return
+	}
+	req, _ := json.Marshal(struct {
+		InvoiceID string `json:"invoiceId"`
+		Email     *bool  `json:"sendEmail"`
+		WhatsApp  *bool  `json:"sendWhatsApp"`
+	}{invoiceID, opts.Email, opts.WhatsApp})
+
+	var resp []byte
+	if err != nil {
+		resp, _ = json.Marshal(struct {
+			Error string `json:"error"`
+		}{err.Error()})
+	} else {
+		resp, _ = json.Marshal(struct {
+			Status string `json:"status"`
+		}{"pengingat dikirim ulang ke Paper.id"})
+	}
+
+	s.rec.Record(blackbox.Call{
+		Integration: "paper_id", Direction: blackbox.Outbound,
+		Method: http.MethodPost, URL: "/api/v1/invoices/" + invoiceID + "/remind",
+		Request: req, Response: resp, Status: httpx.StatusOf(err), Success: err == nil,
+		Duration: time.Since(started), Err: err,
+	})
 }

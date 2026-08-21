@@ -287,6 +287,16 @@ create index if not exists idx_audit_invoice_created on invoice_audit_log (invoi
 -- tabel ini. Perhatikan tetap: body permintaan Paper.id memuat nama, email, dan
 -- telepon member, sehingga tabel ini menyimpan data pribadi dan hanya boleh
 -- dibaca admin — sama seperti halaman yang menampilkannya.
+-- Penghitung pengingat per invoice.
+--
+-- Paper.id membakar nomor invoice secara permanen: mengirim ulang dengan nomor
+-- yang sama ditolak "nomor sudah dipakai". Pengingat karena itu memakai nomor
+-- turunan — INV-2026-001-R1, -R2, dan seterusnya — sementara nomor kanonik di
+-- sistem kita tidak berubah. Penghitung ini yang menentukan sufiksnya.
+alter table invoices
+  add column if not exists paper_id_reminder_count integer not null default 0;
+
+
 create table if not exists integration_calls (
   id          bigserial   primary key,
   occurred_at timestamptz not null default now(),

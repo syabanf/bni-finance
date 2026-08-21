@@ -70,7 +70,9 @@
   ],
   "security": [
     {
-      "bearerAuth": []
+      "bearerAuth": [
+
+      ]
     }
   ],
   "paths": {
@@ -81,7 +83,9 @@
         ],
         "summary": "Masuk dan dapatkan token",
         "description": "Email dibandingkan tanpa membedakan huruf besar/kecil.\n\nEmail tak dikenal dan kata sandi salah menghasilkan **pesan yang sama\npersis** dan waktu pemrosesan yang setara — akun tidak bisa dienumerasi\nlewat endpoint ini.\n",
-        "security": [],
+        "security": [
+
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -133,7 +137,9 @@
         ],
         "summary": "Daftar akun masuk cepat",
         "description": "Akun yang boleh masuk **tanpa kata sandi**, untuk demo dan pengembangan\nlokal. Hanya nama, email, dan peran — tidak pernah kredensial.\n\nDiatur lewat `AUTH_QUICK_LOGIN`, berisi daftar email dipisah koma dan\n**kosong secara bawaan**. Sengaja daftar email, bukan saklar on/off:\nsaklar berarti sekali dinyalakan di produksi, *semua* akun jadi bisa\ndimasuki tanpa kata sandi. Di sini akun yang boleh harus disebut satu\nper satu.\n\nMenjawab **404** saat fitur mati — produksi tidak memberi petunjuk\nbahwa rute ini ada.\n",
-        "security": [],
+        "security": [
+
+        ],
         "responses": {
           "200": {
             "description": "Daftar akun yang diizinkan",
@@ -171,7 +177,9 @@
         ],
         "summary": "Masuk cepat tanpa kata sandi",
         "description": "Menerbitkan token biasa untuk akun yang ada di daftar izin. Tokennya\nsama persis dengan hasil `POST /auth/login` — tidak ada sesi kelas dua.\n\n**404** bila fitur mati, **403** bila email di luar daftar izin. Server\nmencatat peringatan saat start selama fitur ini menyala.\n",
-        "security": [],
+        "security": [
+
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1972,6 +1980,100 @@
         }
       }
     },
+    "/api/v1/invoices/{id}/remind": {
+      "post": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Kirim ulang invoice sebagai pengingat",
+        "description": "**Admin saja.** Mengirim ULANG invoice yang sudah diterbitkan, sehingga\nPaper.id mengantar pesan lagi ke member.\n\n**Kenapa menerbitkan dokumen baru.** Paper.id tidak punya endpoint\npengingat. Diperiksa langsung terhadap API staging dengan probe yang\ndikalibrasi lebih dulu (`store-invoice` menjawab 400 karena validasi,\npath ngawur menjawab 404): kedelapan kandidat nama endpoint pengingat\nmenjawab 404. Satu-satunya cara membuat Paper.id mengantar pesan lagi\nadalah menerbitkan dokumen lain.\n\n**Nomornya berbeda, tagihannya sama.** Paper.id membakar nomor secara\npermanen; mengirim ulang dengan nomor yang sama ditolak \"nomor sudah\ndipakai\". Pengingat memakai nomor turunan `INV-2026-001-R1`, `-R2`, dan\nseterusnya, sementara nomor kanonik invoice tidak berubah sehingga\nrekonsiliasi tetap menunjuk satu tagihan.\n\n**Konsekuensi yang harus disadari:** setiap pengingat membuat dokumen\nbaru di Paper.id untuk tagihan yang sama, jadi member melihat beberapa\ninvoice bernominal identik di riwayat Paper.id mereka.\n\n**Jatuh tempo tidak dihitung ulang** — pengingat atas tunggakan harus\ntetap menampilkan tanggal aslinya, karena memundurkannya membuat\ntunggakan tampak belum jatuh tempo.\n\nStatus invoice TIDAK berubah: yang `overdue` tetap `overdue`. Setiap\npengingat menambah baris audit `reminded` beserta nomor dokumennya.\n",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/InvoiceId"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sendEmail": {
+                    "title": "Kirim via Email",
+                    "type": "boolean",
+                    "description": "Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti\n`paperid_send_email` di app_settings.\n"
+                  },
+                  "sendWhatsApp": {
+                    "title": "Kirim via WhatsApp",
+                    "type": "boolean",
+                    "description": "Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,\nmengikuti `paperid_send_whatsapp` di app_settings.\n"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Invoice setelah pengingat dikirim (status tidak berubah)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invoice"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Member belum punya nomor telepon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Invoice masih draft (pakai Kirim), atau sudah lunas/batal —\nmengingatkan tagihan tertutup berarti menagih orang atas sesuatu\nyang tidak mereka hutangi.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Paper.id menolak atau tidak bisa dihubungi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Paper.id belum dikonfigurasi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/invoices/{id}/send": {
       "post": {
         "tags": [
@@ -2073,7 +2175,9 @@
         ],
         "summary": "Callback pembayaran dari Paper.id",
         "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
-        "security": [],
+        "security": [
+
+        ],
         "parameters": [
           {
             "name": "token",
@@ -2499,7 +2603,9 @@
         ],
         "summary": "Ambil berkas yang tersimpan",
         "description": "**Tanpa token.** URL sengaja dibuat tak tertebak alih-alih dijaga\nautentikasi, karena halaman bayar publik harus bisa menampilkannya\nuntuk orang yang tidak punya akun. Direktori tidak bisa dijelajahi.\n",
-        "security": [],
+        "security": [
+
+        ],
         "parameters": [
           {
             "name": "filename",
@@ -2535,7 +2641,9 @@
         ],
         "summary": "Metrik Prometheus",
         "description": "Format eksposisi teks Prometheus (`version=0.0.4`), untuk di-scrape.\n\n**Akses.** Terbuka bila `METRICS_TOKEN` kosong; bila diisi, setiap scrape\nwajib membawa `Authorization: Bearer <token>` dan dibandingkan\nconstant-time. Terbuka sebagai bawaan karena endpoint metrik yang tak\nbisa di-scrape bukan hardening melainkan hiasan — dan inventaris route\nyang ia ungkap memang sudah publik lewat `/docs` dan `/openapi.json`.\nVolume permintaan dan tingkat error tetap layak dilindungi di produksi:\nisi `METRICS_TOKEN`, atau blokir `/metrics` di ingress.\n\n**Yang TIDAK pernah ada di sini:** id member, nomor invoice, email,\nnominal. Label dibatasi pada pola route, method, status, mitra\nintegrasi, arah, dan hasil — dijamin oleh konstruksi, bukan konfigurasi.\n\n**Kardinalitas.** Label `route` memakai *pola* route\n(`/api/v1/invoices/{id}`), bukan URL. URL berarti satu series per\ninvoice, dan Prometheus menyimpan setiap series yang pernah dilihatnya\ndi memori — lalu lintas normal akan menghabiskan heap scraper sampai\nmati. Path yang tidak cocok route mana pun dikumpulkan ke `other`.\n\n| Metrik | Tipe | Label |\n|---|---|---|\n| `http_requests_total` | counter | `method`, `route`, `status` |\n| `http_request_duration_seconds` | histogram | `method`, `route` |\n| `http_requests_in_flight` | gauge | — |\n| `integration_calls_total` | counter | `integration`, `direction`, `outcome` |\n| `integration_call_duration_seconds` | histogram | `integration`, `direction` |\n| `db_pool_conns_*` | gauge | — |\n| `db_pool_acquire_empty_total` | gauge | — |\n| `go_goroutines`, `go_memstats_*`, `go_gc_cycles_total` | gauge | — |\n",
-        "security": [],
+        "security": [
+
+        ],
         "responses": {
           "200": {
             "description": "Metrik dalam format eksposisi teks",
@@ -2567,7 +2675,9 @@
         ],
         "summary": "Cek kesehatan",
         "description": "Tanpa autentikasi, supaya probe tidak perlu kredensial.",
-        "security": [],
+        "security": [
+
+        ],
         "responses": {
           "200": {
             "description": "Layanan dan database siap",
@@ -2612,7 +2722,9 @@
           "Sistem"
         ],
         "summary": "Spesifikasi OpenAPI ini",
-        "security": [],
+        "security": [
+
+        ],
         "responses": {
           "200": {
             "description": "Spesifikasi",
@@ -2634,7 +2746,9 @@
         ],
         "summary": "Spesifikasi yang sama dalam bentuk JSON",
         "description": "Dihasilkan dari YAML oleh `make docs`. Halaman `/docs` merender bentuk\nini, karena browser bisa mem-parsing JSON tanpa pustaka apa pun.\n",
-        "security": [],
+        "security": [
+
+        ],
         "responses": {
           "200": {
             "description": "Spesifikasi",
@@ -2656,7 +2770,9 @@
         ],
         "summary": "Dokumentasi API yang bisa dibaca di browser",
         "description": "Halaman mandiri — seluruh CSS dan JS tertanam, jadi tetap berfungsi\ntanpa koneksi jaringan.\n",
-        "security": [],
+        "security": [
+
+        ],
         "responses": {
           "200": {
             "description": "Halaman HTML",
@@ -2839,7 +2955,8 @@
           "data": {
             "type": "array",
             "description": "Selalu larik — tidak pernah `null`, meski kosong.",
-            "items": {}
+            "items": {
+            }
           },
           "meta": {
             "type": "object",

@@ -81,6 +81,11 @@ type Invoice struct {
 	PaperIDPaymentURL *string    `json:"paperIdPaymentUrl,omitempty"`
 	PaperIDSentAt     *time.Time `json:"paperIdSentAt,omitempty"`
 
+	// PaperIDReminderCount = berapa kali invoice ini dikirim ulang sebagai
+	// pengingat. Menentukan sufiks nomor berikutnya, karena Paper.id membakar
+	// nomor secara permanen dan menolak pengiriman kedua dengan nomor sama.
+	PaperIDReminderCount int `json:"paperIdReminderCount"`
+
 	// Xendit (self-payment)
 	PaymentProvider     *string    `json:"paymentProvider,omitempty"`
 	XenditExternalID    *string    `json:"xenditExternalId,omitempty"`

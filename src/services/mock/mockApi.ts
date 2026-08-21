@@ -282,6 +282,72 @@ export async function mockApiFetch(
       })
     }
 
+    if (seg[2] === 'remind' && m === 'POST') {
+      if (!invoice) return notFound()
+      if (invoice.status === 'draft') {
+        return fail(409, 'invoice belum pernah dikirim — pakai Kirim, bukan Pengingat')
+      }
+      if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
+        return fail(409, `invoice berstatus ${invoice.status} tidak bisa diingatkan`)
+      }
+      const b = (body ?? {}) as { sendEmail?: boolean; sendWhatsApp?: boolean }
+      const member = memberOf(invoice)
+      const setting = async (key: string) => (await getMockAppSetting(key)) !== 'false'
+      const sendEmail = (b.sendEmail ?? (await setting('paperid_send_email'))) && Boolean(member?.email)
+      const sendWhatsApp = b.sendWhatsApp ?? (await setting('paperid_send_whatsapp'))
+
+      // Nomor turunan, cermin server: Paper.id membakar nomor secara permanen,
+      // jadi pengingat tidak bisa memakai nomor yang sama.
+      const n = (invoice.paperIdReminderCount ?? 0) + 1
+      const docNumber = `${invoice.number}-R${n}`
+      const paperInvoiceID = `mock-paper-r${n}-${invoice.id.slice(-6)}`
+      const paymentURL = `https://stg-v2.paper.id/MOCKR${n}${invoice.number.slice(-3)}`
+
+      recordMockCall({
+        integration: 'paper_id',
+        direction: 'outbound',
+        method: 'POST',
+        url: 'https://open-api.stag-v2.paper.id/api/v1/store-invoice',
+        status: 201,
+        durationMs: 774,
+        success: true,
+        request: {
+          invoice_date: ddmmyyyy(new Date()),
+          // Jatuh tempo tetap tanggal asli — memundurkannya membuat tunggakan
+          // tampak belum jatuh tempo.
+          due_date: ddmmyyyy(new Date(invoice.dueDate)),
+          number: docNumber,
+          customer: {
+            id: `${invoice.memberId}-mock`,
+            name: member?.name ?? '',
+            email: member?.email ?? '',
+            phone: member?.phone ?? '',
+          },
+          items: [{ name: itemNameFor(invoice.type), quantity: 1, price: invoice.amount }],
+          send: { email: sendEmail, whatsapp: sendWhatsApp, sms: false },
+          notes: `Pengingat pembayaran untuk invoice ${invoice.number}`,
+        },
+        response: {
+          data: {
+            id: paperInvoiceID,
+            number: docNumber,
+            payper_url: paymentURL,
+            status_send: { email: sendEmail, whatsapp: sendWhatsApp, sms: false },
+          },
+        },
+      })
+
+      // Status TIDAK berubah: overdue tetap overdue.
+      return ok({
+        ...invoice,
+        paperIdInvoiceId: paperInvoiceID,
+        paperIdPaymentUrl: paymentURL,
+        paperIdSentAt: nowISO(),
+        paperIdReminderCount: n,
+        deliveredVia: [sendEmail && 'email', sendWhatsApp && 'whatsapp'].filter(Boolean),
+      })
+    }
+
     if (seg.length === 2) {
       if (!invoice) return notFound()
       if (m === 'GET') return ok(invoice)

@@ -17,6 +17,7 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 // authenticated mux.
 func (h *Handler) RegisterProtected(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/invoices/{id}/send", auth.RequireAdmin(h.send))
+	mux.HandleFunc("POST /api/v1/invoices/{id}/remind", auth.RequireAdmin(h.remind))
 	mux.HandleFunc("GET /api/v1/paperid/status", auth.RequireAdmin(h.status))
 	mux.HandleFunc("POST /api/v1/paperid/test-invoice", auth.RequireAdmin(h.testInvoice))
 	mux.HandleFunc("POST /api/v1/paperid/test-callback", auth.RequireAdmin(h.testCallback))
@@ -78,6 +79,24 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	inv, err := h.svc.Send(r.Context(), r.PathValue("id"), opts)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, inv)
+}
+
+// remind mengirim ULANG invoice yang sudah diterbitkan. Bentuk permintaannya
+// sengaja sama dengan send, sehingga pemanggil tidak perlu belajar dua bentuk.
+func (h *Handler) remind(w http.ResponseWriter, r *http.Request) {
+	var opts SendOptions
+	if r.ContentLength != 0 {
+		if err := httpx.Decode(r, &opts); err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+	}
+	inv, err := h.svc.Remind(r.Context(), r.PathValue("id"), opts)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
