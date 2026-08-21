@@ -82,6 +82,7 @@ export function InvoiceListPage() {
   const [issuedTo, setIssuedTo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
 
@@ -166,27 +167,66 @@ export function InvoiceListPage() {
     [selectedInvoices],
   )
 
+  /**
+   * Kirim massal: satu panggilan API per invoice, berurutan.
+   *
+   * SATU KEGAGALAN TIDAK BOLEH MEMBATALKAN SISANYA. Dulu begitu — `throw` dari
+   * invoice ke-3 keluar dari loop, 17 sisanya tidak pernah dicoba, dan jumlah
+   * yang sudah berhasil tidak pernah dilaporkan. Satu member tanpa nomor
+   * telepon cukup untuk memblokir seluruh batch penagihan.
+   *
+   * Berurutan, bukan paralel: tiap panggilan menerbitkan dokumen di Paper.id
+   * dan membakar nomor invoice secara permanen. Menghantam mereka bersamaan
+   * menukar waktu tunggu dengan risiko kena rate limit di tengah batch —
+   * dan nomor yang terbakar tidak bisa dikembalikan.
+   */
   const handleBulkSend = async () => {
     if (selectedSendable.length === 0) return
     setBulkSending(true)
+    setBulkProgress({ done: 0, total: selectedSendable.length })
+
+    const gagal: { number: string; reason: string }[] = []
     let sent = 0
-    try {
-      for (const inv of selectedSendable) {
+
+    for (const [i, inv] of selectedSendable.entries()) {
+      try {
         if (inv.status === 'draft') {
           await invoiceService.send(inv.id)
         } else {
           await invoiceService.resend(inv.id)
         }
         sent++
+      } catch (err) {
+        gagal.push({
+          number: inv.number,
+          reason: err instanceof Error ? err.message : 'gagal tanpa keterangan',
+        })
       }
-      toast(`${sent} invoice berhasil dikirim ke Paper.id.`)
-      setSelected(new Set())
-      reload()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal mengirim invoice.', 'error')
-    } finally {
-      setBulkSending(false)
+      setBulkProgress({ done: i + 1, total: selectedSendable.length })
     }
+
+    setBulkProgress(null)
+    setBulkSending(false)
+    setSelected(new Set())
+    reload()
+
+    // Ringkasan yang menyebutkan keduanya. "3 gagal" tanpa menyebut yang mana
+    // memaksa orang menelusuri satu per satu; nomornya disebut supaya bisa
+    // langsung ditindaklanjuti.
+    if (gagal.length === 0) {
+      toast(`${sent} invoice berhasil dikirim ke Paper.id.`)
+      return
+    }
+    const contoh = gagal
+      .slice(0, 3)
+      .map((g) => `${g.number} (${g.reason})`)
+      .join('; ')
+    const sisa = gagal.length > 3 ? ` dan ${gagal.length - 3} lainnya` : ''
+    toast(
+      `${sent} berhasil, ${gagal.length} gagal — ${contoh}${sisa}. ` +
+        `Detail tiap panggilan ada di halaman Blackbox.`,
+      sent === 0 ? 'error' : 'info',
+    )
   }
 
 
@@ -428,7 +468,9 @@ export function InvoiceListPage() {
               {selectedSendable.length > 0 && (
                 <Button size="sm" loading={bulkSending} onClick={handleBulkSend}>
                   <Send className="h-4 w-4" />
-                  Kirim {selectedSendable.length} ke Paper.id
+                  {bulkProgress
+                    ? `Mengirim ${bulkProgress.done}/${bulkProgress.total}…`
+                    : `Kirim ${selectedSendable.length} ke Paper.id`}
                 </Button>
               )}
             </div>

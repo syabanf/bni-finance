@@ -1918,6 +1918,46 @@
       "admin": true
     },
     {
+      "id": "post:/api/v1/invoices/{id}/remind",
+      "method": "POST",
+      "path": "/api/v1/invoices/{id}/remind",
+      "tag": "Paper.id",
+      "summary": "Kirim ulang invoice sebagai pengingat",
+      "description": "**Admin saja.** Mengirim ULANG invoice yang sudah diterbitkan, sehingga\nPaper.id mengantar pesan lagi ke member.\n\n**Kenapa menerbitkan dokumen baru.** Paper.id tidak punya endpoint\npengingat. Diperiksa langsung terhadap API staging dengan probe yang\ndikalibrasi lebih dulu (`store-invoice` menjawab 400 karena validasi,\npath ngawur menjawab 404): kedelapan kandidat nama endpoint pengingat\nmenjawab 404. Satu-satunya cara membuat Paper.id mengantar pesan lagi\nadalah menerbitkan dokumen lain.\n\n**Nomornya berbeda, tagihannya sama.** Paper.id membakar nomor secara\npermanen; mengirim ulang dengan nomor yang sama ditolak \"nomor sudah\ndipakai\". Pengingat memakai nomor turunan `INV-2026-001-R1`, `-R2`, dan\nseterusnya, sementara nomor kanonik invoice tidak berubah sehingga\nrekonsiliasi tetap menunjuk satu tagihan.\n\n**Konsekuensi yang harus disadari:** setiap pengingat membuat dokumen\nbaru di Paper.id untuk tagihan yang sama, jadi member melihat beberapa\ninvoice bernominal identik di riwayat Paper.id mereka.\n\n**Jatuh tempo tidak dihitung ulang** — pengingat atas tunggakan harus\ntetap menampilkan tanggal aslinya, karena memundurkannya membuat\ntunggakan tampak belum jatuh tempo.\n\nStatus invoice TIDAK berubah: yang `overdue` tetap `overdue`. Setiap\npengingat menambah baris audit `reminded` beserta nomor dokumennya.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": "UUID invoice. Format yang salah dijawab 404, bukan 500."
+        }
+      ],
+      "body": {},
+      "bodyFields": [
+        {
+          "name": "sendEmail",
+          "label": "Kirim via Email",
+          "type": "boolean",
+          "required": false,
+          "description": "Paksa kanal email nyala/mati. Bila tidak dikirim, mengikuti",
+          "complex": false
+        },
+        {
+          "name": "sendWhatsApp",
+          "label": "Kirim via WhatsApp",
+          "type": "boolean",
+          "required": false,
+          "description": "Paksa kanal WhatsApp nyala/mati. Bila tidak dikirim,",
+          "complex": false
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
       "id": "post:/api/v1/invoices/{id}/send",
       "method": "POST",
       "path": "/api/v1/invoices/{id}/send",

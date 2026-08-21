@@ -148,19 +148,25 @@ export const apiInvoiceRepository: InvoiceRepository = {
     // choice. Passing flags from here would mean this path, the bulk actions in
     // the invoice list, and "create + send" each had to remember them — and the
     // one that forgot would quietly stop reaching members while still
-    // reporting success. Set the channels in Pengaturan → Metode Pembayaran.
+    // reporting success. Set the channels in Pengaturan.
     return api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/send`, {})
   },
 
+  /**
+   * Pengingat: minta Paper.id mengantar tagihan ini lagi ke member.
+   *
+   * Dulu fungsi ini tidak melakukan apa pun — ia mengambil invoice, memeriksa
+   * statusnya, lalu mengembalikannya utuh dengan alasan "tautannya masih
+   * berlaku, tidak ada yang perlu dibuat ulang". Benar soal tautannya, tetapi
+   * itu bukan yang diminta: menekan Kirim Ulang tidak pernah membuat satu pesan
+   * pun sampai ke member, sambil melaporkan sukses.
+   *
+   * Sekarang benar-benar mengirim. Backend menerbitkan dokumen baru di Paper.id
+   * dengan nomor turunan (-R1, -R2) karena Paper.id membakar nomor secara
+   * permanen dan tidak punya endpoint pengingat. Status invoice tidak berubah.
+   */
   async resend(id) {
-    const invoice = await api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)
-    if (invoice.status !== 'sent' && invoice.status !== 'overdue') {
-      throw new Error('Hanya invoice terkirim atau terlambat yang bisa dikirim ulang')
-    }
-    // The Paper.id invoice already exists and its payment link is persistent, so
-    // there's nothing to re-create — the stored link stays valid. Return the
-    // invoice as-is rather than fabricating a new link.
-    return invoice
+    return api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/remind`, {})
   },
 
   async cancel(id, reason) {

@@ -274,6 +274,57 @@ create table if not exists invoice_audit_log (
 create index if not exists idx_audit_invoice_created on invoice_audit_log (invoice_id, created_at desc);
 
 
+-- Rekaman panggilan integrasi pihak ketiga (Paper.id, BNI VM) — kotak hitam.
+--
+-- Dulu hanya ring buffer di memori dan hilang saat restart. Itu cukup untuk
+-- "apa yang barusan terjadi", tetapi tidak untuk pertanyaan yang sebenarnya
+-- diajukan orang: "invoice ini dikirim kapan, dan waktu itu Paper.id menjawab
+-- apa" — yang hampir selalu ditanyakan berhari-hari kemudian, setelah proses
+-- sudah lama di-restart.
+--
+-- HANYA BODY, TIDAK PERNAH HEADER. Kredensial Paper.id (client_id/client_secret)
+-- dan bearer token hidup di header, jadi secara konstruksi tidak bisa sampai ke
+-- tabel ini. Perhatikan tetap: body permintaan Paper.id memuat nama, email, dan
+-- telepon member, sehingga tabel ini menyimpan data pribadi dan hanya boleh
+-- dibaca admin — sama seperti halaman yang menampilkannya.
+-- Penghitung pengingat per invoice.
+--
+-- Paper.id membakar nomor invoice secara permanen: mengirim ulang dengan nomor
+-- yang sama ditolak "nomor sudah dipakai". Pengingat karena itu memakai nomor
+-- turunan — INV-2026-001-R1, -R2, dan seterusnya — sementara nomor kanonik di
+-- sistem kita tidak berubah. Penghitung ini yang menentukan sufiksnya.
+alter table invoices
+  add column if not exists paper_id_reminder_count integer not null default 0;
+
+
+create table if not exists integration_calls (
+  id          bigserial   primary key,
+  occurred_at timestamptz not null default now(),
+  integration text        not null,
+  direction   text        not null,
+  method      text        not null,
+  url         text        not null,
+  request     jsonb,
+  response    jsonb,
+  status      integer     not null default 0,
+  success     boolean     not null,
+  duration_ms bigint      not null default 0,
+  error       text
+);
+
+-- Halaman blackbox selalu membaca terbaru-dulu, dan pemangkasan retensi
+-- memakai urutan yang sama.
+create index if not exists idx_integration_calls_recent
+  on integration_calls (occurred_at desc, id desc);
+
+-- Penyaringan per integrasi dan "gagal saja" adalah dua filter yang dipakai
+-- saat menelusuri masalah.
+create index if not exists idx_integration_calls_integration
+  on integration_calls (integration, occurred_at desc);
+create index if not exists idx_integration_calls_failed
+  on integration_calls (occurred_at desc) where not success;
+
+
 -- =============================================================================
 -- 2. AKUN AWAL — hanya bila tabel users masih kosong
 --

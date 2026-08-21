@@ -93,6 +93,9 @@ export interface Invoice {
   paperIdPaymentUrl?: string
   paperIdSentAt?: string
 
+  /** Berapa kali invoice ini dikirim ulang sebagai pengingat lewat Paper.id. */
+  paperIdReminderCount?: number
+
   // Xendit (Self Payment Mode) — native VA / QRIS
   paymentProvider?: string // 'xendit' | undefined
   xenditPaymentId?: string

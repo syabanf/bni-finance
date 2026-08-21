@@ -3,9 +3,14 @@
 // captured with its request body, the endpoint hit, the response body, and
 // whether it succeeded.
 //
-// It is an in-memory ring buffer, not a table: this is a diagnostic aid where
-// only recent calls matter, so it avoids a migration and a write on every
-// integration call. Entries are lost on restart — by design.
+// Rekaman ditulis ke Postgres DAN disimpan di ring buffer memori. Dulu hanya
+// memori, dan itu hilang tiap restart — cukup untuk "apa yang barusan terjadi",
+// tetapi tidak untuk pertanyaan yang sebenarnya diajukan orang: "invoice ini
+// dikirim kapan, dan waktu itu Paper.id menjawab apa", yang hampir selalu
+// ditanyakan berhari-hari kemudian.
+//
+// Tanpa Store yang terpasang (tes, mode Data Contoh) ia tetap berfungsi penuh
+// di memori saja, jadi tidak ada jalur yang menuntut database ada.
 //
 // SECURITY: callers pass only JSON bodies here, never headers. Credentials
 // (Paper.id client_id/secret, bearer tokens) live in headers, so they cannot
@@ -13,11 +18,22 @@
 package blackbox
 
 import (
+	"context"
 	"encoding/json"
+	"log/slog"
 	"strconv"
 	"sync"
 	"time"
 )
+
+// Store adalah penyimpanan tahan-restart untuk rekaman. Repository di paket ini
+// mengimplementasikannya; antarmukanya ada supaya tes tidak menuntut Postgres.
+type Store interface {
+	Insert(ctx context.Context, e Entry) error
+	List(ctx context.Context, limit int) ([]Entry, error)
+	Clear(ctx context.Context) error
+	Prune(ctx context.Context) (int64, error)
+}
 
 const (
 	// Outbound = a request we made to an external API.
@@ -56,6 +72,20 @@ type Recorder struct {
 	// derived from the ONE place all four integrations already funnel through,
 	// instead of adding a counter to each client and eventually forgetting one.
 	observe func(Call)
+
+	// store membuat rekaman bertahan melewati restart. nil = memori saja.
+	store Store
+	log   *slog.Logger
+}
+
+// WithStore memasang penyimpanan tahan-restart.
+func (r *Recorder) WithStore(s Store, log *slog.Logger) *Recorder {
+	if r == nil {
+		return nil
+	}
+	r.store = s
+	r.log = log
+	return r
 }
 
 // WithObserver attaches a callback invoked on every Record. The callback runs
@@ -130,12 +160,59 @@ func (r *Recorder) Record(c Call) {
 	if len(r.entries) > r.max {
 		r.entries = r.entries[:r.max]
 	}
+
+	r.persist(e)
+}
+
+// persist menulis rekaman ke penyimpanan.
+//
+// Gagal menyimpan TIDAK boleh menggagalkan panggilan integrasinya: ini catatan
+// diagnostik, bukan bagian dari transaksi bisnis. Kegagalannya dicatat ke log
+// supaya tidak hilang tanpa jejak — kotak hitam yang diam-diam berhenti merekam
+// lebih buruk daripada yang tidak ada.
+//
+// Dipanggil dengan r.mu masih dipegang, jadi urutan penulisan mengikuti urutan
+// perekaman. Insert punya batas waktunya sendiri sehingga database yang lambat
+// tidak menahan lock ini tanpa batas.
+func (r *Recorder) persist(e Entry) {
+	if r.store == nil {
+		return
+	}
+	ctx := context.Background()
+	if err := r.store.Insert(ctx, e); err != nil {
+		if r.log != nil {
+			r.log.Error("blackbox gagal menyimpan rekaman", "error", err,
+				"integration", e.Integration, "url", e.URL)
+		}
+		return
+	}
+	// Pemangkasan tidak perlu tiap baris; tiap 200 rekaman sudah menjaga
+	// tabelnya tetap terbatas tanpa membebani jalur permintaan.
+	if r.seq%200 == 0 {
+		if _, err := r.store.Prune(ctx); err != nil && r.log != nil {
+			r.log.Warn("blackbox gagal memangkas rekaman lama", "error", err)
+		}
+	}
 }
 
 // List returns a copy of the entries, newest first.
+//
+// Membaca dari penyimpanan bila ada, sehingga halaman blackbox menampilkan
+// riwayat penuh dan bukan hanya yang tersisa sejak restart terakhir. Bila
+// pembacaan gagal, isi memori dikembalikan sebagai cadangan — lebih baik
+// menampilkan sebagian daripada halaman kosong saat sedang menelusuri masalah.
 func (r *Recorder) List() []Entry {
 	if r == nil {
 		return []Entry{}
+	}
+	if r.store != nil {
+		got, err := r.store.List(context.Background(), r.max)
+		if err == nil {
+			return got
+		}
+		if r.log != nil {
+			r.log.Error("blackbox gagal membaca riwayat, memakai isi memori", "error", err)
+		}
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -144,14 +221,21 @@ func (r *Recorder) List() []Entry {
 	return out
 }
 
-// Clear empties the buffer.
+// Clear empties the buffer and the stored history.
 func (r *Recorder) Clear() {
 	if r == nil {
 		return
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	r.entries = nil
+	store, log := r.store, r.log
+	r.mu.Unlock()
+
+	if store != nil {
+		if err := store.Clear(context.Background()); err != nil && log != nil {
+			log.Error("blackbox gagal mengosongkan riwayat", "error", err)
+		}
+	}
 }
 
 // asJSON keeps valid JSON as-is and wraps anything else as a JSON string, so a

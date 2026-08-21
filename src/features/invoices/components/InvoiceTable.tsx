@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Eye } from 'lucide-react'
+import { ArrowRight, BellRing, Eye } from 'lucide-react'
 import type { InvoiceWithRelations } from '@/types'
 import {
   Avatar,
@@ -12,12 +12,12 @@ import {
   Th,
   THead,
   Tr,
-  WhatsAppIcon,
+  useToast,
 } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { buildInvoiceWhatsAppUrl } from '@/lib/whatsapp'
 import { daysUntil } from '@/lib/date'
 import { cn } from '@/lib/cn'
+import { invoiceService } from '@/services'
 
 /** Relative due-date hint, e.g. "3 hari lagi" / "terlambat 5 hari". Only for unpaid issued invoices. */
 function DueHint({ dueDate, status }: { dueDate: string; status: InvoiceWithRelations['status'] }) {
@@ -38,32 +38,63 @@ interface InvoiceTableProps {
   onSelectChange?: (s: Set<string>) => void
 }
 
-/** Opens wa.me in a new tab with a prefilled invoice message. */
-function WhatsAppAction({
-  url,
+/**
+ * Pengingat lewat Paper.id.
+ *
+ * Dulu tombol ini membuka wa.me dengan pesan terisi — admin yang mengirimkan
+ * sendiri, dari nomornya sendiri, dan tidak ada catatan bahwa pengingat pernah
+ * dikirim. Sekarang Paper.id yang mengantar, lewat kanal yang sama dengan
+ * penerbitan invoice, dan setiap pengingat meninggalkan baris audit.
+ */
+function RemindAction({
+  invoice,
   size = 'md',
+  onDone,
 }: {
-  url: string
+  invoice: InvoiceWithRelations
   size?: 'sm' | 'md'
+  onDone?: () => void
 }) {
+  const [busy, setBusy] = useState(false)
+  const { toast } = useToast()
   const dim = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8'
   const icon = size === 'sm' ? 'h-[18px] w-[18px]' : 'h-4 w-4'
+
+  const click = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (busy) return
+    setBusy(true)
+    try {
+      await invoiceService.resend(invoice.id)
+      toast(`Pengingat ${invoice.number} dikirim lewat Paper.id.`, 'success')
+      onDone?.()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Pengingat gagal dikirim.', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
+    <button
+      type="button"
+      onClick={click}
+      disabled={busy}
       className={cn(
-        'inline-flex items-center justify-center rounded-lg text-emerald-600 transition-colors hover:bg-emerald-50',
+        'inline-flex items-center justify-center rounded-lg text-brand-600 transition-colors hover:bg-brand-50 disabled:opacity-50',
         dim,
       )}
-      aria-label="Kirim WhatsApp"
-      title="Kirim invoice via WhatsApp"
+      aria-label="Kirim pengingat via Paper.id"
+      title="Kirim pengingat via Paper.id"
     >
-      <WhatsAppIcon className={icon} />
-    </a>
+      <BellRing className={icon} />
+    </button>
   )
+}
+
+/** Pengingat hanya masuk akal untuk tagihan yang sudah dikirim dan belum lunas. */
+function canRemind(inv: InvoiceWithRelations): boolean {
+  return inv.status === 'sent' || inv.status === 'overdue'
 }
 
 export function InvoiceTable({ invoices, compact = false, selected, onSelectChange }: InvoiceTableProps) {
@@ -151,7 +182,6 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
           </div>
         )}
         {sorted.map((inv) => {
-          const waUrl = buildInvoiceWhatsAppUrl(inv)
           return (
             <div
               key={inv.id}
@@ -187,9 +217,9 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <InvoiceStatusBadge status={inv.status} />
                   <InvoiceTypeBadge type={inv.type} />
-                  {waUrl && (
+                  {canRemind(inv) && (
                     <span className="ml-auto">
-                      <WhatsAppAction url={waUrl} size="sm" />
+                      <RemindAction invoice={inv} size="sm" />
                     </span>
                   )}
                 </div>
@@ -228,7 +258,6 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
           </THead>
           <TBody>
             {sorted.map((inv) => {
-              const waUrl = buildInvoiceWhatsAppUrl(inv)
               return (
                 <Tr
                   key={inv.id}
@@ -280,7 +309,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                   {!compact && (
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {waUrl && <WhatsAppAction url={waUrl} />}
+                        {canRemind(inv) && <RemindAction invoice={inv} />}
                         <button
                           onClick={(e) => {
                             e.stopPropagation()

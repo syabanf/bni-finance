@@ -38,6 +38,9 @@ func (s *sendStub) GetSendable(context.Context, string) (*Sendable, error) {
 func (s *sendStub) MarkSent(context.Context, string, CreateResult, time.Time, time.Time, string) (*domain.Invoice, error) {
 	return s.sent, nil
 }
+func (s *sendStub) MarkReminded(context.Context, string, CreateResult, time.Time, string) (*domain.Invoice, error) {
+	return s.sent, nil
+}
 func (s *sendStub) SettleByRef(context.Context, string, string, string, string, int64, time.Time) (bool, error) {
 	return false, nil
 }

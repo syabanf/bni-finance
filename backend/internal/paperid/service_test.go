@@ -19,8 +19,9 @@ type stubStore struct {
 	settings       map[string]string
 	paperInvoiceID string
 
-	sentWith  *CreateResult
-	settleRef struct {
+	sentWith     *CreateResult
+	remindedWith *CreateResult
+	settleRef    struct {
 		paperID, number, method, status string
 		amount                          int64
 		called                          bool
@@ -38,6 +39,11 @@ func (s *stubStore) GetSendable(context.Context, string) (*Sendable, error) {
 func (s *stubStore) MarkSent(_ context.Context, id string, res CreateResult, _, _ time.Time, _ string) (*domain.Invoice, error) {
 	s.sentWith = &res
 	return &domain.Invoice{ID: id, Status: domain.StatusSent}, nil
+}
+
+func (s *stubStore) MarkReminded(_ context.Context, id string, res CreateResult, _ time.Time, _ string) (*domain.Invoice, error) {
+	s.remindedWith = &res
+	return &domain.Invoice{ID: id, Status: domain.StatusSent, PaperIDReminderCount: 1}, nil
 }
 
 func (s *stubStore) SettleByRef(_ context.Context, paperID, number, method, status string, amount int64, _ time.Time) (bool, error) {

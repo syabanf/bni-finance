@@ -32,20 +32,24 @@ type Sendable struct {
 	Name     string
 	Email    string
 	Phone    string
+
+	// ReminderCount menentukan sufiks nomor pengingat berikutnya.
+	ReminderCount int
 }
 
 // GetSendable loads the invoice + member for the send path.
 func (r *Repository) GetSendable(ctx context.Context, invoiceID string) (*Sendable, error) {
 	const q = `
 		SELECT i.id, i.number, i.amount, i.type, i.status, i.due_date,
-		       m.id, m.name, coalesce(m.email,''), coalesce(m.phone,'')
+		       m.id, m.name, coalesce(m.email,''), coalesce(m.phone,''),
+		       i.paper_id_reminder_count
 		FROM invoices i JOIN members m ON m.id = i.member_id
 		WHERE i.id = $1`
 
 	var s Sendable
 	err := r.db.QueryRow(ctx, q, invoiceID).Scan(
 		&s.ID, &s.Number, &s.Amount, &s.Type, &s.Status, &s.DueDate,
-		&s.MemberID, &s.Name, &s.Email, &s.Phone,
+		&s.MemberID, &s.Name, &s.Email, &s.Phone, &s.ReminderCount,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -215,6 +219,7 @@ const invoiceColumns = `
 	id, number, member_id, chapter_id, type, amount, currency,
 	due_date, period_start, period_end, status,
 	paper_id_invoice_id, paper_id_invoice_url, paper_id_payment_url, paper_id_sent_at,
+	paper_id_reminder_count,
 	payment_provider, xendit_external_id, xendit_payment_id, xendit_payment_method,
 	xendit_va_bank, xendit_va_number, xendit_qris_string, xendit_payment_status, xendit_expires_at,
 	paid_at, paid_amount, notes, created_by, cancelled_by, cancelled_at, cancel_reason,
@@ -229,6 +234,7 @@ func scanInvoice(row scannable) (*domain.Invoice, error) {
 		&inv.ID, &inv.Number, &inv.MemberID, &inv.ChapterID, &inv.Type, &inv.Amount, &inv.Currency,
 		&due, &periodStart, &periodEnd, &inv.Status,
 		&inv.PaperIDInvoiceID, &inv.PaperIDInvoiceURL, &inv.PaperIDPaymentURL, &inv.PaperIDSentAt,
+		&inv.PaperIDReminderCount,
 		&inv.PaymentProvider, &inv.XenditExternalID, &inv.XenditPaymentID, &inv.XenditPaymentMethod,
 		&inv.XenditVaBank, &inv.XenditVaNumber, &inv.XenditQrisString, &inv.XenditPaymentStatus, &inv.XenditExpiresAt,
 		&inv.PaidAt, &inv.PaidAmount, &inv.Notes, &inv.CreatedBy, &inv.CancelledBy, &inv.CancelledAt, &inv.CancelReason,
@@ -241,4 +247,57 @@ func scanInvoice(row scannable) (*domain.Invoice, error) {
 	inv.PeriodStart = domain.NewDate(periodStart)
 	inv.PeriodEnd = domain.NewDate(periodEnd)
 	return &inv, nil
+}
+
+// MarkReminded menyimpan hasil pengiriman ulang.
+//
+// Berbeda dari MarkSent, status TIDAK diubah: invoice yang diingatkan tetap
+// sent atau overdue — pengingat bukan penerbitan baru, dan menaikkannya kembali
+// ke sent akan menghapus fakta bahwa invoice itu sudah lewat jatuh tempo.
+//
+// Tautan Paper.id DIPERBARUI ke dokumen terbaru: dokumen lama tetap ada di
+// Paper.id, tetapi yang harus dibagikan adalah yang paling akhir dikirim ke
+// member, supaya admin dan member melihat halaman yang sama.
+func (r *Repository) MarkReminded(ctx context.Context, invoiceID string,
+	res CreateResult, at time.Time, actor string) (*domain.Invoice, error) {
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mulai transaksi pengingat: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	const upd = `
+		UPDATE invoices SET
+		  paper_id_invoice_id = $2,
+		  paper_id_invoice_url = $3,
+		  paper_id_payment_url = $4,
+		  paper_id_sent_at = $5,
+		  paper_id_reminder_count = paper_id_reminder_count + 1,
+		  updated_at = now()
+		WHERE id = $1
+		RETURNING ` + invoiceColumns
+
+	inv, err := scanInvoice(tx.QueryRow(ctx, upd,
+		invoiceID, res.PaperInvoiceID, res.InvoicePDFURL, res.PaymentURL, at))
+	if err != nil {
+		return nil, err
+	}
+
+	// Jejak audit: tanpa ini, tidak ada cara mengetahui berapa kali dan kapan
+	// seorang member diingatkan — dan itu pertanyaan pertama saat ada keluhan
+	// "saya diteror invoice".
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO invoice_audit_log (invoice_id, action, from_status, to_status, actor_name, notes)
+		VALUES ($1, 'reminded', $2, $2, $3, $4)`,
+		invoiceID, inv.Status, actor,
+		fmt.Sprintf("pengingat ke-%d dikirim ulang ke Paper.id sebagai %s",
+			inv.PaperIDReminderCount, res.Number)); err != nil {
+		return nil, fmt.Errorf("catat audit pengingat: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit pengingat: %w", err)
+	}
+	return inv, nil
 }
