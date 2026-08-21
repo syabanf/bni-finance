@@ -166,3 +166,77 @@ func TestSendBerhasilJugaMasukBlackbox(t *testing.T) {
 		t.Errorf("panggilan hulu harus tercatat 1 kali, dapat %d", upstream)
 	}
 }
+
+// Entri tanpa response setengah berguna: halaman blackbox menampilkan
+// permintaannya lalu berhenti, dan pertanyaan "hasilnya apa" tetap tak terjawab
+// — padahal itu justru alasan orang membukanya. Sempat begitu: entri operasi
+// punya request tetapi response-nya string kosong, dan yang dilaporkan
+// pengguna persis "kirim ke Paper.id tapi tidak ada response di blackbox".
+//
+// Blackbox ini untuk melihat integrasi secara UTUH, jadi kedua sisi wajib
+// terisi: apa yang diminta, dan apa hasilnya.
+func TestEntriKirimSelaluPunyaResponse(t *testing.T) {
+	t.Run("gagal memuat pesan yang diterima pemanggil", func(t *testing.T) {
+		rec := blackbox.New(50)
+		svc := NewService(&sendStub{sendable: &Sendable{
+			ID: "inv-2", Status: domain.StatusPaid,
+		}}, "https://contoh.invalid", "id", "secret", "tok", rec)
+
+		_, err := svc.Send(context.Background(), "inv-2", SendOptions{})
+		if err == nil {
+			t.Fatal("harusnya gagal")
+		}
+		ops := opsEntries(rec)
+		if len(ops) != 1 {
+			t.Fatalf("harus 1 entri, dapat %d", len(ops))
+		}
+		if len(ops[0].Response) == 0 {
+			t.Fatal("response kosong — entri kegagalan tidak menjelaskan apa pun")
+		}
+		// Pesannya harus yang sama dengan yang diterima pemanggil, bukan
+		// ringkasan lain yang bisa menyimpang darinya.
+		if !strings.Contains(string(ops[0].Response), err.Error()) {
+			t.Errorf("response %s tidak memuat pesan error %q", ops[0].Response, err.Error())
+		}
+	})
+
+	t.Run("berhasil memuat hasil yang bisa ditindaklanjuti", func(t *testing.T) {
+		hulu := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"data":{"id":"pi-1","number":"INV-2026-009",` +
+				`"payper_url":"https://bayar.contoh/pi-1"},"status_code":200}`))
+		}))
+		defer hulu.Close()
+
+		rec := blackbox.New(50)
+		paperID, payURL := "pi-1", "https://bayar.contoh/pi-1"
+		store := &sendStub{
+			sendable: &Sendable{
+				ID: "inv-9", Number: "INV-2026-009", Amount: 250000,
+				Type: domain.TypeRenewal, Status: domain.StatusDraft,
+				DueDate:  time.Now().Add(24 * time.Hour),
+				MemberID: "mem-9", Name: "Uji Kirim",
+				Email: "uji@contoh.local", Phone: "6282240274833",
+			},
+			sent: &domain.Invoice{
+				ID: "inv-9", Number: "INV-2026-009", Status: domain.StatusSent,
+				PaperIDInvoiceID: &paperID, PaperIDPaymentURL: &payURL,
+			},
+		}
+		svc := NewService(store, hulu.URL, "id", "secret", "tok", rec)
+		if _, err := svc.Send(context.Background(), "inv-9", SendOptions{}); err != nil {
+			t.Fatalf("kirim harusnya berhasil: %v", err)
+		}
+
+		ops := opsEntries(rec)
+		if len(ops) != 1 || len(ops[0].Response) == 0 {
+			t.Fatalf("entri operasi harus punya response: %+v", ops)
+		}
+		// Yang menjadikannya berguna: nomor, status, dan tautan bayar.
+		for _, wajib := range []string{"INV-2026-009", "sent", "pi-1", payURL} {
+			if !strings.Contains(string(ops[0].Response), wajib) {
+				t.Errorf("response tidak memuat %q: %s", wajib, ops[0].Response)
+			}
+		}
+	})
+}

@@ -143,7 +143,8 @@ func (s *Service) resolve(ctx context.Context, opts SendOptions) (email, whatsap
 // Dari dashboard, ketiganya tampak sebagai "kirim gagal" tetapi halaman
 // blackbox kosong — persis keluhan yang membuat perbaikan ini ada. Blackbox
 // dipakai untuk menjawab "tadi kenapa gagal", jadi diam bukan jawaban.
-func (s *Service) recordSend(invoiceID string, opts SendOptions, started time.Time, err error) {
+func (s *Service) recordSend(invoiceID string, opts SendOptions, started time.Time,
+	out *domain.Invoice, err error) {
 	if s.rec == nil {
 		return
 	}
@@ -153,10 +154,34 @@ func (s *Service) recordSend(invoiceID string, opts SendOptions, started time.Ti
 		WhatsApp  *bool  `json:"sendWhatsApp"`
 	}{invoiceID, opts.Email, opts.WhatsApp})
 
+	// Entri tanpa response setengah berguna: halaman blackbox menampilkan
+	// permintaannya lalu berhenti, dan pertanyaan "hasilnya apa" tetap tak
+	// terjawab — padahal itu justru alasan orang membukanya.
+	//
+	// Pada kegagalan, isinya pesan yang benar-benar diterima pemanggil. Pada
+	// keberhasilan, ringkasan hasil yang bisa ditindaklanjuti: nomor, status,
+	// dan tautan Paper.id — bukan seluruh invoice, karena entri ini tentang
+	// operasinya, bukan salinan basis data.
+	var resp []byte
+	switch {
+	case err != nil:
+		resp, _ = json.Marshal(struct {
+			Error string `json:"error"`
+		}{err.Error()})
+	case out != nil:
+		resp, _ = json.Marshal(struct {
+			ID         string               `json:"id"`
+			Number     string               `json:"number"`
+			Status     domain.InvoiceStatus `json:"status"`
+			PaperID    *string              `json:"paperIdInvoiceId,omitempty"`
+			PaymentURL *string              `json:"paperIdPaymentUrl,omitempty"`
+		}{out.ID, out.Number, out.Status, out.PaperIDInvoiceID, out.PaperIDPaymentURL})
+	}
+
 	s.rec.Record(blackbox.Call{
 		Integration: "paper_id", Direction: blackbox.Outbound,
 		Method: http.MethodPost, URL: "/api/v1/invoices/" + invoiceID + "/send",
-		Request: req, Status: httpx.StatusOf(err), Success: err == nil,
+		Request: req, Response: resp, Status: httpx.StatusOf(err), Success: err == nil,
 		Duration: time.Since(started), Err: err,
 	})
 }
@@ -167,9 +192,9 @@ func (s *Service) recordSend(invoiceID string, opts SendOptions, started time.Ti
 // PUN — termasuk return awal yang tidak pernah mencapai gateway. Menaruh
 // pemanggilan Record di setiap titik return akan bekerja hari ini dan bocor
 // lagi pada return berikutnya yang ditambahkan orang.
-func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) (_ *domain.Invoice, err error) {
+func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) (out *domain.Invoice, err error) {
 	started := s.now()
-	defer func() { s.recordSend(invoiceID, opts, started, err) }()
+	defer func() { s.recordSend(invoiceID, opts, started, out, err) }()
 
 	if s.gateway == nil {
 		return nil, httpx.NewError(http.StatusServiceUnavailable,
