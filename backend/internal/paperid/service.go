@@ -236,7 +236,7 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,
-		CustomerPhone: inv.Phone,
+		CustomerPhone: normalizePhone(inv.Phone),
 		SendEmail:     sendEmail,
 		SendWhatsApp:  sendWhatsApp,
 	})
@@ -512,7 +512,7 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,
-		CustomerPhone: inv.Phone,
+		CustomerPhone: normalizePhone(inv.Phone),
 		SendEmail:     sendEmail,
 		SendWhatsApp:  sendWhatsApp,
 		Notes:         "Pengingat pembayaran untuk invoice " + inv.Number,
