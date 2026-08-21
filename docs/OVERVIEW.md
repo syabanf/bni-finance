@@ -408,6 +408,6 @@ Halaman `/docs`, `/openapi.yaml`, dan `/openapi.json` dilayani backend, bukan Ve
 | [`db/init.sql`](../db/init.sql) | ✅ berlaku | Skema database — sumber kebenaran |
 | `/docs` di backend | ✅ berlaku | Referensi API, dibangkitkan dari `openapi.yaml` |
 | [`docs/SYSTEM.md`](./SYSTEM.md) | ⚠️ **sebagian usang** | Alur bisnis masih berlaku; bagian Supabase (PostgREST, RLS, Edge Functions, Storage) dan seluruh bagian Xendit / pembayaran mandiri sudah tidak menggambarkan sistem yang berjalan |
-| [`docs/bni-finance-system-plan.md`](./bni-finance-system-plan.md) | 📜 historis | Rencana teknis awal |
+| [`docs/SYSTEM-PLAN.md`](./SYSTEM-PLAN.md) | 📜 historis | Rencana teknis awal |
 | [`docs/BACKLOG.md`](./BACKLOG.md) · [`docs/epics/`](./epics) · [`docs/features/`](./features) | 📜 historis | User story & acceptance criteria per fitur. `EPIC-001` dan `11-public-payment` menggambarkan pembayaran mandiri Xendit yang sudah dihapus. |
 | [`docs/AGENTIC-WORKFLOW.md`](./AGENTIC-WORKFLOW.md) · [`AGENTS.md`](../AGENTS.md) | ✅ berlaku | Cara kerja agen pada repo ini |
