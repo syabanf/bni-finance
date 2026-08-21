@@ -12,7 +12,7 @@
 
 import { store, nowISO } from './store'
 import { getMockAppSetting, setMockAppSetting } from './appSettings'
-import { clearMockCalls, listMockCalls, recordMockCall } from './blackbox'
+import { clearMockCalls, listMockCalls, recordMockCall } from './blackboxService'
 import type { Invoice, Payment } from '@/types'
 
 /** Paper.id memakai DD-MM-YYYY, bukan ISO. */

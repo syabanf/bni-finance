@@ -5,7 +5,7 @@ renewal keanggotaan, sinkronisasi data dari BNI Visitor Management, pembayaran
 (**Paper.id**), pelaporan keuangan, dan ekspor data.
 
 Dibangun dengan **Vite + React + TypeScript + Tailwind CSS**, dapat dipasang sebagai
-**PWA**, mengikuti [rencana teknis](./docs/bni-finance-system-plan.md) dan menerapkan
+**PWA**, mengikuti [rencana teknis](./docs/SYSTEM-PLAN.md) dan menerapkan
 **clean architecture** (presentation → application → data) sehingga data layer mock dapat
 ditukar dengan backend nyata (**REST API Go** / BNI VM API / Paper.id) tanpa
 mengubah UI.

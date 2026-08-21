@@ -1,6 +1,6 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
 import { isMockMode } from '@/services/dataSource'
-import { clearMockCalls, listMockCalls } from '@/services/mock/blackbox'
+import { clearMockCalls, listMockCalls } from '@/services/mock/blackboxService'
 
 /**
  * Rekaman "kotak hitam" lalu lintas integrasi.
