@@ -8,7 +8,6 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   qris: 'QRIS',
   cash: 'Tunai',
   paper_id: 'Paper.id',
-  xendit: 'Xendit',
   other: 'Lainnya',
 }
 
