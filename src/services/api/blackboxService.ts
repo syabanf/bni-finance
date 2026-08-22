@@ -11,7 +11,7 @@ import { clearMockCalls, listMockCalls } from '@/services/mock/blackboxService'
  * `mock/blackbox` — sebelumnya halaman ini mati total pada mode yang justru
  * dipakai untuk demo.
  */
-export type BlackboxIntegration = 'paper_id' | 'xendit' | 'bni_vm'
+export type BlackboxIntegration = 'paper_id' | 'bni_vm'
 export type BlackboxDirection = 'outbound' | 'inbound'
 
 export interface BlackboxEntry {
@@ -67,6 +67,5 @@ export function clearBlackbox(): Promise<void> {
 
 export const INTEGRATION_LABEL: Record<BlackboxIntegration, string> = {
   paper_id: 'Paper.id',
-  xendit: 'Xendit',
   bni_vm: 'BNI VM',
 }

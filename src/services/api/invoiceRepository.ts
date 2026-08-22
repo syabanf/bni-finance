@@ -9,7 +9,6 @@ import type {
   MemberWithChapter,
   RenewalDueMember,
 } from '@/types'
-import { getAppSetting } from './settingsRepository'
 import { isNotFound } from './chapterRepository'
 
 /**
@@ -124,22 +123,11 @@ export const apiInvoiceRepository: InvoiceRepository = {
     const invoice = await api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)
     if (invoice.status !== 'draft') throw new Error('Hanya invoice draft yang bisa dikirim')
 
-    // Self Payment Mode ON  → the payer settles via Xendit on the public page,
-    //                         so there's no Paper.id push — just issue it.
-    // Self Payment Mode OFF → the server pushes a real invoice to Paper.id and
-    //                         flips the status in one call.
-    const selfPayment = (await getAppSetting('self_payment_mode')) === 'true'
-
-    if (selfPayment) {
-      const dueDaysAfter = Number((await getAppSetting('invoice_due_days_after')) ?? 30)
-      const due = new Date()
-      due.setDate(due.getDate() + dueDaysAfter)
-      return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, {
-        status: 'sent',
-        dueDate: due.toISOString().slice(0, 10),
-      })
-    }
-
+    // Dulu di sini ada percabangan Self Payment Mode: bila menyala, invoice
+    // hanya ditandai terkirim tanpa mendorong apa pun ke Paper.id. Jalur itu
+    // hilang bersama pembayaran mandiri, tetapi pembacaan setelannya sempat
+    // tertinggal — memanggil app_settings untuk kunci yang sudah tidak ada,
+    // lalu selalu jatuh ke cabang yang sama. Bekerja, tetapi menipu pembaca.
     // The Paper.id credentials live on the server; this endpoint does the push,
     // stores the returned payment link + PDF, and records the audit entry.
     //
