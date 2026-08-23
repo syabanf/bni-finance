@@ -53,6 +53,7 @@ const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> 
   overdue: { icon: TriangleAlert, tone: 'bg-red-50 text-red-500' },
   cancelled: { icon: XCircle, tone: 'bg-ink-100 text-ink-500' },
   updated: { icon: Pencil, tone: 'bg-blue-50 text-blue-500' },
+  reminded: { icon: BellRing, tone: 'bg-brand-50 text-brand-500' },
 }
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
@@ -62,6 +63,7 @@ const AUDIT_LABEL: Record<AuditAction, string> = {
   overdue: 'Jatuh tempo terlewati',
   cancelled: 'Invoice dibatalkan',
   updated: 'Invoice diperbarui',
+  reminded: 'Pengingat dikirim',
 }
 
 type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | null

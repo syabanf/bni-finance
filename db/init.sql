@@ -293,6 +293,19 @@ create index if not exists idx_audit_invoice_created on invoice_audit_log (invoi
 -- yang sama ditolak "nomor sudah dipakai". Pengingat karena itu memakai nomor
 -- turunan — INV-2026-001-R1, -R2, dan seterusnya — sementara nomor kanonik di
 -- sistem kita tidak berubah. Penghitung ini yang menentukan sufiksnya.
+-- Pengingat adalah kejadian tersendiri di jejak audit, bukan penerbitan ulang.
+-- Memakai 'sent' akan berbohong: riwayatnya terbaca seolah invoice diterbitkan
+-- dua kali, padahal tagihannya satu dan hanya diingatkan.
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'audit_action' and e.enumlabel = 'reminded'
+  ) then
+    alter type audit_action add value 'reminded';
+  end if;
+end $$;
+
 alter table invoices
   add column if not exists paper_id_reminder_count integer not null default 0;
 

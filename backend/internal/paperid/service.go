@@ -25,6 +25,7 @@ type Store interface {
 	GetSendable(ctx context.Context, invoiceID string) (*Sendable, error)
 	MarkSent(ctx context.Context, invoiceID string, res CreateResult, dueDate, sentAt time.Time, actor string) (*domain.Invoice, error)
 	MarkReminded(ctx context.Context, invoiceID string, res CreateResult, at time.Time, actor string) (*domain.Invoice, error)
+	ReserveReminder(ctx context.Context, invoiceID string) (int, error)
 	SettleByRef(ctx context.Context, paperInvoiceID, number, method, status string, amount int64, paidAt time.Time) (bool, error)
 	GetSetting(ctx context.Context, key string) (string, error)
 	PaperInvoiceID(ctx context.Context, invoiceID string) (string, error)
@@ -522,11 +523,19 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 		sendEmail = false
 	}
 
+	// Nomor urut DIPESAN dan diikat sebelum Paper.id dihubungi. Lihat
+	// ReserveReminder: menaikkannya sesudah membuat setiap kegagalan meracuni
+	// sufiksnya secara permanen.
+	seq, err := s.repo.ReserveReminder(ctx, invoiceID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Jatuh tempo TIDAK dihitung ulang dari hari ini. Pengingat atas tagihan
 	// yang sudah lewat jatuh tempo harus tetap menampilkan tanggal aslinya —
 	// memundurkannya akan membuat tunggakan tampak belum jatuh tempo.
 	res, err := s.gateway.CreateInvoice(ctx, CreateInput{
-		Number:        reminderNumber(inv.Number, inv.ReminderCount+1),
+		Number:        reminderNumber(inv.Number, seq),
 		InvoiceDate:   now,
 		DueDate:       inv.DueDate,
 		Amount:        inv.Amount,

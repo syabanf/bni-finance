@@ -22,6 +22,7 @@ type stubStore struct {
 
 	sentWith     *CreateResult
 	remindedWith *CreateResult
+	reserved     int
 	settleRef    struct {
 		paperID, number, method, status string
 		amount                          int64
@@ -40,6 +41,11 @@ func (s *stubStore) GetSendable(context.Context, string) (*Sendable, error) {
 func (s *stubStore) MarkSent(_ context.Context, id string, res CreateResult, _, _ time.Time, _ string) (*domain.Invoice, error) {
 	s.sentWith = &res
 	return &domain.Invoice{ID: id, Status: domain.StatusSent}, nil
+}
+
+func (s *stubStore) ReserveReminder(context.Context, string) (int, error) {
+	s.reserved++
+	return s.reserved, nil
 }
 
 func (s *stubStore) MarkReminded(_ context.Context, id string, res CreateResult, _ time.Time, _ string) (*domain.Invoice, error) {

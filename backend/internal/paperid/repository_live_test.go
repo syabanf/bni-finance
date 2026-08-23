@@ -203,3 +203,120 @@ func TestLivePaperIDStaging(t *testing.T) {
 	}
 	t.Logf("Paper.id staging OK → id=%s payment=%s", res.PaperInvoiceID, res.PaymentURL)
 }
+
+// MarkReminded HARUS diuji terhadap Postgres sungguhan, bukan stub.
+//
+// Versi pertamanya menulis kolom from_status dan to_status, sementara tabelnya
+// memakai old_status dan new_status — dan memakai nilai enum 'reminded' yang
+// belum ada di audit_action. Dua kesalahan yang MUSTAHIL ketahuan lewat stub
+// di memori, karena stub tidak punya skema untuk dilanggar.
+//
+// Akibatnya bukan sekadar tes merah: panggilan ke Paper.id BERHASIL lebih dulu,
+// dokumen pengingat terbentuk dan nomornya terbakar permanen, lalu transaksi
+// database gagal dan seluruh catatannya hilang. Member menerima tagihan,
+// sistem melaporkan 500, dan operator yang mencoba lagi akan membakar nomor
+// berikutnya sambil mengirim pesan kedua.
+func TestLiveMarkReminded(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := context.Background()
+	id := seedDraft(t, pool)
+
+	// Invoice harus sudah terkirim sebelum bisa diingatkan.
+	if _, err := repo.MarkSent(ctx, id, CreateResult{
+		PaperInvoiceID: "pp-1", PaymentURL: "https://bayar/1", InvoicePDFURL: "https://pdf/1",
+	}, time.Now().AddDate(0, 0, 30), time.Now(), "Admin"); err != nil {
+		t.Fatalf("MarkSent: %v", err)
+	}
+
+	// Nomor urut dipesan lebih dulu, sama seperti jalur nyata.
+	seq, err := repo.ReserveReminder(ctx, id)
+	if err != nil {
+		t.Fatalf("ReserveReminder: %v", err)
+	}
+	if seq != 1 {
+		t.Errorf("pemesanan pertama = %d, mau 1", seq)
+	}
+
+	res := CreateResult{
+		PaperInvoiceID: "pp-r1", Number: "INV-UJI-R1",
+		PaymentURL: "https://bayar/r1", InvoicePDFURL: "https://pdf/r1",
+	}
+	inv, err := repo.MarkReminded(ctx, id, res, time.Now(), "Admin")
+	if err != nil {
+		t.Fatalf("MarkReminded: %v", err)
+	}
+
+	// Status TIDAK berubah — pengingat bukan penerbitan ulang.
+	if inv.Status != domain.StatusSent {
+		t.Errorf("status harus tetap sent, dapat %s", inv.Status)
+	}
+	if inv.PaperIDReminderCount != 1 {
+		t.Errorf("penghitung pengingat = %d, mau 1", inv.PaperIDReminderCount)
+	}
+	// Tautan diperbarui ke dokumen terbaru: itu yang harus dibagikan ke member.
+	if inv.PaperIDPaymentURL == nil || *inv.PaperIDPaymentURL != "https://bayar/r1" {
+		t.Errorf("tautan bayar tidak diperbarui: %v", inv.PaperIDPaymentURL)
+	}
+
+	// Jejak auditnya ada, dan itu satu-satunya cara menjawab "sudah diingatkan
+	// berapa kali" saat member mengeluh.
+	var action, note string
+	if err := pool.QueryRow(ctx,
+		`SELECT action::text, notes FROM invoice_audit_log
+		 WHERE invoice_id = $1 AND action = 'reminded' ORDER BY created_at DESC LIMIT 1`,
+		id).Scan(&action, &note); err != nil {
+		t.Fatalf("baris audit 'reminded' tidak ada: %v", err)
+	}
+	if !strings.Contains(note, "INV-UJI-R1") {
+		t.Errorf("catatan audit harus menyebut nomor dokumennya, dapat %q", note)
+	}
+
+	// Pengingat kedua menaikkan penghitung, bukan mengulang dari satu.
+	seq2, err := repo.ReserveReminder(ctx, id)
+	if err != nil {
+		t.Fatalf("ReserveReminder kedua: %v", err)
+	}
+	if seq2 != 2 {
+		t.Fatalf("pemesanan kedua = %d, mau 2", seq2)
+	}
+	inv2, err := repo.MarkReminded(ctx, id, CreateResult{
+		PaperInvoiceID: "pp-r2", Number: "INV-UJI-R2", PaymentURL: "https://bayar/r2",
+	}, time.Now(), "Admin")
+	if err != nil {
+		t.Fatalf("MarkReminded kedua: %v", err)
+	}
+	if inv2.PaperIDReminderCount != 2 {
+		t.Errorf("penghitung pengingat kedua = %d, mau 2", inv2.PaperIDReminderCount)
+	}
+}
+
+// Pemesanan HARUS mengikat meski langkah sesudahnya gagal.
+//
+// Inilah alasan penghitung dinaikkan sebelum Paper.id dihubungi, bukan
+// sesudahnya. Bila kenaikannya ikut dibatalkan saat pencatatan gagal, percobaan
+// berikutnya memakai sufiks yang sama — dan karena dokumennya sudah terlanjur
+// ada di Paper.id, sufiks itu ditolak selamanya. Terbukti terjadi pada
+// INV-2026-001-R1.
+func TestLiveReserveReminderMengikatMeskiGagalSesudahnya(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := context.Background()
+	id := seedDraft(t, pool)
+
+	n1, err := repo.ReserveReminder(ctx, id)
+	if err != nil {
+		t.Fatalf("ReserveReminder: %v", err)
+	}
+
+	// Tidak ada MarkReminded sesudahnya — meniru Paper.id berhasil lalu
+	// pencatatan gagal, atau proses mati di antaranya.
+	n2, err := repo.ReserveReminder(ctx, id)
+	if err != nil {
+		t.Fatalf("ReserveReminder kedua: %v", err)
+	}
+	if n2 != n1+1 {
+		t.Fatalf("pemesanan berikutnya = %d, mau %d — sufiks yang gagal TIDAK boleh dipakai ulang",
+			n2, n1+1)
+	}
+}
