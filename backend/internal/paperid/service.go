@@ -69,15 +69,31 @@ func NewService(repo Store, baseURL, clientID, clientSecret, callbackToken strin
 
 // recordInbound captures a callback we received, so the blackbox shows both
 // sides of the integration.
-func (s *Service) recordInbound(in WebhookInput, status int, success bool, err error) {
+// recordInbound menyimpan callback APA ADANYA.
+//
+// Dulu yang direkam adalah json.Marshal atas struct HASIL PARSE — yang kita
+// pahami, bukan yang Paper.id kirim. Kalau formatnya berbeda, blackbox
+// menampilkan struct nyaris kosong dan justru MENYESATKAN orang yang sedang
+// mendiagnosis: alat yang dipakai untuk menemukan ketidakcocokan format buta
+// terhadap ketidakcocokan format.
+//
+// Sekarang body mentah yang disimpan, beserta catatan selisihnya terhadap
+// bentuk yang kita harapkan.
+func (s *Service) recordInbound(raw []byte, status int, success bool, err error) {
 	if s.rec == nil {
 		return
 	}
-	body, _ := json.Marshal(in)
+	notes := formatNotes(inspectPayload(raw))
+	var resp []byte
+	if notes != "" {
+		resp, _ = json.Marshal(struct {
+			Catatan string `json:"catatanFormat"`
+		}{notes})
+	}
 	s.rec.Record(blackbox.Call{
 		Integration: "paper_id", Direction: blackbox.Inbound,
 		Method: http.MethodPost, URL: "/api/v1/webhooks/paperid",
-		Request: body, Status: status, Success: success, Err: err,
+		Request: raw, Response: resp, Status: status, Success: success, Err: err,
 	})
 }
 
@@ -288,16 +304,23 @@ type WebhookInput struct {
 // dashboard carries a secret token (?token=… or the x-paper-callback-token
 // header) that we compare here. An unconfigured token rejects every callback
 // rather than accepting them all.
-func (s *Service) HandleWebhook(ctx context.Context, token string, in WebhookInput) (settled bool, err error) {
+func (s *Service) HandleWebhook(ctx context.Context, token string, raw []byte) (settled bool, err error) {
 	if s.callbackToken == "" {
 		err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
-		s.recordInbound(in, http.StatusUnauthorized, false, err)
+		s.recordInbound(raw, http.StatusUnauthorized, false, err)
 		return false, err
 	}
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
 		err := httpx.Unauthorized("token callback tidak valid")
-		s.recordInbound(in, http.StatusUnauthorized, false, err)
+		s.recordInbound(raw, http.StatusUnauthorized, false, err)
 		return false, err
+	}
+
+	var in WebhookInput
+	if err := json.Unmarshal(raw, &in); err != nil {
+		e := httpx.BadRequest("payload callback bukan JSON yang sah")
+		s.recordInbound(raw, http.StatusBadRequest, false, e)
+		return false, e
 	}
 
 	// Only a completed payment settles; other events are acknowledged (200) but
@@ -305,7 +328,7 @@ func (s *Service) HandleWebhook(ctx context.Context, token string, in WebhookInp
 	status := strings.ToUpper(strings.TrimSpace(in.PaymentInfo.Status))
 	if status != "PAID" && status != "SETTLED" && status != "SUCCESS" && status != "SUCCEEDED" {
 		// Acknowledged but not acted on — still worth recording.
-		s.recordInbound(in, http.StatusOK, true, nil)
+		s.recordInbound(raw, http.StatusOK, true, nil)
 		return false, nil
 	}
 
@@ -316,7 +339,7 @@ func (s *Service) HandleWebhook(ctx context.Context, token string, in WebhookInp
 	}
 	if uuid == "" && number == "" {
 		err := httpx.BadRequest("callback tidak memuat invoice yang bisa dicocokkan")
-		s.recordInbound(in, http.StatusBadRequest, false, err)
+		s.recordInbound(raw, http.StatusBadRequest, false, err)
 		return false, err
 	}
 
@@ -338,10 +361,10 @@ func (s *Service) HandleWebhook(ctx context.Context, token string, in WebhookInp
 
 	settled, err = s.repo.SettleByRef(ctx, uuid, number, method, status, amount, s.paidAt(in))
 	if err != nil {
-		s.recordInbound(in, http.StatusInternalServerError, false, err)
+		s.recordInbound(raw, http.StatusInternalServerError, false, err)
 		return false, err
 	}
-	s.recordInbound(in, http.StatusOK, true, nil)
+	s.recordInbound(raw, http.StatusOK, true, nil)
 	return settled, nil
 }
 

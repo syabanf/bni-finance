@@ -2,6 +2,7 @@ package paperid
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -201,6 +202,17 @@ func TestSendDuplicateNumberIs409(t *testing.T) {
 
 // --- webhook ----------------------------------------------------------------
 
+// mustJSONBytes menyalurkan payload lewat encoding JSON, sama seperti callback
+// sungguhan — menyuntikkan struct langsung akan melewati satu-satunya langkah
+// yang bisa gagal karena perbedaan format.
+func mustJSONBytes(in WebhookInput) []byte {
+	b, err := json.Marshal(in)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func paidWebhook() WebhookInput {
 	var in WebhookInput
 	in.PaymentInfo.Status = "PAID"
@@ -219,7 +231,7 @@ func TestWebhookRejectsBadToken(t *testing.T) {
 	store := &stubStore{}
 	svc := newService(store, &stubGateway{}, "rahasia")
 
-	if _, err := svc.HandleWebhook(context.Background(), "salah", paidWebhook()); statusOf(err) != 401 {
+	if _, err := svc.HandleWebhook(context.Background(), "salah", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
 		t.Fatalf("token salah harus 401, dapat %v", err)
 	}
 	if store.settleRef.called {
@@ -229,7 +241,7 @@ func TestWebhookRejectsBadToken(t *testing.T) {
 
 func TestWebhookUnconfiguredRejects(t *testing.T) {
 	svc := newService(&stubStore{}, &stubGateway{}, "")
-	if _, err := svc.HandleWebhook(context.Background(), "apa pun", paidWebhook()); statusOf(err) != 401 {
+	if _, err := svc.HandleWebhook(context.Background(), "apa pun", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
 		t.Fatalf("token belum dikonfigurasi harus menolak, dapat %v", err)
 	}
 }
@@ -240,7 +252,7 @@ func TestWebhookIgnoresNonPaid(t *testing.T) {
 
 	in := paidWebhook()
 	in.PaymentInfo.Status = "PENDING"
-	settled, err := svc.HandleWebhook(context.Background(), "rahasia", in)
+	settled, err := svc.HandleWebhook(context.Background(), "rahasia", mustJSONBytes(in))
 	if err != nil || settled {
 		t.Fatalf("event non-PAID harus diabaikan, dapat settled=%v err=%v", settled, err)
 	}
@@ -253,7 +265,7 @@ func TestWebhookSettlesPaid(t *testing.T) {
 	store := &stubStore{settleReturns: true}
 	svc := newService(store, &stubGateway{}, "rahasia")
 
-	settled, err := svc.HandleWebhook(context.Background(), "rahasia", paidWebhook())
+	settled, err := svc.HandleWebhook(context.Background(), "rahasia", mustJSONBytes(paidWebhook()))
 	if err != nil || !settled {
 		t.Fatalf("PAID harus melunasi, dapat settled=%v err=%v", settled, err)
 	}

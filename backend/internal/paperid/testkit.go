@@ -295,9 +295,11 @@ func (s *Service) TestCallback(ctx context.Context, in TestCallbackInput) (*Test
 		return result, nil
 	}
 
-	// Go through HandleWebhook with the configured token, so the simulation
-	// exercises the real verification and settle logic.
-	settled, err := s.HandleWebhook(ctx, s.callbackToken, payload)
+	// Lewat HandleWebhook dengan body MENTAH, bukan struct — supaya simulasi
+	// menempuh jalur parsing yang sama dengan callback sungguhan. Menyuntikkan
+	// struct langsung akan melewati satu-satunya langkah yang bisa gagal karena
+	// perbedaan format.
+	settled, err := s.HandleWebhook(ctx, s.callbackToken, body)
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()

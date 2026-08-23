@@ -1,6 +1,7 @@
 package paperid
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/syabanf/bni-finance/backend/internal/auth"
@@ -105,9 +106,16 @@ func (h *Handler) remind(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) webhook(w http.ResponseWriter, r *http.Request) {
-	var in WebhookInput
-	if err := httpx.Decode(r, &in); err != nil {
-		httpx.Fail(w, err)
+	// Body dibaca MENTAH, bukan langsung di-decode ke struct.
+	//
+	// Bentuk payload Paper.id disusun dari dokumentasi dan belum pernah
+	// diverifikasi terhadap callback sungguhan. Kalau berbeda, decode ke struct
+	// membuang seluruh bukti: field tak dikenal hilang tanpa jejak, dan yang
+	// tersisa untuk didiagnosis hanyalah struct kosong. Body mentah inilah yang
+	// disimpan ke blackbox beserta catatan selisihnya.
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		httpx.Fail(w, httpx.BadRequest("gagal membaca body callback"))
 		return
 	}
 
@@ -118,7 +126,7 @@ func (h *Handler) webhook(w http.ResponseWriter, r *http.Request) {
 		token = httpx.Query(r, "token")
 	}
 
-	settled, err := h.svc.HandleWebhook(r.Context(), token, in)
+	settled, err := h.svc.HandleWebhook(r.Context(), token, raw)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
