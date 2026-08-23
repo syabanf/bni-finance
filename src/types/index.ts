@@ -96,15 +96,15 @@ export interface Invoice {
   /** Berapa kali invoice ini dikirim ulang sebagai pengingat lewat Paper.id. */
   paperIdReminderCount?: number
 
-  // Xendit (Self Payment Mode) — native VA / QRIS
-  paymentProvider?: string // 'xendit' | undefined
-  xenditPaymentId?: string
-  xenditPaymentMethod?: 'va' | 'qris'
-  xenditVaBank?: string
-  xenditVaNumber?: string
-  xenditQrisString?: string
-  xenditPaymentStatus?: string // PENDING | PAID | EXPIRED
-  xenditExpiresAt?: string
+  /**
+   * Selalu 'paper_id' sejak pembayaran mandiri dihapus.
+   *
+   * Kolom xendit_* masih ada di database — sengaja, karena membuangnya berarti
+   * migrasi destruktif atas data yang sudah tersimpan — tetapi tidak ada lagi
+   * kode yang membacanya, jadi tipenya tidak lagi memuatnya. Field mati di tipe
+   * hanya mengundang orang memakainya kembali.
+   */
+  paymentProvider?: string
 
   // Payment
   paidAt?: string
