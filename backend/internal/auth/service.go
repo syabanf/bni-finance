@@ -14,7 +14,7 @@ type Store interface {
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	GetByID(ctx context.Context, id string) (*domain.User, error)
 	List(ctx context.Context) ([]domain.User, error)
-	Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole) (*domain.User, error)
+	Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole, chapterID *string) (*domain.User, error)
 	UpdateName(ctx context.Context, id, name string) (*domain.User, error)
 	UpdateRole(ctx context.Context, id string, role domain.UserRole) (*domain.User, error)
 	// Guarded: pemeriksaan admin-terakhir dan penulisannya terjadi dalam satu
@@ -177,7 +177,7 @@ func (s *Service) Create(ctx context.Context, in domain.CreateUserInput) (*domai
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.repo.Create(ctx, in.Email, hash, strings.TrimSpace(in.Name), role)
+	user, err := s.repo.Create(ctx, in.Email, hash, strings.TrimSpace(in.Name), role, in.ChapterID)
 	if err != nil {
 		return nil, err
 	}

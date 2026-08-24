@@ -423,7 +423,7 @@ func (s *fakeUserStore) List(context.Context) ([]domain.User, error) {
 	return out, nil
 }
 
-func (s *fakeUserStore) Create(_ context.Context, email, hash, name string, role domain.UserRole) (*domain.User, error) {
+func (s *fakeUserStore) Create(_ context.Context, email, hash, name string, role domain.UserRole, chapterID *string) (*domain.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	email = domain.NormalizeEmail(email)
@@ -435,7 +435,8 @@ func (s *fakeUserStore) Create(_ context.Context, email, hash, name string, role
 	s.seq++
 	u := domain.User{
 		ID: fmt.Sprintf("usr-%03d", s.seq), Email: email, PasswordHash: hash,
-		Name: name, Role: role, CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		Name: name, Role: role, ChapterID: chapterID,
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
 	}
 	s.items[u.ID] = u
 	return &u, nil

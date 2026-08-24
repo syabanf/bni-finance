@@ -33,7 +33,7 @@ func (f *fakeUsers) GetByID(context.Context, string) (*domain.User, error) {
 	return nil, httpx.ErrNotFound
 }
 func (f *fakeUsers) List(context.Context) ([]domain.User, error) { return nil, nil }
-func (f *fakeUsers) Create(context.Context, string, string, string, domain.UserRole) (*domain.User, error) {
+func (f *fakeUsers) Create(context.Context, string, string, string, domain.UserRole, *string) (*domain.User, error) {
 	return nil, nil
 }
 func (f *fakeUsers) UpdateName(context.Context, string, string) (*domain.User, error) {

@@ -33,16 +33,33 @@ type header struct {
 // Claims is the token payload. Field names follow the JWT registered-claim
 // conventions so the token stays inspectable with ordinary tooling.
 type Claims struct {
-	Subject  string          `json:"sub"`
-	Email    string          `json:"email"`
-	Name     string          `json:"name"`
-	Role     domain.UserRole `json:"role"`
-	IssuedAt int64           `json:"iat"`
-	Expires  int64           `json:"exp"`
+	Subject string          `json:"sub"`
+	Email   string          `json:"email"`
+	Name    string          `json:"name"`
+	Role    domain.UserRole `json:"role"`
+	// ChapterID membawa lingkup ST dan MC di dalam token.
+	//
+	// Disimpan di sini, bukan ditanyakan ulang ke basis data tiap permintaan,
+	// karena lingkup yang dibaca terlambat adalah lingkup yang bisa terlewat:
+	// setiap query yang berjalan sebelum pembacaan itu selesai berjalan tanpa
+	// batas sama sekali. Token sudah ditandatangani, jadi nilainya tidak bisa
+	// dipalsukan klien.
+	//
+	// Konsekuensinya disengaja: memindahkan pengguna ke chapter lain baru
+	// berlaku setelah tokennya kedaluwarsa. Itu batas yang bisa dijelaskan,
+	// tidak seperti pembacaan yang kadang terlewat.
+	ChapterID string `json:"chapter_id,omitempty"`
+	IssuedAt  int64  `json:"iat"`
+	Expires   int64  `json:"exp"`
 }
 
 func (c Claims) AsAuthUser() domain.AuthUser {
-	return domain.AuthUser{ID: c.Subject, Name: c.Name, Email: c.Email, Role: c.Role}
+	u := domain.AuthUser{ID: c.Subject, Name: c.Name, Email: c.Email, Role: c.Role}
+	if c.ChapterID != "" {
+		id := c.ChapterID
+		u.ChapterID = &id
+	}
+	return u
 }
 
 // Signer issues and verifies tokens with one shared secret.
@@ -76,6 +93,9 @@ func (s *Signer) Sign(u domain.User, now time.Time) (string, time.Time, error) {
 		Role:     u.Role,
 		IssuedAt: now.Unix(),
 		Expires:  expires.Unix(),
+	}
+	if u.ChapterID != nil {
+		claims.ChapterID = *u.ChapterID
 	}
 
 	headerJSON, err := json.Marshal(header{Alg: "HS256", Typ: "JWT"})
