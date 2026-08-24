@@ -310,6 +310,27 @@ alter table invoices
   add column if not exists paper_id_reminder_count integer not null default 0;
 
 
+-- ---------------------------------------------------------------------------
+-- Kolom uang dilebarkan ke bigint
+--
+-- Go menyimpan seluruh nominal sebagai int64, Postgres menerimanya sebagai
+-- integer (int4, maksimum 2.147.483.647). Selisih itu tidak pernah terlihat
+-- sampai ada yang memasukkan angka lebih besar — lalu API menjawab 500
+-- "terjadi kesalahan pada server":
+--
+--   unable to encode 9223372036854775807 into binary format for int4 (OID 23)
+--
+-- Salah ketik menambah satu nol sudah cukup, dan pesannya menyuruh orang
+-- mencari kerusakan server yang tidak pernah ada. Kedua sisi disamakan di sini,
+-- ke tipe yang memang dipakai kodenya.
+-- ---------------------------------------------------------------------------
+alter table invoices      alter column amount           type bigint;
+alter table invoices      alter column paid_amount      type bigint;
+alter table payments      alter column amount           type bigint;
+alter table fee_settings  alter column registration_fee type bigint;
+alter table fee_settings  alter column renewal_fee      type bigint;
+
+
 create table if not exists integration_calls (
   id          bigserial   primary key,
   occurred_at timestamptz not null default now(),

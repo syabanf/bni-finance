@@ -79,12 +79,21 @@ db-init:  ## Terapkan skema + akun awal + data contoh (satu berkas, idempoten)
 	$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/init.sql
 	@echo "db/init.sql diterapkan"
 
+# fee_settings ikut dikosongkan. Insert-nya di init.sql memakai
+# "on conflict do nothing", jadi tanpa truncate nilainya TIDAK PERNAH kembali ke
+# semula: biaya yang diubah lewat UI bertahan melewati db-reset sementara
+# seluruh invoice contoh dibuat ulang dari angka bawaan — konfigurasi dan data
+# jadi bercerita hal yang berbeda, pada perintah yang bernama "reset".
+#
+# app_settings sengaja TIDAK ikut: di sanalah kredensial Paper.id yang dipasang
+# admin tersimpan, dan menghapusnya setiap reset berarti memasangnya ulang
+# setiap kali.
 db-reset: db-create db-init ## Siapkan database lokal dari nol — MENGOSONGKAN tabel bisnis
 	@echo "mengosongkan tabel bisnis lalu memuat ulang data contoh…"
 	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -c \
-		"truncate invoice_audit_log, payments, invoices, members, chapters restart identity cascade"
+		"truncate invoice_audit_log, payments, invoices, members, chapters, fee_settings restart identity cascade"
 	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/init.sql
-	@echo "data contoh disegarkan (tabel users tidak disentuh)"
+	@echo "data contoh disegarkan (users dan app_settings tidak disentuh)"
 
 db-drop:  ## Hapus database — menghapus SEMUA data di dalamnya
 	@printf 'Hapus database %s beserta seluruh isinya? [y/N] ' "$(DB_NAME)"; \

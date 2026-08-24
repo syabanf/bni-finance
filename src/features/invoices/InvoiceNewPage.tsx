@@ -83,8 +83,25 @@ export function InvoiceNewPage() {
       return
     }
     setSubmitting(true)
+
+    // DUA kegagalan yang berbeda, dan menyamakannya membuat invoice ganda.
+    //
+    // Tombol ini melakukan dua hal berurutan: membuat invoice, lalu
+    // mengirimkannya ke Paper.id. Kalau yang KEDUA gagal, invoicenya tetap
+    // sudah jadi — tapi versi sebelumnya menyapu keduanya ke satu catch,
+    // menampilkan "Gagal membuat invoice", dan bertahan di halaman ini.
+    //
+    // Orang yang membacanya wajar menekan tombol sekali lagi. Invoice pertama
+    // tidak hilang, jadi yang terjadi adalah invoice KEDUA untuk tagihan yang
+    // sama — dan karena setiap pengiriman membakar nomor di Paper.id secara
+    // permanen, kesalahan itu tidak bisa dibatalkan.
+    //
+    // Terbukti nyata saat menguji jalur ini: create berhasil, send dijawab 409
+    // "nomor sudah dipakai", dan INV-2026-009 tertinggal sebagai draft yang
+    // tidak terlihat dari halaman ini.
+    let invoice
     try {
-      const invoice = await invoiceService.create({
+      invoice = await invoiceService.create({
         memberId,
         type,
         amount,
@@ -93,17 +110,28 @@ export function InvoiceNewPage() {
         periodEnd,
         notes: notes.trim() || undefined,
       })
-      if (send) {
-        await invoiceService.send(invoice.id)
-        toast('Invoice dibuat & dikirim ke Paper.id.')
-      } else {
-        toast('Invoice draft berhasil dibuat.')
-      }
-      navigate(`/invoices/${invoice.id}`)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membuat invoice.', 'error')
       setSubmitting(false)
+      return
     }
+
+    if (!send) {
+      toast('Invoice draft berhasil dibuat.')
+      navigate(`/invoices/${invoice.id}`)
+      return
+    }
+
+    try {
+      await invoiceService.send(invoice.id)
+      toast('Invoice dibuat & dikirim ke Paper.id.')
+    } catch (err) {
+      // Invoicenya ADA. Dibawa ke halamannya supaya pengiriman bisa diulang
+      // dari sana, bukan dibuat ulang dari sini.
+      const sebab = err instanceof Error ? err.message : 'penyebab tidak diketahui'
+      toast(`Invoice ${invoice.number} dibuat, tapi pengiriman ke Paper.id gagal: ${sebab}`, 'error')
+    }
+    navigate(`/invoices/${invoice.id}`)
   }
 
   return (

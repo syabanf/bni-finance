@@ -60,13 +60,55 @@ type AppSetting struct {
 // MaskedValue is what a secret setting reads back as.
 const MaskedValue = "••••••"
 
-var secretKeyParts = []string{"token", "secret", "password", "apikey", "api_key", "credential", "private"}
+// secretKeyParts adalah potongan nama yang menandai sebuah setting berisi
+// kredensial.
+//
+// Daftar ini sengaja BERLEBIHAN, dan arah kesalahannya dipilih sadar: menyamarkan
+// setting yang sebenarnya tidak rahasia hanya membuatnya terbaca "••••••" di UI
+// — nilainya tetap bisa ditulis, karena penyamaran ini hanya berlaku saat dibaca.
+// Melewatkan satu yang benar-benar rahasia membocorkannya apa adanya ke SETIAP
+// pengguna yang sudah masuk, termasuk yang bukan admin.
+//
+// Versi pertama hanya berisi tujuh potongan dan meloloskan lima dari enam nama
+// kredensial yang paling lazim. Dibuktikan dengan menulisnya lalu membacanya
+// sebagai pengguna biasa:
+//
+//	supabase_service_role_key  -> RAHASIA-BOCOR-12345
+//	signing_key                -> RAHASIA-BOCOR-12345
+//	encryption_key             -> RAHASIA-BOCOR-12345
+//	db_pass                    -> RAHASIA-BOCOR-12345
+//	connection_string          -> RAHASIA-BOCOR-12345
+//
+// Semuanya lolos karena "key", "pass", dan "conn" tidak ada di daftar — hanya
+// "apikey" dan "api_key", yang tidak cocok dengan "service_role_key".
+var secretKeyParts = []string{
+	"token", "secret", "password", "passwd", "pass",
+	"apikey", "api_key", "key",
+	"credential", "private", "priv",
+	"conn", "dsn",
+	"sign", "cert", "salt", "hash",
+	"jwt", "bearer", "auth",
+}
+
+// secretKeyNames menutup nama yang berbahaya tapi tidak punya potongan penanda.
+//
+// "url" sengaja TIDAK dimasukkan ke secretKeyParts: base URL adalah konfigurasi
+// yang justru harus terlihat oleh admin — menyamarkannya membuat orang tidak
+// tahu sistem sedang menunjuk ke mana. Tapi beberapa nama berakhiran _url
+// memang memuat sandi di dalamnya, dan itu ditutup di sini satu per satu.
+var secretKeyNames = map[string]bool{
+	"database_url": true, "db_url": true, "postgres_url": true,
+	"redis_url": true, "amqp_url": true, "smtp_url": true,
+}
 
 // IsSecretKey reports whether a settings key holds a credential. `app_settings`
 // stores the BNI VM token alongside harmless flags like self_payment_mode, so
 // reads of those keys are redacted — writes still work, they're just write-only.
 func IsSecretKey(key string) bool {
-	k := strings.ToLower(key)
+	k := strings.ToLower(strings.TrimSpace(key))
+	if secretKeyNames[k] {
+		return true
+	}
 	for _, part := range secretKeyParts {
 		if strings.Contains(k, part) {
 			return true
