@@ -2239,7 +2239,7 @@
           "Paper.id"
         ],
         "summary": "Callback pembayaran keluar",
-        "description": "Payload identik dengan pembayaran masuk; hanya URL pendaftarannya yang berbeda.\n",
+        "description": "Direkam dan diakui 200. TIDAK melunasi invoice, dan itu keputusan.\n\nPembayaran keluar adalah uang yang kita bayarkan, bukan yang kita\nterima — sistem ini hanya menagih iuran keanggotaan dan tidak pernah\nmembayar siapa pun. Payload masuk dan keluar IDENTIK menurut\ndokumentasi Paper.id, sehingga URL-nya adalah satu-satunya penanda\narah. Merutekannya ke penangan yang melunasi berarti membuang penanda\nitu, dan satu callback pembayaran keluar yang kebetulan menyebut nomor\ninvoice kita akan menandainya lunas tanpa uang pernah masuk.\n",
         "security": [
 
         ],
@@ -2363,78 +2363,13 @@
         }
       }
     },
-    "/api/v1/webhooks/paperid/reconciliation": {
-      "post": {
-        "tags": [
-          "Paper.id"
-        ],
-        "summary": "Callback rekonsiliasi",
-        "description": "Dipicu saat pembayaran sudah dicocokkan dengan satu atau beberapa invoice.\n\n`FULLY_RECONCILED` melunasi. `PARTIALLY_RECONCILED` sengaja TIDAK — tagihannya\nbelum lunas, dan menandainya lunas akan menghentikan penagihan atas sisa yang\nmasih terutang.\n",
-        "security": [
-
-        ],
-        "parameters": [
-          {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Callback diterima",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Payload tidak bisa dicocokkan dengan invoice mana pun",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/webhooks/paperid/static-va": {
       "post": {
         "tags": [
           "Paper.id"
         ],
         "summary": "Callback static VA dan rekonsiliasi email bank",
-        "description": "Pembayaran lewat virtual account statis. Ditangani seperti callback pembayaran:\nnominal dan statusnya dibaca dari `payment_info.static_va`.\n",
+        "description": "Pembayaran lewat virtual account statis, DAN callback rekonsiliasi —\nkeduanya datang lewat bagian ini di dashboard Paper.id.\n\nNominal dan statusnya dibaca dari `payment_info.static_va`.\n`FULLY_RECONCILED` melunasi; `PARTIALLY_RECONCILED` sengaja TIDAK —\ntagihannya belum lunas, dan menandainya lunas akan menghentikan\npenagihan atas sisa yang masih terutang.\n",
         "security": [
 
         ],

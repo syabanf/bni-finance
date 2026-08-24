@@ -75,24 +75,38 @@ func (h *Handler) testCallback(w http.ResponseWriter, r *http.Request) {
 // eksplisit — dan hanya URL pendaftarannya yang membedakan. Itulah alasan
 // keduanya perlu alamat sendiri meski penanganannya sama.
 //
-// Jenis yang tidak menyentuh penagihan kita — pembayaran ke supplier, paylater,
-// disbursement — tetap diterima dan direkam, lalu dijawab 200. Menolaknya akan
+// Tidak ada endpoint /reconciliation: dashboard Paper.id tidak punya bagian
+// untuk mendaftarkannya. Callback rekonsiliasi datang lewat bagian "Static VA
+// dan Bank Email Reconciliation", dan payloadnya menandai dirinya dengan
+// source "recon_static_va" — jadi /static-va yang menanganinya. Endpoint yang
+// tidak bisa didaftarkan di mana pun hanyalah permukaan mati.
+//
+// Jenis yang tidak menyentuh penagihan kita — pembayaran keluar, pembayaran ke
+// supplier, paylater, disbursement — tetap diterima dan direkam, lalu dijawab 200. Menolaknya akan
 // membuat Paper.id mengulang-ulang pengiriman untuk kejadian yang memang bukan
 // urusan sistem ini, dan rekamannya tetap berguna bila suatu saat dipakai.
 func (h *Handler) RegisterPublic(mux *http.ServeMux) {
 	// Alamat lama, dipertahankan supaya pendaftaran yang sudah ada tidak putus.
 	mux.HandleFunc("POST /api/v1/webhooks/paperid", h.webhook)
 
-	// Menyentuh invoice: bisa melunasi.
+	// Menyentuh invoice: bisa melunasi. Ini uang MASUK.
 	mux.HandleFunc("POST /api/v1/webhooks/paperid/payment-in", h.webhook)
-	mux.HandleFunc("POST /api/v1/webhooks/paperid/payment-out", h.webhook)
 	mux.HandleFunc("POST /api/v1/webhooks/paperid/invoice-paid", h.webhook)
-	mux.HandleFunc("POST /api/v1/webhooks/paperid/reconciliation", h.webhook)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/static-va", h.webhook)
 
 	// Tidak menyentuh invoice: direkam dan diakui saja.
+	//
+	// payment-out termasuk di sini, dan itu KEPUTUSAN, bukan kelalaian.
+	// Pembayaran keluar adalah uang yang kita bayarkan, bukan yang kita terima —
+	// sistem ini hanya menagih iuran keanggotaan dan tidak pernah membayar
+	// siapa pun. Dokumentasi Paper.id menyebut payload masuk dan keluar
+	// IDENTIK, sehingga URL-nya adalah SATU-SATUNYA penanda arah. Merutekan
+	// keduanya ke penangan yang melunasi berarti membuang penanda itu, dan satu
+	// callback pembayaran keluar yang kebetulan menyebut nomor invoice kita
+	// akan menandainya lunas tanpa uang pernah masuk.
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/payment-out", h.acknowledge)
 	mux.HandleFunc("POST /api/v1/webhooks/paperid/supplier-payment", h.acknowledge)
 	mux.HandleFunc("POST /api/v1/webhooks/paperid/paylater", h.acknowledge)
-	mux.HandleFunc("POST /api/v1/webhooks/paperid/static-va", h.webhook)
 	mux.HandleFunc("POST /api/v1/webhooks/paperid/disbursement", h.acknowledge)
 	mux.HandleFunc("POST /api/v1/webhooks/paperid/invoice-amount-due", h.acknowledge)
 }
