@@ -17,10 +17,13 @@ export const apiRenewalRepository: RenewalRepository = {
     return res.data
   },
 
-  async request(memberIds, period) {
+  async request(memberIds, period, assignedMc) {
     return api.post<{ dibuat: number; dilewati: number; total: number }>('/renewal-requests', {
       memberIds,
       period,
+      // null, bukan string kosong: backend menyimpannya sebagai foreign key ke
+      // users, dan string kosong bukan id yang sah.
+      assignedMc: assignedMc || null,
     })
   },
 

@@ -313,4 +313,12 @@ export interface AuthUser {
   name: string
   email: string
   role: UserRole
+  /**
+   * Chapter pengguna; null berarti nasional (admin dan user).
+   *
+   * Backend sudah mengirimkannya sejak peran ST/MC ditambahkan, tapi tipe ini
+   * belum membawanya — sehingga UI sama sekali tidak tahu chapter pengguna yang
+   * sedang masuk, dan tidak bisa menyaring apa pun berdasarkan itu.
+   */
+  chapterId?: string | null
 }

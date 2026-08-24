@@ -5,9 +5,16 @@ import { delay } from './store'
 const STORAGE_KEY = 'bni-finance.auth'
 
 /** Akun demo — email menentukan peran. Email lain tetap masuk sebagai Admin. */
-export const DEMO_ACCOUNTS: Record<string, { id: string; name: string; role: UserRole }> = {
-  'admin@bni-finance.com': { id: 'admin-national', name: 'Admin Nasional', role: 'admin' },
-  'user@bni-finance.com': { id: 'user-demo', name: 'User BNI', role: 'user' },
+export const DEMO_ACCOUNTS: Record<
+  string,
+  { id: string; name: string; role: UserRole; chapterId: string | null }
+> = {
+  // Keduanya NASIONAL — chapterId null, sama seperti yang dikirim backend untuk
+  // peran admin dan user. Ditulis eksplisit supaya bentuk datanya identik di
+  // kedua sumber; `undefined` dan `null` terbaca berbeda oleh kode yang
+  // menyaring berdasarkan chapter.
+  'admin@bni-finance.com': { id: 'admin-national', name: 'Admin Nasional', role: 'admin', chapterId: null },
+  'user@bni-finance.com': { id: 'user-demo', name: 'User BNI', role: 'user', chapterId: null },
 }
 
 const DEFAULT_ACCOUNT = DEMO_ACCOUNTS['admin@bni-finance.com']
@@ -24,7 +31,13 @@ export const mockAuthRepository: AuthRepository = {
       throw new Error('Email dan password wajib diisi.')
     }
     const profile = DEMO_ACCOUNTS[email.trim().toLowerCase()] ?? DEFAULT_ACCOUNT
-    const user: AuthUser = { id: profile.id, name: profile.name, email, role: profile.role }
+    const user: AuthUser = {
+      id: profile.id,
+      name: profile.name,
+      email,
+      role: profile.role,
+      chapterId: profile.chapterId,
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
     return user
   },
