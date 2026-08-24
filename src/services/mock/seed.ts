@@ -37,6 +37,12 @@ export const seedChapters: Chapter[] = [
   // Seed 2026-08-24 — dua kota yang sebelumnya belum terwakili.
   { id: 'ch-cakrawala', name: 'Cakrawala', displayName: 'BNI Cakrawala', areaName: 'Denpasar Selatan', cityName: 'Denpasar', syncedAt: SYNCED_AT },
   { id: 'ch-mahakam', name: 'Mahakam', displayName: 'BNI Mahakam', areaName: 'Samarinda Kota', cityName: 'Samarinda', syncedAt: SYNCED_AT },
+  // Seed 2026-08-24 — empat chapter beserta membernya, melebarkan sebaran ke
+  // luar Jawa/Bali/Kalimantan yang sebelumnya jadi satu-satunya bentuk data.
+  { id: 'ch-bhinneka', name: 'Bhinneka', displayName: 'BNI Bhinneka', areaName: 'Medan Kota', cityName: 'Medan', syncedAt: SYNCED_AT },
+  { id: 'ch-kartika', name: 'Kartika', displayName: 'BNI Kartika', areaName: 'Semarang Tengah', cityName: 'Semarang', syncedAt: SYNCED_AT },
+  { id: 'ch-rinjani', name: 'Rinjani', displayName: 'BNI Rinjani', areaName: 'Mataram Barat', cityName: 'Mataram', syncedAt: SYNCED_AT },
+  { id: 'ch-khatulistiwa', name: 'Khatulistiwa', displayName: 'BNI Khatulistiwa', areaName: 'Pontianak Kota', cityName: 'Pontianak', syncedAt: SYNCED_AT },
 ]
 
 // ---------------------------------------------------------------------------
@@ -105,6 +111,33 @@ const memberSeeds: MemberSeed[] = [
     history: [] },
   { name: 'Yoga Pratama', chapterId: 'ch-samudra', joined: '2026-07-25',
     history: [] },
+
+  // --- Seed 2026-08-24: chapter baru beserta membernya ----------------------
+  // Cerminan db/seeds/2026-08-24-chapter-baru-beserta-member.sql. Lima member
+  // per chapter, semuanya history: [] — tidak ada satu pun yang punya invoice.
+  { name: 'Tengku Iskandar', chapterId: 'ch-bhinneka', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Melati Sinaga', chapterId: 'ch-bhinneka', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Ronald Sitorus', chapterId: 'ch-bhinneka', joined: '2025-09-02', history: [] },
+  { name: 'Farida Lubis', chapterId: 'ch-bhinneka', joined: '2025-09-09', history: [] },
+  { name: 'Anwar Nasution', chapterId: 'ch-bhinneka', joined: '2026-07-10', history: [] },
+
+  { name: 'Sri Handayani', chapterId: 'ch-kartika', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Bagas Susilo', chapterId: 'ch-kartika', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Ratna Wijayanti', chapterId: 'ch-kartika', joined: '2025-09-05', history: [] },
+  { name: 'Joko Prasetyo', chapterId: 'ch-kartika', joined: '2025-09-12', history: [] },
+  { name: 'Endah Puspitasari', chapterId: 'ch-kartika', joined: '2026-08-04', history: [] },
+
+  { name: 'Lalu Ahmad', chapterId: 'ch-rinjani', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Baiq Salma', chapterId: 'ch-rinjani', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Wayan Sudirja', chapterId: 'ch-rinjani', joined: '2025-09-07', history: [] },
+  { name: 'Dinda Maharani', chapterId: 'ch-rinjani', joined: '2025-09-14', history: [] },
+  { name: 'Haris Munandar', chapterId: 'ch-rinjani', joined: '2026-06-15', history: [] },
+
+  { name: 'Rudi Tanjaya', chapterId: 'ch-khatulistiwa', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Siska Halim', chapterId: 'ch-khatulistiwa', joined: '2026-08-24', status: 'pending', history: [] },
+  { name: 'Bambang Setiadi', chapterId: 'ch-khatulistiwa', joined: '2025-09-03', history: [] },
+  { name: 'Novi Andriani', chapterId: 'ch-khatulistiwa', joined: '2025-09-10', history: [] },
+  { name: 'Yusuf Maulana', chapterId: 'ch-khatulistiwa', joined: '2026-08-09', history: [] },
 ]
 
 // ---------------------------------------------------------------------------
