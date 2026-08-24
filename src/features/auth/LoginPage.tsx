@@ -130,7 +130,7 @@ export function LoginPage() {
           </span>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink-900">Finance Hub</h1>
           <p className="mt-1 text-sm text-ink-500">
-            Invoice &amp; pembayaran keanggotaan BNI Grow Chapter
+            Invoice &amp; pembayaran keanggotaan BNI
           </p>
         </div>
 

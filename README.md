@@ -1,6 +1,6 @@
 # BNI Finance Hub
 
-Sistem finance untuk **BNI Grow Chapter Management** — mengelola invoice pendaftaran &
+Sistem finance untuk **BNI** — mengelola invoice pendaftaran &
 renewal keanggotaan, sinkronisasi data dari BNI Visitor Management, pembayaran
 (**Paper.id**), pelaporan keuangan, dan ekspor data.
 

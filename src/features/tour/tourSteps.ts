@@ -46,7 +46,7 @@ export const TOURS: Tour[] = [
       {
         title: 'Selamat datang',
         body:
-          'Halaman ini adalah ringkasan keuangan keanggotaan BNI Grow. ' +
+          'Halaman ini adalah ringkasan keuangan keanggotaan BNI. ' +
           'Semua yang Anda lihat di sini dihitung langsung dari data tagihan yang sebenarnya, ' +
           'jadi tidak ada angka yang disimpan terpisah lalu berbeda dengan kenyataan. ' +
           'Mari saya tunjukkan bagian-bagiannya. Tekan Lanjut untuk berpindah, ' +

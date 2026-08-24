@@ -1,6 +1,6 @@
 # BNI Finance System — Perencanaan Teknis
 
-> Dokumen ini adalah rencana pembangunan sistem finance terpisah untuk BNI Grow Chapter Management.  
+> Dokumen ini adalah rencana pembangunan sistem finance terpisah untuk BNI.  
 > Dibuat: 2026-06-15 | Status: Draft
 >
 > ⚠️ **Catatan historis.** Ini rekaman apa yang DIRENCANAKAN pada Juni 2026, bukan
@@ -584,4 +584,4 @@ Phase 4 (Polish)
 ---
 
 *Dokumen ini akan diperbarui seiring progress pembangunan.*
-*Kontak teknis: Ilham Kurniawan | BNI Grow Platform*
+*Kontak teknis: Ilham Kurniawan | BNI*

@@ -403,9 +403,9 @@ func (s *Service) paidAt(in WebhookInput) time.Time {
 
 func itemName(t domain.InvoiceType) string {
 	if t == domain.TypeRegistration {
-		return "Biaya Pendaftaran Member BNI Grow"
+		return "Biaya Pendaftaran Member BNI"
 	}
-	return "Perpanjangan Keanggotaan BNI Grow"
+	return "Perpanjangan Keanggotaan BNI"
 }
 
 func itemDesc(t domain.InvoiceType) string {

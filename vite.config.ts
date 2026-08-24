@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'BNI Finance Hub',
         short_name: 'Finance Hub',
-        description: 'Invoice & pembayaran keanggotaan BNI Grow Chapter Management.',
+        description: 'Invoice & pembayaran keanggotaan BNI.',
         id: '/',
         start_url: '/',
         scope: '/',

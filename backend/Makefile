@@ -1,4 +1,4 @@
-.PHONY: run build test test-integration vet tidy fmt check docs db-create db-schema db-seed db-reset db-drop
+.PHONY: run build test test-integration vet tidy fmt check docs db-create db-schema db-seed db-seed-baru db-reset db-drop
 
 # --- aplikasi ---------------------------------------------------------------
 
@@ -78,6 +78,19 @@ db-create: ## Buat database bila belum ada
 db-init:  ## Terapkan skema + akun awal + data contoh (satu berkas, idempoten)
 	$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/init.sql
 	@echo "db/init.sql diterapkan"
+
+# Seed bertanggal, terpisah dari init.sql.
+#
+# init.sql hanya mengisi data contoh saat tabel `members` MASIH KOSONG — pada
+# basis data yang sudah berisi, ia tidak menambahkan apa pun. Berkas di db/seeds/
+# justru untuk keadaan itu: menambah data ke basis data yang sudah hidup tanpa
+# menyentuh satu baris pun yang sudah ada. Semuanya idempoten.
+db-seed-baru: ## Terapkan seluruh seed bertanggal di db/seeds/ (idempoten)
+	@for f in ../db/seeds/*.sql; do \
+		echo "menerapkan $$f…"; \
+		$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f "$$f" || exit 1; \
+	done
+	@echo "seed bertanggal diterapkan"
 
 # fee_settings ikut dikosongkan. Insert-nya di init.sql memakai
 # "on conflict do nothing", jadi tanpa truncate nilainya TIDAK PERNAH kembali ke

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "BNI Finance System — invoice & membership payment management for BNI Grow Chapter Management",
+  "description": "BNI Finance System — invoice & membership payment management for BNI",
   "scripts": {
     "setup": "./scripts/setup-env.sh",
     "dev": "vite",
