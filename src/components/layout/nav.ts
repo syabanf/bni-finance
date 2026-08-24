@@ -4,6 +4,7 @@ import {
   Wallet,
   Users,
   Building2,
+  CalendarCheck,
   Settings,
   AlertTriangle,
   BarChart3,
@@ -53,6 +54,7 @@ export const NAV: NavNode[] = [
   { kind: 'section', label: 'Data Member' },
   { kind: 'item', to: '/members', label: 'Member', icon: Users },
   { kind: 'item', to: '/chapters', label: 'Chapter', icon: Building2 },
+  { kind: 'item', to: '/renewal', label: 'Konfirmasi Renewal', icon: CalendarCheck },
 
   // Sistem dikelompokkan agar sidebar tidak memanjang: menu harian di atas,
   // urusan konfigurasi dan alat teknis terlipat sampai dibutuhkan.

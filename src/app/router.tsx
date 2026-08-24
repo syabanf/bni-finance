@@ -12,6 +12,7 @@ import { MemberDetailPage } from '@/features/members/MemberDetailPage'
 import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { RenewalPage } from '@/features/renewal/RenewalPage'
 import { UsersPage } from '@/features/users/UsersPage'
 import { SyncPage } from '@/features/settings/SyncPage'
 import { BlackboxPage } from '@/features/blackbox/BlackboxPage'
@@ -68,6 +69,13 @@ export const router = createBrowserRouter([
                 <SettingsPage />
               </RequirePermission>
             ),
+          },
+          {
+            // Tanpa permission khusus: MC harus bisa membukanya untuk menjawab,
+            // dan MC memang tidak punya izin menulis apa pun yang lain. Siapa
+            // yang boleh MENJAWAB diperiksa di server, bukan di rute.
+            path: '/renewal',
+            element: <RenewalPage />,
           },
           {
             // Pengelolaan akun butuh settings:manage — hanya admin. Peran ST

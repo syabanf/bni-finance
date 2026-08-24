@@ -236,6 +236,35 @@ export type UserRole = 'admin' | 'st' | 'mc' | 'user'
  * Untuk `st` dan `mc` ia WAJIB terisi: backend menolak peran berlingkup chapter
  * tanpa chapter, karena lingkup yang kosong bisa terbaca sebagai "tanpa batas".
  */
+/** Jawaban MC atas permintaan konfirmasi renewal. */
+export type RenewalAnswer = 'pending' | 'will_renew' | 'will_not' | 'unsure'
+
+/**
+ * Satu permintaan konfirmasi renewal.
+ *
+ * ST menanyakan, MC menjawab. `period` adalah TAHUN keanggotaan yang
+ * ditanyakan — bukan tanggal ST menanyakannya — karena itulah yang membedakan
+ * satu permintaan dari permintaan tahun berikutnya.
+ */
+export interface RenewalRequest {
+  id: string
+  memberId: string
+  chapterId: string
+  period: string
+  requestedBy: string | null
+  requestedAt: string
+  assignedMc: string | null
+  answer: RenewalAnswer
+  answeredBy: string | null
+  answeredAt: string | null
+  note: string | null
+  memberName: string | null
+  chapterName: string | null
+  renewalDate: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ManagedUser {
   id: string
   email: string

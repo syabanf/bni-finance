@@ -10,6 +10,8 @@
 
 import type {
   ManagedUser,
+  RenewalAnswer,
+  RenewalRequest,
   UserRole,
   AuditLogEntry,
   AuthUser,
@@ -57,6 +59,21 @@ export interface CreateUserInput {
   role: UserRole
   /** Wajib untuk `st` dan `mc`, harus kosong untuk `admin` dan `user`. */
   chapterId: string | null
+}
+
+/**
+ * Konfirmasi renewal — ST menanyakan, MC menjawab.
+ *
+ * ST TIDAK boleh menjawab, dan itu inti alurnya: ia yang bertanya, jadi
+ * membiarkannya menjawab sendiri membuat konfirmasinya tidak berarti apa-apa.
+ * Aturan itu ditegakkan server; di sini hanya tombolnya yang disembunyikan.
+ */
+export interface RenewalRepository {
+  list(params?: { answer?: RenewalAnswer; period?: string }): Promise<RenewalRequest[]>
+  /** ST meminta konfirmasi untuk sekumpulan member. */
+  request(memberIds: string[], period: string): Promise<{ dibuat: number; dilewati: number; total: number }>
+  /** MC menjawab satu permintaan. */
+  answer(id: string, answer: RenewalAnswer, note?: string): Promise<RenewalRequest>
 }
 
 export interface ChapterRepository {
