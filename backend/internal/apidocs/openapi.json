@@ -2770,6 +2770,98 @@
         }
       }
     },
+    "/api/v1/invoices/send-bulk": {
+      "post": {
+        "tags": [
+          "Paper.id"
+        ],
+        "summary": "Kirim banyak invoice sekaligus",
+        "description": "**Admin dan ST.** ST hanya bisa mengirim invoice chapternya sendiri —\nbatasnya ditegakkan saat tiap invoice dibaca, bukan di middleware.\n\n**Looping panggilan API, satu per invoice.** Bukan satu permintaan\ngabungan: permintaan gabungan yang gagal di tengah tidak memberi tahu\ninvoice mana yang sudah terkirim, dan karena tiap pengiriman membakar\nnomor invoice secara **permanen**, tidak tahu apa yang sudah terkirim\nberarti tidak bisa mengulang dengan aman sama sekali.\n\n**Tidak berhenti saat satu gagal.** Tiap baris berdiri sendiri: yang\nberhasil tercatat berhasil, yang gagal menyebut alasannya apa adanya\ntermasuk pesan dari Paper.id.\n\nJawabannya **200 meski sebagian gagal** — kegagalan per invoice ada di\ndalam `baris`. Menjawab 4xx/5xx akan membuat klien mengira tidak ada satu\npun yang terkirim, padahal nomornya sudah terbakar.\n\nId ganda dibuang: pengiriman kedua atas invoice yang sama pasti gagal\nkarena statusnya sudah `sent`, dan laporannya akan memuat kegagalan\nmembingungkan atas sesuatu yang sebenarnya berhasil.\n\nSeluruh pengiriman — berhasil maupun gagal — tercatat di blackbox.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "invoiceIds"
+                ],
+                "properties": {
+                  "invoiceIds": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "sendEmail": {
+                    "type": "boolean",
+                    "nullable": true
+                  },
+                  "sendWhatsApp": {
+                    "type": "boolean",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hasil per invoice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "integer"
+                    },
+                    "berhasil": {
+                      "type": "integer"
+                    },
+                    "gagal": {
+                      "type": "integer"
+                    },
+                    "baris": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "invoiceId": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "string"
+                          },
+                          "berhasil": {
+                            "type": "boolean"
+                          },
+                          "alasan": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Daftar kosong atau melebihi 200"
+          },
+          "403": {
+            "description": "Peran tidak boleh menulis"
+          }
+        }
+      }
+    },
     "/api/v1/renewal-requests": {
       "get": {
         "tags": [

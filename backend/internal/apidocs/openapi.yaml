@@ -1671,6 +1671,72 @@ paths:
   # ===========================================================================
   # Sinkronisasi
   # ===========================================================================
+  /api/v1/invoices/send-bulk:
+    post:
+      tags: [Paper.id]
+      summary: Kirim banyak invoice sekaligus
+      description: |
+        **Admin dan ST.** ST hanya bisa mengirim invoice chapternya sendiri —
+        batasnya ditegakkan saat tiap invoice dibaca, bukan di middleware.
+
+        **Looping panggilan API, satu per invoice.** Bukan satu permintaan
+        gabungan: permintaan gabungan yang gagal di tengah tidak memberi tahu
+        invoice mana yang sudah terkirim, dan karena tiap pengiriman membakar
+        nomor invoice secara **permanen**, tidak tahu apa yang sudah terkirim
+        berarti tidak bisa mengulang dengan aman sama sekali.
+
+        **Tidak berhenti saat satu gagal.** Tiap baris berdiri sendiri: yang
+        berhasil tercatat berhasil, yang gagal menyebut alasannya apa adanya
+        termasuk pesan dari Paper.id.
+
+        Jawabannya **200 meski sebagian gagal** — kegagalan per invoice ada di
+        dalam `baris`. Menjawab 4xx/5xx akan membuat klien mengira tidak ada satu
+        pun yang terkirim, padahal nomornya sudah terbakar.
+
+        Id ganda dibuang: pengiriman kedua atas invoice yang sama pasti gagal
+        karena statusnya sudah `sent`, dan laporannya akan memuat kegagalan
+        membingungkan atas sesuatu yang sebenarnya berhasil.
+
+        Seluruh pengiriman — berhasil maupun gagal — tercatat di blackbox.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoiceIds]
+              properties:
+                invoiceIds:
+                  type: array
+                  maxItems: 200
+                  items: { type: string, format: uuid }
+                sendEmail: { type: boolean, nullable: true }
+                sendWhatsApp: { type: boolean, nullable: true }
+      responses:
+        "200":
+          description: Hasil per invoice
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: { type: integer }
+                  berhasil: { type: integer }
+                  gagal: { type: integer }
+                  baris:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        invoiceId: { type: string }
+                        number: { type: string }
+                        berhasil: { type: boolean }
+                        alasan: { type: string }
+                        status: { type: integer }
+        "400":
+          description: Daftar kosong atau melebihi 200
+        "403":
+          description: Peran tidak boleh menulis
   /api/v1/renewal-requests:
     get:
       tags: [Member]

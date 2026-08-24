@@ -266,6 +266,17 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 	if err != nil {
 		return nil, gatewayError(err)
 	}
+	// Gateway adalah interface, dan (nil, nil) dari implementasi mana pun akan
+	// membuat baris di bawah men-dereference nil — panic yang mematikan SELURUH
+	// proses, bukan hanya permintaan ini.
+	//
+	// Klien Paper.id yang sekarang tidak pernah melakukannya: ia selalu
+	// mengembalikan galat atau hasil yang terisi. Pemeriksaan ini untuk
+	// implementasi lain — dan ketahuan justru saat pengiriman massal menemukan
+	// jalur itu lewat sebuah stub.
+	if res == nil {
+		return nil, gatewayError(fmt.Errorf("Paper.id tidak mengembalikan hasil"))
+	}
 
 	return s.repo.MarkSent(ctx, invoiceID, *res, dueDate, now, "Admin")
 }
