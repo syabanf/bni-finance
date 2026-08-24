@@ -1698,6 +1698,24 @@ paths:
         membingungkan atas sesuatu yang sebenarnya berhasil.
 
         Seluruh pengiriman — berhasil maupun gagal — tercatat di blackbox.
+
+        ## JANGAN dipanggil dari peramban untuk batch besar
+
+        Endpoint ini menahan koneksi selama seluruh batch berjalan. Satu
+        pengiriman ke Paper.id terukur **sekitar 20 detik**, sedangkan proxy di
+        depan produksi (Cloudflare) memutus permintaan pada **100 detik** —
+        jadi enam invoice saja sudah melewatinya. Yang terjadi bukan pengiriman
+        yang gagal, melainkan KLIEN yang menerima galat sementara server terus
+        mengirim: laporan hasilnya hilang, dan tidak ada yang tahu invoice mana
+        yang sudah terbakar nomornya.
+
+        Untuk pengiriman massal dari UI, halaman Invoice memakai perulangan di
+        sisi klien: satu panggilan per invoice, dengan indikator kemajuan, dan
+        setiap invoice yang sudah terkirim tetap tercatat meski halamannya
+        ditutup di tengah.
+
+        Endpoint ini tetap berguna untuk skrip dan batch kecil, di mana
+        keseluruhannya selesai jauh di bawah batas proxy.
       requestBody:
         required: true
         content:

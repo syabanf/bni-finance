@@ -18,6 +18,7 @@ import { settingsService } from '@/services'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { DataSourceCard } from './components/DataSourceCard'
+import { ReminderCard } from './components/ReminderCard'
 
 
 export function SettingsPage() {
@@ -127,6 +128,8 @@ export function SettingsPage() {
             </CardBody>
           </Card>
         </div>
+
+        <ReminderCard />
 
         <DataSourceCard />
 
