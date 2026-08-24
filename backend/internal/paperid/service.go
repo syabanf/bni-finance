@@ -330,12 +330,19 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 
 	uuid, number := in.invoiceRef()
 	if uuid == "" && number == "" {
+		// Bentuk yang sah tapi belum menunjuk invoice — Static VA yang baru
+		// memberi tahu uang masuk ke virtual account partner. Direkam dan
+		// diakui 200; pelunasannya menyusul lewat callback rekonsiliasi.
+		if in.punyaSasaranLain() {
+			s.recordInboundAt(path, raw, http.StatusOK, true, nil)
+			return false, nil
+		}
 		err := httpx.BadRequest("callback tidak memuat invoice yang bisa dicocokkan")
 		s.recordInboundAt(path, raw, http.StatusBadRequest, false, err)
 		return false, err
 	}
 
-	pay := summarizePayment(in.PaymentInfo)
+	pay := summarizePayment(in.paymentInfo())
 	amount := int64(pay.Detail.PaidAmount)
 	if amount <= 0 {
 		amount = int64(pay.Detail.Amount)
@@ -346,7 +353,7 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 		amount = int64(in.ReconciledAmount)
 	}
 	if amount <= 0 {
-		amount = int64(in.Data.Invoice.TotalAmount)
+		amount = int64(in.invoice().totalAmount())
 	}
 	if amount <= 0 {
 		e := httpx.BadRequest("amount pada callback tidak valid")
@@ -376,10 +383,10 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 
 // paidAt prefers payment_info.paid_at, then payment_date, then now.
 func (s *Service) paidAt(in WebhookInput) time.Time {
-	pay := summarizePayment(in.PaymentInfo)
+	pay := summarizePayment(in.paymentInfo())
 	for _, raw := range []string{
-		pay.Detail.PaidAt, pay.Detail.CreatedAt, in.PaymentDate,
-		in.ReconciliationDate, in.Data.Invoice.UpdatedAt,
+		pay.Detail.PaidAt, pay.Detail.CreatedAt, in.PaymentDate, in.Data.PaymentDate,
+		in.ReconciliationDate, in.invoice().UpdatedAt,
 	} {
 		raw = strings.TrimSpace(raw)
 		if raw == "" {

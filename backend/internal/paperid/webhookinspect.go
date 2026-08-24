@@ -25,20 +25,59 @@ import (
 // resmi Paper.id, mencakup ketiga keluarga callback sekaligus.
 var known = map[string]map[string]bool{
 	"": {
-		// Payment Callback
+		// Payment Callback (Pembayaran Masuk / Keluar)
 		"ref_id": true, "external_id": true, "message": true,
 		"payment_date": true, "payment_info": true, "additional_info": true,
-		// Invoice Callback
-		"data": true,
+		// Invoice Callback — dokumentasi memakai data.invoice, dashboard
+		// menaruh invoice langsung di akar. Keduanya sah.
+		"data": true, "invoice": true,
 		// Reconciliation Callback
 		"reconciled_amount": true, "reconciliation_date": true, "source": true,
+		// Paylater Diajukan
+		"transaction_id": true, "transaction_date": true, "transaction_status": true,
+		// Pembayaran ke Supplier — seluruh detailnya datar di akar
+		"company_id": true, "company_name": true, "partner_id": true,
+		"partner_name": true, "payment_id": true, "disbursement_id": true,
+		"status": true, "account_holder_name": true, "account_number": true,
+		"account_type": true, "amount": true, "bank_code": true,
+		"currency": true, "completed_time": true,
 	},
 	"payment_info": {
 		"channel": true, "method": true, "status": true, "message": true,
-		"source": true, "event": true, "payment_type": true,
+		"source": true, "event": true, "payment_type": true, "additional_info": true,
 	},
 	"additional_info": {"invoices": true},
-	"data":            {"invoice": true},
+	"data": {
+		// Invoice & Sisa Tagihan
+		"invoice": true, "payment": true, "connected_documents": true,
+		// Static VA
+		"additional_info": true, "message": true, "partner": true,
+		"payment_date": true, "payment_info": true,
+		// Disbursement Pay In
+		"id": true, "type": true, "status": true, "datetime": true,
+		"channel": true, "account_number": true, "amount": true, "fee": true,
+		"received_amount": true, "currency": true, "active_balance_after": true,
+		"payment_references": true,
+	},
+}
+
+// keluarga menggolongkan payload sebelum diperiksa.
+//
+// Tanpa ini, inspektor menuntut hal yang tidak pernah ada pada bentuk yang
+// benar: callback Pembayaran ke Supplier dan Disbursement memang TIDAK punya
+// invoice maupun payment_info — keduanya memberi tahu uang keluar, bukan
+// tagihan lunas. Mengeluhkan itu setiap kali membuat catatan berbunyi terus,
+// dan catatan yang selalu berbunyi berhenti dibaca tepat saat ia penting.
+func keluargaPencairan(top map[string]json.RawMessage) bool {
+	if _, ada := top["disbursement_id"]; ada {
+		return true
+	}
+	if d, ok := objectAt(top, "data"); ok {
+		if _, ada := d["payment_references"]; ada {
+			return true
+		}
+	}
+	return false
 }
 
 // inspectPayload melaporkan selisih antara payload nyata dan harapan kita.
@@ -61,8 +100,25 @@ func inspectPayload(raw []byte) []string {
 	// detailnya ada di data.invoice. Memeriksanya seperti Payment Callback
 	// akan mengeluh atas bentuk yang benar.
 	_, invoiceCallback := objectAt(top, "data")
+	pencairan := keluargaPencairan(top)
+	if pencairan {
+		// Tidak ada pelunasan yang diharapkan; cukup periksa field tak dikenal.
+		if d, ok := objectAt(top, "data"); ok {
+			notes = append(notes, unknownIn("data", d)...)
+		}
+		sort.Strings(notes)
+		return notes
+	}
 
-	if nested, ok := objectAt(top, "payment_info"); ok {
+	// Static VA membungkus payment_info di dalam data. Mencarinya hanya di akar
+	// membuat seluruh callback Static VA lolos tanpa diperiksa.
+	nested, ok := objectAt(top, "payment_info")
+	if !ok {
+		if d, has := objectAt(top, "data"); has {
+			nested, ok = objectAt(d, "payment_info")
+		}
+	}
+	if ok {
 		// Objek bernama metode pembayaran — bank_transfer, qris, credit_card,
 		// ewallet, static_va, dan apa pun yang Paper.id tambahkan nanti — bukan
 		// field tak dikenal. Isinya justru tempat status dan nominal berada.
@@ -78,7 +134,8 @@ func inspectPayload(raw []byte) []string {
 		}
 		notes = append(notes, unknownIn("payment_info", metode)...)
 
-		if summarizePayment(json.RawMessage(mustJSON(nested))).Status == "" {
+		_, punyaTransaksi := top["transaction_status"]
+		if summarizePayment(json.RawMessage(mustJSON(nested))).Status == "" && !punyaTransaksi {
 			notes = append(notes, "status pembayaran TIDAK ADA — tidak di payment_info.status "+
 				"maupun di objek metodenya; tanpa itu tidak ada callback yang bisa melunasi apa pun")
 		}
@@ -104,8 +161,10 @@ func inspectPayload(raw []byte) []string {
 			}
 		}
 	}
-	// Invoice Callback membawa identitasnya di data.invoice.
+	// Invoice Callback membawa identitasnya di data.invoice — atau, pada bentuk
+	// dashboard, di invoice akar.
 	if d, ok := objectAt(top, "data"); ok {
+		notes = append(notes, unknownIn("data", d)...)
 		if inv, ok := objectAt(d, "invoice"); ok {
 			notes = append(notes, unknownInvoiceFields(inv)...)
 			if _, has := inv["id"]; has {
@@ -116,10 +175,29 @@ func inspectPayload(raw []byte) []string {
 			}
 		}
 	}
+	if inv, ok := objectAt(top, "invoice"); ok {
+		notes = append(notes, unknownInvoiceFields(inv)...)
+		if _, has := inv["id"]; has {
+			punyaIdentitas = true
+		}
+		if _, has := inv["number"]; has {
+			punyaIdentitas = true
+		}
+	}
 	if _, has := top["ref_id"]; has {
 		punyaIdentitas = true
 	}
 	if _, has := top["external_id"]; has {
+		punyaIdentitas = true
+	}
+	// Static VA menunjuk PARTNER, bukan invoice — uang masuk ke virtual account
+	// miliknya dan pencocokan invoicenya menyusul lewat callback rekonsiliasi.
+	if d, ok := objectAt(top, "data"); ok {
+		if _, has := d["partner"]; has {
+			punyaIdentitas = true
+		}
+	}
+	if _, has := top["transaction_id"]; has {
 		punyaIdentitas = true
 	}
 	if !punyaIdentitas {
@@ -170,14 +248,14 @@ func formatNotes(notes []string) string {
 // invoiceFields adalah field data.invoice yang kita pahami.
 var invoiceFields = map[string]bool{
 	"id": true, "number": true, "partner_id": true, "status": true,
-	"amount_due": true, "total_amount": true, "updated_at": true,
+	"amount": true, "amount_due": true, "total_amount": true, "updated_at": true,
 }
 
 func unknownInvoiceFields(m map[string]json.RawMessage) []string {
 	var out []string
 	for k := range m {
 		if !invoiceFields[k] {
-			out = append(out, "field tidak dikenal: data.invoice."+k)
+			out = append(out, "field tidak dikenal: invoice."+k)
 		}
 	}
 	return out
