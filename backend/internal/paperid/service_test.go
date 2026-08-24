@@ -219,13 +219,22 @@ func mustJSONBytes(in WebhookInput) []byte {
 	return b
 }
 
+// paymentInfoJSON menyusun payment_info dengan bentuk BERSARANG yang sebenarnya
+// dipakai Paper.id — objeknya dinamai menurut metode pembayaran.
+func paymentInfoJSON(method, channel, status string, amount float64, paidAt string) json.RawMessage {
+	detail := map[string]any{"amount": amount, "paid_amount": amount, "status": status}
+	if paidAt != "" {
+		detail["paid_at"] = paidAt
+	}
+	b, _ := json.Marshal(map[string]any{
+		"channel": channel, "method": method, "status": status, method: detail,
+	})
+	return b
+}
+
 func paidWebhook() WebhookInput {
 	var in WebhookInput
-	in.PaymentInfo.Status = "PAID"
-	in.PaymentInfo.Method = "bank_transfer"
-	in.PaymentInfo.Channel = "bni"
-	in.PaymentInfo.PaidAmount = 1_500_000
-	in.PaymentInfo.PaidAt = "2026-07-27 10:00:00"
+	in.PaymentInfo = paymentInfoJSON("bank_transfer", "bni", "PAID", 1_500_000, "2026-07-27 10:00:00")
 	in.AdditionalInfo.Invoices = []struct {
 		UUID   string `json:"uuid"`
 		Number string `json:"number"`
@@ -237,7 +246,7 @@ func TestWebhookRejectsBadToken(t *testing.T) {
 	store := &stubStore{}
 	svc := newService(store, &stubGateway{}, "rahasia")
 
-	if _, err := svc.HandleWebhook(context.Background(), "salah", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
+	if _, err := svc.HandleWebhook(context.Background(), "/api/v1/webhooks/paperid", "salah", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
 		t.Fatalf("token salah harus 401, dapat %v", err)
 	}
 	if store.settleRef.called {
@@ -247,7 +256,7 @@ func TestWebhookRejectsBadToken(t *testing.T) {
 
 func TestWebhookUnconfiguredRejects(t *testing.T) {
 	svc := newService(&stubStore{}, &stubGateway{}, "")
-	if _, err := svc.HandleWebhook(context.Background(), "apa pun", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
+	if _, err := svc.HandleWebhook(context.Background(), "/api/v1/webhooks/paperid", "apa pun", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
 		t.Fatalf("token belum dikonfigurasi harus menolak, dapat %v", err)
 	}
 }
@@ -257,8 +266,8 @@ func TestWebhookIgnoresNonPaid(t *testing.T) {
 	svc := newService(store, &stubGateway{}, "rahasia")
 
 	in := paidWebhook()
-	in.PaymentInfo.Status = "PENDING"
-	settled, err := svc.HandleWebhook(context.Background(), "rahasia", mustJSONBytes(in))
+	in.PaymentInfo = paymentInfoJSON("bank_transfer", "bni", "PENDING", 1_500_000, "")
+	settled, err := svc.HandleWebhook(context.Background(), "/api/v1/webhooks/paperid", "rahasia", mustJSONBytes(in))
 	if err != nil || settled {
 		t.Fatalf("event non-PAID harus diabaikan, dapat settled=%v err=%v", settled, err)
 	}
@@ -271,7 +280,7 @@ func TestWebhookSettlesPaid(t *testing.T) {
 	store := &stubStore{settleReturns: true}
 	svc := newService(store, &stubGateway{}, "rahasia")
 
-	settled, err := svc.HandleWebhook(context.Background(), "rahasia", mustJSONBytes(paidWebhook()))
+	settled, err := svc.HandleWebhook(context.Background(), "/api/v1/webhooks/paperid", "rahasia", mustJSONBytes(paidWebhook()))
 	if err != nil || !settled {
 		t.Fatalf("PAID harus melunasi, dapat settled=%v err=%v", settled, err)
 	}

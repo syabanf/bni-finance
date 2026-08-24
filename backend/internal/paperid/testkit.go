@@ -267,14 +267,25 @@ func (s *Service) TestCallback(ctx context.Context, in TestCallbackInput) (*Test
 		return nil, err
 	}
 
+	// Payload disusun PERSIS seperti bentuk Paper.id yang sebenarnya, termasuk
+	// objek bersarang yang dinamai menurut metode pembayaran. Simulator yang
+	// memakai bentuk lebih sederhana daripada aslinya tidak menguji apa pun
+	// yang bisa gagal di kenyataan.
 	var payload WebhookInput
 	payload.PaymentDate = s.now().Format("2006-01-02")
-	payload.PaymentInfo.Method = method
-	payload.PaymentInfo.Channel = channel
-	payload.PaymentInfo.Amount = float64(amount)
-	payload.PaymentInfo.PaidAmount = float64(amount)
-	payload.PaymentInfo.PaidAt = s.now().Format(time.RFC3339)
-	payload.PaymentInfo.Status = status
+	payload.RefID = "SIMULASI-" + inv.Number
+	payload.PaymentInfo, _ = json.Marshal(map[string]any{
+		"channel": channel,
+		"method":  method,
+		"status":  status,
+		method: map[string]any{
+			"amount":      amount,
+			"paid_amount": amount,
+			"paid_at":     s.now().Format(time.RFC3339),
+			"status":      status,
+			"created":     s.now().Format(time.RFC3339),
+		},
+	})
 	payload.AdditionalInfo.Invoices = []struct {
 		UUID   string `json:"uuid"`
 		Number string `json:"number"`
@@ -299,7 +310,7 @@ func (s *Service) TestCallback(ctx context.Context, in TestCallbackInput) (*Test
 	// menempuh jalur parsing yang sama dengan callback sungguhan. Menyuntikkan
 	// struct langsung akan melewati satu-satunya langkah yang bisa gagal karena
 	// perbedaan format.
-	settled, err := s.HandleWebhook(ctx, s.callbackToken, body)
+	settled, err := s.HandleWebhook(ctx, "/api/v1/webhooks/paperid", s.callbackToken, body)
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()

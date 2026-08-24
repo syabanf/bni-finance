@@ -24,7 +24,8 @@ func TestInspectPayloadMenemukanSelisih(t *testing.T) {
 		{
 			nama: "bentuk yang kita harapkan — bersih",
 			body: `{"ref_id":"r1","payment_date":"2026-08-23",
-			        "payment_info":{"status":"PAID","amount":1500000},
+			        "payment_info":{"channel":"bni","method":"bank_transfer","status":"PAID",
+			          "bank_transfer":{"amount":1500000,"paid_amount":1500000,"status":"PAID"}},
 			        "additional_info":{"invoices":[{"uuid":"u1","number":"INV-1"}]}}`,
 			memuat: nil,
 		},
@@ -34,13 +35,15 @@ func TestInspectPayloadMenemukanSelisih(t *testing.T) {
 			memuat: []string{"invoice_number", "payment_info TIDAK ADA", "TIDAK ADA identitas invoice"},
 		},
 		{
-			nama:   "status hilang dari payment_info",
-			body:   `{"ref_id":"r1","payment_info":{"amount":1500000}}`,
-			memuat: []string{"payment_info.status TIDAK ADA"},
+			// Status tidak ada di mana pun — tidak datar, tidak pula di objek
+			// metodenya. Inilah bentuk yang membuat pelunasan mustahil.
+			nama:   "status hilang dari kedua tempat",
+			body:   `{"ref_id":"r1","payment_info":{"method":"bank_transfer","bank_transfer":{"amount":1500000}}}`,
+			memuat: []string{"status pembayaran TIDAK ADA"},
 		},
 		{
 			nama:   "field tambahan yang kita buang",
-			body:   `{"ref_id":"r1","signature":"abc","payment_info":{"status":"PAID","fee":2500}}`,
+			body:   `{"ref_id":"r1","signature":"abc","payment_info":{"status":"PAID","fee":"tidak-terduga"}}`,
 			memuat: []string{"signature", "payment_info.fee"},
 		},
 		{
@@ -83,7 +86,7 @@ func TestBlackboxMenyimpanBodyMentah(t *testing.T) {
 	svc := NewService(&stubStore{}, "https://contoh.invalid", "id", "secret", "rahasia", rec)
 
 	asing := `{"invoice_number":"INV-1","status":"PAID","signature":"xyz"}`
-	svc.HandleWebhook(context.Background(), "rahasia", []byte(asing))
+	svc.HandleWebhook(context.Background(), "/api/v1/webhooks/paperid", "rahasia", []byte(asing))
 
 	entries := rec.List()
 	if len(entries) != 1 {
@@ -112,7 +115,7 @@ func TestTokenSalahTetapMerekamBodyMentah(t *testing.T) {
 	rec := blackbox.New(20)
 	svc := NewService(&stubStore{}, "https://contoh.invalid", "id", "secret", "rahasia", rec)
 
-	svc.HandleWebhook(context.Background(), "salah", []byte(`{"ref_id":"r-9"}`))
+	svc.HandleWebhook(context.Background(), "/api/v1/webhooks/paperid", "salah", []byte(`{"ref_id":"r-9"}`))
 
 	entries := rec.List()
 	if len(entries) != 1 || !strings.Contains(string(entries[0].Request), "r-9") {

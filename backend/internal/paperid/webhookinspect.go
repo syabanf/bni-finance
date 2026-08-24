@@ -21,17 +21,24 @@ import (
 // callback PERTAMA, bukan setelah berminggu-minggu pembayaran yang tidak
 // pernah tercatat.
 
-// known memetakan field yang kita pahami, per objek.
+// known memetakan field yang kita pahami, per objek. Disusun dari dokumentasi
+// resmi Paper.id, mencakup ketiga keluarga callback sekaligus.
 var known = map[string]map[string]bool{
 	"": {
-		"ref_id": true, "external_id": true, "payment_date": true,
-		"payment_info": true, "additional_info": true,
+		// Payment Callback
+		"ref_id": true, "external_id": true, "message": true,
+		"payment_date": true, "payment_info": true, "additional_info": true,
+		// Invoice Callback
+		"data": true,
+		// Reconciliation Callback
+		"reconciled_amount": true, "reconciliation_date": true, "source": true,
 	},
 	"payment_info": {
-		"method": true, "channel": true, "amount": true,
-		"paid_amount": true, "paid_at": true, "status": true,
+		"channel": true, "method": true, "status": true, "message": true,
+		"source": true, "event": true, "payment_type": true,
 	},
 	"additional_info": {"invoices": true},
+	"data":            {"invoice": true},
 }
 
 // inspectPayload melaporkan selisih antara payload nyata dan harapan kita.
@@ -50,12 +57,32 @@ func inspectPayload(raw []byte) []string {
 	var notes []string
 	notes = append(notes, unknownIn("", top)...)
 
+	// Invoice Callback tidak punya payment_info sama sekali, dan itu sah —
+	// detailnya ada di data.invoice. Memeriksanya seperti Payment Callback
+	// akan mengeluh atas bentuk yang benar.
+	_, invoiceCallback := objectAt(top, "data")
+
 	if nested, ok := objectAt(top, "payment_info"); ok {
-		notes = append(notes, unknownIn("payment_info", nested)...)
-		if _, has := nested["status"]; !has {
-			notes = append(notes, "payment_info.status TIDAK ADA — tanpa itu tidak ada callback yang bisa melunasi apa pun")
+		// Objek bernama metode pembayaran — bank_transfer, qris, credit_card,
+		// ewallet, static_va, dan apa pun yang Paper.id tambahkan nanti — bukan
+		// field tak dikenal. Isinya justru tempat status dan nominal berada.
+		metode := map[string]json.RawMessage{}
+		for k, v := range nested {
+			if !known["payment_info"][k] {
+				var d paymentDetail
+				if json.Unmarshal(v, &d) == nil {
+					continue // objek metode; sah
+				}
+				metode[k] = v
+			}
 		}
-	} else {
+		notes = append(notes, unknownIn("payment_info", metode)...)
+
+		if summarizePayment(json.RawMessage(mustJSON(nested))).Status == "" {
+			notes = append(notes, "status pembayaran TIDAK ADA — tidak di payment_info.status "+
+				"maupun di objek metodenya; tanpa itu tidak ada callback yang bisa melunasi apa pun")
+		}
+	} else if !invoiceCallback {
 		notes = append(notes, "payment_info TIDAK ADA — seluruh detail pembayaran dibaca dari sini")
 	}
 
@@ -74,6 +101,18 @@ func inspectPayload(raw []byte) []string {
 							"additional_info.invoices[].%s tidak dikenal", k))
 					}
 				}
+			}
+		}
+	}
+	// Invoice Callback membawa identitasnya di data.invoice.
+	if d, ok := objectAt(top, "data"); ok {
+		if inv, ok := objectAt(d, "invoice"); ok {
+			notes = append(notes, unknownInvoiceFields(inv)...)
+			if _, has := inv["id"]; has {
+				punyaIdentitas = true
+			}
+			if _, has := inv["number"]; has {
+				punyaIdentitas = true
 			}
 		}
 	}
@@ -126,4 +165,28 @@ func formatNotes(notes []string) string {
 		return ""
 	}
 	return "format callback: " + strings.Join(notes, "; ")
+}
+
+// invoiceFields adalah field data.invoice yang kita pahami.
+var invoiceFields = map[string]bool{
+	"id": true, "number": true, "partner_id": true, "status": true,
+	"amount_due": true, "total_amount": true, "updated_at": true,
+}
+
+func unknownInvoiceFields(m map[string]json.RawMessage) []string {
+	var out []string
+	for k := range m {
+		if !invoiceFields[k] {
+			out = append(out, "field tidak dikenal: data.invoice."+k)
+		}
+	}
+	return out
+}
+
+func mustJSON(m map[string]json.RawMessage) []byte {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return []byte("{}")
+	}
+	return b
 }

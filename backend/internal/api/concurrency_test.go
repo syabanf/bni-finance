@@ -174,10 +174,16 @@ func TestConcurrentWebhooksSettleExactlyOnce(t *testing.T) {
 	s.do(t, "PATCH", "/api/v1/invoices/"+inv.ID, s.adminToken,
 		fmt.Sprintf(`{"status":"sent","paperIdInvoiceId":%q}`, "pp-"+inv.ID), http.StatusOK, nil)
 
+	// Bentuk payload PERSIS seperti yang Paper.id kirim: nominal dan status
+	// bersarang di objek yang dinamai menurut metode pembayaran, bukan datar.
+	// Fixture yang lebih sederhana daripada aslinya tidak menguji apa pun yang
+	// bisa gagal di kenyataan — versi sebelumnya memakai bentuk tebakan, dan
+	// tebakan itu ternyata salah.
 	callback := fmt.Sprintf(`{
 		"payment_date": "2026-07-28",
-		"payment_info": {"method":"bank_transfer","channel":"bni","amount":500000,
-		                 "paid_amount":500000,"paid_at":"2026-07-28 10:00:00","status":"PAID"},
+		"payment_info": {"method":"bank_transfer","channel":"bni","status":"PAID",
+		                 "bank_transfer":{"amount":500000,"paid_amount":500000,
+		                                  "paid_at":"2026-07-28 10:00:00","status":"PAID"}},
 		"additional_info": {"invoices":[{"uuid":%q,"number":%q}]}
 	}`, "pp-"+inv.ID, number)
 

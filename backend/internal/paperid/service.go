@@ -81,6 +81,12 @@ func NewService(repo Store, baseURL, clientID, clientSecret, callbackToken strin
 // Sekarang body mentah yang disimpan, beserta catatan selisihnya terhadap
 // bentuk yang kita harapkan.
 func (s *Service) recordInbound(raw []byte, status int, success bool, err error) {
+	s.recordInboundAt("/api/v1/webhooks/paperid", raw, status, success, err)
+}
+
+// recordInboundAt mencatat dengan alamat sebenarnya, sehingga halaman blackbox
+// langsung memberi tahu jenis callback mana yang datang.
+func (s *Service) recordInboundAt(path string, raw []byte, status int, success bool, err error) {
 	if s.rec == nil {
 		return
 	}
@@ -93,7 +99,7 @@ func (s *Service) recordInbound(raw []byte, status int, success bool, err error)
 	}
 	s.rec.Record(blackbox.Call{
 		Integration: "paper_id", Direction: blackbox.Inbound,
-		Method: http.MethodPost, URL: "/api/v1/webhooks/paperid",
+		Method: http.MethodPost, URL: path,
 		Request: raw, Response: resp, Status: status, Success: success, Err: err,
 	})
 }
@@ -279,25 +285,8 @@ func (s *Service) dueDays(ctx context.Context) int {
 // --- webhook ----------------------------------------------------------------
 
 // WebhookInput matches the documented Paper.id payment callback.
-type WebhookInput struct {
-	RefID       string `json:"ref_id"`
-	ExternalID  string `json:"external_id"`
-	PaymentDate string `json:"payment_date"`
-	PaymentInfo struct {
-		Method     string  `json:"method"`
-		Channel    string  `json:"channel"`
-		Amount     float64 `json:"amount"`
-		PaidAmount float64 `json:"paid_amount"`
-		PaidAt     string  `json:"paid_at"`
-		Status     string  `json:"status"`
-	} `json:"payment_info"`
-	AdditionalInfo struct {
-		Invoices []struct {
-			UUID   string `json:"uuid"`
-			Number string `json:"number"`
-		} `json:"invoices"`
-	} `json:"additional_info"`
-}
+// WebhookInput pindah ke webhookpayload.go — bentuk sebenarnya jauh lebih
+// rumit daripada tebakan awal, dan tempatnya sendiri membuatnya bisa dibaca.
 
 // HandleWebhook verifies the shared secret and settles the invoice.
 //
@@ -305,56 +294,69 @@ type WebhookInput struct {
 // dashboard carries a secret token (?token=… or the x-paper-callback-token
 // header) that we compare here. An unconfigured token rejects every callback
 // rather than accepting them all.
-func (s *Service) HandleWebhook(ctx context.Context, token string, raw []byte) (settled bool, err error) {
+func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []byte) (settled bool, err error) {
 	if s.callbackToken == "" {
 		err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
-		s.recordInbound(raw, http.StatusUnauthorized, false, err)
+		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
 		return false, err
 	}
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
 		err := httpx.Unauthorized("token callback tidak valid")
-		s.recordInbound(raw, http.StatusUnauthorized, false, err)
+		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
 		return false, err
 	}
 
 	var in WebhookInput
 	if err := json.Unmarshal(raw, &in); err != nil {
 		e := httpx.BadRequest("payload callback bukan JSON yang sah")
-		s.recordInbound(raw, http.StatusBadRequest, false, e)
+		s.recordInboundAt(path, raw, http.StatusBadRequest, false, e)
 		return false, e
 	}
 
 	// Only a completed payment settles; other events are acknowledged (200) but
 	// change nothing.
-	status := strings.ToUpper(strings.TrimSpace(in.PaymentInfo.Status))
-	if status != "PAID" && status != "SETTLED" && status != "SUCCESS" && status != "SUCCEEDED" {
+	//
+	// FULLY_RECONCILED ikut melunasi: itu status Reconciliation Callback saat
+	// pembayaran sudah dicocokkan penuh dengan invoicenya. PARTIALLY_RECONCILED
+	// sengaja TIDAK — tagihannya belum lunas, dan menandainya lunas akan
+	// menghentikan penagihan atas sisa yang masih terutang.
+	status := in.settlementStatus()
+	if status != "PAID" && status != "SETTLED" && status != "SUCCESS" &&
+		status != "SUCCEEDED" && status != "FULLY_RECONCILED" {
 		// Acknowledged but not acted on — still worth recording.
-		s.recordInbound(raw, http.StatusOK, true, nil)
+		s.recordInboundAt(path, raw, http.StatusOK, true, nil)
 		return false, nil
 	}
 
-	var uuid, number string
-	if len(in.AdditionalInfo.Invoices) > 0 {
-		uuid = in.AdditionalInfo.Invoices[0].UUID
-		number = in.AdditionalInfo.Invoices[0].Number
-	}
+	uuid, number := in.invoiceRef()
 	if uuid == "" && number == "" {
 		err := httpx.BadRequest("callback tidak memuat invoice yang bisa dicocokkan")
-		s.recordInbound(raw, http.StatusBadRequest, false, err)
+		s.recordInboundAt(path, raw, http.StatusBadRequest, false, err)
 		return false, err
 	}
 
-	amount := int64(in.PaymentInfo.PaidAmount)
+	pay := summarizePayment(in.PaymentInfo)
+	amount := int64(pay.Detail.PaidAmount)
 	if amount <= 0 {
-		amount = int64(in.PaymentInfo.Amount)
+		amount = int64(pay.Detail.Amount)
+	}
+	// Reconciliation membawa nilainya di reconciled_amount, dan Invoice
+	// Callback di data.invoice.total_amount — keduanya di luar payment_info.
+	if amount <= 0 {
+		amount = int64(in.ReconciledAmount)
 	}
 	if amount <= 0 {
-		return false, httpx.BadRequest("amount pada callback tidak valid")
+		amount = int64(in.Data.Invoice.TotalAmount)
+	}
+	if amount <= 0 {
+		e := httpx.BadRequest("amount pada callback tidak valid")
+		s.recordInboundAt(path, raw, http.StatusBadRequest, false, e)
+		return false, e
 	}
 
-	method := strings.TrimSpace(in.PaymentInfo.Method)
-	if in.PaymentInfo.Channel != "" {
-		method = strings.TrimSpace(method + ":" + in.PaymentInfo.Channel)
+	method := strings.TrimSpace(pay.Method)
+	if pay.Channel != "" {
+		method = strings.TrimSpace(method + ":" + pay.Channel)
 	}
 	if method == "" {
 		method = "paper_id"
@@ -362,16 +364,23 @@ func (s *Service) HandleWebhook(ctx context.Context, token string, raw []byte) (
 
 	settled, err = s.repo.SettleByRef(ctx, uuid, number, method, status, amount, s.paidAt(in))
 	if err != nil {
-		s.recordInbound(raw, http.StatusInternalServerError, false, err)
+		// httpx.StatusOf, bukan 500 mati: invoice yang tidak ditemukan diterima
+		// klien sebagai 404, dan rekaman yang menyebut 500 membuat orang
+		// mencari kerusakan server yang tidak pernah ada.
+		s.recordInboundAt(path, raw, httpx.StatusOf(err), false, err)
 		return false, err
 	}
-	s.recordInbound(raw, http.StatusOK, true, nil)
+	s.recordInboundAt(path, raw, http.StatusOK, true, nil)
 	return settled, nil
 }
 
 // paidAt prefers payment_info.paid_at, then payment_date, then now.
 func (s *Service) paidAt(in WebhookInput) time.Time {
-	for _, raw := range []string{in.PaymentInfo.PaidAt, in.PaymentDate} {
+	pay := summarizePayment(in.PaymentInfo)
+	for _, raw := range []string{
+		pay.Detail.PaidAt, pay.Detail.CreatedAt, in.PaymentDate,
+		in.ReconciliationDate, in.Data.Invoice.UpdatedAt,
+	} {
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			continue
@@ -588,5 +597,43 @@ func (s *Service) recordRemind(invoiceID string, opts SendOptions, started time.
 		Method: http.MethodPost, URL: "/api/v1/invoices/" + invoiceID + "/remind",
 		Request: req, Response: resp, Status: httpx.StatusOf(err), Success: err == nil,
 		Duration: time.Since(started), Err: err,
+	})
+}
+
+// AcknowledgeWebhook merekam callback yang tidak menyentuh penagihan lalu
+// mengakuinya, tanpa mengubah apa pun.
+//
+// Tokennya tetap diperiksa: endpoint terbuka yang menerima apa saja adalah
+// tempat menumpuknya sampah, dan rekaman yang tidak bisa dipercaya asalnya
+// tidak berguna saat dipakai menelusuri masalah.
+func (s *Service) AcknowledgeWebhook(_ context.Context, path, token string, raw []byte) error {
+	if s.callbackToken == "" {
+		err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
+		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+		return err
+	}
+	if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
+		err := httpx.Unauthorized("token callback tidak valid")
+		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+		return err
+	}
+	s.recordAcknowledged(path, raw)
+	return nil
+}
+
+// recordAcknowledged mencatat callback yang memang tidak menyentuh invoice.
+//
+// Inspeksi formatnya dilewati dengan sengaja. Kejadian seperti disbursement dan
+// paylater tidak pernah memuat identitas invoice, jadi mengeluhkan
+// ketiadaannya bukan temuan melainkan kebisingan — dan catatan yang selalu
+// berbunyi adalah catatan yang berhenti dibaca tepat saat ia penting.
+func (s *Service) recordAcknowledged(path string, raw []byte) {
+	if s.rec == nil {
+		return
+	}
+	s.rec.Record(blackbox.Call{
+		Integration: "paper_id", Direction: blackbox.Inbound,
+		Method: http.MethodPost, URL: path,
+		Request: raw, Status: http.StatusOK, Success: true,
 	})
 }

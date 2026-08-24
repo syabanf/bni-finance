@@ -66,8 +66,35 @@ func (h *Handler) testCallback(w http.ResponseWriter, r *http.Request) {
 // RegisterPublic wires the payment callback. Paper.id calls it with no login,
 // so it must sit outside the auth middleware — it authenticates itself with the
 // shared secret carried in the callback URL.
+// Paper.id mendaftarkan URL callback TERPISAH per jenis kejadian di dashboard
+// mereka, jadi kita menyediakan satu endpoint untuk masing-masing. Alamat yang
+// berbeda membuat halaman blackbox langsung memberi tahu kejadian apa yang
+// datang, tanpa perlu menebak dari isi payloadnya.
+//
+// Payload Payment In dan Payment Out identik — dokumentasi Paper.id menyebutnya
+// eksplisit — dan hanya URL pendaftarannya yang membedakan. Itulah alasan
+// keduanya perlu alamat sendiri meski penanganannya sama.
+//
+// Jenis yang tidak menyentuh penagihan kita — pembayaran ke supplier, paylater,
+// disbursement — tetap diterima dan direkam, lalu dijawab 200. Menolaknya akan
+// membuat Paper.id mengulang-ulang pengiriman untuk kejadian yang memang bukan
+// urusan sistem ini, dan rekamannya tetap berguna bila suatu saat dipakai.
 func (h *Handler) RegisterPublic(mux *http.ServeMux) {
+	// Alamat lama, dipertahankan supaya pendaftaran yang sudah ada tidak putus.
 	mux.HandleFunc("POST /api/v1/webhooks/paperid", h.webhook)
+
+	// Menyentuh invoice: bisa melunasi.
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/payment-in", h.webhook)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/payment-out", h.webhook)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/invoice-paid", h.webhook)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/reconciliation", h.webhook)
+
+	// Tidak menyentuh invoice: direkam dan diakui saja.
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/supplier-payment", h.acknowledge)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/paylater", h.acknowledge)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/static-va", h.webhook)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/disbursement", h.acknowledge)
+	mux.HandleFunc("POST /api/v1/webhooks/paperid/invoice-amount-due", h.acknowledge)
 }
 
 func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +132,29 @@ func (h *Handler) remind(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, inv)
 }
 
+// acknowledge merekam callback lalu menjawab 200 tanpa menyentuh invoice.
+//
+// Dipakai untuk kejadian Paper.id yang bukan urusan penagihan keanggotaan.
+// Tetap diverifikasi tokennya: endpoint terbuka yang menerima apa saja adalah
+// tempat menumpuknya sampah, dan rekaman yang tidak bisa dipercaya asalnya
+// tidak berguna saat dipakai menelusuri masalah.
+func (h *Handler) acknowledge(w http.ResponseWriter, r *http.Request) {
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		httpx.Fail(w, httpx.BadRequest("gagal membaca body callback"))
+		return
+	}
+	token := r.Header.Get("x-paper-callback-token")
+	if token == "" {
+		token = httpx.Query(r, "token")
+	}
+	if err := h.svc.AcknowledgeWebhook(r.Context(), r.URL.Path, token, raw); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"received": true})
+}
+
 func (h *Handler) webhook(w http.ResponseWriter, r *http.Request) {
 	// Body dibaca MENTAH, bukan langsung di-decode ke struct.
 	//
@@ -126,7 +176,7 @@ func (h *Handler) webhook(w http.ResponseWriter, r *http.Request) {
 		token = httpx.Query(r, "token")
 	}
 
-	settled, err := h.svc.HandleWebhook(r.Context(), token, raw)
+	settled, err := h.svc.HandleWebhook(r.Context(), r.URL.Path, token, raw)
 	if err != nil {
 		httpx.Fail(w, err)
 		return

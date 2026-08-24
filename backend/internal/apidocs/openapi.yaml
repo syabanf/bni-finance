@@ -1265,6 +1265,380 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /api/v1/webhooks/paperid/payment-in:
+    post:
+      tags: [Paper.id]
+      summary: Callback pembayaran masuk
+      description: |
+        Dipanggil Paper.id saat pembayaran masuk mendapat respons balik.
+        
+        Payloadnya IDENTIK dengan pembayaran keluar — dokumentasi Paper.id menyebutnya
+        eksplisit — dan hanya URL pendaftarannya yang membedakan. Itulah sebabnya
+        keduanya punya alamat sendiri meski penanganannya sama.
+        
+        Status dibaca dari `payment_info.status`, dan bila tidak ada di sana, dari objek
+        yang dinamai menurut metode pembayaran: `payment_info.bank_transfer.status`,
+        `payment_info.qris.status`, `payment_info.credit_card.status`,
+        `payment_info.ewallet.status`. Contoh di dashboard Paper.id hanya memuat yang
+        bersarang, jadi membaca satu tempat saja membuat separuh payload sah terbaca
+        kosong.
+        
+        Hanya PAID, SETTLED, SUCCESS, SUCCEEDED, dan FULLY_RECONCILED yang melunasi.
+        Selainnya diakui dengan 200 tanpa mengubah apa pun.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/payment-out:
+    post:
+      tags: [Paper.id]
+      summary: Callback pembayaran keluar
+      description: |
+        Payload identik dengan pembayaran masuk; hanya URL pendaftarannya yang berbeda.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/invoice-paid:
+    post:
+      tags: [Paper.id]
+      summary: Callback invoice dibayar
+      description: |
+        Hanya dipicu saat status invoice di Paper.id berubah menjadi `paid`.
+        
+        Bentuknya BERBEDA dari callback pembayaran: tidak ada `payment_info` sama
+        sekali, dan identitas invoicenya ada di `data.invoice.id` serta
+        `data.invoice.number`.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/reconciliation:
+    post:
+      tags: [Paper.id]
+      summary: Callback rekonsiliasi
+      description: |
+        Dipicu saat pembayaran sudah dicocokkan dengan satu atau beberapa invoice.
+        
+        `FULLY_RECONCILED` melunasi. `PARTIALLY_RECONCILED` sengaja TIDAK — tagihannya
+        belum lunas, dan menandainya lunas akan menghentikan penagihan atas sisa yang
+        masih terutang.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/static-va:
+    post:
+      tags: [Paper.id]
+      summary: Callback static VA dan rekonsiliasi email bank
+      description: |
+        Pembayaran lewat virtual account statis. Ditangani seperti callback pembayaran:
+        nominal dan statusnya dibaca dari `payment_info.static_va`.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/supplier-payment:
+    post:
+      tags: [Paper.id]
+      summary: Callback pembayaran ke supplier
+      description: |
+        Kejadian Paper.id yang tidak menyentuh penagihan keanggotaan. Direkam ke
+        blackbox lalu diakui dengan 200.
+        
+        Menolaknya akan membuat Paper.id mengulang-ulang pengiriman untuk kejadian yang
+        memang bukan urusan sistem ini, dan rekamannya tetap berguna bila suatu saat
+        dipakai.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/paylater:
+    post:
+      tags: [Paper.id]
+      summary: Callback paylater diajukan
+      description: |
+        Diterima, direkam, diakui. Tidak menyentuh invoice.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/disbursement:
+    post:
+      tags: [Paper.id]
+      summary: Callback disbursement pay in
+      description: |
+        Diterima, direkam, diakui. Tidak menyentuh invoice.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /api/v1/webhooks/paperid/invoice-amount-due:
+    post:
+      tags: [Paper.id]
+      summary: Callback sisa tagihan invoice
+      description: |
+        Dipicu saat jumlah tagihan berubah, misalnya setelah pembayaran sebagian.
+        
+        Saat ini direkam dan diakui saja: melunasi sebagian belum didukung, dan menebak
+        akan lebih berbahaya daripada tidak berbuat apa-apa. Rekamannya tersimpan
+        lengkap sehingga bisa ditindaklanjuti begitu perilakunya diputuskan.
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+          description: |
+            Token callback bersama. Bisa juga dikirim lewat header
+            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
+            jadi token inilah satu-satunya pembuktian asalnya.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        "200":
+          description: Callback diterima
+          content:
+            application/json:
+              schema: { type: object }
+        "400":
+          description: Payload tidak bisa dicocokkan dengan invoice mana pun
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: Token callback salah atau belum dikonfigurasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /api/v1/webhooks/paperid:
     post:
       tags: [Paper.id]
