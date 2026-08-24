@@ -9,6 +9,8 @@
  */
 
 import type {
+  ManagedUser,
+  UserRole,
   AuditLogEntry,
   AuthUser,
   Chapter,
@@ -31,6 +33,30 @@ export interface AuthRepository {
   updateProfile(input: { name: string }): Promise<AuthUser>
   /** Set a new password for the signed-in user. */
   updatePassword(newPassword: string): Promise<void>
+}
+
+/**
+ * Pengelolaan akun — dipakai halaman Pengguna.
+ *
+ * Ada karena tanpanya peran ST dan MC tidak bisa dibuat sama sekali dari
+ * aplikasi: batas chapter sudah ditegakkan backend, tapi akun yang memakainya
+ * hanya bisa dibuat lewat curl.
+ */
+export interface UserRepository {
+  list(): Promise<ManagedUser[]>
+  create(input: CreateUserInput): Promise<ManagedUser>
+  /** Ganti peran (dan chapter-nya bila peran itu berlingkup chapter). */
+  changeRole(id: string, role: UserRole, chapterId: string | null): Promise<ManagedUser>
+  remove(id: string): Promise<void>
+}
+
+export interface CreateUserInput {
+  email: string
+  name: string
+  password: string
+  role: UserRole
+  /** Wajib untuk `st` dan `mc`, harus kosong untuk `admin` dan `user`. */
+  chapterId: string | null
 }
 
 export interface ChapterRepository {

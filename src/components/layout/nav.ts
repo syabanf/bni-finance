@@ -65,6 +65,7 @@ export const NAV: NavNode[] = [
     children: [
       { to: '/settings', label: 'Biaya Keanggotaan', end: true },
       { to: '/settings/sync', label: 'Sinkronisasi Data', permission: 'sync:run' },
+      { to: '/settings/users', label: 'Pengguna' },
     ],
   },
   {

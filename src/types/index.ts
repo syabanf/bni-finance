@@ -229,6 +229,23 @@ export interface RenewalDueMember extends MemberWithChapter {
  */
 export type UserRole = 'admin' | 'st' | 'mc' | 'user'
 
+/**
+ * Akun sebagaimana dilihat halaman Pengguna.
+ *
+ * `chapterId` null berarti nasional — itulah yang dipakai `admin` dan `user`.
+ * Untuk `st` dan `mc` ia WAJIB terisi: backend menolak peran berlingkup chapter
+ * tanpa chapter, karena lingkup yang kosong bisa terbaca sebagai "tanpa batas".
+ */
+export interface ManagedUser {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  chapterId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface AuthUser {
   id: string
   name: string
