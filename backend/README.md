@@ -421,6 +421,37 @@ Dua hal yang perlu diketahui:
 
 ---
 
+## 🔐 Rahasia lewat git, terenkripsi
+
+Repo ini **publik**. `backend/.env.production` memuat `DATABASE_URL`,
+`JWT_SECRET`, `SEED_ADMIN_PASSWORD`, `BNI_VM_TOKEN`, dan `PAPER_ID_CLIENT_SECRET`
+— berkas itu tidak pernah boleh ter-commit apa adanya.
+
+Yang ikut ter-commit hanyalah versi terenkripsinya:
+
+```bash
+BNI_SECRETS_KEY="$(cat backend/.secrets-key)" ./backend/secrets.sh lock   # -> .env.production.gpg
+git add backend/.env.production.gpg && git commit && git push
+```
+
+Di server, sekali saja setelah `git pull`:
+
+```bash
+BNI_SECRETS_KEY='<kata kunci>' ./backend/secrets.sh unlock   # -> backend/.env
+docker compose up -d --build
+```
+
+`gpg --symmetric --cipher-algo AES256` dipilih karena **berautentikasi** —
+perubahan pada berkas terenkripsi ketahuan saat dibuka, bukan diam-diam
+menghasilkan sampah — dan sudah tersedia di macOS maupun Raspberry Pi tanpa
+memasang apa pun.
+
+Kata kuncinya ada di `backend/.secrets-key`, diabaikan git. Itu **satu-satunya**
+hal yang harus dikirim ke server di luar git; memilikinya sama dengan memiliki
+seluruh isi berkas terenkripsi tadi.
+
+---
+
 ## 🔒 Keamanan
 
 **Otorisasi ada di sini, dan tidak bisa di tempat lain.** Backend ini menyambung

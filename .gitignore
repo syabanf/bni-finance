@@ -50,6 +50,18 @@ dev-dist
 !.env.example
 !/.env.production
 
+# Varian TERENKRIPSI memang untuk ter-commit — itu seluruh gunanya. Isinya tidak
+# berarti apa-apa tanpa kata kunci di backend/.secrets-key, yang tidak pernah
+# lewat git. Lihat backend/secrets.sh.
+!.env.production.gpg
+
+# Kata kunci untuk backend/secrets.sh. Ini SATU-SATUNYA hal yang tidak boleh
+# lewat git — memilikinya sama dengan memiliki seluruh isi .env.production.gpg
+# yang memang sengaja ter-commit.
+.secrets-key
+*.key
+!*.pub.key
+
 # Claude Code local config (keep launch.json, ignore personal settings)
 .claude/settings.local.json
 
