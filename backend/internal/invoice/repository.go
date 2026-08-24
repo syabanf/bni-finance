@@ -34,6 +34,40 @@ type scannable interface {
 	Scan(dest ...any) error
 }
 
+// salahMasukan menerjemahkan galat basis data yang SEBENARNYA kesalahan klien.
+//
+// Tanpa ini semuanya keluar sebagai 500 "terjadi kesalahan pada server", dan
+// pesan itu menyuruh orang mencari kerusakan server yang tidak pernah ada.
+// Dibuktikan dengan dua permintaan yang salahnya jelas di sisi pemanggil:
+//
+//	memberId yang tidak ada -> 500  (seharusnya 400)
+//	amount di luar jangkauan -> 500  (seharusnya 400)
+//
+// Kelas yang sama pernah menipu pada blackbox, ketika 404 tercatat sebagai 500.
+func salahMasukan(err error) error {
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "23503"): // foreign key violation
+		switch {
+		case strings.Contains(msg, "member_id"):
+			return httpx.BadRequest("memberId tidak ditemukan")
+		case strings.Contains(msg, "chapter_id"):
+			return httpx.BadRequest("chapterId tidak ditemukan")
+		}
+		return httpx.BadRequest("data rujukan tidak ditemukan")
+	case strings.Contains(msg, "23505"): // unique violation
+		return httpx.Conflict("nomor invoice tersebut sudah dipakai")
+	// Nominal di luar jangkauan kolom. Kolomnya sudah dilebarkan ke bigint,
+	// jadi ini kini hanya tercapai oleh angka yang memang mustahil — tapi
+	// jawabannya tetap harus 400, bukan 500.
+	case strings.Contains(msg, "is greater than maximum value"),
+		strings.Contains(msg, "is less than minimum value"),
+		strings.Contains(msg, "22003"):
+		return httpx.BadRequest("nominal di luar jangkauan yang bisa disimpan")
+	}
+	return nil
+}
+
 // scan maps a row onto the domain model. Date columns come back as time.Time
 // and are wrapped so the JSON stays YYYY-MM-DD.
 func scan(row scannable) (*domain.Invoice, error) {
@@ -53,6 +87,9 @@ func scan(row scannable) (*domain.Invoice, error) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, httpx.ErrNotFound
+		}
+		if e := salahMasukan(err); e != nil {
+			return nil, e
 		}
 		return nil, fmt.Errorf("scan invoice: %w", err)
 	}
@@ -174,6 +211,27 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	// Chapter invoice HARUS chapter membernya. Keduanya datang terpisah dari
+	// klien, dan tanpa pemeriksaan ini keduanya boleh berbeda: pengujian
+	// membuat invoice untuk mem-003 (BNI Nusantara) dengan chapterId ch-garuda
+	// dan dijawab 201. Tidak ada yang merah, tapi pendapatan chapter jadi salah
+	// hitung selamanya — dan salahnya tidak terlihat dari invoice itu sendiri.
+	//
+	// Diperiksa di sini, bukan di service: hanya di dalam transaksi ini
+	// jawabannya masih berlaku saat barisnya benar-benar ditulis.
+	var chapterMember string
+	switch err := tx.QueryRow(ctx,
+		"SELECT chapter_id FROM members WHERE id = $1", in.MemberID,
+	).Scan(&chapterMember); {
+	case errors.Is(err, pgx.ErrNoRows):
+		return nil, httpx.BadRequest("memberId tidak ditemukan")
+	case err != nil:
+		return nil, fmt.Errorf("periksa chapter member: %w", err)
+	case chapterMember != in.ChapterID:
+		return nil, httpx.BadRequest(fmt.Sprintf(
+			"chapterId %q bukan chapter member tersebut (%q)", in.ChapterID, chapterMember))
 	}
 
 	const q = `
@@ -334,13 +392,43 @@ func recordAudit(ctx context.Context, tx pgx.Tx, e auditRow) error {
 	return nil
 }
 
+// Delete membuang invoice beserta jejak auditnya, dalam satu transaksi.
+//
+// Versi sebelumnya hanya menghapus barisnya sendiri, dan itu TIDAK PERNAH
+// berhasil sekali pun: setiap invoice punya baris invoice_audit_log sejak
+// detik ia dibuat — recordAudit menulisnya di dalam transaksi Create — dan
+// FK-nya tidak punya klausa on delete. Jadi setiap penghapusan menabrak
+//
+//	violates foreign key constraint "invoice_audit_log_invoice_id_fkey"
+//
+// dan keluar sebagai 500. Bukan sebagian: SETIAP invoice, termasuk yang dari
+// data contoh, karena semuanya punya jejak audit.
+//
+// Jejaknya ikut dihapus, bukan disisakan: ia menggambarkan invoice yang sudah
+// tidak ada, dan penghapusan hanya diizinkan saat belum ada pembayaran sama
+// sekali — dijaga di service lewat CountPayments.
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, "DELETE FROM invoices WHERE id = $1", id)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "DELETE FROM invoice_audit_log WHERE invoice_id = $1", id); err != nil {
+		return fmt.Errorf("hapus jejak audit: %w", err)
+	}
+	tag, err := tx.Exec(ctx, "DELETE FROM invoices WHERE id = $1", id)
+	if err != nil {
+		if e := salahMasukan(err); e != nil {
+			return e
+		}
 		return fmt.Errorf("hapus invoice: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return httpx.ErrNotFound
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("hapus invoice: %w", err)
 	}
 	return nil
 }

@@ -126,6 +126,18 @@ type CreateInvoiceInput struct {
 	CreatedBy   *string     `json:"createdBy"`
 }
 
+// MaxInvoiceAmount adalah pagar salah ketik, BUKAN aturan bisnis.
+//
+// Nilainya seratus miliar rupiah — sekitar 60.000 kali iuran yang sebenarnya,
+// jadi tidak mungkin menghalangi invoice yang sah. Yang dihalangi adalah angka
+// yang jelas kecelakaan: sebelum kolomnya dilebarkan ke bigint, nominal di atas
+// 2,1 miliar dijawab 500 "terjadi kesalahan pada server"; sesudah dilebarkan,
+// 9.223.372.036.854.775.807 rupiah diterima dengan 201 tanpa keluhan apa pun.
+// Keduanya salah, dan yang kedua lebih berbahaya karena tersimpan.
+//
+// Ubah bila memang ada tagihan yang melampauinya.
+const MaxInvoiceAmount int64 = 100_000_000_000
+
 func (in CreateInvoiceInput) Validate() error {
 	switch {
 	case in.MemberID == "":
@@ -136,6 +148,9 @@ func (in CreateInvoiceInput) Validate() error {
 		return fmt.Errorf("type harus 'registration' atau 'renewal'")
 	case in.Amount <= 0:
 		return fmt.Errorf("amount harus lebih besar dari 0")
+	case in.Amount > MaxInvoiceAmount:
+		return fmt.Errorf("amount %d melampaui batas wajar (%d) — periksa jumlah nolnya",
+			in.Amount, MaxInvoiceAmount)
 	case in.DueDate.IsZero():
 		return fmt.Errorf("dueDate wajib diisi")
 	case in.PeriodStart.IsZero() || in.PeriodEnd.IsZero():
@@ -173,6 +188,12 @@ type UpdateInvoiceInput struct {
 func (in UpdateInvoiceInput) Validate() error {
 	if in.Amount != nil && *in.Amount <= 0 {
 		return fmt.Errorf("amount harus lebih besar dari 0")
+	}
+	// Pagar yang sama seperti pada pembuatan — PATCH bisa menaruh nominal
+	// mustahil ke invoice yang sudah ada persis seperti POST bisa.
+	if in.Amount != nil && *in.Amount > MaxInvoiceAmount {
+		return fmt.Errorf("amount %d melampaui batas wajar (%d) — periksa jumlah nolnya",
+			*in.Amount, MaxInvoiceAmount)
 	}
 	if in.Status != nil && !in.Status.Valid() {
 		return fmt.Errorf("status tidak dikenal")
