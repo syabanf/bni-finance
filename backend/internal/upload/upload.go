@@ -1,5 +1,4 @@
-// Package upload stores payment proofs on the local filesystem, replacing the
-// Supabase Storage bucket.
+// Package upload stores payment proofs on the local filesystem.
 package upload
 
 import (

@@ -14,7 +14,7 @@ const DEFAULT_ACCOUNT = DEMO_ACCOUNTS['admin@bni-finance.com']
 
 /**
  * Demo auth. Accepts any non-empty credentials and persists the session in
- * localStorage. Replace with Supabase Auth (`signInWithPassword`) later — the
+ * localStorage. The backend API repository is the real implementation — the
  * `AuthRepository` contract stays the same.
  */
 export const mockAuthRepository: AuthRepository = {

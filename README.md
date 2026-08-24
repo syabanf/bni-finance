@@ -194,16 +194,14 @@ secara langsung — selalu lewat `@/services` atau `@/services/appSettings`.
 
 ## 🔌 Backend
 
-Aplikasi berjalan penuh di atas **Postgres lokal + REST API Go** di `backend/`.
-Tidak ada lagi ketergantungan Supabase.
+Aplikasi berjalan penuh di atas **Postgres + REST API Go** di `backend/`.
 
-| Kebutuhan | Dulu (Supabase) | Sekarang |
-|---|---|---|
-| Database | Supabase Postgres | Postgres lokal — `db/init.sql` |
-| Autentikasi | Supabase Auth | Tabel `users` + JWT (PBKDF2 + HS256, stdlib) |
-| Otorisasi | RLS per baris | Middleware peran di backend |
-| Penyimpanan berkas | Storage bucket | Berkas di disk (`UPLOAD_DIR`) |
-| Halaman bayar publik | Edge Function | Endpoint `/public/**` |
+| Kebutuhan | Bagaimana |
+|---|---|
+| Database | Postgres — `db/init.sql` |
+| Autentikasi | Tabel `users` + JWT (PBKDF2 + HS256, stdlib) |
+| Otorisasi | Middleware peran di backend |
+| Penyimpanan berkas | Berkas di disk (`UPLOAD_DIR`) |
 
 ```bash
 # 1. database + backend

@@ -1,5 +1,5 @@
-// Package auth replaces Supabase Auth: local accounts, password hashing, and
-// signed tokens — all on the standard library.
+// Package auth holds the whole authentication surface: local accounts,
+// password hashing, and signed tokens — all on the standard library.
 package auth
 
 import (

@@ -40,15 +40,15 @@
 -- =============================================================================
 -- BNI Finance System — skema Postgres
 --
--- Skema lengkap untuk database lokal/self-hosted. Menggantikan seluruh isi
--- supabase/ (schema + migrasi 0002–0005 + rls.sql) yang sudah dilipat ke sini.
+-- Skema lengkap untuk database lokal/self-hosted. Satu berkas, idempoten:
+-- skema selalu diterapkan, akun awal dan data contoh hanya bila tabelnya kosong.
 --
--- Perbedaan penting dari versi Supabase:
---   • Tidak ada RLS. Otorisasi ditegakkan backend Go lewat JWT + peran, bukan
---     database — backend memakai satu koneksi tepercaya, jadi kebijakan
---     per-baris tidak punya identitas pengguna untuk dipakai.
---   • Tabel `users` baru: menggantikan Supabase Auth.
---   • Bukti pembayaran disimpan di disk (lihat UPLOAD_DIR), bukan Storage.
+-- Dua hal yang perlu diketahui sebelum membacanya:
+--   • TIDAK ADA row-level security, dan itu bukan kelalaian. Backend menyambung
+--     sebagai SATU peran tepercaya, jadi database melihat satu identitas saja
+--     dan tidak punya apa pun untuk dipakai sebagai kunci kebijakan per-baris.
+--     Seluruh otorisasi ditegakkan backend Go lewat JWT + peran.
+--   • Bukti pembayaran disimpan di disk (lihat UPLOAD_DIR), bukan di database.
 --
 -- Jalankan:  make db-reset      (drop + create + schema + seed)
 -- =============================================================================
@@ -79,7 +79,7 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 -- ---------------------------------------------------------------------------
--- users — pengganti Supabase Auth
+-- users — akun aplikasi
 --
 -- password_hash berformat  pbkdf2_sha256$<iterasi>$<salt-b64>$<hash-b64>
 -- (lihat internal/auth/password.go). Tidak ada kata sandi tersimpan polos.

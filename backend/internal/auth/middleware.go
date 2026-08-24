@@ -23,9 +23,9 @@ func UserFrom(ctx context.Context) (domain.AuthUser, bool) {
 // RequireAuth rejects anything without a valid bearer token and puts the
 // caller's identity in the request context.
 //
-// This is where authorisation lives now. Supabase enforced it in the database
-// with RLS; the Go backend connects as one trusted role, so per-row policies
-// have no user identity to key on and the check has to happen here instead.
+// This is where authorisation lives, and it has to: the backend connects to
+// Postgres as ONE trusted role, so the database sees a single identity and can
+// enforce nothing per user. Every check that matters happens here or nowhere.
 func RequireAuth(signer *Signer) httpx.Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

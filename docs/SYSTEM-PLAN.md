@@ -2,6 +2,12 @@
 
 > Dokumen ini adalah rencana pembangunan sistem finance terpisah untuk BNI Grow Chapter Management.  
 > Dibuat: 2026-06-15 | Status: Draft
+>
+> ⚠️ **Catatan historis.** Ini rekaman apa yang DIRENCANAKAN pada Juni 2026, bukan
+> gambaran sistem yang berjalan. Yang berbeda dari kenyataan sekarang: backendnya
+> jadi REST API Go di atas PostgreSQL (bukan BaaS), dan pembayaran mandiri lewat
+> Xendit tidak pernah dipakai — semuanya lewat Paper.id.
+> Rujukan yang berlaku: [`OVERVIEW.md`](./OVERVIEW.md).
 
 ---
 
@@ -80,7 +86,7 @@ Sistem Finance BNI adalah aplikasi terpisah dari BNI Visitor Management (VM) yan
 
 ---
 
-## 4. Database Schema (Supabase)
+## 4. Database Schema (PostgreSQL)
 
 ### 4.1 Tabel Sync dari BNI VM
 

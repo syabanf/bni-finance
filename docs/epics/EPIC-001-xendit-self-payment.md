@@ -1,6 +1,11 @@
 # EPIC-001 — Xendit Self Payment Mode
 
-**Status**: `done`
+**Status**: `done` — **lalu DIBUANG seluruhnya**
+
+> ⚠️ **Catatan historis.** Seluruh permukaan yang dijelaskan di bawah sudah tidak
+> ada lagi: pembayaran mandiri Xendit dan halaman bayar publik dihapus, dan semua
+> berkas yang disebut di tabel berikut ikut terhapus bersamanya. Semua pengiriman
+> invoice, pengingat, dan pembayaran kini lewat Paper.id.
 
 ## Goal
 

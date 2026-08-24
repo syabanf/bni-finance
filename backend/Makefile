@@ -58,7 +58,7 @@ stress-race: ## Stress test dengan deteksi data race
 
 # --- database ---------------------------------------------------------------
 #
-# Postgres lokal, tanpa Supabase. PSQL bisa ditimpa bila binary-nya tidak ada di
+# Postgres lokal. PSQL bisa ditimpa bila binary-nya tidak ada di
 # PATH, misalnya pada instalasi Homebrew yang tidak di-link:
 #   make db-reset PSQL=/opt/homebrew/opt/postgresql@17/bin/psql
 

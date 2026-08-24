@@ -4,7 +4,7 @@ import type { Chapter } from '@/types'
 import { runSync } from './syncService'
 
 // The API already speaks camelCase, so responses map straight onto the domain
-// types — no row-mapping layer, unlike the Supabase client this replaces.
+// types — no row-mapping layer needed.
 
 export const apiChapterRepository: ChapterRepository = {
   async list() {

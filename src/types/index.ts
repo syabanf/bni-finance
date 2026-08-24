@@ -1,11 +1,10 @@
 /**
  * Domain models for the BNI Finance System.
  *
- * These mirror the Supabase schema described in the technical plan
- * (section 4). The presentation layer depends only on these types and the
- * repository interfaces — never on a concrete data source — so the mock
- * backend can be swapped for the real Supabase/Paper.id/BNI-VM APIs without
- * touching any UI code.
+ * These mirror the Postgres schema in `db/init.sql`. The presentation layer
+ * depends only on these types and the repository interfaces — never on a
+ * concrete data source — so the mock backend can be swapped for the real
+ * Go/Paper.id/BNI-VM APIs without touching any UI code.
  */
 
 // ---------------------------------------------------------------------------

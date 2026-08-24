@@ -22,7 +22,7 @@
 > Sebagai admin, saya ingin mengubah password saya, agar keamanan akun terjaga.
 
 **Acceptance Criteria:**
-- [ ] Section password hanya muncul jika `VITE_USE_MOCK=false` (Supabase mode)
+- [ ] Section password hanya muncul jika `VITE_USE_MOCK=false` (mode Backend API)
 - [ ] Input: password baru + konfirmasi password baru
 - [ ] Validasi: min 6 karakter, kedua input harus match
 - [ ] Pesan error inline jika tidak valid

@@ -11,8 +11,9 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 )
 
-// Supabase enforced access in the database with RLS. That is gone, so these
-// tests are the proof that the replacement boundary actually holds.
+// Postgres cannot enforce any of this: the backend connects as one trusted
+// role, so the database sees a single identity. The boundary exists only in Go
+// middleware — and these tests are the only proof that it actually holds.
 
 func (s *fullStack) doAs(t *testing.T, token, method, path, body string) int {
 	t.Helper()

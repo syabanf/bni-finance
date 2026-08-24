@@ -73,7 +73,7 @@ const MaskedValue = "••••••"
 // kredensial yang paling lazim. Dibuktikan dengan menulisnya lalu membacanya
 // sebagai pengguna biasa:
 //
-//	supabase_service_role_key  -> RAHASIA-BOCOR-12345
+//	service_role_key           -> RAHASIA-BOCOR-12345
 //	signing_key                -> RAHASIA-BOCOR-12345
 //	encryption_key             -> RAHASIA-BOCOR-12345
 //	db_pass                    -> RAHASIA-BOCOR-12345

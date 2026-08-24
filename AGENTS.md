@@ -16,11 +16,11 @@ or tell the user to run them in Claude Code.
 ## Stack Notes
 
 - **Frontend**: Vite 5 + React 18 + TypeScript + Tailwind CSS 3 + React Router 6
-- **Backend**: Supabase (PostgreSQL + PostgREST + Edge Functions Deno)
-- **Payment**: Xendit (Virtual Account BCA/BNI/Mandiri/BRI + QRIS) & Paper.id
-- **Hosting**: Vercel (`https://bni-finance-five.vercel.app`)
-- **Data source**: BNI Visitor Management API (sync, dev-only via Vite proxy)
-- **Auth**: Supabase Auth (mock localStorage in dev)
+- **Backend**: REST API Go 1.25 (stdlib + pgx) di atas PostgreSQL — `backend/`
+- **Payment**: Paper.id (invoice, pengingat, dan callback pembayaran)
+- **Hosting**: Vercel (frontend); backend Go dijalankan terpisah
+- **Data source**: BNI Visitor Management API — disinkronkan `POST /api/v1/sync`
+- **Auth**: Tabel `users` + JWT HS256 (mock localStorage di dev)
 
 ## Test Gate
 

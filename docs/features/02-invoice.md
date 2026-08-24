@@ -89,7 +89,7 @@
 
 **Acceptance Criteria:**
 - [ ] Form: nominal (editable), tanggal bayar, metode pembayaran, catatan (opsional), upload bukti (opsional)
-- [ ] Upload file bukti ke Supabase Storage bucket `payment-proofs`
+- [ ] Upload file bukti lewat `POST /api/v1/uploads` (disimpan di `UPLOAD_DIR`)
 - [ ] Invoice berubah ke `paid` setelah disimpan
 - [ ] Payment record tersimpan dengan: amount, paid_at, method, proof_url, note
 - [ ] Audit log entry `paid` dengan keterangan metode + catatan

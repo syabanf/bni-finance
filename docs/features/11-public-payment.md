@@ -97,6 +97,6 @@ Member buka /pay/:id
 ```
 
 ## Catatan Keamanan
-- Halaman menggunakan **anon key** Supabase (bukan service role)
+- Halaman tidak pernah memegang kredensial apa pun
 - Secret key Xendit **tidak pernah** expose ke client
-- RLS Supabase: invoice bisa dibaca anon (public read untuk `/pay`)
+- Pembacaan invoice publik dibatasi endpoint khusus, bukan kebijakan database

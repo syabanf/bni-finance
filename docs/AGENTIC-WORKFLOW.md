@@ -30,7 +30,7 @@
 | [`docs/BACKLOG.md`](BACKLOG.md) | **Master backlog** — semua task, status, prioritas |
 | [`docs/features/`](features/) | **User stories + AC** per domain fitur |
 | [`docs/epics/`](epics/) | **Epic detail** — scope, AC, automation log per sprint |
-| [`docs/SYSTEM.md`](SYSTEM.md) | Arsitektur teknis, edge functions, env vars |
+| [`docs/OVERVIEW.md`](OVERVIEW.md) | Arsitektur teknis, batas keamanan, env vars |
 
 ## Epics
 

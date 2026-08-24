@@ -18,11 +18,11 @@ type Config struct {
 	IdleTimeout    time.Duration
 
 	// JWTSecret signs session tokens. Required — the API has no other way to
-	// authenticate a caller now that Supabase Auth is gone.
+	// authenticate a caller.
 	JWTSecret string
 	TokenTTL  time.Duration
 
-	// UploadDir holds payment proofs, replacing Supabase Storage.
+	// UploadDir holds payment proofs on the local filesystem.
 	UploadDir     string
 	MaxUploadSize int64
 
