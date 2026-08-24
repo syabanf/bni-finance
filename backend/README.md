@@ -9,9 +9,9 @@ Dibangun dengan **Go + pustaka standar** — satu-satunya dependensi eksternal
 adalah driver Postgres `pgx/v5`. Hashing kata sandi (`crypto/pbkdf2`) dan token
 sesi (HS256 di atas `crypto/hmac`) memakai stdlib, tanpa pustaka pihak ketiga.
 
-> **Menggantikan Supabase sepenuhnya.** Postgres → database lokal;
-> Supabase Auth → tabel `users` + JWT; Storage → berkas di disk; Edge Functions →
-> paket `publicpay`; RLS → middleware `auth.RequireAuth` + `RequireAdmin`.
+> **Semuanya di Postgres.** Data di `db/init.sql`; autentikasi lewat tabel
+> `users` + JWT; berkas unggahan di disk (`UPLOAD_DIR`); otorisasi lewat
+> middleware `auth.RequireAuth` + `RequireAdmin`.
 
 ---
 
@@ -398,9 +398,9 @@ Bentuk error: `{ "error": "pesan" }`.
 
 ## 🔒 Keamanan
 
-**Otorisasi ada di sini sekarang.** Supabase menegakkannya di database lewat RLS;
-backend ini menyambung sebagai satu peran tepercaya, jadi kebijakan per-baris
-tidak punya identitas pengguna untuk dipakai. Tiga tingkat akses:
+**Otorisasi ada di sini, dan tidak bisa di tempat lain.** Backend ini menyambung
+ke Postgres sebagai SATU peran tepercaya, jadi database melihat satu identitas
+saja dan tidak bisa menegakkan apa pun per pengguna. Tiga tingkat akses:
 
 | Tingkat | Isi |
 |---|---|

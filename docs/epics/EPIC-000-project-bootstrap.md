@@ -2,6 +2,10 @@
 
 **Status**: `done`
 
+> ⚠️ **Catatan historis.** Rekaman pekerjaan Juni 2026. Sebagian keluarannya sudah
+> tidak ada: `docs/SYSTEM.md` dihapus setelah usang, dan stack yang disebut di
+> bawah (BaaS + Xendit) sudah diganti REST API Go di atas PostgreSQL + Paper.id.
+
 ## Goal
 
 Bangun baseline agentic workflow untuk BNI Finance Hub agar otomasi dapat berjalan
@@ -19,7 +23,7 @@ konsisten lintas sesi.
 ### #2 — Dokumentasi sistem `done`
 
 - [x] docs/SYSTEM.md dibuat (arsitektur, Xendit, edge functions, env vars, routing)
-- [x] README.md diperbarui (Supabase/Xendit/Vercel stack, pointer ke SYSTEM.md)
+- [x] README.md diperbarui (stack + pointer ke dokumen sistem)
 
 ### #3 — First epic defined `done`
 

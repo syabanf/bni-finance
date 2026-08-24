@@ -17,7 +17,7 @@ import (
 func TestKunciBerbentukKredensialSelaluDisamarkan(t *testing.T) {
 	rahasia := []string{
 		// yang dulu lolos
-		"supabase_service_role_key", "signing_key", "encryption_key",
+		"service_role_key", "signing_key", "encryption_key",
 		"db_pass", "connection_string",
 		// yang sejak awal tertutup — jangan sampai ikut hilang
 		"paperid_client_secret", "bni_vm_token", "admin_password",

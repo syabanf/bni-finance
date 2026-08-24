@@ -26,7 +26,7 @@
 **Acceptance Criteria:**
 - [ ] Input: Draft H-N sebelum renewal (default 30)
 - [ ] Input: Jatuh tempo H+N setelah terbit (default 30)
-- [ ] Hanya tampil jika `VITE_USE_MOCK=false` (Supabase mode)
+- [ ] Hanya tampil jika `VITE_USE_MOCK=false` (mode Backend API)
 - [ ] Simpan ke `app_settings` tabel (key-value)
 - [ ] Info konteks: konfigurasi ini mempengaruhi invoice baru saja
 
@@ -47,7 +47,7 @@
 
 **Acceptance Criteria:**
 - [ ] Informasi sumber data: BNI Visitor Management (nama + status)
-- [ ] Konfigurasi token (jika Supabase mode): input Base URL + API Token (password field + show/hide)
+- [ ] Konfigurasi token (jika mode Backend API): input Base URL + API Token (password field + show/hide)
 - [ ] Tombol simpan konfigurasi token
 - [ ] Card sync Member: jumlah record, last sync timestamp, tombol Sync
 - [ ] Card sync Chapter: jumlah record, last sync timestamp, tombol Sync

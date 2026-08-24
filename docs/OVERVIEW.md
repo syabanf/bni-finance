@@ -262,7 +262,7 @@ VITE_USE_MOCK=true          # hanya nilai awal
 ```
 
 > `.env.production` pernah menyetel `VITE_USE_MOCK=false` tanpa `VITE_API_URL`
-> — warisan era Supabase. Pengunjung pertama mendarat di mode Backend API yang
+> — tanpa VITE_API_URL. Pengunjung pertama mendarat di mode Backend API yang
 > menunjuk ke origin Vercel sendiri, dan karena semua path diarahkan ke
 > `index.html`, permintaan API dijawab HTML berstatus 200. Sekarang bawaannya
 > Data Contoh, jadi deployment langsung bisa dipakai.
@@ -407,7 +407,6 @@ Halaman `/docs`, `/openapi.yaml`, dan `/openapi.json` dilayani backend, bukan Ve
 | [`backend/README.md`](../backend/README.md) | ✅ berlaku | Endpoint, aturan bisnis, keamanan, performa, hasil stress test |
 | [`db/init.sql`](../db/init.sql) | ✅ berlaku | Skema database — sumber kebenaran |
 | `/docs` di backend | ✅ berlaku | Referensi API, dibangkitkan dari `openapi.yaml` |
-| [`docs/SYSTEM.md`](./SYSTEM.md) | ⚠️ **sebagian usang** | Alur bisnis masih berlaku; bagian Supabase (PostgREST, RLS, Edge Functions, Storage) dan seluruh bagian Xendit / pembayaran mandiri sudah tidak menggambarkan sistem yang berjalan |
 | [`docs/SYSTEM-PLAN.md`](./SYSTEM-PLAN.md) | 📜 historis | Rencana teknis awal |
 | [`docs/BACKLOG.md`](./BACKLOG.md) · [`docs/epics/`](./epics) · [`docs/features/`](./features) | 📜 historis | User story & acceptance criteria per fitur. `EPIC-001` dan `11-public-payment` menggambarkan pembayaran mandiri Xendit yang sudah dihapus. |
 | [`docs/AGENTIC-WORKFLOW.md`](./AGENTIC-WORKFLOW.md) · [`AGENTS.md`](../AGENTS.md) | ✅ berlaku | Cara kerja agen pada repo ini |

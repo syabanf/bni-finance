@@ -1,9 +1,9 @@
 /**
  * HTTP client for the Go backend — the single place the app talks to the
- * network. Replaces `lib/supabase.ts`.
+ * network.
  *
  * The session token lives in localStorage rather than memory so a page reload
- * doesn't sign the user out. That is the same trade Supabase's client made.
+ * doesn't sign the user out — the usual trade for that convenience.
  */
 
 const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/+$/, '') ?? ''

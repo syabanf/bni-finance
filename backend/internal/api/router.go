@@ -58,8 +58,9 @@ type Services struct {
 //	protected — any signed-in user: reads
 //	admin     — writes that change money or configuration
 //
-// Supabase enforced this with RLS in the database. The Go backend connects as a
-// single trusted role, so the boundary lives here instead; see auth.RequireAuth.
+// The boundary lives here because it cannot live in Postgres: the backend
+// connects as a single trusted role, so the database has no per-user identity
+// to key a policy on. See auth.RequireAuth.
 func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Services, ping Pinger) http.Handler {
 	protected := http.NewServeMux()
 	registerProtected(protected, svc)

@@ -2,7 +2,7 @@
  * Repository contracts — the boundary between the presentation layer and the
  * data source. Pages and hooks depend ONLY on these interfaces. Concrete
  * implementations live under `services/mock` today and can be replaced with
- * Supabase/HTTP implementations later (see `services/index.ts`).
+ * HTTP implementations later (see `services/index.ts`).
  *
  * Everything is async so swapping to a network-backed source is a no-op for
  * callers.
