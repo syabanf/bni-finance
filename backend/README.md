@@ -396,6 +396,31 @@ Bentuk error: `{ "error": "pesan" }`.
 
 ---
 
+## 🐳 Docker
+
+```bash
+docker compose up -d --build     # dari akar repo
+docker compose logs -f api
+```
+
+Image akhir ~50 MB: binary statis di atas alpine, berjalan sebagai pengguna
+non-root `app` (uid 10001). `go vet` dan `go test` dijalankan DI DALAM tahap
+build, jadi image yang gagal uji tidak pernah selesai dibangun.
+
+Rahasia tidak pernah masuk ke image maupun ke `docker-compose.yml` — semuanya
+dibaca dari `backend/.env` saat container start. Salin dari `.env.example`.
+
+Dua hal yang perlu diketahui:
+
+- **`db/init.sql` hanya dijalankan Postgres saat data directory masih kosong.**
+  Pada volume yang sudah terisi, perubahan skema tidak ikut terpakai. Terapkan
+  dengan `docker compose exec -T db psql -U postgres -d bni_finance < db/init.sql`
+  (berkasnya idempoten, jadi aman diulang).
+- **Bukti pembayaran ada di volume `uploads`.** `docker compose down -v` ikut
+  menghapusnya; tanpa `-v` ia selamat.
+
+---
+
 ## 🔒 Keamanan
 
 **Otorisasi ada di sini, dan tidak bisa di tempat lain.** Backend ini menyambung
