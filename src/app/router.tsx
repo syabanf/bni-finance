@@ -12,6 +12,7 @@ import { MemberDetailPage } from '@/features/members/MemberDetailPage'
 import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { UsersPage } from '@/features/users/UsersPage'
 import { SyncPage } from '@/features/settings/SyncPage'
 import { BlackboxPage } from '@/features/blackbox/BlackboxPage'
 import { ApiConsolePage } from '@/features/apiconsole/ApiConsolePage'
@@ -65,6 +66,17 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission="settings:manage">
                 <SettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Pengelolaan akun butuh settings:manage — hanya admin. Peran ST
+            // dan MC yang dibuat di sini adalah batas keamanan sistem, jadi
+            // yang boleh membuatnya harus lebih sempit daripada yang memakainya.
+            path: '/settings/users',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <UsersPage />
               </RequirePermission>
             ),
           },

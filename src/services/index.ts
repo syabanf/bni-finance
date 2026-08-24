@@ -16,6 +16,7 @@ import type {
   MemberRepository,
   PaymentRepository,
   SettingsRepository,
+  UserRepository,
 } from './types'
 
 import { isMockMode } from './dataSource'
@@ -27,6 +28,7 @@ import { mockInvoiceRepository } from './mock/invoiceRepository'
 import { mockMemberRepository } from './mock/memberRepository'
 import { mockPaymentRepository } from './mock/paymentRepository'
 import { mockSettingsRepository } from './mock/settingsRepository'
+import { mockUserRepository } from './mock/userRepository'
 
 import { apiAuthRepository } from './api/authRepository'
 import { apiChapterRepository } from './api/chapterRepository'
@@ -35,6 +37,7 @@ import { apiInvoiceRepository } from './api/invoiceRepository'
 import { apiMemberRepository } from './api/memberRepository'
 import { apiPaymentRepository } from './api/paymentRepository'
 import { apiSettingsRepository } from './api/settingsRepository'
+import { apiUserRepository } from './api/userRepository'
 
 const useMock = isMockMode()
 
@@ -46,6 +49,7 @@ interface Services {
   settings: SettingsRepository
   payments: PaymentRepository
   dashboard: DashboardRepository
+  users: UserRepository
 }
 
 const mockServices: Services = {
@@ -56,6 +60,7 @@ const mockServices: Services = {
   settings: mockSettingsRepository,
   payments: mockPaymentRepository,
   dashboard: mockDashboardRepository,
+  users: mockUserRepository,
 }
 
 const apiServices: Services = {
@@ -66,6 +71,7 @@ const apiServices: Services = {
   settings: apiSettingsRepository,
   payments: apiPaymentRepository,
   dashboard: apiDashboardRepository,
+  users: apiUserRepository,
 }
 
 export const services: Services = useMock ? mockServices : apiServices
@@ -79,4 +85,5 @@ export const {
   settings: settingsService,
   payments: paymentService,
   dashboard: dashboardService,
+  users: userService,
 } = services
