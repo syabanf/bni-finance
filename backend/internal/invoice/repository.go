@@ -12,6 +12,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
 
 const columns = `
@@ -123,6 +124,18 @@ func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain
 	if f.ChapterID != "" {
 		add("chapter_id = $%d", f.ChapterID)
 	}
+	// Batas chapter pemanggil, DI ATAS filter apa pun yang ia kirim.
+	//
+	// Ditambahkan sebagai klausa terpisah, bukan dengan menimpa f.ChapterID:
+	// menimpanya akan membuat ST yang menyaring chapter lain diam-diam melihat
+	// chapternya sendiri — jawaban yang salah tanpa ada yang menyadari. Sebagai
+	// klausa kedua, permintaan itu mengembalikan nol baris, yang memang benar.
+	if klausa, arg, pakai := scope.Chapter(ctx).SQL("chapter_id", len(args)+1); klausa != "" {
+		if pakai {
+			args = append(args, arg)
+		}
+		where = append(where, klausa)
+	}
 	if f.MemberID != "" {
 		add("member_id = $%d", f.MemberID)
 	}
@@ -173,7 +186,22 @@ func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain
 	return items, total, rows.Err()
 }
 
+// GetByID membaca satu invoice, dibatasi chapter pemanggil.
+//
+// Batasnya masuk ke KLAUSA WHERE, bukan diperiksa setelah barisnya terbaca.
+// Bedanya terlihat pada jawabannya: invoice chapter lain berakhir sebagai 404
+// "tidak ditemukan", bukan 403 "tidak boleh". Yang kedua membocorkan bahwa
+// invoice itu ADA — dan bagi ST yang menebak-nebak nomor invoice, itu sudah
+// informasi yang tidak berhak ia miliki.
 func (r *Repository) GetByID(ctx context.Context, id string) (*domain.Invoice, error) {
+	lim := scope.Chapter(ctx)
+	switch {
+	case lim.Buntu:
+		return nil, httpx.ErrNotFound
+	case lim.Terbatas:
+		return scan(r.db.QueryRow(ctx,
+			"SELECT "+columns+" FROM invoices WHERE id = $1 AND chapter_id = $2", id, lim.ChapterID))
+	}
 	return scan(r.db.QueryRow(ctx, "SELECT "+columns+" FROM invoices WHERE id = $1", id))
 }
 
@@ -221,6 +249,15 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 	//
 	// Diperiksa di sini, bukan di service: hanya di dalam transaksi ini
 	// jawabannya masih berlaku saat barisnya benar-benar ditulis.
+	// ST hanya boleh menerbitkan di chapternya sendiri.
+	//
+	// Membaca ini SEBELUM menyentuh basis data: menolak lebih awal berarti tidak
+	// ada nomor invoice yang terbakar untuk permintaan yang memang akan ditolak,
+	// dan nomor Paper.id tidak bisa dikembalikan setelah terpakai.
+	if lim := scope.Chapter(ctx); lim.Buntu || (lim.Terbatas && in.ChapterID != lim.ChapterID) {
+		return nil, httpx.Forbidden("tidak boleh menerbitkan invoice untuk chapter lain")
+	}
+
 	var chapterMember string
 	switch err := tx.QueryRow(ctx,
 		"SELECT chapter_id FROM members WHERE id = $1", in.MemberID,

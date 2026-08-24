@@ -13,7 +13,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
 
-const columns = `id, email, password_hash, name, role, created_at, updated_at`
+const columns = `id, email, password_hash, name, role, chapter_id, created_at, updated_at`
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -27,7 +27,7 @@ type scannable interface {
 
 func scan(row scannable) (*domain.User, error) {
 	var u domain.User
-	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.Role, &u.ChapterID, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, httpx.ErrNotFound
@@ -65,16 +65,19 @@ func (r *Repository) List(ctx context.Context) ([]domain.User, error) {
 	return items, rows.Err()
 }
 
-func (r *Repository) Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole) (*domain.User, error) {
+func (r *Repository) Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole, chapterID *string) (*domain.User, error) {
 	const q = `
-		INSERT INTO users (email, password_hash, name, role)
-		VALUES ($1,$2,$3,$4)
+		INSERT INTO users (email, password_hash, name, role, chapter_id)
+		VALUES ($1,$2,$3,$4,$5)
 		RETURNING ` + columns
 
-	u, err := scan(r.db.QueryRow(ctx, q, domain.NormalizeEmail(email), passwordHash, name, role))
+	u, err := scan(r.db.QueryRow(ctx, q, domain.NormalizeEmail(email), passwordHash, name, role, chapterID))
 	if err != nil {
-		if strings.Contains(err.Error(), "23505") {
+		switch {
+		case strings.Contains(err.Error(), "23505"):
 			return nil, httpx.Conflict("email tersebut sudah terdaftar")
+		case strings.Contains(err.Error(), "23503"):
+			return nil, httpx.BadRequest("chapterId tidak ditemukan")
 		}
 		return nil, err
 	}

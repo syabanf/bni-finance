@@ -311,6 +311,44 @@ alter table invoices
 
 
 -- ---------------------------------------------------------------------------
+-- Peran berlingkup chapter — ST dan MC
+--
+-- ST (Secretary/Treasurer) dan MC (Membership Committee) adalah pengurus SATU
+-- chapter, bukan nasional. Keduanya login, dan keduanya hanya boleh melihat
+-- chapternya sendiri.
+--
+-- Lingkupnya disimpan di users.chapter_id, dan null berarti nasional — itulah
+-- yang dipakai admin dan user. Kolomnya nullable dengan sengaja: memaksanya
+-- not null akan menuntut chapter untuk admin, yang tidak punya satu pun.
+--
+-- Perlu diketahui: TIDAK ADA row-level security yang menegakkan lingkup ini.
+-- Backend menyambung sebagai satu peran tepercaya, jadi database melihat satu
+-- identitas saja. Seluruh pembatasan ada di kode Go, dan tes batas akseslah
+-- satu-satunya bukti bahwa ia benar-benar ada.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'user_role' and e.enumlabel = 'st'
+  ) then
+    alter type user_role add value 'st';
+  end if;
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'user_role' and e.enumlabel = 'mc'
+  ) then
+    alter type user_role add value 'mc';
+  end if;
+end $$;
+
+alter table users
+  add column if not exists chapter_id text references chapters(id);
+
+create index if not exists idx_users_chapter on users (chapter_id);
+
+
+-- ---------------------------------------------------------------------------
 -- Kolom uang dilebarkan ke bigint
 --
 -- Go menyimpan seluruh nominal sebagai int64, Postgres menerimanya sebagai

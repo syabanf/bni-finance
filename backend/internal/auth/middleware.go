@@ -8,6 +8,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
 
 type ctxKey string
@@ -43,7 +44,24 @@ func RequireAuth(signer *Signer) httpx.Middleware {
 				httpx.Fail(w, httpx.Unauthorized("token tidak valid"))
 				return
 			}
-			ctx := context.WithValue(r.Context(), userKey, claims.AsAuthUser())
+			user := claims.AsAuthUser()
+			ctx := context.WithValue(r.Context(), userKey, user)
+
+			// Lingkup chapter dipasang DI SINI, satu kali, untuk seluruh
+			// permintaan. Repository membacanya lewat scope.Chapter dan
+			// menempelkannya pada query.
+			//
+			// Dipasang di sini dan bukan di tiap handler karena yang terlewat
+			// tidak bisa ketahuan dari membaca handler-nya: query tanpa lingkup
+			// tetap berjalan dan tetap mengembalikan data. Yang menyelamatkan
+			// justru scope.Chapter yang gagal tertutup — tapi mengandalkan
+			// jaring itu berarti setiap kelalaian berakhir sebagai layar kosong
+			// yang membingungkan, bukan sebagai kode yang benar.
+			if chapterID, terbatas := user.ChapterScope(); terbatas {
+				ctx = scope.WithChapter(ctx, chapterID)
+			} else {
+				ctx = scope.WithoutLimit(ctx)
+			}
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -61,6 +79,29 @@ func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		}
 		if user.Role != domain.RoleAdmin {
 			httpx.Fail(w, httpx.Forbidden("butuh akses admin"))
+			return
+		}
+		next(w, r)
+	}
+}
+
+// RequireWrite mengizinkan peran yang boleh mengubah data — admin secara
+// nasional, ST di dalam chapternya sendiri.
+//
+// Pembatasan CHAPTER-nya tidak di sini, melainkan di repository lewat
+// ChapterScope. Middleware hanya menyatakan "boleh menulis"; yang menyatakan
+// "menulis apa" adalah query-nya. Memisahkan keduanya disengaja: penambahan
+// endpoint baru tidak bisa lupa membatasi chapter, karena batas itu ikut pada
+// query-nya, bukan pada daftar middleware yang harus diingat satu per satu.
+func RequireWrite(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := UserFrom(r.Context())
+		if !ok {
+			httpx.Fail(w, httpx.Unauthorized("token tidak disertakan"))
+			return
+		}
+		if !user.Role.CanWrite() {
+			httpx.Fail(w, httpx.Forbidden("peran ini hanya boleh membaca"))
 			return
 		}
 		next(w, r)

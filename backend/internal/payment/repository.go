@@ -12,6 +12,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
 
 const columns = `
@@ -56,6 +57,14 @@ func (r *Repository) List(ctx context.Context, f domain.PaymentFilter) ([]domain
 	if f.InvoiceID != "" {
 		add("invoice_id = $%d", f.InvoiceID)
 	}
+	// payments tidak punya chapter_id sendiri — lingkupnya diwarisi dari invoice
+	// induknya. Subquery, bukan JOIN, supaya bentuk query yang sudah ada beserta
+	// penomoran argumennya tidak berubah sama sekali.
+	if lim := scope.Chapter(ctx); lim.Buntu {
+		where = append(where, "1=0")
+	} else if lim.Terbatas {
+		add("invoice_id IN (SELECT id FROM invoices WHERE chapter_id = $%d)", lim.ChapterID)
+	}
 	if f.Method != "" {
 		add("payment_method = $%d", f.Method)
 	}
@@ -97,6 +106,14 @@ func (r *Repository) List(ctx context.Context, f domain.PaymentFilter) ([]domain
 }
 
 func (r *Repository) GetByID(ctx context.Context, id string) (*domain.Payment, error) {
+	lim := scope.Chapter(ctx)
+	switch {
+	case lim.Buntu:
+		return nil, httpx.ErrNotFound
+	case lim.Terbatas:
+		return scan(r.db.QueryRow(ctx, "SELECT "+columns+" FROM payments WHERE id = $1"+
+			" AND invoice_id IN (SELECT id FROM invoices WHERE chapter_id = $2)", id, lim.ChapterID))
+	}
 	return scan(r.db.QueryRow(ctx, "SELECT "+columns+" FROM payments WHERE id = $1", id))
 }
 

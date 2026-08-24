@@ -14,6 +14,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
 
 // Members are always read with their chapter joined — every list view in the
@@ -92,6 +93,14 @@ func (r *Repository) List(ctx context.Context, f domain.MemberFilter) ([]domain.
 	if f.ChapterID != "" {
 		add("m.chapter_id = $%d", f.ChapterID)
 	}
+	// Batas chapter pemanggil, di atas filter apa pun yang ia kirim. Klausa
+	// terpisah, bukan menimpa f.ChapterID — lihat alasannya di invoice.
+	if klausa, arg, pakai := scope.Chapter(ctx).SQL("m.chapter_id", len(args)+1); klausa != "" {
+		if pakai {
+			args = append(args, arg)
+		}
+		where = append(where, klausa)
+	}
 	if f.Status != "" {
 		add("m.status = $%d", domain.MemberStatus(f.Status))
 	}
@@ -137,7 +146,19 @@ func (r *Repository) List(ctx context.Context, f domain.MemberFilter) ([]domain.
 	return items, total, rows.Err()
 }
 
+// GetByID membaca satu member, dibatasi chapter pemanggil.
+//
+// Batasnya di klausa WHERE, sehingga member chapter lain berakhir 404 dan bukan
+// 403 — yang kedua membocorkan bahwa membernya memang ada.
 func (r *Repository) GetByID(ctx context.Context, id string) (*domain.Member, error) {
+	lim := scope.Chapter(ctx)
+	switch {
+	case lim.Buntu:
+		return nil, httpx.ErrNotFound
+	case lim.Terbatas:
+		return scan(r.db.QueryRow(ctx,
+			"SELECT "+columns+" "+from+" WHERE m.id = $1 AND m.chapter_id = $2", id, lim.ChapterID))
+	}
 	return scan(r.db.QueryRow(ctx, "SELECT "+columns+" "+from+" WHERE m.id = $1", id))
 }
 

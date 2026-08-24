@@ -10,6 +10,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
@@ -66,7 +67,10 @@ func TestHapusInvoiceIkutMembuangJejakAudit(t *testing.T) {
 	pool := livePool(t)
 	testdb.Serialize(t, pool)
 	repo := NewRepository(pool)
-	ctx := context.Background()
+	// Lingkup dinyatakan EKSPLISIT. scope.Chapter gagal tertutup, jadi context
+	// polos berarti "tidak boleh melihat apa pun" — dan tes ini memang menguji
+	// perilaku tanpa batas chapter, bukan perilaku ST.
+	ctx := scope.WithoutLimit(context.Background())
 
 	var memberID, chapterID string
 	if err := pool.QueryRow(ctx,
@@ -115,7 +119,10 @@ func TestChapterHarusCocokDenganMember(t *testing.T) {
 	pool := livePool(t)
 	testdb.Serialize(t, pool)
 	repo := NewRepository(pool)
-	ctx := context.Background()
+	// Lingkup dinyatakan EKSPLISIT. scope.Chapter gagal tertutup, jadi context
+	// polos berarti "tidak boleh melihat apa pun" — dan tes ini memang menguji
+	// perilaku tanpa batas chapter, bukan perilaku ST.
+	ctx := scope.WithoutLimit(context.Background())
 
 	var memberID, chapterMember, chapterLain string
 	if err := pool.QueryRow(ctx,
@@ -154,7 +161,7 @@ func TestMemberTidakAdaAdalah400BukanS500(t *testing.T) {
 		t.Skipf("tidak ada chapter contoh: %v", err)
 	}
 
-	_, err := repo.Create(context.Background(),
+	_, err := repo.Create(scope.WithoutLimit(context.Background()),
 		contohInput("member-yang-tidak-pernah-ada", chapterID, 1_500_000), "", "IDR")
 	if err == nil {
 		t.Fatal("invoice dibuat untuk member yang tidak ada")
@@ -170,7 +177,10 @@ func TestNominalDiAtasBatasInt4Tersimpan(t *testing.T) {
 	pool := livePool(t)
 	testdb.Serialize(t, pool)
 	repo := NewRepository(pool)
-	ctx := context.Background()
+	// Lingkup dinyatakan EKSPLISIT. scope.Chapter gagal tertutup, jadi context
+	// polos berarti "tidak boleh melihat apa pun" — dan tes ini memang menguji
+	// perilaku tanpa batas chapter, bukan perilaku ST.
+	ctx := scope.WithoutLimit(context.Background())
 
 	var memberID, chapterID string
 	if err := pool.QueryRow(ctx,
