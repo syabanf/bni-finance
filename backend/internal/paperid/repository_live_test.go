@@ -177,7 +177,7 @@ func TestLivePaperIDStaging(t *testing.T) {
 			InvoiceDate:   time.Now(),
 			DueDate:       time.Now().AddDate(0, 0, 30),
 			Amount:        1_500_000,
-			ItemName:      "Renewal Keanggotaan BNI Grow",
+			ItemName:      "Renewal Keanggotaan BNI",
 			ItemDesc:      "Perpanjangan tahunan",
 			CustomerID:    "wit-gotest-001",
 			CustomerName:  "Budi Santoso",

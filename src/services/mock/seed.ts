@@ -34,6 +34,9 @@ export const seedChapters: Chapter[] = [
   { id: 'ch-nusantara', name: 'Nusantara', displayName: 'BNI Nusantara', areaName: 'Jakarta Selatan', cityName: 'Jakarta', syncedAt: SYNCED_AT },
   { id: 'ch-merdeka', name: 'Merdeka', displayName: 'BNI Merdeka', areaName: 'Bandung Kota', cityName: 'Bandung', syncedAt: SYNCED_AT },
   { id: 'ch-samudra', name: 'Samudra', displayName: 'BNI Samudra', areaName: 'Surabaya Timur', cityName: 'Surabaya', syncedAt: SYNCED_AT },
+  // Seed 2026-08-24 — dua kota yang sebelumnya belum terwakili.
+  { id: 'ch-cakrawala', name: 'Cakrawala', displayName: 'BNI Cakrawala', areaName: 'Denpasar Selatan', cityName: 'Denpasar', syncedAt: SYNCED_AT },
+  { id: 'ch-mahakam', name: 'Mahakam', displayName: 'BNI Mahakam', areaName: 'Samarinda Kota', cityName: 'Samarinda', syncedAt: SYNCED_AT },
 ]
 
 // ---------------------------------------------------------------------------
@@ -79,6 +82,29 @@ const memberSeeds: MemberSeed[] = [
     history: [{ status: 'cancelled', type: 'registration' }] },
   { name: 'Rina Kartika', chapterId: 'ch-samudra', joined: '2025-05-12',
     status: 'inactive', history: [] },
+
+  // --- Seed 2026-08-24: member yang BELUM punya invoice ---------------------
+  // Cerminan db/seeds/2026-08-24-member-tanpa-invoice.sql. Semuanya
+  // history: [] — itu seluruh maksudnya. Halaman "Buat Invoice" hanya
+  // menampilkan member yang belum punya invoice pendaftaran aktif; tanpa
+  // tambahan ini, daftarnya habis begitu member lama ditagih dan alur
+  // pengiriman tidak bisa dicoba lagi.
+  { name: 'Gita Anindya', chapterId: 'ch-cakrawala', joined: '2026-08-24',
+    status: 'pending', history: [] },
+  { name: 'Bayu Prakoso', chapterId: 'ch-cakrawala', joined: '2026-08-24',
+    status: 'pending', history: [] },
+  { name: 'Nadia Rahmawati', chapterId: 'ch-mahakam', joined: '2026-08-24',
+    status: 'pending', history: [] },
+  { name: 'Fajar Nugroho', chapterId: 'ch-mahakam', joined: '2026-08-24',
+    status: 'pending', history: [] },
+  { name: 'Laras Wulandari', chapterId: 'ch-garuda', joined: '2025-08-31',
+    history: [] },
+  { name: 'Reza Firmansyah', chapterId: 'ch-nusantara', joined: '2025-09-07',
+    history: [] },
+  { name: 'Ayu Kusuma', chapterId: 'ch-merdeka', joined: '2025-09-14',
+    history: [] },
+  { name: 'Yoga Pratama', chapterId: 'ch-samudra', joined: '2026-07-25',
+    history: [] },
 ]
 
 // ---------------------------------------------------------------------------

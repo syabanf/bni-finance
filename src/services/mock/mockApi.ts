@@ -21,7 +21,7 @@ function ddmmyyyy(d: Date): string {
 }
 
 function itemNameFor(type: Invoice['type']): string {
-  return type === 'registration' ? 'Pendaftaran Keanggotaan BNI Grow' : 'Perpanjangan Keanggotaan BNI Grow'
+  return type === 'registration' ? 'Pendaftaran Keanggotaan BNI' : 'Perpanjangan Keanggotaan BNI'
 }
 
 export interface MockResponse {

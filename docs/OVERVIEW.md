@@ -10,7 +10,7 @@ Dokumen ini **ringkasan**, bukan pengganti. Rujukan mendalam ada di bagian
 
 ## 1. Apa ini
 
-Platform pengelolaan **invoice keanggotaan BNI Grow Chapter** — pendaftaran dan
+Platform pengelolaan **invoice keanggotaan BNI** — pendaftaran dan
 perpanjangan tahunan. Data member ditarik dari BNI Visitor Management, invoice diterbitkan
 ke **Paper.id**, pembayaran masuk lewat webhook, dan
 seluruhnya terekam dengan jejak audit.

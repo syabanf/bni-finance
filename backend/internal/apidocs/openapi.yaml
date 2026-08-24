@@ -4,7 +4,7 @@ info:
   title: BNI Finance API
   version: "1.0.0"
   description: |
-    REST API untuk BNI Grow Chapter Management — invoice keanggotaan
+    REST API untuk BNI — invoice keanggotaan
     (pendaftaran & renewal), pembayaran, member, chapter, dan pelaporan.
 
     ## Autentikasi
@@ -46,7 +46,7 @@ info:
     `src/types`, sehingga bisa dipakai klien TypeScript tanpa lapisan pemetaan.
 
   license:
-    name: Internal — BNI Grow Chapter Management
+    name: Internal — BNI
 
 servers:
   - url: http://localhost:8080
