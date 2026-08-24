@@ -1671,6 +1671,109 @@ paths:
   # ===========================================================================
   # Sinkronisasi
   # ===========================================================================
+  /api/v1/import/{jenis}:
+    post:
+      tags: [Sinkronisasi]
+      summary: Impor chapter atau member dari berkas CSV/XLSX
+      description: |
+        **Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan
+        ST berarti memberi jalan mengubah data chapter lain lewat satu berkas —
+        melewati seluruh batas chapter yang dijaga di sisi query.
+
+        **Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak
+        ada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah
+        ketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.
+
+        Pratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang
+        dihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.
+
+        Format ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang
+        di-rename menjadi `.csv` tetap terbaca benar.
+
+        Kolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa
+        Indonesia maupun Inggris sama-sama diterima (`nama`/`name`,
+        `telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**
+        di `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik
+        yang datanya tidak ikut terbaca.
+
+        **Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**
+        Berkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang
+        hilang sebagai "kosongkan" akan menghapus email seluruh member dalam satu
+        impor yang tampak wajar.
+
+        Baris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis
+        data, `status` tidak dikenal, atau `id` ganda di dalam berkas yang sama.
+        Setiap penolakan menyebut **nomor barisnya seperti di Excel**.
+      parameters:
+        - name: jenis
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [chapters, members]
+        - name: terapkan
+          in: query
+          required: false
+          description: >
+            `true` menulis perubahannya. Tanpa ini, hasilnya hanya pratinjau.
+          schema:
+            type: string
+            enum: ["true"]
+      requestBody:
+        required: true
+        description: >
+          Berkas CSV atau XLSX, lewat `multipart/form-data` field `file`
+          maupun sebagai body mentah.
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Hasil pemeriksaan (dan penerapan bila diminta)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  format: { type: string, enum: [csv, xlsx] }
+                  jenis: { type: string, enum: [chapters, members] }
+                  diterapkan: { type: boolean }
+                  total: { type: integer }
+                  baru: { type: integer }
+                  diperbarui: { type: integer }
+                  sama: { type: integer }
+                  ditolak: { type: integer }
+                  peringatan:
+                    type: array
+                    items: { type: string }
+                  baris:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nomor: { type: integer, description: Nomor baris seperti di Excel }
+                        id: { type: string }
+                        nama: { type: string }
+                        tindakan:
+                          type: string
+                          enum: [baru, diperbarui, sama, ditolak]
+                        alasan: { type: string }
+                        perubahan:
+                          type: array
+                          items: { type: string }
+        "400":
+          description: Berkas tidak terbaca, kolom wajib hilang, atau terlalu besar
+        "403":
+          description: Bukan admin
   /api/v1/sync:
     post:
       tags: [Sinkronisasi]
