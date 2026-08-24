@@ -11,6 +11,10 @@ export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
   paid: 'Lunas',
   overdue: 'Overdue',
   cancelled: 'Dibatalkan',
+  // Dibedakan dari "Dibatalkan" dengan sengaja: yang satu tagihan yang ditarik
+  // kembali, yang lain keanggotaan yang diputus. Menyamakan namanya di layar
+  // menghapus perbedaan yang justru jadi alasan statusnya ditambahkan.
+  terminated: 'Diputus',
 }
 
 export const INVOICE_STATUS_COLOR: Record<InvoiceStatus, string> = {
@@ -19,6 +23,7 @@ export const INVOICE_STATUS_COLOR: Record<InvoiceStatus, string> = {
   overdue: '#ef4444',
   draft: '#94a3b8',
   cancelled: '#cbd5e1',
+  terminated: '#7c3aed',
 }
 
 /**

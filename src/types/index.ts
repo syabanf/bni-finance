@@ -13,7 +13,7 @@
 
 export type InvoiceType = 'registration' | 'renewal'
 
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'terminated'
 
 export type MemberStatus = 'active' | 'inactive' | 'pending'
 
@@ -223,7 +223,11 @@ export interface RenewalDueMember extends MemberWithChapter {
 }
 
 /** Peran pengguna. Admin = kontrol penuh, User = lihat & ekspor saja. */
-export type UserRole = 'admin' | 'user'
+/**
+ * `st` = Secretary/Treasurer, `mc` = Membership Committee — keduanya pengurus
+ * SATU chapter, bukan nasional. Lingkupnya ada di `chapterId` pada user.
+ */
+export type UserRole = 'admin' | 'st' | 'mc' | 'user'
 
 export interface AuthUser {
   id: string

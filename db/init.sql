@@ -349,6 +349,53 @@ create index if not exists idx_users_chapter on users (chapter_id);
 
 
 -- ---------------------------------------------------------------------------
+-- Status invoice `terminated`
+--
+-- Berbeda dari `cancelled`, dan bedanya bukan kosmetik: `cancelled` adalah
+-- pembatalan biasa — salah terbit, member menunda, tagihan ditarik kembali.
+-- `terminated` menandai tagihan yang gugur karena keanggotaannya diputus.
+-- Menyatukan keduanya membuat laporan tidak bisa lagi membedakan tagihan yang
+-- batal dari hubungan yang berakhir.
+--
+-- Idempoten, mengikuti pola audit_action di atas.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'invoice_status' and e.enumlabel = 'terminated'
+  ) then
+    alter type invoice_status add value 'terminated';
+  end if;
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'audit_action' and e.enumlabel = 'terminated'
+  ) then
+    alter type audit_action add value 'terminated';
+  end if;
+end $$;
+
+
+-- ---------------------------------------------------------------------------
+-- Pengaturan denda keterlambatan
+--
+-- HANYA DITAMPILKAN, tidak pernah ditagih otomatis, dan itu keputusan yang
+-- membuat fiturnya kecil. Denda yang menempel dan tumbuh di invoice memaksa
+-- nominalnya berubah seiring waktu — dan setiap perubahan nominal pada invoice
+-- yang sudah terkirim ke Paper.id menghasilkan tagihan yang tidak lagi cocok
+-- dengan yang diterima member.
+--
+-- Nilainya dihitung saat dibaca: hari telat x denda_per_hari, dibatasi
+-- denda_maks_hari supaya tagihan lama tidak menumbuhkan angka tak berhingga.
+-- ---------------------------------------------------------------------------
+insert into app_settings (key, value) values
+  ('denda_aktif',       'false'),
+  ('denda_per_hari',    '0'),
+  ('denda_maks_hari',   '90')
+on conflict (key) do nothing;
+
+
+-- ---------------------------------------------------------------------------
 -- Kolom uang dilebarkan ke bigint
 --
 -- Go menyimpan seluruh nominal sebagai int64, Postgres menerimanya sebagai

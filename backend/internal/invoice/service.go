@@ -19,6 +19,7 @@ type Store interface {
 	Delete(ctx context.Context, id string) error
 	CountPayments(ctx context.Context, invoiceID string) (int, error)
 	NextNumber(ctx context.Context, year int) (string, error)
+	LateFeeRule(ctx context.Context) (domain.LateFeeRule, error)
 }
 
 // compile-time check that the Postgres repository satisfies the contract.
@@ -31,11 +32,44 @@ type Service struct {
 func NewService(repo Store) *Service { return &Service{repo: repo} }
 
 func (s *Service) List(ctx context.Context, f domain.InvoiceFilter) ([]domain.Invoice, int, error) {
-	return s.repo.List(ctx, f)
+	items, total, err := s.repo.List(ctx, f)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.tempelkanDenda(ctx, items)
+	return items, total, nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*domain.Invoice, error) {
-	return s.repo.GetByID(ctx, id)
+	inv, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	satu := []domain.Invoice{*inv}
+	s.tempelkanDenda(ctx, satu)
+	return &satu[0], nil
+}
+
+// tempelkanDenda mengisi field LateFee yang terhitung.
+//
+// Aturannya dibaca SEKALI untuk seluruh halaman, bukan per invoice — daftar 200
+// baris tidak boleh berarti 200 kali membaca app_settings.
+//
+// Kegagalan membacanya TIDAK menggagalkan permintaan. Denda hanya keterangan
+// tambahan; menolak menampilkan seluruh daftar invoice karena satu baris
+// pengaturan tidak terbaca akan menukar informasi tambahan dengan halaman yang
+// sama sekali kosong.
+func (s *Service) tempelkanDenda(ctx context.Context, items []domain.Invoice) {
+	rule, err := s.repo.LateFeeRule(ctx)
+	if err != nil || !rule.Aktif {
+		return
+	}
+	now := time.Now()
+	for i := range items {
+		if f := rule.Hitung(items[i], now); f.Nominal > 0 {
+			items[i].LateFee = &f
+		}
+	}
 }
 
 func (s *Service) Create(ctx context.Context, in domain.CreateInvoiceInput) (*domain.Invoice, error) {
