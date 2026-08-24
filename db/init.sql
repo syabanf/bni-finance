@@ -397,6 +397,62 @@ create index if not exists idx_renewal_assigned
 
 
 -- ---------------------------------------------------------------------------
+-- reminder_log — penjaga agar satu pengingat tidak pernah terkirim dua kali
+--
+-- INI TABEL YANG PALING MENENTUKAN DI SELURUH FITUR PENGINGAT, dan alasannya
+-- bukan kerapian data.
+--
+-- Setiap pengiriman ke Paper.id membakar nomor invoice secara PERMANEN. Worker
+-- yang restart — deploy, crash, kontainer dijadwal ulang — akan melihat kembali
+-- seluruh invoice yang jatuh tempo dan mengirim ulang semuanya. Tanpa baris di
+-- sini, satu restart berarti setiap member menerima pengingat ganda, dan tidak
+-- ada cara menariknya kembali.
+--
+-- Kuncinya (invoice_id, offset_hari): satu invoice boleh diingatkan pada H-7,
+-- H-3, dan H-1, tapi masing-masing HANYA SEKALI.
+--
+-- Baris ditulis SEBELUM memanggil Paper.id, bukan sesudah. Urutan itu disengaja
+-- dan arahnya dipilih sadar: kalau panggilannya gagal setelah baris tercatat,
+-- satu pengingat terlewat — merugikan tapi bisa dikirim manual. Kalau barisnya
+-- ditulis sesudah dan proses mati di antaranya, pengingatnya terkirim tanpa
+-- tercatat, dan restart berikutnya mengirimnya lagi. Kelalaian lebih murah
+-- daripada duplikat yang membakar nomor.
+-- ---------------------------------------------------------------------------
+create table if not exists reminder_log (
+  invoice_id  uuid not null references invoices(id) on delete cascade,
+  offset_hari integer not null,
+  sent_at     timestamptz not null default now(),
+  berhasil    boolean not null default false,
+  error       text,
+  primary key (invoice_id, offset_hari)
+);
+
+create index if not exists idx_reminder_log_sent on reminder_log (sent_at desc);
+
+
+-- ---------------------------------------------------------------------------
+-- Pengaturan pengingat dan notifikasi
+--
+-- reminder_offsets berisi daftar hari SEBELUM jatuh tempo, dipisah koma.
+-- "7,3,1" berarti tiga pengingat: H-7, H-3, dan H-1.
+--
+-- notifications_enabled adalah sakelar induk. Dimatikan, tidak ada satu pun
+-- pengingat terkirim — dipakai saat memindahkan lingkungan atau menguji, ketika
+-- pesan yang telanjur keluar tidak bisa ditarik kembali.
+--
+-- reminder_worker_enabled terpisah dari sakelar induk dengan sengaja: yang satu
+-- mematikan SELURUH notifikasi termasuk pengiriman manual, yang lain hanya
+-- menghentikan worker otomatis sambil membiarkan orang mengirim sendiri.
+-- ---------------------------------------------------------------------------
+insert into app_settings (key, value) values
+  ('notifications_enabled',    'true'),
+  ('reminder_worker_enabled',  'false'),
+  ('reminder_offsets',         '7,3,1'),
+  ('reminder_worker_interval', '1h')
+on conflict (key) do nothing;
+
+
+-- ---------------------------------------------------------------------------
 -- Status invoice `terminated`
 --
 -- Berbeda dari `cancelled`, dan bedanya bukan kosmetik: `cancelled` adalah

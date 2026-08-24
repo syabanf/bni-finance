@@ -27,6 +27,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/reminder"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 	"github.com/syabanf/bni-finance/backend/internal/sync"
@@ -113,6 +114,10 @@ func run(log *slog.Logger) error {
 		}
 	}
 
+	paperSvc := paperid.NewService(paperid.NewRepository(pool),
+		cfg.PaperIDBaseURL, cfg.PaperIDClientID, cfg.PaperIDClientSecret,
+		cfg.PaperIDCallbackToken, recorder)
+
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
 		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
@@ -126,11 +131,9 @@ func run(log *slog.Logger) error {
 		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder),
 		Importer:  importer.NewService(importer.NewRepository(pool)),
 		Renewal:   renewal.NewService(renewal.NewRepository(pool)),
-		PaperID: paperid.NewService(paperid.NewRepository(pool),
-			cfg.PaperIDBaseURL, cfg.PaperIDClientID, cfg.PaperIDClientSecret,
-			cfg.PaperIDCallbackToken, recorder),
-		Blackbox: recorder,
-		Metrics:  reg,
+		PaperID:   paperSvc,
+		Blackbox:  recorder,
+		Metrics:   reg,
 	}, pool.Ping)
 
 	srv := &http.Server{
@@ -140,6 +143,21 @@ func run(log *slog.Logger) error {
 		WriteTimeout: cfg.WriteTimeout,
 		IdleTimeout:  cfg.IdleTimeout,
 	}
+
+	// Worker pengingat berjalan sebagai goroutine di proses yang sama, dan
+	// berhenti saat context aplikasi dibatalkan — sama seperti server-nya.
+	//
+	// Bawaannya MATI (app_settings.reminder_worker_enabled = false). Worker ini
+	// mengirim pesan sungguhan ke member dan membakar nomor invoice Paper.id
+	// secara permanen, jadi menyalakannya harus keputusan sadar, bukan efek
+	// samping dari sebuah deploy.
+	workerCtx, hentikanWorker := context.WithCancel(ctx)
+	defer hentikanWorker()
+	go reminder.NewWorker(
+		reminder.NewRepository(pool),
+		reminder.NewPaperPengirim(paperSvc),
+		log,
+	).Jalankan(workerCtx)
 
 	errCh := make(chan error, 1)
 	go func() {
