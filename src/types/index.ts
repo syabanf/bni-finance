@@ -236,6 +236,39 @@ export type UserRole = 'admin' | 'st' | 'mc' | 'user'
  * Untuk `st` dan `mc` ia WAJIB terisi: backend menolak peran berlingkup chapter
  * tanpa chapter, karena lingkup yang kosong bisa terbaca sebagai "tanpa batas".
  */
+/** Apa yang akan terjadi pada satu baris berkas impor. */
+export type ImportTindakan = 'baru' | 'diperbarui' | 'sama' | 'ditolak'
+
+export interface ImportBaris {
+  /** Nomor baris SEPERTI DI EXCEL, supaya bisa langsung dicari di berkasnya. */
+  nomor: number
+  id: string
+  nama: string
+  tindakan: ImportTindakan
+  alasan?: string
+  perubahan?: string[]
+}
+
+/**
+ * Hasil pemeriksaan berkas impor.
+ *
+ * `diterapkan` membedakan pratinjau dari penulisan — dan itu yang membuat
+ * pratinjau bisa dipercaya: angkanya dihitung kode yang sama dengan yang
+ * menulis, jadi tidak mungkin berbeda.
+ */
+export interface ImportHasil {
+  format: 'csv' | 'xlsx'
+  jenis: 'chapters' | 'members'
+  diterapkan: boolean
+  total: number
+  baru: number
+  diperbarui: number
+  sama: number
+  ditolak: number
+  baris: ImportBaris[]
+  peringatan?: string[]
+}
+
 /** Jawaban MC atas permintaan konfirmasi renewal. */
 export type RenewalAnswer = 'pending' | 'will_renew' | 'will_not' | 'unsure'
 

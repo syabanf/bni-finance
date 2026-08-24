@@ -177,6 +177,33 @@ export const api = {
     }
     return payload as { url: string }
   },
+
+  /**
+   * Unggah multipart yang mengembalikan bentuk apa pun.
+   *
+   * Terpisah dari `upload` karena kembaliannya berbeda: `upload` menjanjikan
+   * `{ url }` untuk bukti pembayaran, sedangkan impor mengembalikan laporan
+   * berisi hitungan dan daftar baris. Melonggarkan tipe `upload` akan membuat
+   * setiap pemanggilnya kehilangan jaminan yang selama ini dipegang.
+   */
+  async uploadFor<T>(path: string, file: File): Promise<T> {
+    const form = new FormData()
+    form.append('file', file)
+
+    const token = getToken()
+    const response = await fetch(`${BASE_URL}/api/v1${path}`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+
+    const text = await response.text()
+    const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {}
+    if (!response.ok) {
+      throw new ApiError((payload.error as string) ?? 'Unggah gagal', response.status)
+    }
+    return payload as T
+  },
 }
 
 /** Turns a stored path like `/uploads/x.jpg` into a URL the browser can load. */
