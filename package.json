@@ -8,7 +8,7 @@
     "setup": "./scripts/setup-env.sh",
     "dev": "vite",
     "api-collection": "node scripts/build-api-collection.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && node scripts/check-tour-anchors.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && node scripts/check-tour-anchors.mjs && node scripts/check-seed-integrity.mjs",
     "build": "node scripts/build-api-collection.mjs && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
