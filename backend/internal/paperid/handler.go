@@ -18,6 +18,10 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 // authenticated mux.
 func (h *Handler) RegisterProtected(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/invoices/{id}/send", auth.RequireAdmin(h.send))
+	// RequireWrite, bukan RequireAdmin: ST harus bisa mengirim invoice
+	// chapternya sendiri. Batas chapternya ditegakkan di dalam Send, lewat
+	// query yang membaca invoicenya — bukan di middleware ini.
+	mux.HandleFunc("POST /api/v1/invoices/send-bulk", auth.RequireWrite(h.sendBulk))
 	mux.HandleFunc("POST /api/v1/invoices/{id}/remind", auth.RequireAdmin(h.remind))
 	mux.HandleFunc("GET /api/v1/paperid/status", auth.RequireAdmin(h.status))
 	mux.HandleFunc("POST /api/v1/paperid/test-invoice", auth.RequireAdmin(h.testInvoice))
@@ -198,4 +202,21 @@ func (h *Handler) webhook(w http.ResponseWriter, r *http.Request) {
 	// Always 200 on an authentic, well-formed callback — including ignored
 	// events. A non-2xx just makes Paper.id retry something we chose to skip.
 	httpx.JSON(w, http.StatusOK, map[string]bool{"settled": settled})
+}
+
+func (h *Handler) sendBulk(w http.ResponseWriter, r *http.Request) {
+	var in BulkInput
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	hasil, err := h.svc.SendBulk(r.Context(), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	// 200 meski sebagian gagal. Kegagalan per invoice ada di dalam Baris, dan
+	// menjawab 4xx/5xx akan membuat klien mengira tidak ada satu pun yang
+	// terkirim — padahal nomornya sudah terbakar.
+	httpx.JSON(w, http.StatusOK, hasil)
 }
