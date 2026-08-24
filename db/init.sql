@@ -349,6 +349,54 @@ create index if not exists idx_users_chapter on users (chapter_id);
 
 
 -- ---------------------------------------------------------------------------
+-- renewal_requests — ST menanyakan, MC menjawab
+--
+-- Alurnya: ST membuka daftar member yang keanggotaannya segera jatuh tempo dan
+-- menekan "minta konfirmasi". Tiap member menghasilkan satu baris di sini,
+-- ter-tag ke MC chapter itu. MC menjawab per member, lalu ST menerbitkan invoice
+-- HANYA untuk yang menjawab akan memperpanjang.
+--
+-- SATU BARIS PER MEMBER PER PERIODE, dijaga indeks unik. Tanpa itu, ST yang
+-- menekan tombolnya dua kali menghasilkan dua permintaan untuk orang yang sama,
+-- dan MC melihat pekerjaan ganda yang tidak bisa ia bedakan.
+--
+-- Periode disimpan sebagai teks 'YYYY' dan bukan tanggal: yang membedakan satu
+-- permintaan dari permintaan berikutnya adalah TAHUN keanggotaannya, bukan
+-- tanggal persis kapan ST menanyakannya.
+-- ---------------------------------------------------------------------------
+do $$ begin
+  create type renewal_answer as enum ('pending', 'will_renew', 'will_not', 'unsure');
+exception when duplicate_object then null; end $$;
+
+create table if not exists renewal_requests (
+  id           uuid primary key default gen_random_uuid(),
+  member_id    text not null references members(id),
+  -- chapter_id disalin dari membernya, bukan dibaca lewat join setiap kali.
+  -- Batas chapter ditegakkan di klausa WHERE tiap query; kolom di tabel ini
+  -- membuat batas itu bisa dipasang tanpa join, dan query yang lebih sederhana
+  -- lebih kecil kemungkinannya kehilangan batasnya saat diubah nanti.
+  chapter_id   text not null references chapters(id),
+  period       text not null,
+  requested_by text,
+  requested_at timestamptz not null default now(),
+  assigned_mc  uuid references users(id),
+  answer       renewal_answer not null default 'pending',
+  answered_by  uuid references users(id),
+  answered_at  timestamptz,
+  note         text,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+
+create unique index if not exists idx_renewal_member_period
+  on renewal_requests (member_id, period);
+create index if not exists idx_renewal_chapter_answer
+  on renewal_requests (chapter_id, answer);
+create index if not exists idx_renewal_assigned
+  on renewal_requests (assigned_mc, answer);
+
+
+-- ---------------------------------------------------------------------------
 -- Status invoice `terminated`
 --
 -- Berbeda dari `cancelled`, dan bedanya bukan kosmetik: `cancelled` adalah
