@@ -84,8 +84,18 @@ export interface ImportRepository {
 
 export interface RenewalRepository {
   list(params?: { answer?: RenewalAnswer; period?: string }): Promise<RenewalRequest[]>
-  /** ST meminta konfirmasi untuk sekumpulan member. */
-  request(memberIds: string[], period: string): Promise<{ dibuat: number; dilewati: number; total: number }>
+  /**
+   * ST meminta konfirmasi untuk sekumpulan member.
+   *
+   * `assignedMc` boleh null — permintaan tetap terlihat oleh SELURUH MC di
+   * chapter itu. Menuntutnya terisi akan menghentikan ST yang chapternya belum
+   * punya akun MC sama sekali.
+   */
+  request(
+    memberIds: string[],
+    period: string,
+    assignedMc?: string | null,
+  ): Promise<{ dibuat: number; dilewati: number; total: number }>
   /** MC menjawab satu permintaan. */
   answer(id: string, answer: RenewalAnswer, note?: string): Promise<RenewalRequest>
 }

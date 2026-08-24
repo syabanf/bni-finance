@@ -40,7 +40,7 @@ export const mockRenewalRepository: RenewalRepository = {
     return delay(out, 220)
   },
 
-  async request(memberIds, period) {
+  async request(memberIds, period, assignedMc) {
     let dibuat = 0
     let dilewati = 0
     for (const memberId of memberIds) {
@@ -58,7 +58,7 @@ export const mockRenewalRepository: RenewalRepository = {
         period,
         requestedBy: 'admin-national',
         requestedAt: nowISO(),
-        assignedMc: null,
+        assignedMc: assignedMc || null,
         answer: 'pending',
         answeredBy: null,
         answeredAt: null,

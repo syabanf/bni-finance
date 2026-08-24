@@ -11,7 +11,10 @@ import {
   ErrorState,
   Input,
   LoadingState,
+  Field,
+  Modal,
   PageHeader,
+  Select,
   TBody,
   Table,
   Td,
@@ -21,7 +24,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { memberService, renewalService } from '@/services'
+import { chapterService, memberService, renewalService, userService } from '@/services'
 import { useAuth } from '@/features/auth/AuthContext'
 import { formatDate } from '@/lib/format'
 
@@ -59,10 +62,45 @@ export function RenewalPage() {
   const { user } = useAuth()
   const [period, setPeriod] = useState(tahunIni)
   const permintaan = useAsync(() => renewalService.list({ period }), [period])
+  // Daftar akun hanya bisa dibaca admin. Untuk ST dan MC panggilannya gagal,
+  // dan itu tidak boleh menggagalkan halaman — kolom "Ditugaskan ke" cukup
+  // menampilkan idnya. Karena itu galatnya ditelan, bukan diteruskan.
+  const akun = useAsync(() => userService.list().catch(() => []), [])
   const [memproses, setMemproses] = useState<string | null>(null)
 
   const bolehMenjawab = user?.role === 'mc' || user?.role === 'admin'
   const bolehMeminta = user?.role === 'st' || user?.role === 'admin'
+
+  const chapters = useAsync(() => chapterService.list().catch(() => []), [])
+  const namaChapterDari = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const c of chapters.data ?? []) map.set(c.id, c.displayName)
+    return map
+  }, [chapters.data])
+
+  const namaMc = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const u of akun.data ?? []) map.set(u.id, u.name)
+    return map
+  }, [akun.data])
+
+  // MC disaring ke chapter PEMANGGIL bila ia berlingkup chapter.
+  //
+  // Tanpa ini, menugaskan MC lintas chapter mungkin terjadi — dan terbukti
+  // terjadi saat diuji: MC BNI Garuda ter-tag pada permintaan milik BNI
+  // Nusantara dan BNI Bhinneka. Tidak ada yang gagal, tapi orang yang ditugaskan
+  // tidak akan pernah melihat permintaannya, karena daftarnya sendiri dibatasi
+  // chapter di server.
+  const daftarMc = useMemo(() => {
+    const mc = (akun.data ?? []).filter((u) => u.role === 'mc')
+    if (user?.chapterId) return mc.filter((u) => u.chapterId === user.chapterId)
+    return mc
+  }, [akun.data, user?.chapterId])
+
+  // Admin bisa meminta lintas chapter sekaligus, dan satu MC hanya masuk akal
+  // untuk satu chapter. Dinyatakan di layar alih-alih dilarang: admin mungkin
+  // memang sedang menangani satu chapter saja.
+  const lintasChapter = !user?.chapterId
 
   const ringkas = useMemo(() => {
     const d = permintaan.data ?? []
@@ -91,7 +129,21 @@ export function RenewalPage() {
       <PageHeader
         title="Konfirmasi Renewal"
         description="ST menanyakan siapa yang akan memperpanjang; MC menjawab per member."
-        action={bolehMeminta ? <TombolMinta period={period} onDone={permintaan.reload} /> : undefined}
+        action={
+          bolehMeminta ? (
+            <TombolMinta
+              period={period}
+              lintasChapter={lintasChapter}
+              daftarMc={daftarMc.map((u) => ({
+                id: u.id,
+                nama: u.name,
+                chapterId: u.chapterId,
+                namaChapter: (u.chapterId && namaChapterDari.get(u.chapterId)) || null,
+              }))}
+              onDone={permintaan.reload}
+            />
+          ) : undefined
+        }
       />
 
       <Card>
@@ -134,6 +186,7 @@ export function RenewalPage() {
                   <Th>Member</Th>
                   <Th>Chapter</Th>
                   <Th>Jatuh tempo</Th>
+                  <Th>Ditugaskan ke</Th>
                   <Th>Jawaban</Th>
                   {bolehMenjawab && <Th className="text-right">Jawab</Th>}
                 </Tr>
@@ -145,6 +198,16 @@ export function RenewalPage() {
                     <Td className="text-ink-600">{r.chapterName ?? r.chapterId}</Td>
                     <Td className="text-ink-600">
                       {r.renewalDate ? formatDate(r.renewalDate) : <span className="text-ink-400">—</span>}
+                    </Td>
+                    <Td className="text-ink-600">
+                      {r.assignedMc ? (
+                        namaMc.get(r.assignedMc) ?? r.assignedMc
+                      ) : (
+                        // Bukan sel kosong: tidak ditugaskan ke siapa pun BUKAN
+                        // berarti tidak ada yang menanganinya — permintaannya
+                        // terlihat oleh seluruh MC chapter itu.
+                        <span className="text-ink-400">Semua MC</span>
+                      )}
                     </Td>
                     <Td>
                       <Badge tone={TONE[r.answer]}>{LABEL[r.answer]}</Badge>
@@ -214,8 +277,20 @@ function TombolJawab({
   )
 }
 
-function TombolMinta({ period, onDone }: { period: string; onDone: () => void }) {
+function TombolMinta({
+  period,
+  daftarMc,
+  lintasChapter,
+  onDone,
+}: {
+  period: string
+  daftarMc: { id: string; nama: string; chapterId: string | null; namaChapter: string | null }[]
+  lintasChapter: boolean
+  onDone: () => void
+}) {
   const { toast } = useToast()
+  const [buka, setBuka] = useState(false)
+  const [assignedMc, setAssignedMc] = useState('')
   const [mengirim, setMengirim] = useState(false)
 
   const minta = async () => {
@@ -224,13 +299,13 @@ function TombolMinta({ period, onDone }: { period: string; onDone: () => void })
       // Diambil dari daftar member yang jatuh tempo, bukan seluruh member:
       // menanyakan konfirmasi kepada orang yang keanggotaannya masih lama
       // membuat daftar tugas MC penuh hal yang belum perlu dijawab.
-      const jatuhTempo = await memberService.list()
-      const ids = jatuhTempo.filter((m) => m.status === 'active').map((m) => m.id)
+      const semua = await memberService.list()
+      const ids = semua.filter((m) => m.status === 'active').map((m) => m.id)
       if (ids.length === 0) {
         toast('Tidak ada member aktif yang perlu dikonfirmasi.', 'error')
         return
       }
-      const hasil = await renewalService.request(ids, period)
+      const hasil = await renewalService.request(ids, period, assignedMc || null)
       // Membedakan "dibuat" dari "dilewati" secara eksplisit: menekan dua kali
       // harus terbaca "0 baru, 12 sudah ada", bukan "12 dibuat" yang membuat
       // orang mengira permintaan pertamanya hilang.
@@ -239,6 +314,7 @@ function TombolMinta({ period, onDone }: { period: string; onDone: () => void })
           ? `${hasil.dibuat} permintaan dibuat${hasil.dilewati ? `, ${hasil.dilewati} sudah ada` : ''}.`
           : `Semua ${hasil.dilewati} permintaan sudah ada sebelumnya.`,
       )
+      setBuka(false)
       onDone()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal meminta konfirmasi.', 'error')
@@ -248,9 +324,59 @@ function TombolMinta({ period, onDone }: { period: string; onDone: () => void })
   }
 
   return (
-    <Button onClick={minta} loading={mengirim}>
-      <Send className="h-4 w-4" />
-      Minta Konfirmasi
-    </Button>
+    <>
+      <Button onClick={() => setBuka(true)}>
+        <Send className="h-4 w-4" />
+        Minta Konfirmasi
+      </Button>
+
+      <Modal open={buka} onClose={() => setBuka(false)} title={`Minta konfirmasi periode ${period}`}>
+        <div className="space-y-4">
+          <Field
+            label="Tugaskan ke MC"
+            hint="Boleh dikosongkan — permintaan tetap terlihat oleh seluruh MC di chapter itu."
+          >
+            <Select value={assignedMc} onChange={(e) => setAssignedMc(e.target.value)}>
+              {/* Pilihan pertama bukan placeholder kosong melainkan pilihan yang
+                  SAH dan dinamai, supaya orang tahu mengosongkannya bukan
+                  kelalaian melainkan keputusan. */}
+              <option value="">Semua MC di chapter</option>
+              {daftarMc.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nama}
+                  {m.namaChapter ? ` — ${m.namaChapter}` : ''}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          {lintasChapter && assignedMc && (
+            <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+              Permintaan ini mencakup member dari BEBERAPA chapter, sedangkan satu MC hanya
+              menangani chapternya sendiri. MC yang dipilih tidak akan melihat permintaan milik
+              chapter lain — kosongkan pilihannya bila ingin setiap MC melihat chapternya
+              masing-masing.
+            </p>
+          )}
+
+          {daftarMc.length === 0 && (
+            <p className="rounded-lg bg-ink-50 p-3 text-xs leading-relaxed text-ink-600">
+              Belum ada akun MC yang bisa ditugaskan. Permintaan tetap bisa dibuat — ia akan
+              terlihat oleh MC mana pun yang ditambahkan kemudian.
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => setBuka(false)}>
+              Batal
+            </Button>
+            <Button onClick={minta} loading={mengirim}>
+              <Send className="h-4 w-4" />
+              Kirim permintaan
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   )
 }
