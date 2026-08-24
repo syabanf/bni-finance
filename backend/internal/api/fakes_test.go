@@ -140,6 +140,12 @@ func (s *fakeInvoiceStore) Delete(_ context.Context, id string) error {
 
 func (s *fakeInvoiceStore) CountPayments(_ context.Context, _ string) (int, error) { return 0, nil }
 
+// Aturan denda tidak aktif di stub: tes rute menguji rutenya, bukan aturan
+// dendanya. Perhitungannya sendiri diuji terpisah di domain/latefee_test.go.
+func (s *fakeInvoiceStore) LateFeeRule(context.Context) (domain.LateFeeRule, error) {
+	return domain.LateFeeRule{}, nil
+}
+
 func (s *fakeInvoiceStore) NextNumber(_ context.Context, year int) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

@@ -45,6 +45,7 @@ const INVOICE_STATUS_TONE: Record<InvoiceStatus, Tone> = {
   paid: 'green',
   overdue: 'red',
   cancelled: 'gray',
+  terminated: 'purple',
 }
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {

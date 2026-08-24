@@ -24,11 +24,19 @@ const (
 	StatusPaid      InvoiceStatus = "paid"
 	StatusOverdue   InvoiceStatus = "overdue"
 	StatusCancelled InvoiceStatus = "cancelled"
+	// StatusTerminated — pembayarannya dibatalkan dan keanggotaannya diputus.
+	//
+	// Berbeda dari StatusCancelled, dan bedanya bukan kosmetik: `cancelled`
+	// adalah pembatalan biasa — salah terbit, member menunda, tagihan ditarik
+	// kembali. `terminated` menandai tagihan yang gugur karena hubungannya
+	// berakhir. Menyatukan keduanya membuat laporan tidak bisa lagi membedakan
+	// tagihan yang batal dari keanggotaan yang putus.
+	StatusTerminated InvoiceStatus = "terminated"
 )
 
 func (s InvoiceStatus) Valid() bool {
 	switch s {
-	case StatusDraft, StatusSent, StatusPaid, StatusOverdue, StatusCancelled:
+	case StatusDraft, StatusSent, StatusPaid, StatusOverdue, StatusCancelled, StatusTerminated:
 		return true
 	}
 	return false
@@ -36,12 +44,17 @@ func (s InvoiceStatus) Valid() bool {
 
 // allowedTransitions mirrors the lifecycle the UI enforces: draft → sent →
 // paid, cancellable until paid. Paid and cancelled are terminal.
+// StatusTerminated bisa dicapai dari mana pun kecuali `paid`, dan sifatnya
+// terminal. Tidak dari `paid` karena uangnya sudah masuk: memutus keanggotaan
+// tidak membatalkan pembayaran yang sudah diterima, dan menandai tagihan lunas
+// sebagai terminated akan menghilangkannya dari laporan pendapatan.
 var allowedTransitions = map[InvoiceStatus][]InvoiceStatus{
-	StatusDraft:     {StatusSent, StatusCancelled},
-	StatusSent:      {StatusPaid, StatusOverdue, StatusCancelled},
-	StatusOverdue:   {StatusPaid, StatusCancelled},
-	StatusPaid:      {},
-	StatusCancelled: {},
+	StatusDraft:      {StatusSent, StatusCancelled, StatusTerminated},
+	StatusSent:       {StatusPaid, StatusOverdue, StatusCancelled, StatusTerminated},
+	StatusOverdue:    {StatusPaid, StatusCancelled, StatusTerminated},
+	StatusCancelled:  {StatusTerminated},
+	StatusPaid:       {},
+	StatusTerminated: {},
 }
 
 // CanTransitionTo reports whether a status change is legal. Staying on the same
@@ -108,6 +121,14 @@ type Invoice struct {
 
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+
+	// LateFee DIHITUNG saat dibaca, tidak pernah tersimpan. Nil bila fiturnya
+	// dimatikan atau tagihannya belum telat — lihat latefee.go.
+	//
+	// omitempty pada pointer: klien lama yang tidak mengenal field ini tidak
+	// melihat perubahan apa pun, dan klien baru bisa membedakan "belum telat"
+	// dari "fitur mati" lewat pengaturannya, bukan lewat nilai nol yang ambigu.
+	LateFee *LateFee `json:"lateFee,omitempty"`
 }
 
 // CreateInvoiceInput is the POST body. Number is generated server-side when

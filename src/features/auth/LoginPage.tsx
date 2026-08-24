@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { ArrowRight, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound } from 'lucide-react'
+import { ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound, Users } from 'lucide-react'
 import type { UserRole } from '@/types'
 import { BniLogo, Button, Field, Input } from '@/components/ui'
 import { useAuth } from './AuthContext'
@@ -39,8 +39,18 @@ const DEMO_ROLES: {
 ]
 
 /** Ikon & keterangan per peran, dipakai kartu mock maupun kartu mode API. */
-const ROLE_ICON: Record<UserRole, typeof UserCog> = { admin: UserCog, user: UserRound }
-const ROLE_DESC: Record<UserRole, string> = { admin: 'Akses penuh', user: 'Lihat & ekspor' }
+const ROLE_ICON: Record<UserRole, typeof UserCog> = {
+  admin: UserCog,
+  st: Briefcase,
+  mc: Users,
+  user: UserRound,
+}
+const ROLE_DESC: Record<UserRole, string> = {
+  admin: 'Akses penuh',
+  st: 'Kelola chapternya sendiri',
+  mc: 'Lihat & konfirmasi renewal',
+  user: 'Lihat & ekspor',
+}
 
 export function LoginPage() {
   const { login, quickLogin: quickLoginAs, user, loading: authLoading } = useAuth()

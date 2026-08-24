@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -504,4 +505,45 @@ func nextNumberTx(ctx context.Context, q querier, year int) (string, error) {
 		return "", fmt.Errorf("hitung nomor invoice: %w", err)
 	}
 	return fmt.Sprintf("%s%03d", prefix, count+1), nil
+}
+
+// LateFeeRule membaca pengaturan denda dari app_settings.
+//
+// Pengaturan yang hilang atau tidak terbaca berarti denda MATI, bukan denda
+// dengan nilai bawaan. Arahnya disengaja: fitur uang yang menyala sendiri
+// karena sebuah baris gagal dibaca akan menampilkan tagihan yang tidak pernah
+// diminta siapa pun.
+func (r *Repository) LateFeeRule(ctx context.Context) (domain.LateFeeRule, error) {
+	rows, err := r.db.Query(ctx,
+		`SELECT key, value FROM app_settings WHERE key IN ('denda_aktif','denda_per_hari','denda_maks_hari')`)
+	if err != nil {
+		return domain.LateFeeRule{}, fmt.Errorf("baca pengaturan denda: %w", err)
+	}
+	defer rows.Close()
+
+	var out domain.LateFeeRule
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return domain.LateFeeRule{}, fmt.Errorf("scan pengaturan denda: %w", err)
+		}
+		v = strings.TrimSpace(v)
+		switch k {
+		case "denda_aktif":
+			out.Aktif = v == "true"
+		case "denda_per_hari":
+			n, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				// Nilai rusak diperlakukan sebagai nol, yang mematikan dendanya.
+				// Menebak angka lain berarti menagih jumlah yang tidak pernah
+				// ditetapkan siapa pun.
+				n = 0
+			}
+			out.PerHari = n
+		case "denda_maks_hari":
+			n, _ := strconv.Atoi(v)
+			out.MaksHari = n
+		}
+	}
+	return out, rows.Err()
 }
