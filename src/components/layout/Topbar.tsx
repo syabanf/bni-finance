@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/AuthContext'
 import { useNotifications } from '@/features/notifications/NotificationsContext'
 import { cn } from '@/lib/cn'
 import { TourButton } from '@/features/tour/TourButton'
+import { DemoBadge } from './DemoBadge'
 import { ROLE_LABEL } from '@/lib/rbac'
 
 export function Topbar() {
@@ -37,6 +38,8 @@ export function Topbar() {
           <BniLogo className="h-7 w-auto" />
           <span className="border-l border-ink-100 pl-2.5 text-[15px] font-bold text-ink-900">Finance Hub</span>
         </Link>
+
+        <DemoBadge />
 
         {/* Search — submits to the invoice list (which reads ?q=) */}
         <form
