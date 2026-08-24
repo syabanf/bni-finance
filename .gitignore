@@ -30,9 +30,25 @@ dev-dist
 *.sw?
 
 # Env
+# Rahasia. Aturan lama hanya menutup .env, .env.local, dan .env.*.local —
+# sehingga backend/.env.production dan backend/.env.staging IKUT TER-COMMIT
+# begitu dibuat. Keduanya memuat client_secret Paper.id dan DATABASE_URL.
+#
+# Sekarang seluruh varian .env ditutup, lalu yang aman dibuka kembali satu per
+# satu di bawah. Arah ini disengaja: berkas rahasia baru otomatis tertutup,
+# bukan otomatis terbuka.
 .env
-.env.local
-.env.*.local
+.env.*
+
+# Yang BOLEH ter-commit, karena tidak memuat rahasia:
+#   .env.example        — daftar nama variabel, nilainya kosong
+#   .env.production     — hanya VITE_* frontend, yang memang tertanam ke bundel
+#                         publik saat build; tidak boleh memuat rahasia apa pun
+# Garis miring di depan berarti HANYA di akar repo. Tanpa itu, pengecualiannya
+# berlaku di setiap direktori — termasuk backend/.env.production, yang justru
+# memuat client_secret Paper.id dan DATABASE_URL.
+!.env.example
+!/.env.production
 
 # Claude Code local config (keep launch.json, ignore personal settings)
 .claude/settings.local.json

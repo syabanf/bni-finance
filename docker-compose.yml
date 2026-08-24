@@ -36,10 +36,16 @@ services:
       args:
         VERSION: ${VERSION:-dev}
     env_file:
+      # Berkas mana yang dipakai bisa ditentukan saat menjalankan:
+      #
+      #   docker compose up -d                                    # backend/.env
+      #   ENV_FILE=backend/.env.production docker compose up -d   # produksi
+      #   ENV_FILE=backend/.env.staging    docker compose up -d   # staging
+      #
       # required:false supaya `docker compose config` dan build tetap jalan pada
       # clone baru yang belum punya berkas ini. Tanpa itu compose menolak sebelum
       # apa pun sempat dibangun, dengan pesan yang tidak menyebut .env.example.
-      - path: backend/.env
+      - path: ${ENV_FILE:-backend/.env}
         required: false
     environment:
       # Menimpa apa pun yang ada di backend/.env: di dalam jaringan compose,
