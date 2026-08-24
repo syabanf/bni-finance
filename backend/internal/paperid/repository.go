@@ -273,7 +273,6 @@ func (r *Repository) MarkReminded(ctx context.Context, invoiceID string,
 		  paper_id_invoice_url = $3,
 		  paper_id_payment_url = $4,
 		  paper_id_sent_at = $5,
-		  paper_id_reminder_count = paper_id_reminder_count + 1,
 		  updated_at = now()
 		WHERE id = $1
 		RETURNING ` + invoiceColumns
@@ -288,7 +287,7 @@ func (r *Repository) MarkReminded(ctx context.Context, invoiceID string,
 	// seorang member diingatkan — dan itu pertanyaan pertama saat ada keluhan
 	// "saya diteror invoice".
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO invoice_audit_log (invoice_id, action, from_status, to_status, actor_name, notes)
+		INSERT INTO invoice_audit_log (invoice_id, action, old_status, new_status, actor_name, notes)
 		VALUES ($1, 'reminded', $2, $2, $3, $4)`,
 		invoiceID, inv.Status, actor,
 		fmt.Sprintf("pengingat ke-%d dikirim ulang ke Paper.id sebagai %s",
@@ -300,4 +299,36 @@ func (r *Repository) MarkReminded(ctx context.Context, invoiceID string,
 		return nil, fmt.Errorf("commit pengingat: %w", err)
 	}
 	return inv, nil
+}
+
+// ReserveReminder menaikkan penghitung pengingat dan MENGIKATNYA, lalu
+// mengembalikan nomor urut yang baru.
+//
+// Dipanggil SEBELUM Paper.id dihubungi, dan urutan itu disengaja.
+//
+// Kalau penghitung dinaikkan sesudahnya — di transaksi yang sama dengan
+// pencatatan hasil — maka setiap kegagalan setelah Paper.id menjawab akan
+// membatalkan kenaikannya, sementara dokumen di Paper.id sudah terlanjur ada.
+// Percobaan berikutnya memakai sufiks yang sama, ditolak "nomor sudah dipakai",
+// dan sufiks itu MATI PERMANEN untuk invoice tersebut. Terbukti terjadi: satu
+// bug SQL membuat INV-2026-001-R1 terbakar tanpa tercatat, dan pengingat sah
+// berikutnya tidak akan pernah bisa memakainya lagi.
+//
+// Dengan urutan ini, kegagalan hanya membuang satu angka pada penghitung kita
+// sendiri — murah, dan percobaan berikutnya memakai sufiks berikutnya yang
+// masih bersih. Nomor di Paper.id yang langka, bukan nomor di sisi kita.
+func (r *Repository) ReserveReminder(ctx context.Context, invoiceID string) (int, error) {
+	var n int
+	err := r.db.QueryRow(ctx, `
+		UPDATE invoices
+		SET paper_id_reminder_count = paper_id_reminder_count + 1, updated_at = now()
+		WHERE id = $1
+		RETURNING paper_id_reminder_count`, invoiceID).Scan(&n)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, httpx.NotFound("invoice tidak ditemukan")
+		}
+		return 0, fmt.Errorf("pesan nomor pengingat: %w", err)
+	}
+	return n, nil
 }

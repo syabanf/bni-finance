@@ -1,4 +1,4 @@
-import { api, query, type ListResponse } from '@/lib/apiClient'
+import { ApiError, api, query, type ListResponse } from '@/lib/apiClient'
 import { todayISO } from '@/lib/date'
 import type { CreateInvoiceInput, InvoiceRepository, ManualPaymentInput } from '@/services/types'
 import type {
@@ -55,6 +55,48 @@ async function syncOverdue(invoices: Invoice[]): Promise<void> {
     ),
   )
   for (const invoice of stale) invoice.status = 'overdue'
+}
+
+/**
+ * Menentukan apakah sebuah operasi yang GAGAL DI SISI KLIEN sebenarnya berhasil
+ * di server.
+ *
+ * Panggilan ke Paper.id terukur 5 sampai 36 detik untuk operasi yang sama
+ * persis. Kalau koneksi putus atau timeout di tengahnya, klien melihat
+ * kegagalan sementara server menyelesaikannya dengan tenang — dan itu bukan
+ * hipotesis: pada uji kirim, curl melaporkan gagal untuk dua dari tiga tagihan
+ * yang ternyata SEMUANYA sampai ke penerima.
+ *
+ * Melaporkan gagal padahal berhasil adalah kesalahan yang mahal. Operator akan
+ * mengirim ulang; Paper.id membakar nomor invoice secara permanen, jadi nomor
+ * kedua ikut terbakar, dan member menerima tagihan yang sama dua kali.
+ *
+ * Karena itu kegagalan JARINGAN — ApiError berstatus 0, bukan penolakan server
+ * yang punya kode HTTP jelas — tidak langsung dipercaya. Invoice dibaca ulang
+ * beberapa kali untuk melihat apakah operasinya benar-benar mendarat.
+ *
+ * Jeda totalnya sekitar dua puluh detik, dan itu disengaja: menunggu selama itu
+ * jauh lebih murah daripada satu nomor terbakar plus satu pesan ganda ke member.
+ */
+async function reconcileNetworkFailure(
+  err: unknown,
+  id: string,
+  landed: (after: Invoice) => boolean,
+): Promise<Invoice> {
+  // Penolakan server punya kode HTTP dan bisa dipercaya apa adanya — hanya
+  // kegagalan jaringan yang ambigu.
+  if (!(err instanceof ApiError) || err.status !== 0) throw err
+
+  for (const jeda of [2000, 4000, 6000, 8000]) {
+    await new Promise((r) => setTimeout(r, jeda))
+    try {
+      const after = await api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)
+      if (landed(after)) return after
+    } catch {
+      // Server masih tidak terjangkau; coba lagi pada jeda berikutnya.
+    }
+  }
+  throw err
 }
 
 export const apiInvoiceRepository: InvoiceRepository = {
@@ -137,7 +179,13 @@ export const apiInvoiceRepository: InvoiceRepository = {
     // the invoice list, and "create + send" each had to remember them — and the
     // one that forgot would quietly stop reaching members while still
     // reporting success. Set the channels in Pengaturan.
-    return api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/send`, {})
+    try {
+      return await api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/send`, {})
+    } catch (err) {
+      // Berhasil bila invoice sudah tidak lagi draft — server memindahkannya
+      // ke sent dalam satu transaksi bersama pencatatan hasil Paper.id.
+      return reconcileNetworkFailure(err, id, (after) => after.status !== 'draft')
+    }
   },
 
   /**
@@ -154,7 +202,19 @@ export const apiInvoiceRepository: InvoiceRepository = {
    * permanen dan tidak punya endpoint pengingat. Status invoice tidak berubah.
    */
   async resend(id) {
-    return api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/remind`, {})
+    // Penghitung dibaca lebih dulu supaya kenaikannya bisa dipakai sebagai
+    // bukti bahwa pengingat benar-benar terkirim, seandainya koneksi putus.
+    let sebelum = 0
+    try {
+      sebelum = (await api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)).paperIdReminderCount ?? 0
+    } catch {
+      // Gagal membaca keadaan awal bukan alasan membatalkan pengiriman.
+    }
+    try {
+      return await api.post<Invoice>(`/invoices/${encodeURIComponent(id)}/remind`, {})
+    } catch (err) {
+      return reconcileNetworkFailure(err, id, (after) => (after.paperIdReminderCount ?? 0) > sebelum)
+    }
   },
 
   async cancel(id, reason) {

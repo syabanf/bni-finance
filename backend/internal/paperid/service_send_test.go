@@ -26,6 +26,7 @@ import (
 type sendStub struct {
 	sendable *Sendable
 	sent     *domain.Invoice
+	reserved int
 	getErr   error
 }
 
@@ -38,6 +39,11 @@ func (s *sendStub) GetSendable(context.Context, string) (*Sendable, error) {
 func (s *sendStub) MarkSent(context.Context, string, CreateResult, time.Time, time.Time, string) (*domain.Invoice, error) {
 	return s.sent, nil
 }
+func (s *sendStub) ReserveReminder(context.Context, string) (int, error) {
+	s.reserved++
+	return s.reserved, nil
+}
+
 func (s *sendStub) MarkReminded(context.Context, string, CreateResult, time.Time, string) (*domain.Invoice, error) {
 	return s.sent, nil
 }

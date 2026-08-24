@@ -161,6 +161,7 @@ export type AuditAction =
   | 'cancelled'
   | 'overdue'
   | 'updated'
+  | 'reminded'
 
 export interface AuditLogEntry {
   id: string
