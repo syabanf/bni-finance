@@ -1,0 +1,63 @@
+# BNI Finance Hub — backend Go + Postgres.
+#
+#   docker compose up -d --build
+#   docker compose logs -f api
+#
+# Rahasia TIDAK ditulis di berkas ini. Semuanya dibaca dari backend/.env, yang
+# diabaikan git — lihat backend/.env.example untuk daftar variabelnya.
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-bni_finance}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # init.sql idempoten: skema selalu diterapkan, akun awal dan data contoh
+      # hanya bila tabelnya kosong. Postgres menjalankan berkas di direktori ini
+      # HANYA saat data directory masih kosong, jadi pada volume yang sudah
+      # terisi berkas ini tidak dijalankan ulang — terapkan perubahan skema
+      # dengan `docker compose exec -T db psql … < db/init.sql`.
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # Wajib, dan bukan basa-basi: tanpa ini `api` start lebih dulu daripada
+      # Postgres siap menerima koneksi, gagal menyambung, lalu keluar.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-bni_finance}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./backend
+      args:
+        VERSION: ${VERSION:-dev}
+    env_file:
+      # required:false supaya `docker compose config` dan build tetap jalan pada
+      # clone baru yang belum punya berkas ini. Tanpa itu compose menolak sebelum
+      # apa pun sempat dibangun, dengan pesan yang tidak menyebut .env.example.
+      - path: backend/.env
+        required: false
+    environment:
+      # Menimpa apa pun yang ada di backend/.env: di dalam jaringan compose,
+      # basis datanya bernama `db`, bukan localhost.
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-bni_finance}?sslmode=disable
+      PORT: "8080"
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      # Bukti pembayaran harus selamat dari `docker compose down`. Tanpa volume,
+      # setiap pembangunan ulang menghapus seluruh lampiran yang pernah diunggah.
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

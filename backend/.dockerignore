@@ -1,0 +1,10 @@
+# Konteks build sengaja dipersempit: apa pun yang ikut terkirim ke daemon
+# memperlambat build dan bisa tanpa sengaja masuk ke image.
+.env
+.env.*
+!.env.example
+uploads/
+*.log
+
+# Berkas di luar backend/ tidak pernah dibutuhkan binary ini.
+../node_modules
