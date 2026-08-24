@@ -27,6 +27,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/renewal"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
@@ -124,6 +125,7 @@ func run(log *slog.Logger) error {
 		Upload:    uploads,
 		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder),
 		Importer:  importer.NewService(importer.NewRepository(pool)),
+		Renewal:   renewal.NewService(renewal.NewRepository(pool)),
 		PaperID: paperid.NewService(paperid.NewRepository(pool),
 			cfg.PaperIDBaseURL, cfg.PaperIDClientID, cfg.PaperIDClientSecret,
 			cfg.PaperIDCallbackToken, recorder),

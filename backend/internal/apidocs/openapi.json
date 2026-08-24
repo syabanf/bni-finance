@@ -2770,6 +2770,371 @@
         }
       }
     },
+    "/api/v1/renewal-requests": {
+      "get": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "Daftar permintaan konfirmasi renewal",
+        "description": "ST melihat permintaan chapternya, MC melihat daftar tugasnya, admin\nmelihat semuanya. **Dibatasi chapter** untuk ST dan MC — permintaan\nchapter lain tidak muncul sama sekali, bukan muncul lalu ditolak.\n\nDiurutkan `pending` lebih dulu, lalu tanggal perpanjangan terdekat.\n",
+        "parameters": [
+          {
+            "name": "chapterId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "answer",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "will_renew",
+                "will_not",
+                "unsure"
+              ]
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daftar permintaan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": null
+                    },
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "memberId": {
+                        "type": "string"
+                      },
+                      "chapterId": {
+                        "type": "string"
+                      },
+                      "period": {
+                        "type": "string",
+                        "description": "Tahun keanggotaan yang ditanyakan"
+                      },
+                      "requestedBy": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "requestedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "assignedMc": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "answer": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "will_renew",
+                          "will_not",
+                          "unsure"
+                        ]
+                      },
+                      "answeredBy": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "answeredAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      },
+                      "note": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "memberName": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "chapterName": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "renewalDate": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer"
+                        },
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "ST meminta konfirmasi renewal ke MC",
+        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "memberIds",
+                  "period"
+                ],
+                "properties": {
+                  "memberIds": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "period": {
+                    "type": "string",
+                    "example": "2027"
+                  },
+                  "assignedMc": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Boleh kosong — permintaan tetap terlihat oleh seluruh MC di chapter itu.\n"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Permintaan dibuat",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dibuat": {
+                      "type": "integer"
+                    },
+                    "dilewati": {
+                      "type": "integer",
+                      "description": "Sudah ada untuk periode itu"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Member ada di chapter lain, atau peran tidak boleh menulis"
+          }
+        }
+      }
+    },
+    "/api/v1/renewal-requests/{id}": {
+      "patch": {
+        "tags": [
+          "Member"
+        ],
+        "summary": "MC menjawab konfirmasi renewal",
+        "description": "**MC dan admin saja.** ST tidak boleh menjawab — ia yang menanyakan,\njadi membiarkannya menjawab sendiri membuat konfirmasinya tidak berarti\napa-apa: ia hanya mencatat dugaannya sendiri sebagai jawaban orang lain.\n\nMC dari chapter lain dijawab **404**, bukan 403 — \"tidak boleh\"\nmengonfirmasi bahwa permintaannya ada.\n\n`pending` **ditolak** sebagai jawaban: itu keadaan awal, bukan jawaban.\n",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "answer"
+                ],
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                    "enum": [
+                      "will_renew",
+                      "will_not",
+                      "unsure"
+                    ]
+                  },
+                  "note": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Jawaban tersimpan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "memberId": {
+                      "type": "string"
+                    },
+                    "chapterId": {
+                      "type": "string"
+                    },
+                    "period": {
+                      "type": "string",
+                      "description": "Tahun keanggotaan yang ditanyakan"
+                    },
+                    "requestedBy": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "requestedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "assignedMc": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "answer": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "will_renew",
+                        "will_not",
+                        "unsure"
+                      ]
+                    },
+                    "answeredBy": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "answeredAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "memberName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "chapterName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "renewalDate": {
+                      "type": "string",
+                      "format": "date",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "answer tidak sah atau 'pending'"
+          },
+          "403": {
+            "description": "Peran tidak boleh menjawab"
+          },
+          "404": {
+            "description": "Permintaan tidak ada",
+            "atau milik chapter lain": null
+          }
+        }
+      }
+    },
     "/api/v1/import/{jenis}": {
       "post": {
         "tags": [
