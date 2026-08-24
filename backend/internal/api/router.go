@@ -17,6 +17,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/importer"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
@@ -43,6 +44,7 @@ type Services struct {
 	Dashboard *dashboard.Service
 	Upload    *upload.Store
 	Sync      *sync.Service
+	Importer  *importer.Service
 	PaperID   *paperid.Service
 	Blackbox  *blackbox.Recorder
 
@@ -150,6 +152,9 @@ func registerProtected(mux *http.ServeMux, svc Services) {
 	}
 	if svc.Sync != nil {
 		sync.NewHandler(svc.Sync).Register(mux)
+	}
+	if svc.Importer != nil {
+		importer.NewHandler(svc.Importer).Register(mux)
 	}
 	if svc.PaperID != nil {
 		paperid.NewHandler(svc.PaperID).RegisterProtected(mux)
