@@ -12,6 +12,7 @@ import { MemberDetailPage } from '@/features/members/MemberDetailPage'
 import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { ImportPage } from '@/features/import/ImportPage'
 import { RenewalPage } from '@/features/renewal/RenewalPage'
 import { UsersPage } from '@/features/users/UsersPage'
 import { SyncPage } from '@/features/settings/SyncPage'
@@ -76,6 +77,17 @@ export const router = createBrowserRouter([
             // yang boleh MENJAWAB diperiksa di server, bukan di rute.
             path: '/renewal',
             element: <RenewalPage />,
+          },
+          {
+            // Admin saja. Impor menulis lintas chapter sekaligus — mengizinkan
+            // ST berarti memberi jalan mengubah data chapter lain lewat satu
+            // berkas, melewati seluruh batas chapter yang dijaga di server.
+            path: '/settings/import',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <ImportPage />
+              </RequirePermission>
+            ),
           },
           {
             // Pengelolaan akun butuh settings:manage — hanya admin. Peran ST

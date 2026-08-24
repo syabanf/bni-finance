@@ -9,6 +9,7 @@
  */
 
 import type {
+  ImportHasil,
   ManagedUser,
   RenewalAnswer,
   RenewalRequest,
@@ -68,6 +69,19 @@ export interface CreateUserInput {
  * membiarkannya menjawab sendiri membuat konfirmasinya tidak berarti apa-apa.
  * Aturan itu ditegakkan server; di sini hanya tombolnya yang disembunyikan.
  */
+/**
+ * Impor chapter dan member dari berkas.
+ *
+ * SELALU dua langkah: `preview` tidak pernah menulis. Impor yang langsung
+ * menulis menyembunyikan chapter yang salah ketik, kolom yang tergeser, dan id
+ * ganda di balik satu kalimat "berhasil" — dan pada data keanggotaan, itu baru
+ * ketahuan saat tagihannya salah kirim.
+ */
+export interface ImportRepository {
+  preview(jenis: 'chapters' | 'members', file: File): Promise<ImportHasil>
+  apply(jenis: 'chapters' | 'members', file: File): Promise<ImportHasil>
+}
+
 export interface RenewalRepository {
   list(params?: { answer?: RenewalAnswer; period?: string }): Promise<RenewalRequest[]>
   /** ST meminta konfirmasi untuk sekumpulan member. */

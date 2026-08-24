@@ -217,7 +217,16 @@ export function buildSeedData(): BuiltData {
       phone: SEED_PHONE,
       status: seed.status ?? (seed.history.some((h) => h.status === 'overdue') ? 'pending' : 'active'),
       joinedDate: seed.joined,
-      renewalDate: null,
+      // Member yang PUNYA riwayat invoice mendapat renewalDate dari periode
+      // invoice terakhirnya, di bawah. Yang tidak punya riwayat mendapatnya
+      // dari joinedDate + 1 tahun.
+      //
+      // Sebelumnya yang tanpa riwayat dibiarkan null, dan itu membuat mock
+      // berbeda dari Postgres: seed SQL 2026-08-24 mengisi renewal_date untuk
+      // member aktif tanpa invoice, sementara mock menampilkannya "—". Beralih
+      // sumber data mengubah dunia yang dilihat pengguna, dan itu justru yang
+      // paling ingin dihindari dari punya dua sumber.
+      renewalDate: seed.status === 'pending' || !seed.joined ? null : addYear(seed.joined),
       syncedAt: SYNCED_AT,
     }
     members.push(member)
