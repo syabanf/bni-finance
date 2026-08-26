@@ -11,6 +11,7 @@ import {
   Input,
   LoadingState,
   PageHeader,
+  Select,
   Textarea,
   useToast,
 } from '@/components/ui'
@@ -38,6 +39,7 @@ export function InvoiceNewPage() {
   // nominal.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
+  const [chapterFilter, setChapterFilter] = useState('all')
   const [amount, setAmount] = useState<number>(0)
   const [periodStart, setPeriodStart] = useState<string>(todayISO())
   const [notes, setNotes] = useState('')
@@ -84,14 +86,31 @@ export function InvoiceNewPage() {
     }
   }, [type, selectedIds])
 
+  // Hanya chapter yang PUNYA member di daftar ini yang ditawarkan.
+  //
+  // Menawarkan seluruh chapter berarti sebagian pilihan menghasilkan daftar
+  // kosong — dan pada tipe Pendaftaran itu sering terjadi, karena daftarnya
+  // sudah disaring ke member yang belum punya invoice pendaftaran aktif.
+  // Pilihan yang pasti kosong hanya membuat orang mengira datanya hilang.
+  const chapterOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const m of members ?? []) {
+      if (m.chapter) map.set(m.chapter.id, m.chapter.displayName)
+    }
+    return [...map.entries()]
+      .map(([id, nama]) => ({ id, nama }))
+      .sort((a, b) => a.nama.localeCompare(b.nama))
+  }, [members])
+
   const filteredMembers = useMemo(() => {
     if (!members) return []
     const q = search.trim().toLowerCase()
-    if (!q) return members
-    return members.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q),
-    )
-  }, [members, search])
+    return members.filter((m) => {
+      if (chapterFilter !== 'all' && m.chapterId !== chapterFilter) return false
+      if (!q) return true
+      return m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q)
+    })
+  }, [members, search, chapterFilter])
 
   const toggleMember = (id: string) =>
     setSelectedIds((lama) => {
@@ -244,6 +263,7 @@ export function InvoiceNewPage() {
                     // invoice pendaftaran), jadi id yang tetap terpilih bisa
                     // tidak ada lagi di daftar dan tak terlihat untuk dibatalkan.
                     setSelectedIds(new Set())
+                    setChapterFilter('all')
                   }}
                   className={cn(
                     'rounded-xl border-2 p-4 text-left transition-colors',
@@ -284,7 +304,11 @@ export function InvoiceNewPage() {
             <div className="px-5 pb-3">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-xs text-ink-500">
-                  {jumlah > 0 ? `${jumlah} dipilih` : 'Bisa pilih lebih dari satu'}
+                  {jumlah > 0
+                    ? `${jumlah} dipilih`
+                    : chapterFilter !== 'all'
+                      ? `${filteredMembers.length} member di chapter ini`
+                      : 'Bisa pilih lebih dari satu'}
                 </span>
                 {filteredMembers.length > 0 && (
                   <button
@@ -297,14 +321,34 @@ export function InvoiceNewPage() {
                   </button>
                 )}
               </div>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari nama atau ID member…"
-                  className="pl-10"
-                />
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Cari nama atau ID member…"
+                    className="pl-10"
+                  />
+                </div>
+                {/* Filter chapter berdampingan dengan pencarian, bukan di
+                    tempat lain: keduanya menyaring daftar yang sama, dan
+                    "Pilih semua" di atasnya memilih HASIL keduanya. Menyaring
+                    ke satu chapter lalu menekan Pilih semua adalah cara
+                    menerbitkan renewal satu chapter penuh dalam sekali klik. */}
+                <Select
+                  value={chapterFilter}
+                  onChange={(e) => setChapterFilter(e.target.value)}
+                  className="sm:w-52"
+                  aria-label="Filter chapter"
+                >
+                  <option value="all">Semua Chapter ({members?.length ?? 0})</option>
+                  {chapterOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nama}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </div>
             <div className="max-h-[360px] overflow-y-auto px-3 pb-3">
