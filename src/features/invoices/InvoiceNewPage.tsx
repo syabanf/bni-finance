@@ -32,14 +32,24 @@ export function InvoiceNewPage() {
     [type],
   )
 
-  const [memberId, setMemberId] = useState<string>('')
+  // Pilihan JAMAK. Halaman ini dulu hanya bisa satu member, sehingga
+  // menerbitkan renewal untuk satu chapter berarti mengulang seluruh formulir
+  // puluhan kali — dan tiap pengulangan adalah kesempatan salah pilih tipe atau
+  // nominal.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [amount, setAmount] = useState<number>(0)
   const [periodStart, setPeriodStart] = useState<string>(todayISO())
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [progress, setProgress] = useState<{ selesai: number; total: number } | null>(null)
 
-  const selectedMember = members?.find((m) => m.id === memberId) ?? null
+  const selectedMembers = useMemo(
+    () => (members ?? []).filter((m) => selectedIds.has(m.id)),
+    [members, selectedIds],
+  )
+  const selectedMember = selectedMembers.length === 1 ? selectedMembers[0] : null
+  const jumlah = selectedIds.size
   const dueDate = todayISO()
   const periodEnd = useMemo(() => addYear(periodStart), [periodStart])
 
@@ -50,13 +60,19 @@ export function InvoiceNewPage() {
   }, [fees, type])
 
   // Compute the membership period start (renewal continues the previous period).
+  // Untuk SATU member, periode lanjutan dihitung dari invoice terakhirnya dan
+  // ditampilkan di ringkasan. Untuk banyak member, tiap orang punya periodenya
+  // sendiri — jadi dihitung di dalam loop saat pembuatan, bukan di sini, dan
+  // ringkasannya menyatakan "dihitung per member" alih-alih memajang satu
+  // tanggal yang hanya benar untuk salah satunya.
   useEffect(() => {
     let active = true
-    if (type === 'registration' || !memberId) {
+    const satu = selectedIds.size === 1 ? [...selectedIds][0] : ''
+    if (type === 'registration' || !satu) {
       setPeriodStart(todayISO())
       return
     }
-    invoiceService.listByMember(memberId).then((list) => {
+    invoiceService.listByMember(satu).then((list) => {
       if (!active) return
       const last = list
         .filter((i) => i.status !== 'cancelled')
@@ -66,7 +82,7 @@ export function InvoiceNewPage() {
     return () => {
       active = false
     }
-  }, [type, memberId])
+  }, [type, selectedIds])
 
   const filteredMembers = useMemo(() => {
     if (!members) return []
@@ -77,61 +93,123 @@ export function InvoiceNewPage() {
     )
   }, [members, search])
 
+  const toggleMember = (id: string) =>
+    setSelectedIds((lama) => {
+      const baru = new Set(lama)
+      if (baru.has(id)) baru.delete(id)
+      else baru.add(id)
+      return baru
+    })
+
+  // Memilih SELURUH hasil filter, bukan seluruh member. Bedanya menentukan:
+  // orang menyaring dulu ke satu chapter lalu menekan ini, dan yang dipilih
+  // harus persis yang sedang ia lihat — bukan diam-diam menyertakan chapter
+  // lain yang tersembunyi oleh filter.
+  const pilihSemuaTerlihat = () =>
+    setSelectedIds((lama) => {
+      const terlihat = filteredMembers.map((m) => m.id)
+      const semuaSudah = terlihat.every((id) => lama.has(id))
+      const baru = new Set(lama)
+      terlihat.forEach((id) => (semuaSudah ? baru.delete(id) : baru.add(id)))
+      return baru
+    })
+
   const handleSubmit = async (send: boolean) => {
-    if (!memberId) {
-      toast('Pilih member terlebih dahulu.', 'error')
+    if (selectedIds.size === 0) {
+      toast('Pilih minimal satu member.', 'error')
       return
     }
     setSubmitting(true)
+    setProgress({ selesai: 0, total: selectedMembers.length })
 
-    // DUA kegagalan yang berbeda, dan menyamakannya membuat invoice ganda.
+    // MEMBUAT dan MENGIRIM dipisah per member, dan urutannya per orang:
+    // buat lalu kirim, baru lanjut ke member berikutnya.
     //
-    // Tombol ini melakukan dua hal berurutan: membuat invoice, lalu
-    // mengirimkannya ke Paper.id. Kalau yang KEDUA gagal, invoicenya tetap
-    // sudah jadi — tapi versi sebelumnya menyapu keduanya ke satu catch,
-    // menampilkan "Gagal membuat invoice", dan bertahan di halaman ini.
+    // Bukan "buat semua dulu, kirim semua kemudian": kalau pengirimannya
+    // berhenti di tengah, sisanya tertinggal sebagai draft yang tidak terlihat
+    // dari halaman ini — dan orang yang mengulang dari sini akan membuat
+    // invoice KEDUA untuk tagihan yang sama.
     //
-    // Orang yang membacanya wajar menekan tombol sekali lagi. Invoice pertama
-    // tidak hilang, jadi yang terjadi adalah invoice KEDUA untuk tagihan yang
-    // sama — dan karena setiap pengiriman membakar nomor di Paper.id secara
-    // permanen, kesalahan itu tidak bisa dibatalkan.
-    //
-    // Terbukti nyata saat menguji jalur ini: create berhasil, send dijawab 409
-    // "nomor sudah dipakai", dan INV-2026-009 tertinggal sebagai draft yang
-    // tidak terlihat dari halaman ini.
-    let invoice
-    try {
-      invoice = await invoiceService.create({
-        memberId,
-        type,
-        amount,
-        dueDate,
-        periodStart,
-        periodEnd,
-        notes: notes.trim() || undefined,
-      })
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal membuat invoice.', 'error')
-      setSubmitting(false)
-      return
+    // Kegagalan satu member TIDAK menghentikan sisanya. Tiap baris berdiri
+    // sendiri, dan yang gagal disebut nomor beserta alasannya — nomor Paper.id
+    // yang telanjur terbakar tidak bisa dikembalikan, jadi mengulang seluruh
+    // daftar bukan pilihan.
+    const dibuat: string[] = []
+    const gagal: { nama: string; sebab: string }[] = []
+    let terkirim = 0
+    let invoiceTerakhir = ''
+
+    for (const [i, m] of selectedMembers.entries()) {
+      try {
+        // Periode dihitung PER MEMBER: renewal melanjutkan periode invoice
+        // terakhir orang itu sendiri, bukan tanggal yang sama untuk semua.
+        let mulai = todayISO()
+        if (type === 'renewal') {
+          const riwayat = await invoiceService.listByMember(m.id)
+          const terakhir = riwayat
+            .filter((inv) => inv.status !== 'cancelled' && inv.status !== 'terminated')
+            .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0]
+          if (terakhir) mulai = addDays(terakhir.periodEnd, 1)
+        }
+
+        const inv = await invoiceService.create({
+          memberId: m.id,
+          type,
+          amount,
+          dueDate,
+          periodStart: mulai,
+          periodEnd: addYear(mulai),
+          notes: notes.trim() || undefined,
+        })
+        dibuat.push(inv.number)
+        invoiceTerakhir = inv.id
+
+        if (send) {
+          try {
+            await invoiceService.send(inv.id)
+            terkirim++
+          } catch (err) {
+            // Invoicenya SUDAH ADA. Dilaporkan sebagai gagal KIRIM, bukan gagal
+            // buat — bedanya menentukan tindakan berikutnya: kirim ulang dari
+            // halaman invoicenya, bukan buat lagi dari sini.
+            gagal.push({
+              nama: `${m.name} (${inv.number})`,
+              sebab: `dibuat, gagal kirim — ${err instanceof Error ? err.message : 'sebab tidak diketahui'}`,
+            })
+          }
+        }
+      } catch (err) {
+        gagal.push({
+          nama: m.name,
+          sebab: err instanceof Error ? err.message : 'gagal tanpa keterangan',
+        })
+      }
+      setProgress({ selesai: i + 1, total: selectedMembers.length })
     }
 
-    if (!send) {
-      toast('Invoice draft berhasil dibuat.')
-      navigate(`/invoices/${invoice.id}`)
-      return
+    setProgress(null)
+    setSubmitting(false)
+
+    const ringkas = send
+      ? `${dibuat.length} invoice dibuat, ${terkirim} terkirim`
+      : `${dibuat.length} invoice draft dibuat`
+
+    if (gagal.length === 0) {
+      toast(`${ringkas}.`)
+    } else {
+      // Nama yang gagal disebut, bukan hanya jumlahnya: "3 gagal" memaksa orang
+      // menelusuri satu per satu untuk tahu siapa.
+      const contoh = gagal.slice(0, 3).map((g) => `${g.nama}: ${g.sebab}`).join('; ')
+      const sisa = gagal.length > 3 ? ` dan ${gagal.length - 3} lainnya` : ''
+      toast(`${ringkas}; ${gagal.length} gagal — ${contoh}${sisa}.`,
+        dibuat.length === 0 ? 'error' : 'info')
     }
 
-    try {
-      await invoiceService.send(invoice.id)
-      toast('Invoice dibuat & dikirim ke Paper.id.')
-    } catch (err) {
-      // Invoicenya ADA. Dibawa ke halamannya supaya pengiriman bisa diulang
-      // dari sana, bukan dibuat ulang dari sini.
-      const sebab = err instanceof Error ? err.message : 'penyebab tidak diketahui'
-      toast(`Invoice ${invoice.number} dibuat, tapi pengiriman ke Paper.id gagal: ${sebab}`, 'error')
-    }
-    navigate(`/invoices/${invoice.id}`)
+    // Satu invoice dibuka langsung; lebih dari satu dibawa ke daftarnya, karena
+    // tidak ada satu pun di antaranya yang lebih layak dibuka daripada yang lain.
+    if (dibuat.length === 1 && invoiceTerakhir) navigate(`/invoices/${invoiceTerakhir}`)
+    else if (dibuat.length > 0) navigate('/invoices')
+    else setSelectedIds(new Set())
   }
 
   return (
@@ -161,7 +239,11 @@ export function InvoiceNewPage() {
                   key={t}
                   onClick={() => {
                     setType(t)
-                    setMemberId('')
+                    // Pilihan dikosongkan saat tipe berganti: daftar membernya
+                    // berbeda (registrasi hanya menampilkan yang belum punya
+                    // invoice pendaftaran), jadi id yang tetap terpilih bisa
+                    // tidak ada lagi di daftar dan tak terlihat untuk dibatalkan.
+                    setSelectedIds(new Set())
                   }}
                   className={cn(
                     'rounded-xl border-2 p-4 text-left transition-colors',
@@ -200,6 +282,21 @@ export function InvoiceNewPage() {
               }
             />
             <div className="px-5 pb-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-ink-500">
+                  {jumlah > 0 ? `${jumlah} dipilih` : 'Bisa pilih lebih dari satu'}
+                </span>
+                {filteredMembers.length > 0 && (
+                  <button
+                    onClick={pilihSemuaTerlihat}
+                    className="text-xs font-medium text-brand-600 hover:text-brand-700"
+                  >
+                    {filteredMembers.every((m) => selectedIds.has(m.id))
+                      ? 'Batalkan semua'
+                      : `Pilih semua (${filteredMembers.length})`}
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
                 <Input
@@ -222,10 +319,10 @@ export function InvoiceNewPage() {
                   {filteredMembers.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => setMemberId(m.id)}
+                      onClick={() => toggleMember(m.id)}
                       className={cn(
                         'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors',
-                        memberId === m.id ? 'bg-brand-50 ring-1 ring-brand-200' : 'hover:bg-ink-50',
+                        selectedIds.has(m.id) ? 'bg-brand-50 ring-1 ring-brand-200' : 'hover:bg-ink-50',
                       )}
                     >
                       <Avatar name={m.name} size="sm" />
@@ -235,7 +332,7 @@ export function InvoiceNewPage() {
                           {m.id} · {m.chapter?.displayName ?? '—'}
                         </div>
                       </div>
-                      {memberId === m.id && (
+                      {selectedIds.has(m.id) && (
                         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-500 text-white">
                           <Check className="h-3 w-3" />
                         </span>
@@ -263,6 +360,22 @@ export function InvoiceNewPage() {
                     </div>
                   </div>
                 </div>
+              ) : jumlah > 1 ? (
+                <div className="rounded-xl bg-ink-50 p-3">
+                  <div className="mb-2 text-sm font-medium text-ink-900">{jumlah} member dipilih</div>
+                  {/* Namanya disebut, bukan hanya jumlahnya. Menerbitkan tagihan
+                      untuk orang yang salah tidak bisa dibatalkan begitu
+                      terkirim, jadi daftarnya harus bisa diperiksa sebelum
+                      ditekan. */}
+                  <div className="max-h-32 space-y-1 overflow-y-auto pr-1">
+                    {selectedMembers.map((m) => (
+                      <div key={m.id} className="flex items-center gap-2 text-xs text-ink-600">
+                        <span className="truncate">{m.name}</span>
+                        <span className="shrink-0 text-ink-400">· {m.chapter?.displayName ?? '—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center gap-3 rounded-xl border border-dashed border-ink-200 p-3 text-sm text-ink-400">
                   <UserRound className="h-5 w-5" />
@@ -282,10 +395,23 @@ export function InvoiceNewPage() {
 
               <div className="space-y-2.5 rounded-xl bg-ink-50 p-4 text-sm">
                 <Row label="Tanggal terbit" value={formatDate(dueDate)} />
-                <Row label="Masa berlaku" value={`${formatDate(periodStart)} → ${formatDate(periodEnd)}`} />
+                {jumlah === 1 ? (
+                  <Row label="Masa berlaku" value={`${formatDate(periodStart)} → ${formatDate(periodEnd)}`} />
+                ) : (
+                  // Tiap member punya periodenya sendiri; memajang satu tanggal
+                  // di sini hanya benar untuk salah satunya.
+                  <Row label="Masa berlaku" value="Dihitung per member" />
+                )}
                 <Row label="Tipe" value={type === 'registration' ? 'Pendaftaran' : 'Renewal'} />
                 <div className="my-1 border-t border-ink-200" />
-                <Row label="Total" value={formatCurrency(amount)} bold />
+                {jumlah > 1 && (
+                  <Row label="Jumlah member" value={`${jumlah} member`} />
+                )}
+                <Row
+                  label={jumlah > 1 ? 'Total seluruhnya' : 'Total'}
+                  value={formatCurrency(amount * Math.max(jumlah, 1))}
+                  bold
+                />
               </div>
 
               <Field label="Catatan (opsional)">
@@ -297,22 +423,30 @@ export function InvoiceNewPage() {
               </Field>
 
               <div className="space-y-2 pt-1">
+                {progress && (
+                  // Pengiriman ke Paper.id memakan sekitar 20 detik per invoice,
+                  // jadi tanpa penunjuk kemajuan halaman ini tampak menggantung
+                  // selama bermenit-menit dan orang wajar menekan tombolnya lagi.
+                  <div className="rounded-xl bg-ink-50 p-3 text-center text-sm text-ink-600">
+                    Memproses {progress.selesai} dari {progress.total}…
+                  </div>
+                )}
                 <Button
                   className="w-full"
                   loading={submitting}
-                  disabled={!memberId}
+                  disabled={jumlah === 0}
                   onClick={() => handleSubmit(true)}
                 >
                   <Send className="h-4 w-4" />
-                  Buat & Kirim ke Paper.id
+                  {jumlah > 1 ? `Buat & Kirim ${jumlah} Invoice` : 'Buat & Kirim ke Paper.id'}
                 </Button>
                 <Button
                   variant="outline"
                   className="w-full"
-                  disabled={submitting || !memberId}
+                  disabled={submitting || jumlah === 0}
                   onClick={() => handleSubmit(false)}
                 >
-                  Simpan sebagai Draft
+                  {jumlah > 1 ? `Simpan ${jumlah} Draft` : 'Simpan sebagai Draft'}
                 </Button>
               </div>
             </div>

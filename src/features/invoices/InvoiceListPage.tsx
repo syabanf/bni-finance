@@ -37,6 +37,10 @@ const STATUS_TABS: { value: StatusFilter; label: string; dot?: string }[] = [
   { value: 'paid', label: 'Lunas', dot: 'bg-emerald-500' },
   { value: 'draft', label: 'Draft', dot: 'bg-ink-300' },
   { value: 'cancelled', label: 'Dibatalkan' },
+  // Dibedakan dari "Dibatalkan" sampai ke tabnya sendiri. Menyatukannya di satu
+  // tab akan menghapus perbedaan yang justru jadi alasan statusnya ditambahkan:
+  // tagihan yang ditarik kembali versus keanggotaan yang berakhir.
+  { value: 'terminated', label: 'Diputus', dot: 'bg-violet-500' },
 ]
 
 const TYPE_OPTIONS: { value: InvoiceType | 'all'; label: string }[] = [

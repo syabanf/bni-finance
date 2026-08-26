@@ -16,6 +16,7 @@ import { BellRing,
   TriangleAlert,
   Upload,
   XCircle,
+  UserMinus,
 } from 'lucide-react'
 import type { AuditAction, AuditLogEntry, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
 import {
@@ -54,6 +55,7 @@ const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> 
   cancelled: { icon: XCircle, tone: 'bg-ink-100 text-ink-500' },
   updated: { icon: Pencil, tone: 'bg-blue-50 text-blue-500' },
   reminded: { icon: BellRing, tone: 'bg-brand-50 text-brand-500' },
+  terminated: { icon: Ban, tone: 'bg-violet-50 text-violet-500' },
 }
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
@@ -64,9 +66,10 @@ const AUDIT_LABEL: Record<AuditAction, string> = {
   cancelled: 'Invoice dibatalkan',
   updated: 'Invoice diperbarui',
   reminded: 'Pengingat dikirim',
+  terminated: 'Keanggotaan diputus',
 }
 
-type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | null
+type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | 'terminate' | null
 
 const MANUAL_METHODS: { value: string; label: string }[] = [
   { value: 'bank_transfer', label: 'Transfer Bank' },
@@ -216,7 +219,11 @@ export function InvoiceDetailPage() {
   // Aksi yang mengubah data juga butuh izin peran, bukan cuma status yang cocok.
   const canSend = canManage && status === 'draft'
   const canPay = canManage && isPayable
-  const canCancel = canManage && status !== 'paid' && status !== 'cancelled'
+  const canCancel = canManage && status !== 'paid' && status !== 'cancelled' && status !== 'terminated'
+  // Bisa dari mana pun KECUALI `paid` — termasuk dari `cancelled`, karena
+  // tagihan yang sudah ditarik kembali tetap bisa berakhir sebagai keanggotaan
+  // yang diputus.
+  const canTerminate = canManage && status !== 'paid' && status !== 'terminated'
 
   return (
     <div>
@@ -267,6 +274,12 @@ export function InvoiceDetailPage() {
                 Batalkan
               </Button>
             )}
+            {canTerminate && (
+              <Button variant="outline" onClick={() => setDialog('terminate')}>
+                <UserMinus className="h-4 w-4" />
+                Putus Keanggotaan
+              </Button>
+            )}
           </div>
         }
       />
@@ -313,7 +326,7 @@ export function InvoiceDetailPage() {
                 <p className="mt-1 text-sm text-ink-600">{invoice.notes}</p>
               </div>
             )}
-            {invoice.status === 'cancelled' && invoice.cancelReason && (
+            {(invoice.status === 'cancelled' || invoice.status === 'terminated') && invoice.cancelReason && (
               <div className="border-t border-ink-100 bg-red-50/50 px-5 py-4">
                 <div className="text-xs font-medium uppercase tracking-wide text-red-400">Alasan Pembatalan</div>
                 <p className="mt-1 text-sm text-red-600">{invoice.cancelReason}</p>
@@ -647,6 +660,46 @@ export function InvoiceDetailPage() {
             autoFocus
           />
         </Field>
+      </Modal>
+
+      <Modal
+        open={dialog === 'terminate'}
+        onClose={() => setDialog(null)}
+        title="Putus keanggotaan?"
+        description="Tagihan ini akan ditandai gugur karena keanggotaannya berakhir — berbeda dari pembatalan biasa, dan tidak dapat dikembalikan."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
+            <Button
+              variant="danger"
+              loading={busy}
+              disabled={!cancelReason.trim()}
+              onClick={() =>
+                runAction(
+                  () => invoiceService.terminate(invoice.id, cancelReason.trim()),
+                  'Keanggotaan diputus.',
+                )
+              }
+            >
+              <UserMinus className="h-4 w-4" />
+              Putus Keanggotaan
+            </Button>
+          </>
+        }
+      >
+        <Field label="Alasan pemutusan" required>
+          <Textarea
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="Mis. member mengundurkan diri dari chapter."
+            autoFocus
+          />
+        </Field>
+        <p className="mt-3 rounded-lg bg-ink-50 p-3 text-xs leading-relaxed text-ink-600">
+          Pakai <strong>Batalkan</strong> bila tagihannya sekadar ditarik kembali — salah terbit,
+          nominal keliru, atau member menunda. <strong>Putus Keanggotaan</strong> untuk hubungan
+          yang memang berakhir. Laporan membedakan keduanya.
+        </p>
       </Modal>
     </div>
   )
