@@ -18,6 +18,16 @@ import (
 // tidak punya foreign key, tidak punya tabel members, dan tidak punya batas
 // lebar kolom. Semuanya hanya terlihat terhadap Postgres sungguhan:
 //
+// FIXTURE-NYA DIBUAT SENDIRI, dan itu bukan kerapian. Versi pertama membaca data
+// contoh dan memanggil t.Skip bila kurang — sementara integration test lain
+// men-TRUNCATE tabel. Akibatnya urutan run yang biasa saja sudah cukup membuat
+// tes ini melewati dirinya sendiri, dan `go test` melaporkannya "ok".
+//
+// Terbukti terjadi: TestChapterHarusCocokDenganMember di-SKIP tanpa ada yang
+// menyadari, jadi salah satu penjaga bug kemarin sedang tidak menjaga apa pun.
+// Tes yang bisa hijau tanpa menguji lebih buruk daripada tidak ada tes, sebab ia
+// membuat orang berhenti memeriksa.
+//
 //	make test-integration TEST_DATABASE_URL=postgres://…/bni_finance_dev
 func livePool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
@@ -72,11 +82,7 @@ func TestHapusInvoiceIkutMembuangJejakAudit(t *testing.T) {
 	// perilaku tanpa batas chapter, bukan perilaku ST.
 	ctx := scope.WithoutLimit(context.Background())
 
-	var memberID, chapterID string
-	if err := pool.QueryRow(ctx,
-		"SELECT id, chapter_id FROM members LIMIT 1").Scan(&memberID, &chapterID); err != nil {
-		t.Skipf("tidak ada member contoh: %v", err)
-	}
+	chapterID, _, memberID, _ := duaChapter(t, repo)
 
 	inv, err := repo.Create(ctx, contohInput(memberID, chapterID, 1_500_000), "", "IDR")
 	if err != nil {
@@ -124,15 +130,7 @@ func TestChapterHarusCocokDenganMember(t *testing.T) {
 	// perilaku tanpa batas chapter, bukan perilaku ST.
 	ctx := scope.WithoutLimit(context.Background())
 
-	var memberID, chapterMember, chapterLain string
-	if err := pool.QueryRow(ctx,
-		"SELECT id, chapter_id FROM members LIMIT 1").Scan(&memberID, &chapterMember); err != nil {
-		t.Skipf("tidak ada member contoh: %v", err)
-	}
-	if err := pool.QueryRow(ctx,
-		"SELECT id FROM chapters WHERE id <> $1 LIMIT 1", chapterMember).Scan(&chapterLain); err != nil {
-		t.Skipf("butuh minimal dua chapter: %v", err)
-	}
+	chapterMember, chapterLain, memberID, _ := duaChapter(t, repo)
 
 	inv, err := repo.Create(ctx, contohInput(memberID, chapterLain, 1_500_000), "", "IDR")
 	if err == nil {
@@ -155,11 +153,7 @@ func TestMemberTidakAdaAdalah400BukanS500(t *testing.T) {
 	testdb.Serialize(t, pool)
 	repo := NewRepository(pool)
 
-	var chapterID string
-	if err := pool.QueryRow(context.Background(),
-		"SELECT id FROM chapters LIMIT 1").Scan(&chapterID); err != nil {
-		t.Skipf("tidak ada chapter contoh: %v", err)
-	}
+	chapterID, _, _, _ := duaChapter(t, repo)
 
 	_, err := repo.Create(scope.WithoutLimit(context.Background()),
 		contohInput("member-yang-tidak-pernah-ada", chapterID, 1_500_000), "", "IDR")
@@ -182,11 +176,7 @@ func TestNominalDiAtasBatasInt4Tersimpan(t *testing.T) {
 	// perilaku tanpa batas chapter, bukan perilaku ST.
 	ctx := scope.WithoutLimit(context.Background())
 
-	var memberID, chapterID string
-	if err := pool.QueryRow(ctx,
-		"SELECT id, chapter_id FROM members LIMIT 1").Scan(&memberID, &chapterID); err != nil {
-		t.Skipf("tidak ada member contoh: %v", err)
-	}
+	chapterID, _, memberID, _ := duaChapter(t, repo)
 
 	const besar int64 = 5_000_000_000 // di atas int4, di bawah MaxInvoiceAmount
 	inv, err := repo.Create(ctx, contohInput(memberID, chapterID, besar), "", "IDR")
