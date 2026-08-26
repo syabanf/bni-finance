@@ -224,6 +224,16 @@ export const apiInvoiceRepository: InvoiceRepository = {
     })
   },
 
+  async terminate(id, reason) {
+    // Memakai kolom cancelReason yang sama: alasannya satu jenis informasi,
+    // dan yang membedakan keduanya adalah STATUS-nya, bukan tempat alasannya
+    // disimpan.
+    return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, {
+      status: 'terminated',
+      cancelReason: reason,
+    })
+  },
+
   async markPaid(id) {
     const invoice = await api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)
     // Recording the payment settles the invoice in the same transaction, so

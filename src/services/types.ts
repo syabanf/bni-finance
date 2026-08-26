@@ -125,6 +125,16 @@ export interface InvoiceRepository {
   /** Re-send an already-sent/overdue invoice to Paper.id (refreshes payment link). */
   resend(id: string): Promise<Invoice>
   cancel(id: string, reason: string): Promise<Invoice>
+  /**
+   * Memutus keanggotaan: invoicenya gugur karena hubungannya berakhir.
+   *
+   * Berbeda dari `cancel`, dan bedanya bukan kosmetik — `cancel` adalah
+   * pembatalan biasa (salah terbit, member menunda), sedangkan ini menandai
+   * tagihan yang gugur karena keanggotaannya diputus. Menyatukan keduanya
+   * membuat laporan tidak bisa lagi membedakan tagihan yang batal dari
+   * hubungan yang berakhir.
+   */
+  terminate(id: string, reason: string): Promise<Invoice>
   /** Simulate a Paper.id "payment.success" webhook for a sent invoice. */
   markPaid(id: string): Promise<Invoice>
   /** Manually record an offline payment (e.g. bank transfer) with optional proof. */

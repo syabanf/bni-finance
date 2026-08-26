@@ -201,6 +201,36 @@ export const mockInvoiceRepository: InvoiceRepository = {
     return delay(invoice, 400)
   },
 
+  async terminate(id, reason) {
+    const invoice = store.invoices.find((i) => i.id === id)
+    if (!invoice) throw new Error('Invoice tidak ditemukan.')
+    // Tidak dari `paid`, dan alasannya bukan kerapian: uangnya sudah masuk.
+    // Memutus keanggotaan tidak membatalkan pembayaran yang sudah diterima, dan
+    // menandai tagihan lunas sebagai diputus akan menghilangkannya dari laporan
+    // pendapatan. Aturan yang sama ditegakkan server.
+    if (invoice.status === 'paid') {
+      throw new Error('Invoice yang sudah dibayar tidak bisa diputus.')
+    }
+
+    const old = invoice.status
+    invoice.status = 'terminated'
+    invoice.cancelledBy = 'admin-national'
+    invoice.cancelledAt = nowISO()
+    invoice.cancelReason = reason
+    invoice.updatedAt = nowISO()
+
+    pushAudit({
+      invoiceId: id,
+      action: 'terminated',
+      oldStatus: old,
+      newStatus: 'terminated',
+      actorId: 'admin-national',
+      actorName: 'Admin Nasional',
+      notes: reason,
+    })
+    return delay(invoice, 400)
+  },
+
   async markPaid(id) {
     // Simulates the Paper.id "payment.success" webhook arriving.
     const invoice = store.invoices.find((i) => i.id === id)
