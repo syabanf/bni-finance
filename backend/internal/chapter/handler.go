@@ -16,6 +16,11 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/chapters", h.list)
+	// Didaftarkan SEBELUM /chapters/{id} bukan karena urutannya penting bagi
+	// ServeMux Go 1.22 — pola literal memang menang atas wildcard — melainkan
+	// supaya keduanya terbaca berdampingan oleh siapa pun yang menambah rute
+	// baru di sini.
+	mux.HandleFunc("GET /api/v1/chapters/stats", h.stats)
 	mux.HandleFunc("POST /api/v1/chapters", auth.RequireAdmin(h.create))
 	mux.HandleFunc("GET /api/v1/chapters/{id}", h.get)
 	mux.HandleFunc("PATCH /api/v1/chapters/{id}", auth.RequireAdmin(h.update))
@@ -37,6 +42,21 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, httpx.List(items, total, f.Limit, f.Offset))
+}
+
+// stats melayani angka ringkas per chapter untuk halaman daftar chapter.
+//
+// Halaman itu dulu menghitungnya sendiri dengan menarik SELURUH member dan
+// SELURUH invoice — dua daftar yang sama-sama terpotong di 200 baris. Dampaknya
+// bukan sekadar lambat: jumlah member berhenti bertambah di 200, dan nominal
+// tunggakan hanya menjumlahkan 200 invoice pertama.
+func (h *Handler) stats(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.Counts(r.Context())
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"data": items})
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {

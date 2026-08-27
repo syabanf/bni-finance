@@ -2,6 +2,7 @@ package chapter
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -99,6 +100,95 @@ func TestDaftarChapterBerlingkup(t *testing.T) {
 	}
 	if jml != 0 || len(kosong) != 0 {
 		t.Errorf("konteks tanpa scope mengembalikan %d chapter — seharusnya nol", jml)
+	}
+}
+
+// Counts tidak boleh menggandakan angka, dan harus tetap berlingkup.
+//
+// Bahaya yang dijaga di sini bukan hipotesis: meng-JOIN members dan invoices
+// sekaligus menghasilkan hasil kali kartesian di dalam tiap chapter. Diuji
+// langsung ke basis data dengan 3 member dan 4 invoice, versi JOIN memberi
+// member=12 dan tunggakan Rp12 juta — dua-duanya terkali, dan dua-duanya masih
+// terlihat seperti angka yang wajar.
+func TestHitunganChapterTidakMenggandaDanBerlingkup(t *testing.T) {
+	pool := livePool(t)
+	testdb.Serialize(t, pool)
+	repo := NewRepository(pool)
+
+	chA, chB := duaChapter(t, pool)
+	ctx := context.Background()
+
+	exec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, q, args...); err != nil {
+			t.Fatalf("siapkan data: %v", err)
+		}
+	}
+	// Chapter A: 3 member, 4 invoice sent @1 juta → 3 dan 4.000.000.
+	for i := 1; i <= 3; i++ {
+		exec(`INSERT INTO members (id, chapter_id, name, email, phone, status)
+		      VALUES ($1,$2,$3,'h@contoh.invalid','08','active') ON CONFLICT (id) DO NOTHING`,
+			fmt.Sprintf("mem-hitung-%d", i), chA, fmt.Sprintf("Member %d", i))
+	}
+	for i := 1; i <= 4; i++ {
+		exec(`INSERT INTO invoices (id, number, member_id, chapter_id, type, amount, currency,
+		                          due_date, period_start, period_end, status)
+		      VALUES ($1,$2,'mem-hitung-1',$3,'renewal',1000000,'IDR',
+		              CURRENT_DATE+30, CURRENT_DATE, CURRENT_DATE+365,'sent')
+		      ON CONFLICT (number) DO NOTHING`,
+			fmt.Sprintf("33333333-3333-3333-3333-33333333333%d", i),
+			fmt.Sprintf("HITUNG-%d", i), chA)
+	}
+	t.Cleanup(func() {
+		c := context.Background()
+		_, _ = pool.Exec(c, `DELETE FROM invoices WHERE number LIKE 'HITUNG-%'`)
+		_, _ = pool.Exec(c, `DELETE FROM members WHERE id LIKE 'mem-hitung-%'`)
+	})
+
+	cari := func(items []domain.ChapterCounts, id string) *domain.ChapterCounts {
+		for i := range items {
+			if items[i].ChapterID == id {
+				return &items[i]
+			}
+		}
+		return nil
+	}
+
+	// --- admin: angkanya harus persis, bukan kelipatannya --------------------
+	semua, err := repo.Counts(scope.WithoutLimit(ctx))
+	if err != nil {
+		t.Fatalf("counts sebagai admin: %v", err)
+	}
+	a := cari(semua, chA)
+	if a == nil {
+		t.Fatalf("chapter %s tidak ada di hasil", chA)
+	}
+	if a.MemberCount != 3 {
+		t.Errorf("memberCount = %d, seharusnya 3 — JOIN menggandakan baris?", a.MemberCount)
+	}
+	if a.Outstanding != 4_000_000 {
+		t.Errorf("outstanding = %d, seharusnya 4000000 — JOIN menggandakan baris?", a.Outstanding)
+	}
+
+	// --- ST hanya melihat chapternya ----------------------------------------
+	milikST, err := repo.Counts(scope.WithChapter(ctx, chA))
+	if err != nil {
+		t.Fatalf("counts sebagai ST: %v", err)
+	}
+	if len(milikST) != 1 || milikST[0].ChapterID != chA {
+		t.Errorf("ST melihat %d chapter, seharusnya hanya %s", len(milikST), chA)
+	}
+	if cari(milikST, chB) != nil {
+		t.Errorf("ST melihat hitungan chapter %s", chB)
+	}
+
+	// --- tanpa scope: gagal TERTUTUP ----------------------------------------
+	kosong, err := repo.Counts(ctx)
+	if err != nil {
+		t.Fatalf("counts tanpa scope: %v", err)
+	}
+	if len(kosong) != 0 {
+		t.Errorf("konteks tanpa scope mengembalikan %d chapter — seharusnya nol", len(kosong))
 	}
 }
 

@@ -1637,6 +1637,38 @@
         }
       }
     },
+    "/api/v1/chapters/stats": {
+      "get": {
+        "tags": [
+          "Chapter"
+        ],
+        "summary": "Angka ringkas per chapter",
+        "description": "Jumlah member dan **nominal** tunggakan (`sent` + `overdue`) tiap chapter. **Dibatasi per chapter** seperti `/chapters`.\n\nAda di server karena halaman daftar chapter dulu menghitungnya di klien dengan menarik seluruh member dan seluruh invoice — dua daftar yang sama-sama dipaku pada 200 baris. Dampaknya bukan sekadar lambat: jumlah member berhenti bertambah di 200, dan tunggakannya hanya menjumlahkan 200 invoice pertama. Angka uang yang diam-diam terlalu kecil.\n\nDihitung dengan subquery, bukan JOIN: meng-JOIN members dan invoices sekaligus menghasilkan hasil kali kartesian di dalam tiap chapter, dan kedua angkanya ikut terkali sambil tetap terlihat wajar.\n",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ChapterCounts"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
     "/api/v1/chapters/{id}": {
       "get": {
         "tags": [
@@ -4063,6 +4095,27 @@
       }
     },
     "schemas": {
+      "ChapterCounts": {
+        "type": "object",
+        "required": [
+          "chapterId",
+          "memberCount",
+          "outstanding"
+        ],
+        "properties": {
+          "chapterId": {
+            "type": "string"
+          },
+          "memberCount": {
+            "type": "integer"
+          },
+          "outstanding": {
+            "type": "integer",
+            "format": "int64",
+            "description": "NOMINAL invoice sent + overdue, bukan cacahnya."
+          }
+        }
+      },
       "Error": {
         "type": "object",
         "required": [

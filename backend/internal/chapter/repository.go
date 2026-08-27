@@ -187,3 +187,43 @@ func isUniqueViolation(err error) bool {
 	// import list for one check.
 	return strings.Contains(err.Error(), "23505")
 }
+
+// Counts mengembalikan jumlah member dan nominal tunggakan tiap chapter.
+//
+// SUBQUERY, BUKAN JOIN, dan itu bukan soal selera. Meng-JOIN members dan
+// invoices sekaligus menghasilkan hasil kali kartesian di dalam tiap chapter:
+// 10 member dan 5 invoice menjadi 50 baris, sehingga cacah membernya terkali
+// lima dan nominal tunggakannya terkali sepuluh. Keduanya tetap terlihat
+// seperti angka yang wajar.
+func (r *Repository) Counts(ctx context.Context) ([]domain.ChapterCounts, error) {
+	where := "1=1"
+	args := []any{}
+	if lim := scope.Chapter(ctx); lim.Buntu {
+		where = "1=0"
+	} else if lim.Terbatas {
+		where = "c.id = $1"
+		args = append(args, lim.ChapterID)
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT c.id,
+		  (SELECT count(*) FROM members m WHERE m.chapter_id = c.id),
+		  coalesce((SELECT sum(i.amount) FROM invoices i
+		             WHERE i.chapter_id = c.id AND i.status IN ('sent','overdue')), 0)
+		FROM chapters c
+		WHERE `+where, args...)
+	if err != nil {
+		return nil, fmt.Errorf("hitung ringkasan chapter: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]domain.ChapterCounts, 0, 16)
+	for rows.Next() {
+		var c domain.ChapterCounts
+		if err := rows.Scan(&c.ChapterID, &c.MemberCount, &c.Outstanding); err != nil {
+			return nil, fmt.Errorf("scan ringkasan chapter: %w", err)
+		}
+		items = append(items, c)
+	}
+	return items, rows.Err()
+}

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Building2, MapPin, Search, Users, X } from 'lucide-react'
-import type { Chapter, InvoiceWithRelations, MemberWithChapter } from '@/types'
+import type { Chapter, ChapterCounts } from '@/types'
 import {
   Card,
   EmptyState,
@@ -13,7 +13,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { chapterService, invoiceService, memberService } from '@/services'
+import { chapterService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
 
@@ -21,8 +21,23 @@ export function ChapterListPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const { data: chapters, loading } = useAsync<Chapter[]>(() => chapterService.list())
-  const { data: members } = useAsync<MemberWithChapter[]>(() => memberService.list())
-  const { data: invoices } = useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
+
+  /**
+   * Angka per chapter dari server — satu permintaan, bukan dua tarikan penuh.
+   *
+   * Sebelumnya halaman ini menarik SELURUH member dan SELURUH invoice lalu
+   * menjumlahkannya sendiri. Keduanya dipaku pada 200 baris, jadi begitu
+   * datanya melewati angka itu jumlah member berhenti bertambah dan nominal
+   * tunggakan hanya menjumlahkan 200 invoice pertama — angka uang yang
+   * diam-diam terlalu kecil, tanpa satu pun tanda bahwa ia terpotong.
+   */
+  const { data: counts } = useAsync<ChapterCounts[]>(() => chapterService.counts())
+
+  const perChapter = useMemo(() => {
+    const peta = new Map<string, ChapterCounts>()
+    for (const c of counts ?? []) peta.set(c.chapterId, c)
+    return peta
+  }, [counts])
 
   const [city, setCity] = useState('all')
   const [search, setSearch] = useState('')
@@ -48,14 +63,10 @@ export function ChapterListPage() {
     })
   }, [chapters, city, search])
 
-  const memberCount = (chapterId: string) =>
-    members?.filter((m) => m.chapterId === chapterId).length ?? 0
+  const memberCount = (chapterId: string) => perChapter.get(chapterId)?.memberCount ?? 0
 
   // Outstanding = invoice yang sudah diterbitkan tapi belum dibayar (sent + overdue).
-  const outstanding = (chapterId: string) =>
-    invoices
-      ?.filter((i) => i.chapterId === chapterId && (i.status === 'sent' || i.status === 'overdue'))
-      .reduce((acc, i) => acc + i.amount, 0) ?? 0
+  const outstanding = (chapterId: string) => perChapter.get(chapterId)?.outstanding ?? 0
 
   const totalMembers = filteredChapters.reduce((a, c) => a + memberCount(c.id), 0)
   const totalOutstanding = filteredChapters.reduce((a, c) => a + outstanding(c.id), 0)
