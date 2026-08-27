@@ -5,6 +5,8 @@ import type {
   AuditLogEntry,
   Chapter,
   Invoice,
+  InvoiceFilters,
+  InvoiceSummary,
   InvoiceWithRelations,
   MemberWithChapter,
   RenewalDueMember,
@@ -16,18 +18,70 @@ import { isNotFound } from './chapterRepository'
  * Rather than a join per invoice, the reference tables are fetched once per
  * call and indexed — they are small (hundreds of rows) and change rarely.
  */
-async function loadDirectory(): Promise<{
+/**
+ * Menarik SELURUH baris sebuah daftar, bukan hanya halaman pertama.
+ *
+ * Versi sebelumnya meminta satu halaman berisi 200 baris dan memperlakukannya
+ * sebagai keseluruhan. Untuk member, akibatnya tidak terlihat sebagai galat:
+ * invoice milik member ke-201 ke atas tetap tampil, hanya saja kolom namanya
+ * jadi "—" — dan itu terbaca sebagai data member yang rusak, bukan sebagai
+ * daftar yang terpotong.
+ */
+async function tarikSemua<T>(jalur: string, batasAman = 5000): Promise<T[]> {
+  const kumpulan: T[] = []
+  for (;;) {
+    const res = await api.get<ListResponse<T>>(`${jalur}${query({ limit: 200, offset: kumpulan.length })}`)
+    if (res.data.length === 0) break
+    kumpulan.push(...res.data)
+    if (kumpulan.length >= res.meta.total || kumpulan.length >= batasAman) break
+  }
+  return kumpulan
+}
+
+interface Direktori {
   members: Map<string, MemberWithChapter>
   chapters: Map<string, Chapter>
-}> {
-  const [memberRes, chapterRes] = await Promise.all([
-    api.get<ListResponse<MemberWithChapter>>(`/members${query({ limit: 200 })}`),
-    api.get<ListResponse<Chapter>>(`/chapters${query({ limit: 500 })}`),
-  ])
-  return {
-    members: new Map(memberRes.data.map((m) => [m.id, m])),
-    chapters: new Map(chapterRes.data.map((c) => [c.id, c])),
-  }
+}
+
+/**
+ * Tabel rujukan disimpan sebentar.
+ *
+ * Sebelumnya member dan chapter ditarik ulang pada SETIAP panggilan invoice.
+ * Itu masih tertutupi ketika halaman hanya memuat sekali; dengan paginasi di
+ * server, tiap pindah halaman dan tiap potongan ekspor membayar dua permintaan
+ * tambahan untuk data yang praktis tidak berubah.
+ *
+ * Umurnya pendek dengan sengaja — member yang baru dibuat harus muncul tanpa
+ * perlu memuat ulang halaman.
+ */
+const UMUR_DIREKTORI = 60_000
+let direktori: { pada: number; isi: Promise<Direktori> } | null = null
+
+async function loadDirectory(): Promise<Direktori> {
+  const sekarang = Date.now()
+  // Menyimpan PROMISE-nya, bukan hasilnya: tanpa itu, dua panggilan yang
+  // berbarengan sama-sama melihat cache kosong dan sama-sama menembak jaringan.
+  if (direktori && sekarang - direktori.pada < UMUR_DIREKTORI) return direktori.isi
+
+  const isi = (async () => {
+    const [members, chapters] = await Promise.all([
+      tarikSemua<MemberWithChapter>('/members'),
+      tarikSemua<Chapter>('/chapters'),
+    ])
+    return {
+      members: new Map(members.map((m) => [m.id, m])),
+      chapters: new Map(chapters.map((c) => [c.id, c])),
+    }
+  })()
+
+  // Kegagalan tidak boleh mengendap di cache dan membuat halaman rusak selama
+  // semenit penuh; permintaan berikutnya harus boleh mencoba lagi.
+  isi.catch(() => {
+    if (direktori?.isi === isi) direktori = null
+  })
+
+  direktori = { pada: sekarang, isi }
+  return isi
 }
 
 function attach(
@@ -99,31 +153,59 @@ async function reconcileNetworkFailure(
   throw err
 }
 
+/** Menyusun query dari filter UI; "all" berarti tidak menyaring. */
+function paramFilter(f: InvoiceFilters | undefined) {
+  const nilai = (v?: string) => (v && v !== 'all' ? v : undefined)
+  return {
+    status: nilai(f?.status),
+    type: nilai(f?.type),
+    chapterId: nilai(f?.chapterId),
+    aging: nilai(f?.aging),
+    q: f?.search?.trim() || undefined,
+    dueFrom: f?.dueFrom || undefined,
+    dueTo: f?.dueTo || undefined,
+    issuedFrom: f?.issuedFrom || undefined,
+    issuedTo: f?.issuedTo || undefined,
+  }
+}
+
+/**
+ * Batas per permintaan yang diterima server.
+ *
+ * Bukan angka pilihan klien: server menolak limit di atas 200, jadi menaikkannya
+ * di sini hanya menghasilkan permintaan yang ditolak diam-diam.
+ */
+const MAKS_PER_HALAMAN = 200
+
 export const apiInvoiceRepository: InvoiceRepository = {
-  async list(filters) {
-    const res = await api.get<ListResponse<Invoice>>(
+  async listPaged(filters) {
+    const res = await api.get<ListResponse<Invoice> & { meta: { summary?: InvoiceSummary } }>(
       `/invoices${query({
-        status: filters?.status && filters.status !== 'all' ? filters.status : undefined,
-        type: filters?.type && filters.type !== 'all' ? filters.type : undefined,
-        chapterId: filters?.chapterId && filters.chapterId !== 'all' ? filters.chapterId : undefined,
-        limit: 200,
+        ...paramFilter(filters),
+        summary: filters?.summary ? 'true' : undefined,
+        limit: Math.min(filters?.limit ?? 25, MAKS_PER_HALAMAN),
+        offset: filters?.offset ?? 0,
       })}`,
     )
     await syncOverdue(res.data)
 
     const { members, chapters } = await loadDirectory()
-    let rows = res.data.map((i) => attach(i, members, chapters))
-
-    // Search spans the invoice number AND the member name, which the API can't
-    // do in one query — it only indexes the number.
-    const term = filters?.search?.trim().toLowerCase()
-    if (term) {
-      rows = rows.filter(
-        (r) =>
-          r.number.toLowerCase().includes(term) ||
-          (r.member?.name ?? '').toLowerCase().includes(term),
-      )
+    return {
+      rows: res.data.map((i) => attach(i, members, chapters)),
+      total: res.meta.total,
+      summary: res.meta.summary,
     }
+  },
+
+  async list(filters) {
+    const res = await api.get<ListResponse<Invoice>>(
+      `/invoices${query({ ...paramFilter(filters), limit: MAKS_PER_HALAMAN })}`,
+    )
+    await syncOverdue(res.data)
+
+    const { members, chapters } = await loadDirectory()
+    const rows = res.data.map((i) => attach(i, members, chapters))
+
     return rows
   },
 

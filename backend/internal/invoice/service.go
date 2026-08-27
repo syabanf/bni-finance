@@ -20,6 +20,7 @@ type Store interface {
 	CountPayments(ctx context.Context, invoiceID string) (int, error)
 	NextNumber(ctx context.Context, year int) (string, error)
 	LateFeeRule(ctx context.Context) (domain.LateFeeRule, error)
+	Summary(ctx context.Context, f domain.InvoiceFilter) (*domain.InvoiceSummary, error)
 }
 
 // compile-time check that the Postgres repository satisfies the contract.
@@ -38,6 +39,12 @@ func (s *Service) List(ctx context.Context, f domain.InvoiceFilter) ([]domain.In
 	}
 	s.tempelkanDenda(ctx, items)
 	return items, total, nil
+}
+
+// Summary mengagregasi seluruh hasil filter, untuk kartu ringkasan dan hitungan
+// per tab status.
+func (s *Service) Summary(ctx context.Context, f domain.InvoiceFilter) (*domain.InvoiceSummary, error) {
+	return s.repo.Summary(ctx, f)
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*domain.Invoice, error) {

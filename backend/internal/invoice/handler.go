@@ -27,6 +27,9 @@ type listMeta struct {
 	Total  int `json:"total"`
 	Limit  int `json:"limit"`
 	Offset int `json:"offset"`
+	// Summary hanya terisi bila diminta lewat ?summary=true. Nil-nya dihilangkan
+	// dari JSON, jadi pemanggil lama tidak melihat perubahan apa pun.
+	Summary *domain.InvoiceSummary `json:"summary,omitempty"`
 }
 
 type listResponse struct {
@@ -45,6 +48,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		DueTo:      httpx.Query(r, "dueTo"),
 		IssuedFrom: httpx.Query(r, "issuedFrom"),
 		IssuedTo:   httpx.Query(r, "issuedTo"),
+		Aging:      httpx.Query(r, "aging"),
 		Limit:      httpx.QueryInt(r, "limit", 50, 1, 200),
 		Offset:     httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
 	}
@@ -54,10 +58,23 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, listResponse{
-		Data: items,
-		Meta: listMeta{Total: total, Limit: f.Limit, Offset: f.Offset},
-	})
+	meta := listMeta{Total: total, Limit: f.Limit, Offset: f.Offset}
+
+	// Ringkasan hanya dihitung bila diminta.
+	//
+	// Ia satu query agregat tambahan, dan sebagian besar pemanggil — dashboard,
+	// laporan, autofill — tidak membutuhkannya. Menyalakannya untuk semua
+	// berarti membebankan biaya itu pada jalur yang tidak memakainya.
+	if httpx.Query(r, "summary") == "true" {
+		ringkas, err := h.svc.Summary(r.Context(), f)
+		if err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+		meta.Summary = ringkas
+	}
+
+	httpx.JSON(w, http.StatusOK, listResponse{Data: items, Meta: meta})
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {

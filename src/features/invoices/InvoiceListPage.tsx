@@ -1,7 +1,13 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, FileText, Plus, Search, Send, X } from 'lucide-react'
-import type { Chapter, InvoiceStatus, InvoiceType, InvoiceWithRelations } from '@/types'
+import type {
+  Chapter,
+  InvoicePage,
+  InvoiceStatus,
+  InvoiceType,
+  InvoiceWithRelations,
+} from '@/types'
 import {
   Button,
   Card,
@@ -22,8 +28,7 @@ import { chapterService, invoiceService } from '@/services'
 import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
-import { isOutstanding, INVOICE_STATUS_LABEL } from '@/lib/status'
-import { daysUntil } from '@/lib/date'
+import { INVOICE_STATUS_LABEL } from '@/lib/status'
 import { downloadCsv } from '@/lib/csv'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
@@ -67,9 +72,6 @@ export function InvoiceListPage() {
   const initialType = (searchParams.get('type') as InvoiceType | null) ?? 'all'
   const initialChapter = searchParams.get('chapter') ?? 'all'
 
-  const { data: invoices, loading, error, reload } = useAsync<InvoiceWithRelations[]>(() =>
-    invoiceService.list(),
-  )
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
   const canCreate = useCan('invoice:create')
@@ -90,77 +92,111 @@ export function InvoiceListPage() {
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
 
-  // Everything except the status filter. Drives the summary cards and the
-  // status-tab counts, so they reflect type/chapter/search/due-date while still
-  // showing the full per-status breakdown the user is choosing between.
-  const baseFiltered = useMemo(() => {
-    if (!invoices) return []
-    const q = search.trim().toLowerCase()
-    return invoices.filter((inv) => {
-      if (type !== 'all' && inv.type !== type) return false
-      if (chapterId !== 'all' && inv.chapterId !== chapterId) return false
-      if (q && !inv.number.toLowerCase().includes(q) && !(inv.member?.name ?? '').toLowerCase().includes(q))
-        return false
-      // Missing due date is out-of-range for BOTH bounds (symmetric).
-      if (dueFrom && (!inv.dueDate || inv.dueDate < dueFrom)) return false
-      if (dueTo && (!inv.dueDate || inv.dueDate > dueTo)) return false
-      // Tanggal terbit (createdAt) — sumbu waktu yang dipakai Laporan.
-      const issued = inv.createdAt ? inv.createdAt.slice(0, 10) : ''
-      if (issuedFrom && (!issued || issued < issuedFrom)) return false
-      if (issuedTo && (!issued || issued > issuedTo)) return false
-      // Umur tunggakan: hanya invoice belum dibayar yang punya "umur".
-      if (aging !== 'all') {
-        if (!isOutstanding(inv.status) || !inv.dueDate) return false
-        const late = -daysUntil(inv.dueDate) // positif = jumlah hari telat
-        if (late < 1) return false
-        if (aging === '1-30' && late > 30) return false
-        if (aging === '31-60' && (late < 31 || late > 60)) return false
-        if (aging === '60+' && late <= 60) return false
-      }
-      return true
-    })
-  }, [invoices, type, chapterId, search, dueFrom, dueTo, issuedFrom, issuedTo, aging])
+  /**
+   * Pencarian ditunda sebelum dikirim.
+   *
+   * Tanpa penundaan, setiap ketukan tombol memicu satu permintaan; mengetik
+   * nama member berarti belasan kueri yang seluruhnya usang begitu tiba, dan
+   * jawaban yang datang tak berurutan bisa menampilkan hasil dari ketukan
+   * sebelumnya.
+   */
+  const [searchTertunda, setSearchTertunda] = useState(search)
+  useEffect(() => {
+    const t = setTimeout(() => setSearchTertunda(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
 
-  const countByStatus = useMemo(() => {
-    return baseFiltered.reduce<Record<string, number>>((acc, inv) => {
-      acc[inv.status] = (acc[inv.status] ?? 0) + 1
-      return acc
-    }, {})
-  }, [baseFiltered])
+  const filterAktif = useMemo(
+    () => ({
+      status,
+      type,
+      chapterId,
+      search: searchTertunda,
+      aging,
+      dueFrom,
+      dueTo,
+      issuedFrom,
+      issuedTo,
+    }),
+    [status, type, chapterId, searchTertunda, aging, dueFrom, dueTo, issuedFrom, issuedTo],
+  )
+
+  // Filter berubah, halaman kembali ke satu. Tanpa ini, menyaring dari 300 baris
+  // ke 4 baris sementara halaman masih di 5 menampilkan tabel kosong — dan
+  // kosong terbaca sebagai "tidak ada datanya", bukan "halamannya kejauhan".
+  useEffect(() => {
+    setPage(1)
+  }, [filterAktif])
+
+  const {
+    data: halaman,
+    loading,
+    error,
+    reload,
+  } = useAsync<InvoicePage>(
+    () =>
+      invoiceService.listPaged({
+        ...filterAktif,
+        summary: true,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+      }),
+    [filterAktif, page],
+  )
+
+  // Halaman terakhir yang berhasil dipertahankan selama permintaan berikutnya
+  // berjalan, supaya tabel tidak berkedip kosong tiap kali pindah halaman.
+  const [terakhir, setTerakhir] = useState<InvoicePage | null>(null)
+  useEffect(() => {
+    if (halaman) setTerakhir(halaman)
+  }, [halaman])
+  const aktif = halaman ?? terakhir
+
+  const paginated = aktif?.rows ?? []
+  const totalBaris = aktif?.total ?? 0
+
+  /**
+   * Angka untuk SELURUH hasil filter, dihitung server.
+   *
+   * Dulu dihitung dari array di klien. Itu bekerja hanya selama seluruh baris
+   * ada di klien — dan tidak pernah benar-benar begitu: permintaannya dipaku
+   * pada 200 baris, jadi tiap angka di halaman ini diam-diam berhenti tumbuh
+   * di sana.
+   */
+  const byStatus: Record<string, { count: number; amount: number }> =
+    aktif?.summary?.byStatus ?? {}
+  const ambil = (k: string) => byStatus[k] ?? { count: 0, amount: 0 }
+
+  const countByStatus = useMemo(
+    () =>
+      Object.fromEntries(Object.entries(byStatus).map(([k, v]) => [k, v.count])) as Record<
+        string,
+        number
+      >,
+    [byStatus],
+  )
 
   const summary = useMemo(() => {
-    const list = baseFiltered
-    const amt = (pred: (i: InvoiceWithRelations) => boolean) =>
-      list.filter(pred).reduce((a, i) => a + i.amount, 0)
+    const sent = ambil('sent')
+    const overdue = ambil('overdue')
     return {
-      // Exclude cancelled from the headline total (matches the dashboard — a
-      // voided invoice shouldn't inflate "total billed").
-      total: {
-        count: list.filter((i) => i.status !== 'cancelled').length,
-        amount: amt((i) => i.status !== 'cancelled'),
-      },
+      total: aktif?.summary?.total ?? { count: 0, amount: 0 },
       outstanding: {
-        count: list.filter((i) => isOutstanding(i.status)).length,
-        amount: amt((i) => isOutstanding(i.status)),
+        count: sent.count + overdue.count,
+        amount: sent.amount + overdue.amount,
       },
-      overdue: { count: countByStatus.overdue ?? 0, amount: amt((i) => i.status === 'overdue') },
-      paid: { count: countByStatus.paid ?? 0, amount: amt((i) => i.status === 'paid') },
+      overdue,
+      paid: ambil('paid'),
     }
-  }, [baseFiltered, countByStatus])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aktif])
 
-  const filtered = useMemo(() => {
-    return baseFiltered.filter((inv) => {
-      if (status === 'outstanding') return isOutstanding(inv.status)
-      if (status !== 'all') return inv.status === status
-      return true
-    })
-  }, [baseFiltered, status])
 
   // Bulk actions operate only on currently-visible (filtered) selected rows —
   // so tightening a filter can't leave hidden invoices in the batch.
   const selectedInvoices = useMemo(
-    () => filtered.filter((inv) => selected.has(inv.id)),
-    [filtered, selected],
+    () => paginated.filter((inv) => selected.has(inv.id)),
+    [paginated, selected],
   )
   const selectedSendable = useMemo(
     () => selectedInvoices.filter((inv) => inv.status === 'draft' || inv.status === 'sent' || inv.status === 'overdue'),
@@ -234,20 +270,81 @@ export function InvoiceListPage() {
   }
 
 
-  // Reset ke halaman 1 setiap kali filter berubah
-  useEffect(() => {
-    setPage(1)
-  }, [filtered])
+  const totalPages = Math.max(1, Math.ceil(totalBaris / PAGE_SIZE))
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const EXPORT_HEADERS = ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo']
+
+  /**
+   * Batas jumlah baris yang diekspor.
+   *
+   * Ada batasnya karena ekspor tanpa batas menahan peramban selama puluhan
+   * permintaan dan menyusun berkas yang tak terbuka di mana pun. Kalau batas ini
+   * tersentuh, orangnya DIBERI TAHU — ekspor yang diam-diam terpotong adalah
+   * persis bug yang sedang diperbaiki di halaman ini, dan mengulanginya di
+   * tempat lain hanya memindahkannya.
+   */
+  const BATAS_EKSPOR = 5000
+
+  const [mengekspor, setMengekspor] = useState(false)
+
+  /**
+   * Menarik SELURUH hasil filter, bukan halaman yang sedang tampil.
+   *
+   * Ini bagian yang paling mudah luput. Dengan paginasi di server, klien hanya
+   * memegang 25 baris; mengekspor dari situ menghasilkan berkas yang terlihat
+   * benar, tertulis "Daftar Invoice", dan diam-diam kehilangan sisanya.
+   */
+  async function ambilSemuaBaris() {
+    const kumpulan: InvoiceWithRelations[] = []
+    let total = 0
+    for (;;) {
+      const h = await invoiceService.listPaged({
+        ...filterAktif,
+        limit: 200,
+        offset: kumpulan.length,
+      })
+      total = h.total
+      if (h.rows.length === 0) break
+      kumpulan.push(...h.rows)
+      if (kumpulan.length >= total || kumpulan.length >= BATAS_EKSPOR) break
+    }
+    return { baris: kumpulan.slice(0, BATAS_EKSPOR), total }
+  }
+
+  /** Membungkus ekspor: satu tempat untuk status sibuk, galat, dan peringatan potong. */
+  async function jalankanEkspor(
+    tulis: (baris: InvoiceWithRelations[]) => void | boolean,
+  ) {
+    setMengekspor(true)
+    try {
+      const { baris, total } = await ambilSemuaBaris()
+      if (baris.length === 0) {
+        toast('Tidak ada invoice yang cocok dengan filter ini.', 'error')
+        return
+      }
+      const hasil = tulis(baris)
+      if (hasil === false) {
+        toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
+        return
+      }
+      if (total > baris.length) {
+        toast(
+          `Ekspor dibatasi ${baris.length.toLocaleString('id-ID')} dari ${total.toLocaleString('id-ID')} invoice. Persempit filter untuk mengekspor sisanya.`,
+          'error',
+        )
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengambil data untuk ekspor.', 'error')
+    } finally {
+      setMengekspor(false)
+    }
+  }
 
   const typeLabel = (t: InvoiceType) => (t === 'registration' ? 'Pendaftaran' : 'Renewal')
 
-  const EXPORT_HEADERS = ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo']
-  // Raw rows (amount stays numeric so Excel can sum it) — always the FILTERED set.
-  const exportRows = () =>
-    filtered.map((inv) => [
+  // Nominal tetap angka supaya Excel bisa menjumlahkannya.
+  const barisEkspor = (baris: InvoiceWithRelations[]) =>
+    baris.map((inv) => [
       inv.number,
       inv.member?.name ?? '',
       inv.chapter?.displayName ?? '',
@@ -257,38 +354,48 @@ export function InvoiceListPage() {
       formatDate(inv.dueDate),
     ])
 
-  const exportCsv = () => downloadCsv('invoice.csv', EXPORT_HEADERS, exportRows())
-  const exportExcel = () => downloadXlsx('invoice', 'Daftar Invoice', EXPORT_HEADERS, exportRows())
+  const exportCsv = () =>
+    jalankanEkspor((b) => downloadCsv('invoice.csv', EXPORT_HEADERS, barisEkspor(b)))
 
-  const exportPdf = () => {
-    const total = filtered.reduce((a, i) => a + i.amount, 0)
-    const ok = printTableReport({
-      title: 'Daftar Invoice',
-      subtitle: `Status: ${STATUS_TABS.find((t) => t.value === status)?.label ?? 'Semua'}`,
-      meta: [`${filtered.length} invoice`, `Dibuat ${formatDateTime(new Date())}`],
-      columns: [
-        { label: 'No. Invoice' },
-        { label: 'Member' },
-        { label: 'Chapter' },
-        { label: 'Tipe' },
-        { label: 'Nominal', align: 'right' },
-        { label: 'Status' },
-        { label: 'Jatuh Tempo' },
-      ],
-      rows: filtered.map((inv) => [
-        inv.number,
-        inv.member?.name ?? '—',
-        inv.chapter?.displayName ?? '—',
-        typeLabel(inv.type),
-        formatCurrency(inv.amount),
-        INVOICE_STATUS_LABEL[inv.status],
-        formatDate(inv.dueDate),
-      ]),
-      totals: ['', '', '', 'Total', formatCurrency(total), '', ''],
-      documentTitle: 'Daftar Invoice — BNI Finance',
-    })
-    if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
-  }
+  const exportExcel = () =>
+    jalankanEkspor((b) => downloadXlsx('invoice', 'Daftar Invoice', EXPORT_HEADERS, barisEkspor(b)))
+
+  const exportPdf = () =>
+    jalankanEkspor((b) =>
+      printTableReport({
+        title: 'Daftar Invoice',
+        subtitle: `Status: ${STATUS_TABS.find((t) => t.value === status)?.label ?? 'Semua'}`,
+        meta: [`${b.length} invoice`, `Dibuat ${formatDateTime(new Date())}`],
+        columns: [
+          { label: 'No. Invoice' },
+          { label: 'Member' },
+          { label: 'Chapter' },
+          { label: 'Tipe' },
+          { label: 'Nominal', align: 'right' },
+          { label: 'Status' },
+          { label: 'Jatuh Tempo' },
+        ],
+        rows: b.map((inv) => [
+          inv.number,
+          inv.member?.name ?? '—',
+          inv.chapter?.displayName ?? '—',
+          typeLabel(inv.type),
+          formatCurrency(inv.amount),
+          INVOICE_STATUS_LABEL[inv.status],
+          formatDate(inv.dueDate),
+        ]),
+        totals: [
+          '',
+          '',
+          '',
+          'Total',
+          formatCurrency(b.reduce((a, i) => a + i.amount, 0)),
+          '',
+          '',
+        ],
+        documentTitle: 'Daftar Invoice — BNI Finance',
+      }),
+    )
 
   return (
     <div>
@@ -297,7 +404,12 @@ export function InvoiceListPage() {
         description="Kelola seluruh invoice pendaftaran dan renewal."
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />
+            <ExportMenu
+              onExcel={exportExcel}
+              onCsv={exportCsv}
+              onPdf={exportPdf}
+              disabled={mengekspor || totalBaris === 0}
+            />
             {canCreate && (
               <Button data-tour="invoice-new" onClick={() => navigate('/invoices/new')}>
                 <Plus className="h-4 w-4" />
@@ -350,7 +462,7 @@ export function InvoiceListPage() {
           {STATUS_TABS.map((tab) => {
             const count =
               tab.value === 'all'
-                ? baseFiltered.length
+                ? Object.values(byStatus).reduce((a, b) => a + b.count, 0)
                 : tab.value === 'outstanding'
                   ? (countByStatus.sent ?? 0) + (countByStatus.overdue ?? 0)
                   : countByStatus[tab.value]
@@ -485,7 +597,7 @@ export function InvoiceListPage() {
           <ErrorState message={error} onRetry={reload} />
         ) : loading ? (
           <TableSkeleton rows={8} cols={7} />
-        ) : filtered.length === 0 ? (
+        ) : paginated.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="Tidak ada invoice"
@@ -506,9 +618,9 @@ export function InvoiceListPage() {
             />
             <div className="flex items-center justify-between gap-4 border-t border-ink-100 px-5 py-3">
               <span className="text-xs text-ink-400">
-                {filtered.length === 0
+                {totalBaris === 0
                   ? 'Tidak ada invoice'
-                  : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} dari ${filtered.length} invoice`}
+                  : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalBaris)} dari ${totalBaris.toLocaleString('id-ID')} invoice`}
               </span>
               {totalPages > 1 && (
                 <div className="flex items-center gap-1">

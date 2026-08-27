@@ -640,9 +640,33 @@
           {
             "name": "q",
             "in": "query",
-            "description": "Pencarian pada **nomor invoice** saja (belum nama member).",
+            "description": "Pencarian pada **nomor invoice dan nama member**. Nama member dulu disaring di klien setelah seluruh baris ditarik; begitu paginasi pindah ke server, penyaringan itu hanya akan berlaku pada halaman yang kebetulan tampil — dan orang akan menyimpulkan membernya tidak ada. Karena itu sekarang dikerjakan server.\n",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "aging",
+            "in": "query",
+            "description": "Umur tunggakan. Dihitung dari `due_date` terhadap **hari ini di basis data**, bukan tanggal kiriman klien — jam peramban bisa salah, dan umur yang bergeser sehari memindahkan invoice antar keranjang. Otomatis membatasi ke `sent` dan `overdue`.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1-30",
+                "31-60",
+                "60+"
+              ]
+            }
+          },
+          {
+            "name": "summary",
+            "in": "query",
+            "description": "`true` menambahkan `meta.summary`: hitungan dan jumlah per status untuk **seluruh hasil filter**, bukan halaman yang dikirim. Halaman daftar membutuhkannya untuk kartu ringkasan dan angka pada tiap tab — menghitungnya dari satu halaman menampilkan angka jauh lebih kecil daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru. Satu query agregat tambahan, jadi tidak dinyalakan untuk pemanggil yang tidak memerlukannya.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
             }
           },
           {

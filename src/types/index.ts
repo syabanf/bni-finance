@@ -211,10 +211,51 @@ export interface DashboardSummary {
 // ---------------------------------------------------------------------------
 
 export interface InvoiceFilters {
-  status?: InvoiceStatus | 'all'
+  /** `outstanding` adalah jalan pintas server untuk sent + overdue. */
+  status?: InvoiceStatus | 'all' | 'outstanding'
   type?: InvoiceType | 'all'
   chapterId?: string | 'all'
   search?: string
+  /** Umur tunggakan; dihitung server terhadap tanggal basis data. */
+  aging?: '1-30' | '31-60' | '60+' | 'all'
+  dueFrom?: string
+  dueTo?: string
+  issuedFrom?: string
+  issuedTo?: string
+  limit?: number
+  offset?: number
+  /**
+   * Minta agregat untuk seluruh hasil filter. Bawaannya mati.
+   *
+   * Satu query agregat tambahan di server, jadi pemanggil yang hanya butuh
+   * barisnya — ekspor, misalnya — tidak membayarnya.
+   */
+  summary?: boolean
+}
+
+/**
+ * Hitungan dan jumlah untuk SELURUH hasil filter, bukan halaman yang diterima.
+ *
+ * Dihitung server. Begitu paginasi pindah ke server, klien hanya memegang satu
+ * halaman — menghitung kartu ringkasan darinya akan menampilkan angka jauh
+ * lebih kecil daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru.
+ */
+export interface InvoiceBucket {
+  count: number
+  amount: number
+}
+
+export interface InvoiceSummary {
+  byStatus: Record<string, InvoiceBucket>
+  /** Tidak termasuk cancelled dan terminated — yang batal bukan yang ditagih. */
+  total: InvoiceBucket
+}
+
+/** Satu halaman invoice, beserta angka untuk keseluruhan hasil filter. */
+export interface InvoicePage {
+  rows: InvoiceWithRelations[]
+  total: number
+  summary?: InvoiceSummary
 }
 
 export interface RenewalDueMember extends MemberWithChapter {
