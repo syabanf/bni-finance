@@ -11,7 +11,13 @@
  * only needs the request side — method, path, params, a starter body — plus
  * enough prose to explain each call. Response schemas stay in /docs.
  *
- *   node scripts/build-api-collection.mjs
+ *   node scripts/build-api-collection.mjs           menulis ulang berkasnya
+ *   node scripts/build-api-collection.mjs --check   hanya memeriksa, tanpa menulis
+ *
+ * --check dipakai `npm run typecheck`. Tanpa itu berkas ini pernah tertinggal
+ * diam-diam melewati tiga perubahan berturut-turut: konsol API menampilkan
+ * daftar endpoint yang sudah tidak sesuai spesifikasi, dan tidak ada satu pun
+ * yang gagal. openapi.json sendiri sudah dijaga tes Go; turunannya belum.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -202,7 +208,25 @@ const collection = {
   operations,
 }
 
-writeFileSync(OUT, JSON.stringify(collection, null, 2) + '\n')
+const isi = JSON.stringify(collection, null, 2) + '\n'
 
-const bytes = readFileSync(OUT).length
-console.log(`${operations.length} operasi → public/api-collection.json (${(bytes / 1024).toFixed(1)} KB)`)
+if (process.argv.includes('--check')) {
+  let tersimpan = null
+  try {
+    tersimpan = readFileSync(OUT, 'utf8')
+  } catch {
+    // Berkasnya belum ada — sama saja dengan basi.
+  }
+  if (tersimpan !== isi) {
+    console.error(
+      'public/api-collection.json tidak sesuai openapi.json.\n' +
+        'Jalankan `npm run api-collection` lalu commit hasilnya.',
+    )
+    process.exit(1)
+  }
+  console.log(`\u2713 api-collection sinkron — ${operations.length} operasi`)
+} else {
+  writeFileSync(OUT, isi)
+  const bytes = readFileSync(OUT).length
+  console.log(`${operations.length} operasi → public/api-collection.json (${(bytes / 1024).toFixed(1)} KB)`)
+}
