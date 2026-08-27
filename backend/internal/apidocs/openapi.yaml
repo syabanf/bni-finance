@@ -850,6 +850,11 @@ paths:
     get:
       tags: [Chapter]
       summary: Daftar chapter
+      description: >
+        **Dibatasi per chapter.** Pengguna berlingkup hanya menerima chapternya
+        sendiri. Daftar ini juga mengisi dropdown penyaring chapter di UI, jadi
+        mengembalikan seluruhnya membuat seolah pengguna boleh menelusuri
+        chapter lain.
       parameters:
         - name: q
           in: query
@@ -1084,6 +1089,13 @@ paths:
       summary: Agregat KPI
       description: |
         Bentuknya persis `DashboardSummary` di frontend.
+
+        **Dibatasi per chapter.** Pengguna berlingkup (ST dan MC) hanya menerima
+        angka chapternya sendiri — termasuk `chapterStats`, yang tidak lagi
+        menyebut chapter lain sama sekali. Sebelumnya endpoint ini tidak
+        membatasi apa pun: daftar invoice seorang ST sudah benar, tetapi
+        dashboard — halaman pertama setelah login — menampilkan setiap chapter
+        lengkap dengan nominalnya, berikut total nasional.
 
         Angka `trend` membandingkan **30 hari terakhir** dengan 30 hari
         sebelumnya, dibulatkan satu desimal. Pertumbuhan dari nol dilaporkan

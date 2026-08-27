@@ -1522,6 +1522,7 @@
           "Chapter"
         ],
         "summary": "Daftar chapter",
+        "description": "**Dibatasi per chapter.** Pengguna berlingkup hanya menerima chapternya sendiri. Daftar ini juga mengisi dropdown penyaring chapter di UI, jadi mengembalikan seluruhnya membuat seolah pengguna boleh menelusuri chapter lain.\n",
         "parameters": [
           {
             "name": "q",
@@ -1949,7 +1950,7 @@
           "Dashboard"
         ],
         "summary": "Agregat KPI",
-        "description": "Bentuknya persis `DashboardSummary` di frontend.\n\nAngka `trend` membandingkan **30 hari terakhir** dengan 30 hari\nsebelumnya, dibulatkan satu desimal. Pertumbuhan dari nol dilaporkan\n`+100`, bukan tak hingga.\n",
+        "description": "Bentuknya persis `DashboardSummary` di frontend.\n\n**Dibatasi per chapter.** Pengguna berlingkup (ST dan MC) hanya menerima\nangka chapternya sendiri — termasuk `chapterStats`, yang tidak lagi\nmenyebut chapter lain sama sekali. Sebelumnya endpoint ini tidak\nmembatasi apa pun: daftar invoice seorang ST sudah benar, tetapi\ndashboard — halaman pertama setelah login — menampilkan setiap chapter\nlengkap dengan nominalnya, berikut total nasional.\n\nAngka `trend` membandingkan **30 hari terakhir** dengan 30 hari\nsebelumnya, dibulatkan satu desimal. Pertumbuhan dari nol dilaporkan\n`+100`, bukan tak hingga.\n",
         "parameters": [
           {
             "name": "months",
