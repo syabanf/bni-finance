@@ -23,6 +23,7 @@ import type {
   Invoice,
   InvoiceFilters,
   InvoiceType,
+  InvoicePage,
   InvoiceWithRelations,
   MemberWithChapter,
   PaymentWithInvoice,
@@ -120,6 +121,15 @@ export interface MemberRepository {
 
 export interface InvoiceRepository {
   list(filters?: InvoiceFilters): Promise<InvoiceWithRelations[]>
+  /**
+   * Satu halaman, disaring dan dihitung SERVER.
+   *
+   * Terpisah dari list() dengan sengaja. list() menarik apa adanya dan dipakai
+   * pemanggil yang memang butuh seluruh baris; ia juga masih terpaku pada batas
+   * 200 baris — potongan diam yang belum diperbaiki untuk Dasbor, daftar
+   * Chapter, dan Notifikasi.
+   */
+  listPaged(filters?: InvoiceFilters): Promise<InvoicePage>
   getById(id: string): Promise<InvoiceWithRelations | null>
   listByMember(memberId: string): Promise<Invoice[]>
   create(input: CreateInvoiceInput): Promise<Invoice>

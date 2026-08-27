@@ -2,10 +2,12 @@ import type { CreateInvoiceInput, InvoiceRepository } from '@/services/types'
 import type {
   AuditLogEntry,
   Invoice,
+  InvoiceFilters,
+  InvoiceSummary,
   InvoiceWithRelations,
   RenewalDueMember,
 } from '@/types'
-import { daysUntil } from '@/lib/date'
+import { daysUntil, todayISO } from '@/lib/date'
 import { delay, nextId, nowISO, store } from './store'
 
 /** Mark sent invoices past their due date as overdue. Called lazily before reads. */
@@ -50,32 +52,91 @@ function nextInvoiceNumber(): string {
   return `INV-${year}-${String(seq).padStart(3, '0')}`
 }
 
+/** Hari antara dua tanggal ISO, positif bila `sampai` lebih baru. */
+function selisihHari(dari: string, sampai: string): number {
+  return Math.floor((Date.parse(sampai) - Date.parse(dari)) / 86_400_000)
+}
+
+/**
+ * Menyaring persis seperti server.
+ *
+ * Dipakai bersama list() dan listPaged() agar keduanya tidak bisa berbeda.
+ * Mock yang menyaring lain dari server membuat bug hanya muncul di produksi,
+ * dan justru di sanalah bug paling mahal untuk ditemukan.
+ */
+function saring(semua: InvoiceWithRelations[], filters?: InvoiceFilters) {
+  let hasil = semua
+
+  if (filters?.status && filters.status !== 'all') {
+    hasil =
+      filters.status === 'outstanding'
+        ? hasil.filter((i) => i.status === 'sent' || i.status === 'overdue')
+        : hasil.filter((i) => i.status === filters.status)
+  }
+  if (filters?.type && filters.type !== 'all') {
+    hasil = hasil.filter((i) => i.type === filters.type)
+  }
+  if (filters?.chapterId && filters.chapterId !== 'all') {
+    hasil = hasil.filter((i) => i.chapterId === filters.chapterId)
+  }
+  if (filters?.search) {
+    const q = filters.search.toLowerCase()
+    hasil = hasil.filter(
+      (i) =>
+        i.number.toLowerCase().includes(q) || (i.member?.name ?? '').toLowerCase().includes(q),
+    )
+  }
+  if (filters?.dueFrom) hasil = hasil.filter((i) => i.dueDate >= filters.dueFrom!)
+  if (filters?.dueTo) hasil = hasil.filter((i) => i.dueDate <= filters.dueTo!)
+  // Server menyaring created_at untuk "tanggal terbit"; mock harus memakai
+  // kolom yang sama, bukan dueDate — dua sumbu waktu yang berbeda akan membuat
+  // rentang tanggal memilih baris yang berbeda antara mock dan produksi.
+  if (filters?.issuedFrom) hasil = hasil.filter((i) => i.createdAt.slice(0, 10) >= filters.issuedFrom!)
+  if (filters?.issuedTo) hasil = hasil.filter((i) => i.createdAt.slice(0, 10) <= filters.issuedTo!)
+
+  if (filters?.aging && filters.aging !== 'all') {
+    const hariIni = todayISO()
+    hasil = hasil.filter((i) => {
+      if (i.status !== 'sent' && i.status !== 'overdue') return false
+      const telat = selisihHari(i.dueDate, hariIni)
+      if (filters.aging === '1-30') return telat >= 1 && telat <= 30
+      if (filters.aging === '31-60') return telat >= 31 && telat <= 60
+      return telat > 60
+    })
+  }
+
+  return hasil.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
 export const mockInvoiceRepository: InvoiceRepository = {
   async list(filters) {
     syncOverdueStatus()
-    let result = store.invoices.map(relations)
+    return delay(saring(store.invoices.map(relations), filters))
+  },
 
-    if (filters?.status && filters.status !== 'all') {
-      result = result.filter((i) => i.status === filters.status)
-    }
-    if (filters?.type && filters.type !== 'all') {
-      result = result.filter((i) => i.type === filters.type)
-    }
-    if (filters?.chapterId && filters.chapterId !== 'all') {
-      result = result.filter((i) => i.chapterId === filters.chapterId)
-    }
-    if (filters?.search) {
-      const q = filters.search.toLowerCase()
-      result = result.filter(
-        (i) =>
-          i.number.toLowerCase().includes(q) ||
-          (i.member?.name ?? '').toLowerCase().includes(q),
-      )
+  async listPaged(filters) {
+    syncOverdueStatus()
+    // Ringkasan dihitung dari SELURUH hasil filter — tanpa status, karena kartu
+    // dan tab harus tetap menampilkan angka status lain saat satu tab dipilih.
+    const semua = saring(store.invoices.map(relations), { ...filters, status: 'all' })
+    const byStatus: InvoiceSummary['byStatus'] = {}
+    let total = { count: 0, amount: 0 }
+    for (const i of semua) {
+      const b = (byStatus[i.status] ??= { count: 0, amount: 0 })
+      b.count += 1
+      b.amount += i.amount
+      if (i.status !== 'cancelled' && i.status !== 'terminated') {
+        total = { count: total.count + 1, amount: total.amount + i.amount }
+      }
     }
 
-    return delay(
-      result.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    )
+    const cocok = saring(store.invoices.map(relations), filters)
+    const offset = filters?.offset ?? 0
+    return delay({
+      rows: cocok.slice(offset, offset + (filters?.limit ?? 25)),
+      total: cocok.length,
+      summary: { byStatus, total },
+    })
   },
 
   async getById(id) {
