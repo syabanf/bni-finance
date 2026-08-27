@@ -236,8 +236,33 @@ type InvoiceFilter struct {
 	DueTo      string
 	IssuedFrom string
 	IssuedTo   string
-	Limit      int
-	Offset     int
+	// Aging menyaring berdasarkan UMUR TUNGGAKAN: "1-30", "31-60", "60+".
+	//
+	// Hanya invoice yang belum dibayar punya umur, jadi filter ini otomatis
+	// membatasi ke sent dan overdue. Dihitung dari due_date terhadap hari ini,
+	// bukan disimpan — umur yang tersimpan basi keesokan harinya.
+	Aging  string
+	Limit  int
+	Offset int
+}
+
+// InvoiceSummary adalah agregat untuk SELURUH hasil filter, bukan halaman yang
+// sedang ditampilkan.
+//
+// Ada karena halaman daftar menampilkan kartu ringkasan dan hitungan per tab
+// status. Dengan paginasi di server, klien hanya memegang satu halaman — dan
+// menghitung ringkasan dari situ akan menampilkan angka yang jauh lebih kecil
+// daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru.
+type InvoiceSummary struct {
+	ByStatus map[string]InvoiceBucket `json:"byStatus"`
+	// Total mencakup semua KECUALI cancelled dan terminated: tagihan yang
+	// ditarik kembali atau gugur tidak boleh menggelembungkan total tertagih.
+	Total InvoiceBucket `json:"total"`
+}
+
+type InvoiceBucket struct {
+	Count  int   `json:"count"`
+	Amount int64 `json:"amount"`
 }
 
 // ValidateUpdateFrom memeriksa apakah patch boleh diterapkan pada invoice yang

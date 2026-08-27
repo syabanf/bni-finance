@@ -146,6 +146,26 @@ func (s *fakeInvoiceStore) LateFeeRule(context.Context) (domain.LateFeeRule, err
 	return domain.LateFeeRule{}, nil
 }
 
+// Ringkasan dihitung dari isi stub, bukan dikembalikan kosong: tes rute yang
+// memeriksa bentuk jawabannya harus melihat angka yang benar-benar berasal dari
+// data, kalau tidak ia lulus meski agregatnya rusak.
+func (s *fakeInvoiceStore) Summary(context.Context, domain.InvoiceFilter) (*domain.InvoiceSummary, error) {
+	out := &domain.InvoiceSummary{ByStatus: map[string]domain.InvoiceBucket{}}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, inv := range s.items {
+		b := out.ByStatus[string(inv.Status)]
+		b.Count++
+		b.Amount += inv.Amount
+		out.ByStatus[string(inv.Status)] = b
+		if inv.Status != domain.StatusCancelled && inv.Status != domain.StatusTerminated {
+			out.Total.Count++
+			out.Total.Amount += inv.Amount
+		}
+	}
+	return out, nil
+}
+
 func (s *fakeInvoiceStore) NextNumber(_ context.Context, year int) (string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

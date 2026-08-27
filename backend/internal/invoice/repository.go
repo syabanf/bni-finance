@@ -102,8 +102,13 @@ func scan(row scannable) (*domain.Invoice, error) {
 	return &inv, nil
 }
 
-// List returns a filtered page plus the total row count for that filter.
-func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain.Invoice, int, error) {
+// klausaFilter menyusun WHERE dan argumennya dari sebuah filter.
+//
+// SATU tempat, dipakai List maupun Summary. Menyusunnya dua kali berarti
+// ringkasan dan daftarnya bisa menghitung himpunan yang berbeda — dan orang
+// akan membaca kartu "12 outstanding" di atas tabel berisi delapan baris tanpa
+// tahu mana yang benar.
+func klausaFilter(ctx context.Context, f domain.InvoiceFilter) (string, []any) {
 	where := []string{"1=1"}
 	args := []any{}
 	add := func(clause string, value any) {
@@ -141,7 +146,18 @@ func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain
 		add("member_id = $%d", f.MemberID)
 	}
 	if f.Search != "" {
-		add("number ILIKE $%d", "%"+f.Search+"%")
+		// Mencakup NOMOR dan NAMA MEMBER. Sebelumnya server hanya mencari nomor,
+		// dan klien menyaring nama sendiri setelah menarik seluruh baris —
+		// begitu paginasi pindah ke server, pencarian nama hanya akan berlaku
+		// pada halaman yang kebetulan sedang tampil, dan orang akan menyimpulkan
+		// membernya tidak ada.
+		//
+		// EXISTS, bukan JOIN: join menggandakan baris bila suatu saat relasinya
+		// berubah, dan penggandaan itu akan mengacaukan hitungan maupun jumlah
+		// pada ringkasan.
+		add(`(number ILIKE $%[1]d OR EXISTS (
+			SELECT 1 FROM members m WHERE m.id = invoices.member_id AND m.name ILIKE $%[1]d))`,
+			"%"+f.Search+"%")
 	}
 	if f.DueFrom != "" {
 		add("due_date >= $%d", f.DueFrom)
@@ -156,8 +172,26 @@ func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain
 		// inclusive: cover the whole end day
 		add("created_at < ($%d::date + interval '1 day')", f.IssuedTo)
 	}
+	// Umur tunggakan dihitung dari due_date terhadap HARI INI di basis data,
+	// bukan dari tanggal yang dikirim klien: jam peramban bisa salah, dan umur
+	// tunggakan yang bergeser sehari mengubah invoice mana yang masuk laporan.
+	//
+	// Hanya sent dan overdue yang punya umur — yang lain sudah selesai urusannya.
+	switch f.Aging {
+	case "1-30":
+		where = append(where, "status IN ('sent','overdue') AND due_date BETWEEN current_date - 30 AND current_date - 1")
+	case "31-60":
+		where = append(where, "status IN ('sent','overdue') AND due_date BETWEEN current_date - 60 AND current_date - 31")
+	case "60+":
+		where = append(where, "status IN ('sent','overdue') AND due_date < current_date - 60")
+	}
 
-	clause := strings.Join(where, " AND ")
+	return strings.Join(where, " AND "), args
+}
+
+// List returns a filtered page plus the total row count for that filter.
+func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain.Invoice, int, error) {
+	clause, args := klausaFilter(ctx, f)
 
 	var total int
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM invoices WHERE "+clause, args...).Scan(&total); err != nil {
@@ -543,6 +577,46 @@ func (r *Repository) LateFeeRule(ctx context.Context) (domain.LateFeeRule, error
 		case "denda_maks_hari":
 			n, _ := strconv.Atoi(v)
 			out.MaksHari = n
+		}
+	}
+	return out, rows.Err()
+}
+
+// Summary mengagregasi SELURUH hasil filter, bukan halaman yang ditampilkan.
+//
+// Satu query, dikelompokkan per status. Menghitungnya di klien dari halaman yang
+// sedang tampil akan menampilkan angka yang jauh lebih kecil daripada
+// kenyataannya — dan tidak ada satu pun tanda bahwa itu keliru.
+func (r *Repository) Summary(ctx context.Context, f domain.InvoiceFilter) (*domain.InvoiceSummary, error) {
+	// Status dikosongkan: kartu ringkasan menampilkan rincian PER status, jadi
+	// menyaring ke satu status lebih dulu membuat sisanya selalu nol. Filter
+	// lainnya tetap berlaku.
+	tanpaStatus := f
+	tanpaStatus.Status = ""
+	clause, args := klausaFilter(ctx, tanpaStatus)
+
+	rows, err := r.db.Query(ctx,
+		"SELECT status::text, COUNT(*), COALESCE(SUM(amount),0) FROM invoices WHERE "+
+			clause+" GROUP BY status", args...)
+	if err != nil {
+		return nil, fmt.Errorf("ringkas invoice: %w", err)
+	}
+	defer rows.Close()
+
+	out := &domain.InvoiceSummary{ByStatus: map[string]domain.InvoiceBucket{}}
+	for rows.Next() {
+		var status string
+		var b domain.InvoiceBucket
+		if err := rows.Scan(&status, &b.Count, &b.Amount); err != nil {
+			return nil, fmt.Errorf("scan ringkasan: %w", err)
+		}
+		out.ByStatus[status] = b
+		// cancelled dan terminated TIDAK masuk total: tagihan yang ditarik
+		// kembali atau gugur karena keanggotaan diputus bukan pendapatan, dan
+		// memasukkannya menggelembungkan angka yang dibaca sebagai total tertagih.
+		if status != string(domain.StatusCancelled) && status != string(domain.StatusTerminated) {
+			out.Total.Count += b.Count
+			out.Total.Amount += b.Amount
 		}
 	}
 	return out, rows.Err()
