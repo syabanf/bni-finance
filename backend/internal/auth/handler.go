@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
@@ -12,10 +14,13 @@ import (
 var timeNow = time.Now
 
 type Handler struct {
-	svc *Service
+	svc      *Service
+	pembatas *Pembatas
 }
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+func NewHandler(svc *Service) *Handler {
+	return &Handler{svc: svc, pembatas: NewPembatas()}
+}
 
 // RegisterPublic wires the routes that must work WITHOUT a token — login being
 // the obvious one, since you have no token until it succeeds.
@@ -74,11 +79,35 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
+
+	// Diperiksa SEBELUM kata sandinya diverifikasi. Memverifikasi lebih dulu
+	// berarti setiap percobaan yang ditolak tetap membayar biaya PBKDF2 600.000
+	// iterasi — pembatas yang justru menjadikan penebakan sebagai cara
+	// menghabiskan CPU server.
+	if sisa, terkunci := h.pembatas.Terkunci(in.Email); terkunci {
+		detik := int(sisa.Seconds()) + 1
+		w.Header().Set("Retry-After", strconv.Itoa(detik))
+		// Dibulatkan KE ATAS, bukan ditambah satu. Versi pertama memakai
+		// detik/60+1, sehingga tepat 900 detik dilaporkan sebagai "16 menit" —
+		// menyuruh orang menunggu semenit lebih lama daripada perlu, tiap kali.
+		httpx.Fail(w, httpx.NewError(http.StatusTooManyRequests, fmt.Sprintf(
+			"terlalu banyak percobaan masuk — coba lagi dalam %d menit", (detik+59)/60), nil))
+		return
+	}
+
 	result, err := h.svc.Login(r.Context(), in)
 	if err != nil {
+		// Hanya kredensial yang salah yang dihitung. Galat lain — basis data
+		// mati, permintaan cacat — bukan penebakan, dan menghitungnya membuat
+		// gangguan sesaat pada server ikut mengunci orang yang tidak melakukan
+		// apa-apa.
+		if httpx.StatusOf(err) == http.StatusUnauthorized {
+			h.pembatas.Gagal(in.Email)
+		}
 		httpx.Fail(w, err)
 		return
 	}
+	h.pembatas.Berhasil(in.Email)
 	httpx.JSON(w, http.StatusOK, result)
 }
 
