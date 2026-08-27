@@ -17,6 +17,7 @@ import type {
   AuditLogEntry,
   AuthUser,
   Chapter,
+  ChapterCounts,
   DashboardSummary,
   FeeSettings,
   Invoice,
@@ -102,6 +103,8 @@ export interface RenewalRepository {
 
 export interface ChapterRepository {
   list(): Promise<Chapter[]>
+  /** Jumlah member dan nominal tunggakan tiap chapter, dihitung server. */
+  counts(): Promise<ChapterCounts[]>
   getById(id: string): Promise<Chapter | null>
   /** Pull fresh data from BNI VM and refresh the local mirror. */
   sync(): Promise<{ count: number; syncedAt: string }>

@@ -17,6 +17,7 @@ type Store interface {
 	Update(ctx context.Context, id string, in domain.UpdateChapterInput) (*domain.Chapter, error)
 	Delete(ctx context.Context, id string) error
 	CountDependents(ctx context.Context, id string) (members, invoices int, err error)
+	Counts(ctx context.Context) ([]domain.ChapterCounts, error)
 }
 
 var _ Store = (*Repository)(nil)
@@ -66,4 +67,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 			members, invoices))
 	}
 	return s.repo.Delete(ctx, id)
+}
+
+// Counts meneruskan agregat per chapter; pembatasan lingkupnya ada di repository.
+func (s *Service) Counts(ctx context.Context) ([]domain.ChapterCounts, error) {
+	return s.repo.Counts(ctx)
 }

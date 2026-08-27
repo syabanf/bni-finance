@@ -113,6 +113,20 @@ func (s *fakeChapterStore) CountDependents(_ context.Context, _ string) (int, in
 	return s.members, s.invoices, nil
 }
 
+func (s *fakeChapterStore) Counts(_ context.Context) ([]domain.ChapterCounts, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]domain.ChapterCounts, 0, len(s.items))
+	for _, c := range s.items {
+		out = append(out, domain.ChapterCounts{
+			ChapterID:   c.ID,
+			MemberCount: s.members,
+			Outstanding: int64(s.invoices),
+		})
+	}
+	return out, nil
+}
+
 // --- members ----------------------------------------------------------------
 
 type fakeMemberStore struct {

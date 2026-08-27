@@ -59,3 +59,16 @@ type ChapterFilter struct {
 	Limit    int
 	Offset   int
 }
+
+// ChapterCounts adalah angka ringkas per chapter untuk halaman daftar chapter.
+//
+// Ada di server karena halaman itu dulu menghitungnya di klien dari seluruh
+// member dan seluruh invoice — dua daftar yang sama-sama dipaku pada 200 baris,
+// sehingga jumlah membernya berhenti bertambah di 200 dan tunggakannya hanya
+// menjumlahkan 200 invoice pertama. Angka uang yang diam-diam terlalu kecil.
+type ChapterCounts struct {
+	ChapterID   string `json:"chapterId"`
+	MemberCount int    `json:"memberCount"`
+	// Outstanding adalah NOMINAL invoice sent + overdue, bukan cacahnya.
+	Outstanding int64 `json:"outstanding"`
+}

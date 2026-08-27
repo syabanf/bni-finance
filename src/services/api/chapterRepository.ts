@@ -1,6 +1,6 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
 import type { ChapterRepository } from '@/services/types'
-import type { Chapter } from '@/types'
+import type { Chapter, ChapterCounts } from '@/types'
 import { runSync } from './syncService'
 
 // The API already speaks camelCase, so responses map straight onto the domain
@@ -9,6 +9,11 @@ import { runSync } from './syncService'
 export const apiChapterRepository: ChapterRepository = {
   async list() {
     const res = await api.get<ListResponse<Chapter>>(`/chapters${query({ limit: 500 })}`)
+    return res.data
+  },
+
+  async counts() {
+    const res = await api.get<{ data: ChapterCounts[] }>('/chapters/stats')
     return res.data
   },
 

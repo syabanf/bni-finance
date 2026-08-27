@@ -323,3 +323,18 @@ export interface AuthUser {
    */
   chapterId?: string | null
 }
+
+/**
+ * Angka ringkas per chapter, dihitung server.
+ *
+ * Halaman daftar chapter dulu menghitungnya sendiri dengan menarik seluruh
+ * member dan seluruh invoice — dua daftar yang sama-sama dipaku pada 200 baris.
+ * Dampaknya bukan sekadar lambat: jumlah member berhenti bertambah di 200, dan
+ * tunggakannya hanya menjumlahkan 200 invoice pertama.
+ */
+export interface ChapterCounts {
+  chapterId: string
+  memberCount: number
+  /** NOMINAL invoice sent + overdue, bukan cacahnya. */
+  outstanding: number
+}
