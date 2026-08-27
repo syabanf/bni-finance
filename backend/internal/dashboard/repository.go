@@ -9,7 +9,35 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
+
+// PEMBATASAN CHAPTER UNTUK SELURUH ANGKA DI HALAMAN INI.
+//
+// Paket ini semula tidak membatasi apa pun, dan akibatnya sudah dibuktikan
+// dengan pengguna ST sungguhan: daftar invoicenya benar — hanya chapter dia —
+// tetapi dashboard, halaman PERTAMA setelah login, menampilkan setiap chapter
+// lengkap dengan nama dan nominalnya, berikut total nasional.
+//
+// Itu membatalkan pembatasan yang justru jadi alasan peran ST ada. Dan bentuk
+// kebocorannya adalah yang paling sulit disadari: tidak ada galat, tidak ada
+// layar kosong — hanya angka yang lebih besar daripada yang berhak dilihat,
+// yang tampak persis seperti data yang benar.
+//
+// syaratChapter mengembalikan ekspresi boolean yang SELALU bisa di-AND-kan,
+// termasuk saat tidak ada pembatasan. Bentuk itu dipilih supaya tiap query
+// hanya perlu satu sisipan, bukan dua cabang dengan SQL yang berbeda — dua
+// cabang berarti versi tak berlingkup yang tetap hidup dan bisa terpanggil.
+func syaratChapter(ctx context.Context, kolom string, n int) (string, []any) {
+	switch lim := scope.Chapter(ctx); {
+	case lim.Buntu:
+		return "false", nil
+	case lim.Terbatas:
+		return fmt.Sprintf("%s = $%d", kolom, n), []any{lim.ChapterID}
+	default:
+		return "true", nil
+	}
+}
 
 // TrendWindowDays is the length of the comparison window behind every trend
 // figure: the last N days against the N days before them.
@@ -69,8 +97,10 @@ SELECT
 FROM invoices`
 
 func (r *Repository) totals(ctx context.Context) (*totals, error) {
+	syarat, arg := syaratChapter(ctx, "chapter_id", 2)
 	var t totals
-	err := r.db.QueryRow(ctx, totalsQuery, TrendWindowDays).Scan(
+	err := r.db.QueryRow(ctx, totalsQuery+" WHERE "+syarat,
+		append([]any{TrendWindowDays}, arg...)...).Scan(
 		&t.totalCount, &t.totalAmount,
 		&t.paidCount, &t.paidAmount,
 		&t.outstandingCount, &t.outstandingAmount,
@@ -96,16 +126,20 @@ func (r *Repository) renewalDue(ctx context.Context) (current, previous int, err
 	  count(*) FILTER (WHERE renewal_date >= CURRENT_DATE - $1::int
 	                     AND renewal_date <  CURRENT_DATE)
 	FROM members
-	WHERE status = 'active' AND renewal_date IS NOT NULL`
+	WHERE status = 'active' AND renewal_date IS NOT NULL AND %s`
 
-	if err = r.db.QueryRow(ctx, q, TrendWindowDays).Scan(&current, &previous); err != nil {
+	syarat, arg := syaratChapter(ctx, "chapter_id", 2)
+	if err = r.db.QueryRow(ctx, fmt.Sprintf(q, syarat),
+		append([]any{TrendWindowDays}, arg...)...).Scan(&current, &previous); err != nil {
 		return 0, 0, fmt.Errorf("hitung jatuh tempo keanggotaan: %w", err)
 	}
 	return current, previous, nil
 }
 
 func (r *Repository) statusBreakdown(ctx context.Context) ([]domain.StatusCount, error) {
-	rows, err := r.db.Query(ctx, "SELECT status, count(*) FROM invoices GROUP BY status ORDER BY status")
+	syarat, arg := syaratChapter(ctx, "chapter_id", 1)
+	rows, err := r.db.Query(ctx,
+		"SELECT status, count(*) FROM invoices WHERE "+syarat+" GROUP BY status ORDER BY status", arg...)
 	if err != nil {
 		return nil, fmt.Errorf("hitung sebaran status: %w", err)
 	}
@@ -132,13 +166,23 @@ func (r *Repository) monthly(ctx context.Context, months int) ([]domain.MonthlyP
 	)
 	SELECT to_char(m, 'YYYY-MM'),
 	  coalesce((SELECT sum(i.amount) FROM invoices i
-	             WHERE i.status <> 'cancelled' AND date_trunc('month', i.created_at) = bulan.m), 0),
+	             WHERE i.status <> 'cancelled' AND date_trunc('month', i.created_at) = bulan.m
+	               AND %[1]s), 0),
 	  coalesce((SELECT sum(p.amount) FROM payments p
-	             WHERE date_trunc('month', p.paid_at) = bulan.m), 0)
+	             WHERE date_trunc('month', p.paid_at) = bulan.m
+	               AND %[2]s), 0)
 	FROM bulan
 	ORDER BY m`
 
-	rows, err := r.db.Query(ctx, q, months)
+	// payments tidak punya chapter_id sendiri; lingkupnya diwarisi dari invoice
+	// induknya. Keduanya memakai $2 yang sama, jadi argumennya cukup sekali.
+	syaratInv, arg := syaratChapter(ctx, "i.chapter_id", 2)
+	syaratBayar, _ := syaratChapter(ctx, "p.invoice_id IN (SELECT id FROM invoices WHERE chapter_id", 2)
+	if len(arg) > 0 {
+		syaratBayar += ")"
+	}
+	rows, err := r.db.Query(ctx, fmt.Sprintf(q, syaratInv, syaratBayar),
+		append([]any{months}, arg...)...)
 	if err != nil {
 		return nil, fmt.Errorf("hitung tren bulanan: %w", err)
 	}
@@ -167,10 +211,15 @@ func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, er
 	  coalesce(sum(i.amount) FILTER (WHERE i.status <> 'cancelled'), 0)
 	FROM chapters c
 	LEFT JOIN invoices i ON i.chapter_id = c.id
+	WHERE %s
 	GROUP BY c.id, c.display_name
 	ORDER BY 7 DESC, c.display_name ASC`
 
-	rows, err := r.db.Query(ctx, q)
+	// Membatasi CHAPTER-nya, bukan hanya invoicenya. Membatasi invoice saja
+	// tetap menampilkan setiap chapter dengan nominal nol — yang masih
+	// membocorkan nama dan keberadaan seluruh chapter.
+	syarat, arg := syaratChapter(ctx, "c.id", 1)
+	rows, err := r.db.Query(ctx, fmt.Sprintf(q, syarat), arg...)
 	if err != nil {
 		return nil, fmt.Errorf("hitung statistik chapter: %w", err)
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
 
 const columns = `id, name, display_name, area_name, city_name, synced_at`
@@ -44,6 +45,18 @@ func (r *Repository) List(ctx context.Context, f domain.ChapterFilter) ([]domain
 	add := func(clause string, value any) {
 		args = append(args, value)
 		where = append(where, fmt.Sprintf(clause, len(args)))
+	}
+
+	// Pengguna berlingkup hanya melihat chapternya sendiri.
+	//
+	// Tanpa ini seorang ST mendapat daftar SELURUH chapter — nama dan
+	// keberadaannya — meski invoice dan membernya sudah dibatasi dengan benar.
+	// Daftar itu juga yang mengisi dropdown penyaring chapter, sehingga
+	// tampak seolah ia boleh menelusuri chapter lain.
+	if lim := scope.Chapter(ctx); lim.Buntu {
+		where = append(where, "1=0")
+	} else if lim.Terbatas {
+		add("id = $%d", lim.ChapterID)
 	}
 
 	if f.Search != "" {
