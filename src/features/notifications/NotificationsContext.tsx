@@ -9,7 +9,7 @@ import {
 } from 'react'
 import type { InvoiceWithRelations, PaymentWithInvoice } from '@/types'
 import { invoiceService, paymentService } from '@/services'
-import { daysUntil } from '@/lib/date'
+import { daysUntil, todayISO } from '@/lib/date'
 import { formatCurrency } from '@/lib/format'
 
 export type NotificationType = 'overdue' | 'due-soon' | 'payment'
@@ -36,6 +36,26 @@ interface NotificationsValue {
 const SEEN_KEY = 'bni:notif:seen'
 const PAYMENT_LIMIT = 30
 
+/**
+ * Jendela "jatuh tempo mendekat", dalam hari.
+ *
+ * Angka yang sama dipakai untuk menyaring di server DAN untuk memutuskan mana
+ * yang ditampilkan. Dulu penyaringannya hanya ada di klien; dua tempat dengan
+ * angka berbeda berarti server mengirim baris yang lalu dibuang klien, atau —
+ * lebih buruk — klien menunggu baris yang tidak pernah dikirim.
+ */
+const JENDELA_JATUH_TEMPO = 7
+
+/**
+ * Batas invoice per kategori.
+ *
+ * Ada batasnya karena daftar notifikasi berisi ratusan entri tidak bisa dibaca
+ * siapa pun. Dipisah per kategori dengan sengaja: satu batas gabungan membuat
+ * ratusan tagihan terlambat mendorong keluar seluruh peringatan jatuh tempo,
+ * dan yang hilang justru yang masih bisa dicegah.
+ */
+const BATAS_INVOICE = 100
+
 function loadSeen(): Set<string> {
   try {
     const raw = localStorage.getItem(SEEN_KEY)
@@ -55,11 +75,29 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [invoices, payments] = await Promise.all([
-        invoiceService.list(),
+      // MENARIK YANG DIBUTUHKAN SAJA, bukan seluruh invoice.
+      //
+      // Dulu di sini invoiceService.list() tanpa filter, yang dipaku pada 200
+      // baris. Untuk notifikasi akibatnya paling tajam: 200 baris itu diurutkan
+      // menurut tanggal buat, bukan menurut mendesaknya — jadi begitu datanya
+      // melewati 200, tagihan yang paling terlambat justru yang pertama hilang
+      // dari daftar "perlu tindakan", dan lonceng notifikasinya terlihat tenang.
+      //
+      // Dua kueri sempit ini menyaring di server, jadi yang ditarik memang hanya
+      // yang akan ditampilkan.
+      const besok7 = new Date()
+      besok7.setDate(besok7.getDate() + JENDELA_JATUH_TEMPO)
+      const [telat, segera, payments] = await Promise.all([
+        invoiceService.listPaged({ status: 'overdue', limit: BATAS_INVOICE }),
+        invoiceService.listPaged({
+          status: 'sent',
+          dueFrom: todayISO(),
+          dueTo: besok7.toISOString().slice(0, 10),
+          limit: BATAS_INVOICE,
+        }),
         paymentService.list(),
       ])
-      setItems(buildNotifications(invoices, payments))
+      setItems(buildNotifications([...telat.rows, ...segera.rows], payments))
     } catch {
       setItems([])
     } finally {
@@ -126,7 +164,7 @@ function buildNotifications(
       })
     } else if (inv.status === 'sent') {
       const d = daysUntil(inv.dueDate)
-      if (d >= 0 && d <= 7) {
+      if (d >= 0 && d <= JENDELA_JATUH_TEMPO) {
         out.push({
           id: `due-soon:${inv.id}`,
           type: 'due-soon',
