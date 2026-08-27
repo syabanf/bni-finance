@@ -3,12 +3,12 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "BNI Finance System — invoice & membership payment management for BNI",
+  "description": "BNI Finance System \u2014 invoice & membership payment management for BNI",
   "scripts": {
     "setup": "./scripts/setup-env.sh",
     "dev": "vite",
     "api-collection": "node scripts/build-api-collection.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && node scripts/check-tour-anchors.mjs && node scripts/check-seed-integrity.mjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && node scripts/check-tour-anchors.mjs && node scripts/check-seed-integrity.mjs && node scripts/build-api-collection.mjs --check",
     "build": "node scripts/build-api-collection.mjs && tsc --noEmit && vite build",
     "preview": "vite preview"
   },
