@@ -200,3 +200,14 @@ func (f *fakeUsers) PakaiTokenReset(context.Context, string, string, string, tim
 	return nil
 }
 func (f *fakeUsers) HapusTokenResetLama(context.Context, time.Time) (int64, error) { return 0, nil }
+
+// --- OTP login: cukup untuk memenuhi kontrak Store ---
+//
+// OTPAktif mengembalikan false, jadi tes yang sudah ada tetap menempuh jalur
+// login biasa. Perilaku OTP diuji sungguhan lewat integration test.
+func (f *fakeUsers) SimpanOTP(context.Context, string, string, time.Time) error { return nil }
+func (f *fakeUsers) PakaiOTP(context.Context, string, string, time.Time, int) (int, error) {
+	return 0, httpx.ErrNotFound
+}
+func (f *fakeUsers) HapusOTPLama(context.Context, time.Time) (int64, error) { return 0, nil }
+func (f *fakeUsers) OTPAktif(context.Context) bool                          { return false }

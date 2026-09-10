@@ -39,7 +39,23 @@ export const mockAuthRepository: AuthRepository = {
       chapterId: profile.chapterId,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-    return user
+    // Mode Data Contoh tidak punya email, jadi OTP tidak pernah diminta di
+    // sini. Bentuk kembaliannya tetap disamakan supaya halaman login tidak
+    // perlu tahu ia sedang berbicara dengan mock atau server.
+    return { user }
+  },
+
+  async verifikasiOtp(email) {
+    const profile = DEMO_ACCOUNTS[email.trim().toLowerCase()] ?? DEFAULT_ACCOUNT
+    const user: AuthUser = {
+      id: profile.id,
+      name: profile.name,
+      email,
+      role: profile.role,
+      chapterId: profile.chapterId,
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+    return delay(user)
   },
 
   async mintaResetSandi() {

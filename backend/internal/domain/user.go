@@ -129,6 +129,10 @@ type LoginResult struct {
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
 	User      AuthUser  `json:"user"`
+	// ButuhOTP menandai kata sandi sudah benar tapi belum cukup: kode sudah
+	// dikirim ke email, dan token baru terbit setelah kode itu diverifikasi.
+	// Token SENGAJA kosong saat ini true.
+	ButuhOTP bool `json:"otpRequired,omitempty"`
 }
 
 // MinPasswordLength matches the rule the UI already enforces.

@@ -31,7 +31,16 @@ import type {
 } from '@/types'
 
 export interface AuthRepository {
-  login(email: string, password: string): Promise<AuthUser>
+  /**
+   * Masuk. Bisa berakhir di salah satu dari DUA keadaan.
+   *
+   * Kalau OTP menyala, kata sandi yang benar belum menghasilkan sesi — ia
+   * mengembalikan { otpRequired: true } dan kode dikirim ke email. Sesinya baru
+   * ada setelah verifikasiOtp().
+   */
+  login(email: string, password: string): Promise<{ user: AuthUser; otpRequired?: boolean }>
+  /** Menukar kode dari email dengan sesi. */
+  verifikasiOtp(email: string, code: string): Promise<AuthUser>
   /**
    * Meminta tautan reset dikirim ke email.
    *
