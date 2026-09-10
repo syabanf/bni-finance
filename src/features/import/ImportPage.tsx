@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, FileUp, Upload } from 'lucide-react'
-import type { ImportBaris, ImportHasil } from '@/types'
+import { AlertTriangle, CheckCircle2, Download, FileUp, Upload } from 'lucide-react'
+import type { Chapter, ImportBaris, ImportHasil, MemberWithChapter } from '@/types'
 import {
   Badge,
   Button,
@@ -18,7 +18,8 @@ import {
   Tr,
   useToast,
 } from '@/components/ui'
-import { importService } from '@/services'
+import { chapterService, importService, memberService } from '@/services'
+import { downloadXlsx } from '@/lib/xlsx'
 
 /**
  * Impor chapter dan member dari berkas.
@@ -34,6 +35,18 @@ import { importService } from '@/services'
  * yang membuatnya bisa dipercaya: tidak mungkin berbeda dari yang akhirnya
  * terjadi.
  */
+
+/**
+ * Judul kolom yang ditulis ke template.
+ *
+ * Sengaja memakai nama KANONIK yang dibaca importer, bukan nama yang enak
+ * dibaca manusia. Importer menerima beberapa alias untuk kolom yang sama
+ * ("phone", "telepon", "hp", "no_hp"), tapi template yang memakai alias
+ * mengajarkan orang menulis judul yang kebetulan bekerja hari ini — dan alias
+ * adalah hal pertama yang hilang saat berkasnya disalin-tempel ke tempat lain.
+ */
+const KOLOM_MEMBER = ['id', 'name', 'chapter_id', 'status', 'email', 'phone', 'company', 'business_field']
+const KOLOM_CHAPTER = ['id', 'name', 'display_name', 'area_name', 'city_name']
 
 const TONE: Record<ImportBaris['tindakan'], 'green' | 'amber' | 'gray' | 'red'> = {
   baru: 'green',
@@ -55,6 +68,59 @@ export function ImportPage() {
     // Pratinjau lama DIBUANG saat berkasnya berganti. Membiarkannya membuat
     // orang menekan "Terapkan" atas laporan yang menggambarkan berkas lain.
     setHasil(null)
+  }
+
+  const [menyiapkan, setMenyiapkan] = useState(false)
+
+  /**
+   * Template BERISI DATA YANG SUDAH ADA, bukan lembar kosong.
+   *
+   * MOM meminta template "untuk import phone number dan email karena data
+   * import kurang lengkap" — dan itu menentukan bentuknya. Lembar kosong
+   * memaksa orang mengetik ulang id dan nama setiap member hanya untuk
+   * menambahkan satu nomor telepon, dan setiap pengetikan ulang adalah peluang
+   * id-nya salah — yang berarti bukan melengkapi data, melainkan membuat member
+   * baru atau menimpa orang lain.
+   *
+   * Jadi template ini sudah terisi id, nama, dan chapter; kolom email dan
+   * telepon dibiarkan kosong persis di baris yang memang belum punya. Yang
+   * sudah terisi ikut dibawa supaya tidak terhapus saat diimpor kembali.
+   */
+  const unduhTemplate = async () => {
+    setMenyiapkan(true)
+    try {
+      if (jenis === 'members') {
+        const anggota: MemberWithChapter[] = await memberService.list()
+        downloadXlsx(
+          'template-member',
+          'Member',
+          KOLOM_MEMBER,
+          anggota.map((m) => [
+            m.id,
+            m.name,
+            m.chapterId,
+            m.status,
+            m.email ?? '',
+            m.phone ?? '',
+            m.company ?? '',
+            m.businessField ?? '',
+          ]),
+        )
+      } else {
+        const daftar: Chapter[] = await chapterService.list()
+        downloadXlsx(
+          'template-chapter',
+          'Chapter',
+          KOLOM_CHAPTER,
+          daftar.map((c) => [c.id, c.name, c.displayName, c.areaName ?? '', c.cityName ?? '']),
+        )
+      }
+      toast('Template diunduh. Isi kolom yang kosong, lalu unggah kembali di halaman ini.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menyiapkan template.', 'error')
+    } finally {
+      setMenyiapkan(false)
+    }
   }
 
   const jalankan = async (terapkan: boolean) => {
@@ -123,6 +189,27 @@ export function ImportPage() {
                 </span>
               </button>
             </div>
+
+            {/* Template diletakkan SEBELUM tombol unggah, bukan sesudahnya.
+                Urutannya mengikuti urutan pekerjaannya: orang datang ke sini
+                justru karena datanya belum lengkap, jadi mengunduh template
+                adalah langkah pertama, bukan pelengkap di bawah. */}
+            <button
+              onClick={unduhTemplate}
+              disabled={menyiapkan}
+              className="flex w-full items-center gap-3 rounded-xl border border-ink-200 p-3 text-left transition-colors hover:bg-ink-50 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4 shrink-0 text-brand-500" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-ink-800">
+                  {menyiapkan ? 'Menyiapkan…' : 'Unduh template'}
+                </span>
+                <span className="block text-xs leading-snug text-ink-500">
+                  Sudah terisi {jenis === 'members' ? 'id, nama, dan chapter' : 'id dan nama'} yang ada —
+                  {jenis === 'members' ? ' tinggal lengkapi email dan nomor telepon.' : ' tinggal lengkapi kolom kosongnya.'}
+                </span>
+              </span>
+            </button>
 
             <div className="space-y-2">
               <Button className="w-full" disabled={!file} loading={sibuk && !hasil} onClick={() => jalankan(false)}>
