@@ -9,13 +9,53 @@ import { TourButton } from '@/features/tour/TourButton'
 import { DemoBadge } from './DemoBadge'
 import { ROLE_LABEL } from '@/lib/rbac'
 
+/**
+ * Tujuan pencarian topbar.
+ *
+ * Setiap rute di sini HARUS membaca `?q=` dan mengisi kotak pencariannya
+ * sendiri dari sana. Menambahkan tujuan yang tidak melakukannya menghasilkan
+ * halaman yang terbuka dengan kotak kosong — orangnya sudah mengetik, dan yang
+ * terlihat tetap seluruh daftar.
+ */
+const TUJUAN = [
+  { nilai: 'invoices', label: 'Invoice', rute: '/invoices', petunjuk: 'Nomor invoice atau nama member…' },
+  { nilai: 'members', label: 'Member', rute: '/members', petunjuk: 'Nama, ID, atau email…' },
+  { nilai: 'payments', label: 'Pembayaran', rute: '/payments', petunjuk: 'Nama member atau nomor invoice…' },
+  { nilai: 'chapters', label: 'Chapter', rute: '/chapters', petunjuk: 'Nama chapter, kota, atau area…' },
+] as const
+
+type Entitas = (typeof TUJUAN)[number]['nilai']
+
+const KUNCI_ENTITAS = 'bni.cari.entitas'
+
+function entitasTersimpan(): Entitas {
+  try {
+    const v = localStorage.getItem(KUNCI_ENTITAS)
+    if (TUJUAN.some((t) => t.nilai === v)) return v as Entitas
+  } catch {
+    // Peramban yang memblokir penyimpanan situs melempar di sini. Pilihannya
+    // kembali ke bawaan; tidak ada yang perlu gagal karena itu.
+  }
+  return 'invoices'
+}
+
 export function Topbar() {
   const { user, logout } = useAuth()
   const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [entitas, setEntitas] = useState<Entitas>(entitasTersimpan)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const simpanEntitas = (v: Entitas) => {
+    setEntitas(v)
+    try {
+      localStorage.setItem(KUNCI_ENTITAS, v)
+    } catch {
+      // Tidak bisa disimpan bukan alasan untuk tidak bisa dipakai.
+    }
+  }
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -41,25 +81,70 @@ export function Topbar() {
 
         <DemoBadge />
 
-        {/* Search — submits to the invoice list (which reads ?q=) */}
+        {/*
+          Pencarian: TUJUANNYA DIPILIH, tidak lagi selalu ke daftar invoice.
+          
+          Sebelumnya apa pun yang diketik berujung ke /invoices?q= — termasuk
+          nama member yang belum punya invoice, yang karena itu tidak akan
+          pernah ketemu, padahal placeholder-nya menjanjikan "Cari invoice,
+          member…". Yang rusak bukan pencariannya melainkan janjinya.
+          
+          Pilihannya disimpan di localStorage: orang yang bekerja di data
+          member mencari member berkali-kali berturut-turut, dan mengembalikan
+          pilihan ke "Invoice" setiap kali halaman dimuat ulang berarti
+          menyuruhnya memilih lagi sepanjang hari.
+        */}
         <form
           onSubmit={(e) => {
             e.preventDefault()
             const q = search.trim()
-            navigate(q ? `/invoices?q=${encodeURIComponent(q)}` : '/invoices')
+            const tujuan = TUJUAN.find((t) => t.nilai === entitas) ?? TUJUAN[0]
+            navigate(q ? `${tujuan.rute}?q=${encodeURIComponent(q)}` : tujuan.rute)
           }}
-          className="relative ml-auto hidden w-full max-w-xs sm:block"
+          className="relative ml-auto hidden w-full max-w-sm sm:block"
           data-tour="topbar-search"
         >
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari invoice, member…"
-            aria-label="Cari invoice atau member"
-            className="h-9 w-full rounded-xl border border-ink-200 bg-ink-50 pl-9 pr-3 text-sm text-ink-700 placeholder:text-ink-400 transition-colors focus-ring focus:border-brand-400 focus:bg-white"
-          />
+          <div className="flex h-9 items-center rounded-xl border border-ink-200 bg-ink-50 transition-colors focus-within:border-brand-400 focus-within:bg-white">
+            <select
+              value={entitas}
+              onChange={(e) => simpanEntitas(e.target.value as Entitas)}
+              aria-label="Cari di"
+              className="h-full shrink-0 rounded-l-xl border-0 bg-transparent pl-3 pr-1 text-xs font-medium text-ink-600 focus-ring"
+            >
+              {TUJUAN.map((t) => (
+                <option key={t.nilai} value={t.nilai}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+            <span className="h-4 w-px shrink-0 bg-ink-200" aria-hidden />
+            {/*
+              Ikon kaca pembesar ini TOMBOL SUBMIT, bukan hiasan.
+              
+              Enter tetap bekerja tanpanya — yang memblokir implicit submission
+              hanyalah adanya LEBIH DARI SATU field bertipe teks, dan <select>
+              tidak termasuk. Tombol ini ada karena alasan lain: pemilih di
+              sebelah kiri membuat kotaknya terlihat seperti kontrol majemuk,
+              dan kontrol majemuk tanpa satu pun tombol menyisakan pertanyaan
+              "lalu ditekan apa". Ia juga memberi sasaran sentuh untuk yang
+              memakai layar sentuh, di mana tidak ada Enter untuk ditekan.
+            */}
+            <button
+              type="submit"
+              aria-label="Cari"
+              className="ml-1 shrink-0 rounded-lg p-1 text-ink-400 transition-colors hover:text-ink-700 focus-ring"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={(TUJUAN.find((t) => t.nilai === entitas) ?? TUJUAN[0]).petunjuk}
+              aria-label={`Cari ${(TUJUAN.find((t) => t.nilai === entitas) ?? TUJUAN[0]).label}`}
+              className="h-full w-full bg-transparent px-1.5 text-sm text-ink-700 placeholder:text-ink-400 focus:outline-none"
+            />
+          </div>
         </form>
 
         {/* Notifications */}
