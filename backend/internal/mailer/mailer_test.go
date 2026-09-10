@@ -106,3 +106,61 @@ func TestBelumDikonfigurasiDitolakJelas(t *testing.T) {
 		t.Errorf("galat = %v, seharusnya menyebut belum dikonfigurasi", err)
 	}
 }
+
+// Pengirim AMPLOP diambil dari From, bukan dari username SMTP.
+//
+// Bug yang dijaga di sini nyata dan hanya muncul pada penyedia kedua. Versi
+// pertama memakai cfg.User; pada Gmail itu kebetulan benar karena username
+// SMTP-nya memang alamat email, tapi pada Resend username-nya literal "resend"
+// dan servernya menolak dengan 501 "Bad sender address syntax".
+//
+// Satu penyedia menyembunyikannya sepenuhnya — dua nilai yang berbeda arti
+// kebetulan sama isinya.
+func TestAlamatAmplopDariFromBukanUsername(t *testing.T) {
+	kasus := []struct {
+		nama string
+		cfg  Config
+		mau  string
+	}{
+		{
+			nama: "resend: username bukan alamat",
+			cfg:  Config{Host: "h", Port: "587", User: "resend", Password: "p", From: "BNI Finance Hub <onboarding@resend.dev>"},
+			mau:  "onboarding@resend.dev",
+		},
+		{
+			nama: "gmail: username memang alamat",
+			cfg:  Config{Host: "h", Port: "587", User: "orang@gmail.com", Password: "p", From: "BNI <orang@gmail.com>"},
+			mau:  "orang@gmail.com",
+		},
+		{
+			nama: "From alamat polos tanpa nama",
+			cfg:  Config{Host: "h", Port: "587", User: "resend", Password: "p", From: "kirim@contoh.id"},
+			mau:  "kirim@contoh.id",
+		},
+		{
+			nama: "From kosong: New() mengisinya dari User",
+			cfg:  Config{Host: "h", Port: "587", User: "orang@gmail.com", Password: "p"},
+			mau:  "orang@gmail.com",
+		},
+	}
+
+	for _, k := range kasus {
+		t.Run(k.nama, func(t *testing.T) {
+			var amplop string
+			m := New(k.cfg)
+			m.kirim = func(_ string, _ smtp.Auth, dari string, _ []string, _ []byte) error {
+				amplop = dari
+				return nil
+			}
+			if err := m.Kirim(context.Background(), Pesan{Ke: "a@b.test", Subjek: "s", Teks: "t"}); err != nil {
+				t.Fatalf("kirim: %v", err)
+			}
+			if amplop != k.mau {
+				t.Errorf("amplop = %q, seharusnya %q", amplop, k.mau)
+			}
+			if strings.Contains(amplop, "<") || strings.Contains(amplop, " ") {
+				t.Errorf("amplop = %q — nama tampilan ikut terbawa; itu milik header, bukan protokolnya", amplop)
+			}
+		})
+	}
+}

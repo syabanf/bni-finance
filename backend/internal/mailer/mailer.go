@@ -85,7 +85,7 @@ func (m *Mailer) Kirim(ctx context.Context, p Pesan) error {
 
 	selesai := make(chan error, 1)
 	go func() {
-		selesai <- m.kirim(alamat, auth, m.cfg.User, []string{p.Ke}, badan)
+		selesai <- m.kirim(alamat, auth, alamatAmplop(m.cfg), []string{p.Ke}, badan)
 	}()
 
 	select {
@@ -100,6 +100,48 @@ func (m *Mailer) Kirim(ctx context.Context, p Pesan) error {
 		// percakapan SMTP justru bisa meninggalkan pesan separuh terkirim.
 		return ctx.Err()
 	}
+}
+
+// alamatAmplop mengembalikan alamat pengirim untuk perintah MAIL FROM.
+//
+// DIAMBIL DARI From, BUKAN DARI USER — dan itu perbedaan yang baru terlihat
+// setelah dicoba pada penyedia kedua.
+//
+// Versi pertama memakai cfg.User sebagai pengirim amplop. Pada Gmail itu
+// kebetulan benar: username SMTP-nya memang alamat email. Pada Resend username
+// SMTP-nya literal "resend", dan servernya menolak:
+//
+//	501 "Error: Bad sender address syntax"
+//
+// Diuji langsung terhadap Resend: amplop "onboarding@resend.dev" terkirim,
+// amplop "resend" gagal. Satu penyedia menyembunyikan bug ini sepenuhnya karena
+// dua nilai yang berbeda arti kebetulan sama isinya.
+//
+// From boleh berbentuk "Nama <alamat@x>" — yang masuk amplop hanya alamatnya;
+// nama tampilannya milik header, bukan protokolnya.
+func alamatAmplop(c Config) string {
+	if a := alamatSaja(c.From); a != "" {
+		return a
+	}
+	// Cadangan terakhir: sebagian penyedia memang memakai alamat sebagai
+	// username. Kalau From kosong dan User pun bukan alamat, biarkan servernya
+	// yang menolak dengan pesannya sendiri — menebak di sini hanya mengganti
+	// satu galat jelas dengan galat lain yang membingungkan.
+	return strings.TrimSpace(c.User)
+}
+
+// alamatSaja mengupas "Nama <alamat@x>" menjadi "alamat@x".
+func alamatSaja(v string) string {
+	v = strings.TrimSpace(v)
+	if i := strings.LastIndex(v, "<"); i >= 0 {
+		if j := strings.Index(v[i:], ">"); j > 0 {
+			v = strings.TrimSpace(v[i+1 : i+j])
+		}
+	}
+	if !strings.Contains(v, "@") {
+		return ""
+	}
+	return v
 }
 
 // rakit menyusun pesan RFC 5322. Header dibersihkan dari CR/LF.
