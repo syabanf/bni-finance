@@ -1,4 +1,4 @@
-import { api, fileUrl, query, type ListResponse } from '@/lib/apiClient'
+import { ApiError, api, fileUrl, query, type ListResponse } from '@/lib/apiClient'
 import type { PaymentRepository } from '@/services/types'
 import type { Invoice, MemberWithChapter, Payment, PaymentWithInvoice } from '@/types'
 
@@ -29,6 +29,20 @@ export const apiPaymentRepository: PaymentRepository = {
   async list() {
     const res = await api.get<ListResponse<Payment>>(`/payments${query({ limit: 200 })}`)
     return withRelations(res.data)
+  },
+
+  async getById(id) {
+    let payment: Payment
+    try {
+      payment = await api.get<Payment>(`/payments/${encodeURIComponent(id)}`)
+    } catch (err) {
+      // Kontraknya mengembalikan null untuk "tidak ditemukan", bukan melempar —
+      // halaman detail perlu membedakan "tidak ada" dari "gagal memuat".
+      if (err instanceof ApiError && err.status === 404) return null
+      throw err
+    }
+    const [lengkap] = await withRelations([payment])
+    return lengkap ?? null
   },
 
   async listByInvoice(invoiceId) {

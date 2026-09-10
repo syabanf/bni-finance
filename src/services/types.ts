@@ -183,6 +183,7 @@ export interface SettingsRepository {
 
 export interface PaymentRepository {
   list(): Promise<PaymentWithInvoice[]>
+  getById(id: string): Promise<PaymentWithInvoice | null>
   listByInvoice(invoiceId: string): Promise<PaymentWithInvoice[]>
   /** Upload a payment-proof file, returning a URL to store with the payment. */
   uploadProof(file: File): Promise<string>

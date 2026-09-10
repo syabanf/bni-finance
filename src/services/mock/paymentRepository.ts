@@ -15,6 +15,11 @@ export const mockPaymentRepository: PaymentRepository = {
     )
   },
 
+  async getById(id) {
+    const p = store.payments.find((x) => x.id === id)
+    return delay(p ? withRelations(p) : null)
+  },
+
   async listByInvoice(invoiceId) {
     return delay(
       store.payments

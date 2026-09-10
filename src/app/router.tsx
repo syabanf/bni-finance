@@ -10,6 +10,7 @@ import { InvoiceDetailPage } from '@/features/invoices/InvoiceDetailPage'
 import { MemberListPage } from '@/features/members/MemberListPage'
 import { MemberDetailPage } from '@/features/members/MemberDetailPage'
 import { ChapterListPage } from '@/features/chapters/ChapterListPage'
+import { PaymentDetailPage } from '@/features/payments/PaymentDetailPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ImportPage } from '@/features/import/ImportPage'
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
 
           { path: '/chapters', element: <ChapterListPage /> },
           { path: '/payments', element: <PaymentListPage /> },
+          { path: '/payments/:id', element: <PaymentDetailPage /> },
           { path: '/reports', element: <ReportPage /> },
 
           {
