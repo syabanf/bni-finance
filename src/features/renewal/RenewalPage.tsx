@@ -519,10 +519,23 @@ function TombolMinta({
       // Membedakan "dibuat" dari "dilewati" secara eksplisit: menekan dua kali
       // harus terbaca "0 baru, 12 sudah ada", bukan "12 dibuat" yang membuat
       // orang mengira permintaan pertamanya hilang.
+      //
+      // Tamu disebut TERPISAH, dengan alasannya. Menyatukannya ke "sudah ada"
+      // membuat orang mengira pekerjaannya beres, padahal ada nama yang tidak
+      // menerima apa pun — dan mungkin memang statusnya yang belum diperbarui
+      // setelah ia mendaftar.
+      const bagian = [
+        hasil.dibuat > 0 ? `${hasil.dibuat} permintaan dibuat` : null,
+        hasil.dilewati > 0 ? `${hasil.dilewati} sudah ada` : null,
+        hasil.visitor > 0
+          ? `${hasil.visitor} dilewati karena masih berstatus visitor`
+          : null,
+      ].filter(Boolean)
       toast(
-        hasil.dibuat > 0
-          ? `${hasil.dibuat} permintaan dibuat${hasil.dilewati ? `, ${hasil.dilewati} sudah ada` : ''}.`
-          : `Semua ${hasil.dilewati} permintaan sudah ada sebelumnya.`,
+        bagian.length > 0
+          ? `${bagian.join(', ')}.`
+          : 'Tidak ada permintaan yang dibuat.',
+        hasil.dibuat === 0 && hasil.visitor > 0 ? 'error' : undefined,
       )
       setBuka(false)
       onDone()

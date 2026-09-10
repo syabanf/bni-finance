@@ -11,12 +11,53 @@ const (
 	MemberActive   MemberStatus = "active"
 	MemberInactive MemberStatus = "inactive"
 	MemberPending  MemberStatus = "pending"
+	// MemberVisitor adalah tamu yang datang ke pertemuan tapi BELUM mendaftar.
+	//
+	// Ia dicatat supaya bisa diundang lagi dan diikuti sampai menjadi anggota.
+	// Yang tidak boleh terjadi: ia ikut tertagih. Lihat BolehDitagih.
+	MemberVisitor MemberStatus = "visitor"
 )
 
+// SemuaStatusMember adalah daftar lengkapnya, dan satu-satunya sumbernya.
+//
+// Valid() dan tes klasifikasi membacanya dari sini, jadi status yang
+// ditambahkan tanpa memutuskan perlakuannya akan memerahkan tes — bukan
+// diam-diam ikut aturan yang kebetulan berlaku.
+var SemuaStatusMember = []MemberStatus{
+	MemberActive, MemberInactive, MemberPending, MemberVisitor,
+}
+
 func (s MemberStatus) Valid() bool {
+	for _, v := range SemuaStatusMember {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
+// BolehDitagih melaporkan orang berstatus ini boleh menerima tagihan
+// keanggotaan.
+//
+// DITULIS SEBAGAI SWITCH YANG MENYEBUT SETIAP STATUS, bukan sebagai
+// `!= MemberVisitor`. Bentuk negatif membuat status yang ditambahkan nanti
+// otomatis ikut tertagih — diam-diam, tanpa seorang pun memutuskannya. Di sini
+// yang tidak disebut jatuh ke `false`, dan tes memaksa setiap status punya
+// keputusan tertulis.
+//
+// Arah gagalnya dipilih sengaja: tagihan yang tidak terbit hanya perlu
+// diperbaiki; tagihan yang terlanjur terkirim ke orang yang tidak pernah
+// menjadi anggota tidak bisa ditarik kembali dari kotak masuknya.
+//
+// `inactive` dan `pending` tetap boleh, seperti sebelumnya — member yang
+// keanggotaannya lewat masih ditagih perpanjangan, dan yang pending memang
+// sedang menunggu tagihan pendaftarannya.
+func (s MemberStatus) BolehDitagih() bool {
 	switch s {
 	case MemberActive, MemberInactive, MemberPending:
 		return true
+	case MemberVisitor:
+		return false
 	}
 	return false
 }
@@ -70,7 +111,7 @@ func (in CreateMemberInput) Validate() error {
 	case in.Name == "":
 		return fmt.Errorf("name wajib diisi")
 	case in.Status != nil && !in.Status.Valid():
-		return fmt.Errorf("status harus 'active', 'inactive', atau 'pending'")
+		return fmt.Errorf("status harus 'active', 'inactive', 'pending', atau 'visitor'")
 	}
 	return nil
 }
@@ -94,7 +135,7 @@ func (in UpdateMemberInput) Validate() error {
 	case in.ChapterID != nil && *in.ChapterID == "":
 		return fmt.Errorf("chapterId tidak boleh kosong")
 	case in.Status != nil && !in.Status.Valid():
-		return fmt.Errorf("status harus 'active', 'inactive', atau 'pending'")
+		return fmt.Errorf("status harus 'active', 'inactive', 'pending', atau 'visitor'")
 	}
 	return nil
 }

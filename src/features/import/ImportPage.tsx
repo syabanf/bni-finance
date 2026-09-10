@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileUp, Upload } from 'lucide-react'
 import type { Chapter, ImportBaris, ImportHasil, MemberWithChapter } from '@/types'
 import {
@@ -18,7 +18,9 @@ import {
   Tr,
   useToast,
 } from '@/components/ui'
+import { useSearchParams } from 'react-router-dom'
 import { chapterService, importService, memberService } from '@/services'
+import type { ImportOpsi } from '@/services/types'
 import { downloadXlsx } from '@/lib/xlsx'
 
 /**
@@ -58,7 +60,46 @@ const TONE: Record<ImportBaris['tindakan'], 'green' | 'amber' | 'gray' | 'red'> 
 export function ImportPage() {
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement>(null)
+  const [params] = useSearchParams()
+
+  /**
+   * Chapter tujuan dan status bawaan dibaca dari URL.
+   *
+   * Datang dari KONTEKS tombolnya — kartu chapter tertentu, tombol "Impor
+   * Visitor" — bukan dari isi berkasnya. Daftar hadir pertemuan tidak pernah
+   * memuat kolom chapter maupun status, dan menuntut orang menambahkan kolom
+   * yang isinya sama di setiap baris hanya menambah satu tempat untuk salah
+   * ketik. Salah ketik di kolom chapter memindahkan member beserta tagihannya.
+   */
+  const chapterTujuan = params.get('chapter') ?? ''
+  const statusBawaan = params.get('status') === 'visitor' ? 'visitor' : undefined
+  const opsi: ImportOpsi | undefined =
+    chapterTujuan || statusBawaan
+      ? { chapter: chapterTujuan || undefined, statusBawaan }
+      : undefined
+
   const [jenis, setJenis] = useState<'members' | 'chapters'>('members')
+  const [namaChapter, setNamaChapter] = useState('')
+
+  useEffect(() => {
+    if (!chapterTujuan) return
+    // Impor yang ditujukan ke satu chapter selalu tentang member.
+    setJenis('members')
+    let aktif = true
+    chapterService
+      .list()
+      .then((cs) => {
+        if (!aktif) return
+        // Nama yang dibaca orang, bukan id. Layar yang cuma menampilkan
+        // "ch-garuda" menuntut orang mengingat pemetaannya sendiri — dan salah
+        // ingat di sini berarti mengunggah daftar ke chapter yang salah.
+        setNamaChapter(cs.find((c) => c.id === chapterTujuan)?.displayName ?? '')
+      })
+      .catch(() => undefined)
+    return () => {
+      aktif = false
+    }
+  }, [chapterTujuan])
   const [file, setFile] = useState<File | null>(null)
   const [hasil, setHasil] = useState<ImportHasil | null>(null)
   const [sibuk, setSibuk] = useState(false)
@@ -90,9 +131,16 @@ export function ImportPage() {
     setMenyiapkan(true)
     try {
       if (jenis === 'members') {
-        const anggota: MemberWithChapter[] = await memberService.list()
+        const semua: MemberWithChapter[] = await memberService.list()
+        // Template ikut menyempit ke chapter tujuan.
+        //
+        // Template yang memuat seluruh member nasional pada layar yang jelas
+        // menyebut satu chapter adalah undangan untuk mengunggahnya kembali apa
+        // adanya — dan setiap baris dari chapter lain akan ditolak, sehingga
+        // yang terlihat adalah ratusan penolakan alih-alih pekerjaan yang beres.
+        const anggota = chapterTujuan ? semua.filter((m) => m.chapterId === chapterTujuan) : semua
         downloadXlsx(
-          'template-member',
+          chapterTujuan ? `template-member-${chapterTujuan}` : 'template-member',
           'Member',
           KOLOM_MEMBER,
           anggota.map((m) => [
@@ -128,8 +176,8 @@ export function ImportPage() {
     setSibuk(true)
     try {
       const out = terapkan
-        ? await importService.apply(jenis, file)
-        : await importService.preview(jenis, file)
+        ? await importService.apply(jenis, file, opsi)
+        : await importService.preview(jenis, file, opsi)
       setHasil(out)
       if (terapkan) {
         toast(`Diterapkan: ${out.baru} baru, ${out.diperbarui} diperbarui, ${out.ditolak} ditolak.`)
@@ -149,13 +197,30 @@ export function ImportPage() {
         description="Unggah CSV atau XLSX berisi chapter atau member. Selalu ditinjau dulu sebelum ditulis."
       />
 
+      {chapterTujuan && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <span className="font-semibold">
+            Impor ditujukan ke {namaChapter || chapterTujuan}
+            {statusBawaan === 'visitor' ? ' sebagai Visitor' : ''}.
+          </span>
+          <span className="text-blue-800">
+            Kolom <code className="rounded bg-blue-100 px-1">chapter_id</code> boleh dikosongkan.
+            Baris yang menyebut chapter lain <strong>ditolak</strong>, bukan dipindahkan.
+          </span>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
         <Card>
           <CardHeader title="Berkas" subtitle="Kolom dicari lewat judulnya, bukan urutannya." />
           <CardBody className="space-y-4">
-            <Field label="Jenis data">
+            <Field
+              label="Jenis data"
+              hint={chapterTujuan ? 'Terkunci: impor per chapter selalu tentang member.' : undefined}
+            >
               <Select
                 value={jenis}
+                disabled={!!chapterTujuan}
                 onChange={(e) => {
                   setJenis(e.target.value as 'members' | 'chapters')
                   setHasil(null)

@@ -1,9 +1,10 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Users } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Upload, Users } from 'lucide-react'
 import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Avatar,
+  Button,
   Card,
   DateRangeFilter,
   EmptyState,
@@ -25,6 +26,8 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
+import { useAuth } from '@/features/auth/AuthContext'
+import { can } from '@/lib/rbac'
 import { chapterService, memberService } from '@/services'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
@@ -47,6 +50,9 @@ const MEMBER_STATUS_LABEL: Record<string, string> = {
 
 export function MemberListPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // Impor dijaga settings:manage di router dan admin-saja di server.
+  const bolehImpor = can(user?.role, 'settings:manage')
   const { toast } = useToast()
   const { data: members, loading, error, reload } = useAsync<MemberWithChapter[]>(() =>
     memberService.list(),
@@ -54,7 +60,13 @@ export function MemberListPage() {
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState('')
+  // Nilai awal dibaca dari ?q= — pencarian di topbar mengirimkannya ke sini.
+  //
+  // Tanpa ini, memilih "Member" di kotak pencarian membuka halaman ini dengan
+  // kotak yang kosong: orangnya sudah mengetik, alamatnya sudah membawa
+  // kata kuncinya, dan yang terlihat tetap seluruh daftar. Persis keluhan
+  // yang membuat pencariannya disebut "belum berfungsi".
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [chapterId, setChapterId] = useState(searchParams.get('chapter') ?? 'all')
   const [hideNoDueDate, setHideNoDueDate] = useState(false)
   const [dueFrom, setDueFrom] = useState('')
@@ -96,6 +108,7 @@ export function MemberListPage() {
       active: list.filter((m) => m.status === 'active').length,
       pending: list.filter((m) => m.status === 'pending').length,
       inactive: list.filter((m) => m.status === 'inactive').length,
+      visitor: list.filter((m) => m.status === 'visitor').length,
     }
   }, [baseFiltered])
 
@@ -144,6 +157,28 @@ export function MemberListPage() {
         description="Data member hasil sinkronisasi dari BNI Visitor Management."
         action={
           <div className="flex flex-wrap items-center gap-2">
+            {/*
+              Tombol impor tamu muncul HANYA di tab Visitor.
+              
+              Di sanalah orang sedang memikirkan tamu, dan di sanalah daftar
+              hadir pertemuan ada di tangannya. Menaruhnya permanen di samping
+              "Sinkron" membuatnya jadi tombol keempat yang tidak jelas bedanya
+              dari impor member biasa — dan bedanya justru penting: yang ini
+              memberi status `visitor` pada baris yang kolom statusnya kosong.
+            */}
+            {memberStatus === 'visitor' && bolehImpor && (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  navigate(
+                    `/settings/import?status=visitor${chapterId !== 'all' ? `&chapter=${chapterId}` : ''}`,
+                  )
+                }
+              >
+                <Upload className="h-4 w-4" />
+                Impor Visitor
+              </Button>
+            )}
             <SyncButton jenis="member" onSelesai={reload} />
             <ExportMenu {...exportHandlers} disabled={filtered.length === 0} />
           </div>
@@ -151,7 +186,7 @@ export function MemberListPage() {
       />
 
       {/* Summary cards (also filter by status) */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <SummaryCard
           label="Total Member"
           value={statusCounts.all}
@@ -179,6 +214,13 @@ export function MemberListPage() {
           tone="default"
           active={memberStatus === 'inactive'}
           onClick={() => setMemberStatus('inactive')}
+        />
+        <SummaryCard
+          label="Visitor"
+          value={statusCounts.visitor}
+          tone="blue"
+          active={memberStatus === 'visitor'}
+          onClick={() => setMemberStatus('visitor')}
         />
       </div>
 

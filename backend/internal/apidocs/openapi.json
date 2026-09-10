@@ -3249,7 +3249,7 @@
           "Member"
         ],
         "summary": "ST meminta konfirmasi renewal ke MC",
-        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n",
+        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n\n**Visitor dilewati**, dan dihitung terpisah dari `dilewati`. Tamu belum\nmenjadi anggota, jadi tidak ada keanggotaan yang bisa diperpanjang —\ndan inilah satu-satunya jalur yang bisa mengirimkan permintaan itu\nkepadanya, karena daftar id-nya dipilih operator, bukan dipanen query\nyang menyaring status. Disatukan dengan `dilewati`, tamu yang terlewat\ntidak bisa dibedakan dari pekerjaan yang memang sudah beres.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -3296,6 +3296,10 @@
                     "dilewati": {
                       "type": "integer",
                       "description": "Sudah ada untuk periode itu"
+                    },
+                    "visitor": {
+                      "type": "integer",
+                      "description": "Dilewati karena belum menjadi anggota"
                     },
                     "total": {
                       "type": "integer"
@@ -3457,7 +3461,7 @@
           "Sinkronisasi"
         ],
         "summary": "Impor chapter atau member dari berkas CSV/XLSX",
-        "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, atau `id` ganda di dalam berkas yang sama.\nSetiap penolakan menyebut **nomor barisnya seperti di Excel**.\n",
+        "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
         "parameters": [
           {
             "name": "jenis",
@@ -3481,6 +3485,24 @@
               "enum": [
                 "true"
               ]
+            }
+          },
+          {
+            "name": "chapter",
+            "in": "query",
+            "required": false,
+            "description": "Batasi impor ke satu chapter. Membuat kolom `chapter_id` opsional; baris yang menyebut chapter lain **ditolak**. Tidak berlaku untuk `jenis=chapters` — berkasnyalah yang mendefinisikan chapter, jadi kombinasi itu dijawab 400 alih-alih diabaikan diam-diam.\n",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status_bawaan",
+            "in": "query",
+            "required": false,
+            "description": "Status untuk baris yang kolom `status`-nya KOSONG. Bawaannya `active`. Diisi `visitor` oleh tombol impor tamu: daftar hadir pertemuan tidak pernah memuat kolom status, dan tanpa ini setiap tamu masuk sebagai anggota penuh. Status yang DITULIS di berkas tidak pernah ditimpa nilai ini.\n",
+            "schema": {
+              "$ref": "#/components/schemas/MemberStatus"
             }
           }
         ],
@@ -5018,8 +5040,10 @@
         "enum": [
           "active",
           "inactive",
-          "pending"
-        ]
+          "pending",
+          "visitor"
+        ],
+        "description": "`visitor` adalah tamu yang datang ke pertemuan chapter tapi **belum** menjadi anggota. Ia dicatat supaya bisa diikuti sampai mendaftar, dan **tidak pernah ditagih**: dua query yang memanen member untuk renewal menyaring `active`, dan permintaan renewal yang memakai daftar id pilihan operator melewatinya secara eksplisit.\n"
       },
       "Chapter": {
         "type": "object",

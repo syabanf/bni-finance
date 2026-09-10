@@ -403,15 +403,46 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		if len(bb.Data) == 0 {
 			t.Fatal("panggilan ke Paper.id tidak terekam")
 		}
-		// Rekaman terbaru dulu; ambil yang paling akhir dikirim.
-		call := bb.Data[0]
-		if call.Direction != "outbound" || !call.Success || call.Status != http.StatusCreated {
-			t.Errorf("rekaman salah: %+v", call)
+		// PENERBITAN dicari, bukan diambil dari puncak daftar.
+		//
+		// Versi sebelumnya memakai bb.Data[0] dengan anggapan rekaman terbaru
+		// adalah penerbitan invoice (201). Anggapan itu berhenti benar begitu
+		// alur pengiriman menambah satu panggilan sesudahnya — /send, yang
+		// menjawab 200 — dan tesnya menuduh rekaman yang sebenarnya sah.
+		var terbit *struct {
+			Integration string          `json:"integration"`
+			Direction   string          `json:"direction"`
+			Status      int             `json:"status"`
+			Success     bool            `json:"success"`
+			Request     json.RawMessage `json:"request"`
+		}
+		for i := range bb.Data {
+			if bb.Data[i].Direction == "outbound" && bb.Data[i].Status == http.StatusCreated {
+				terbit = &bb.Data[i]
+				break
+			}
+		}
+		if terbit == nil {
+			t.Fatalf("tidak ada rekaman penerbitan (outbound 201) di %d rekaman", len(bb.Data))
+		}
+		if !terbit.Success {
+			t.Errorf("penerbitan terekam sebagai gagal: %+v", *terbit)
 		}
 		// Recorder hanya menerima body; kredensial hidup di header. Ini
 		// menjaga batas itu tetap benar, bukan sekadar niat.
+		// Disapu ke SELURUH rekaman, bukan satu.
+		//
+		// Kebocoran kredensial tidak harus terjadi pada panggilan yang kebetulan
+		// sedang diperiksa — memeriksa satu rekaman berarti menyatakan sesuatu
+		// yang jauh lebih sempit daripada yang dijanjikan komentar di atas.
 		for _, secret := range []string{os.Getenv("PAPER_ID_CLIENT_ID"), os.Getenv("PAPER_ID_CLIENT_SECRET")} {
-			if secret != "" && strings.Contains(string(call.Request), secret) {
+			bocor := false
+			for i := range bb.Data {
+				if secret != "" && strings.Contains(string(bb.Data[i].Request), secret) {
+					bocor = true
+				}
+			}
+			if bocor {
 				t.Error("blackbox membocorkan kredensial Paper.id")
 			}
 		}
@@ -419,10 +450,26 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 
 	// --- pembayaran ---------------------------------------------------------
 
+	// payment_info BERSARANG — objeknya dinamai menurut metode pembayaran.
+	//
+	// Bentuk itulah yang sebenarnya dikirim Paper.id (lihat paymentInfoJSON di
+	// internal/paperid/service_test.go). Versi sebelumnya di sini menaruh
+	// amount dan paid_amount langsung di akar payment_info — bentuk yang tidak
+	// pernah ada — sehingga summarizePayment tidak menemukan nilainya dan
+	// callback-nya dijawab 400 "amount pada callback tidak valid".
+	//
+	// Tesnya merah sejak entah kapan tanpa ada yang tahu, karena seluruh berkas
+	// ini dilewati kecuali TEST_DATABASE_URL diset. `go test ./...` biasa
+	// melaporkannya "ok".
 	callback := fmt.Sprintf(`{
 		"payment_date": "2026-07-27",
-		"payment_info": {"method":"bank_transfer","channel":"bni","amount":250000,
-		                 "paid_amount":250000,"paid_at":"2026-07-27 10:00:00","status":"PAID"},
+		"payment_info": {
+			"method": "bank_transfer",
+			"channel": "bni",
+			"status": "PAID",
+			"bank_transfer": {"amount":250000,"paid_amount":250000,
+			                  "paid_at":"2026-07-27 10:00:00","status":"PAID"}
+		},
 		"additional_info": {"invoices":[{"uuid":%q,"number":%q}]}
 	}`, inv.PaperIDInvoiceID, inv.Number)
 

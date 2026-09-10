@@ -14,7 +14,7 @@ import (
 type Store interface {
 	List(ctx context.Context, f domain.RenewalFilter) ([]domain.RenewalRequest, int, error)
 	GetByID(ctx context.Context, id string) (*domain.RenewalRequest, error)
-	Create(ctx context.Context, memberIDs []string, period, requestedBy string, assignedMC *string) (int, int, error)
+	Create(ctx context.Context, memberIDs []string, period, requestedBy string, assignedMC *string) (dibuat, dilewati, visitor int, err error)
 	Answer(ctx context.Context, id string, in domain.AnswerRenewalInput, answeredBy string) (*domain.RenewalRequest, error)
 }
 
@@ -32,7 +32,14 @@ func (s *Service) List(ctx context.Context, f domain.RenewalFilter) ([]domain.Re
 type HasilMinta struct {
 	Dibuat   int `json:"dibuat"`
 	Dilewati int `json:"dilewati"`
-	Total    int `json:"total"`
+	// Visitor dihitung terpisah dari Dilewati.
+	//
+	// "Dilewati" berarti permintaannya memang sudah ada — pekerjaan yang sudah
+	// beres. Tamu yang terlewat bukan itu: ia perlu dilihat orang, karena
+	// mungkin memang salah pilih, atau memang statusnya yang belum diperbarui
+	// setelah ia mendaftar.
+	Visitor int `json:"visitor"`
+	Total   int `json:"total"`
 }
 
 // Minta membuat permintaan konfirmasi untuk sekumpulan member.
@@ -45,12 +52,15 @@ func (s *Service) Minta(ctx context.Context, in domain.CreateRenewalRequestInput
 		return nil, httpx.Unauthorized("token tidak disertakan")
 	}
 
-	dibuat, dilewati, err := s.repo.Create(ctx, dedup(in.MemberIDs),
+	dibuat, dilewati, visitor, err := s.repo.Create(ctx, dedup(in.MemberIDs),
 		strings.TrimSpace(in.Period), user.ID, in.AssignedMC)
 	if err != nil {
 		return nil, err
 	}
-	return &HasilMinta{Dibuat: dibuat, Dilewati: dilewati, Total: dibuat + dilewati}, nil
+	return &HasilMinta{
+		Dibuat: dibuat, Dilewati: dilewati, Visitor: visitor,
+		Total: dibuat + dilewati + visitor,
+	}, nil
 }
 
 // Jawab mencatat jawaban MC.

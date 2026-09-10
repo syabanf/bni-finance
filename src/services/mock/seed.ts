@@ -138,6 +138,15 @@ const memberSeeds: MemberSeed[] = [
   { name: 'Bambang Setiadi', chapterId: 'ch-khatulistiwa', joined: '2025-09-03', history: [] },
   { name: 'Novi Andriani', chapterId: 'ch-khatulistiwa', joined: '2025-09-10', history: [] },
   { name: 'Yusuf Maulana', chapterId: 'ch-khatulistiwa', joined: '2026-08-09', history: [] },
+
+  // --- Seed 2026-09-11: visitor --------------------------------------------
+  // Cerminan db/seeds/2026-09-11-visitor.sql. Tamu yang datang ke pertemuan
+  // tapi belum mendaftar — history: [] dan tanpa tanggal perpanjangan, karena
+  // keanggotaannya memang belum ada.
+  { name: 'Bayu Anggara', chapterId: 'ch-garuda', joined: '2026-08-28', status: 'visitor', history: [] },
+  { name: 'Nadia Prameswari', chapterId: 'ch-garuda', joined: '2026-09-04', status: 'visitor', history: [] },
+  { name: 'Reza Firmansyah', chapterId: 'ch-nusantara', joined: '2026-08-21', status: 'visitor', history: [] },
+  { name: 'Clara Simanjuntak', chapterId: 'ch-bhinneka', joined: '2026-09-08', status: 'visitor', history: [] },
 ]
 
 // ---------------------------------------------------------------------------
@@ -226,7 +235,17 @@ export function buildSeedData(): BuiltData {
       // member aktif tanpa invoice, sementara mock menampilkannya "—". Beralih
       // sumber data mengubah dunia yang dilihat pengguna, dan itu justru yang
       // paling ingin dihindari dari punya dua sumber.
-      renewalDate: seed.status === 'pending' || !seed.joined ? null : addYear(seed.joined),
+      // Visitor ikut null, sama seperti `pending`.
+      //
+      // Bukan kosmetik: renewal_date adalah kolom yang dibaca pemanen renewal.
+      // Tamu yang punya tanggal jatuh tempo masuk antrean tagihan lewat pintu
+      // yang tidak dijaga penyaring status — dan mock yang lebih longgar
+      // daripada seed SQL (yang menulisnya null) membuat demo memperlihatkan
+      // sesuatu yang tidak akan terjadi di server.
+      renewalDate:
+        seed.status === 'pending' || seed.status === 'visitor' || !seed.joined
+          ? null
+          : addYear(seed.joined),
       syncedAt: SYNCED_AT,
     }
     members.push(member)

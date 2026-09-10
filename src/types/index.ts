@@ -15,7 +15,14 @@ export type InvoiceType = 'registration' | 'renewal'
 
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'terminated'
 
-export type MemberStatus = 'active' | 'inactive' | 'pending'
+/**
+ * `visitor` adalah tamu yang datang ke pertemuan chapter tapi BELUM mendaftar.
+ *
+ * Dibedakan supaya terlihat siapa yang perlu diikuti sampai menjadi anggota —
+ * dan supaya ia tidak ikut tertagih. Penjaganya ada di backend
+ * (domain.MemberStatus.BolehDitagih); di sini ia hanya perlu terlihat.
+ */
+export type MemberStatus = 'active' | 'inactive' | 'pending' | 'visitor'
 
 // ---------------------------------------------------------------------------
 // Synced entities (read-only mirrors from BNI Visitor Management)

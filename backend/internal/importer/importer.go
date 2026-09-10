@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/syabanf/bni-finance/backend/internal/domain"
 )
 
 // Import chapter dan member dari berkas, DENGAN PRATINJAU LEBIH DULU.
@@ -113,7 +115,30 @@ func NewService(repo Store) *Service { return &Service{repo: repo} }
 // kode yang BERBEDA dari kode yang menulis adalah pratinjau yang bisa berbohong.
 // Selisih sekecil apa pun di antara keduanya berarti orang menyetujui sesuatu
 // yang tidak sama dengan yang akhirnya terjadi.
-func (s *Service) Jalankan(ctx context.Context, jenis Jenis, data []byte, terapkan bool) (*Hasil, error) {
+// Opsi mempersempit impor ke satu chapter, dan menentukan status bawaannya.
+//
+// Keduanya datang dari KONTEKS tempat tombol impornya ditekan — kartu chapter
+// tertentu, tab Visitor tertentu — bukan dari isi berkasnya. Berkas yang
+// disusun manual sering tidak memuat kolomnya sama sekali, dan menuntut orang
+// menambahkan kolom chapter_id yang isinya sama di setiap baris adalah cara
+// paling mudah menghasilkan satu baris yang salah ketik.
+type Opsi struct {
+	// Chapter, bila diisi, adalah SATU-SATUNYA chapter yang boleh disentuh.
+	//
+	// Baris tanpa kolom chapter mengikutinya. Baris yang menyebut chapter LAIN
+	// DITOLAK — tidak diam-diam dipindahkan. Memindahkan member antar chapter
+	// mengubah ke mana tagihannya pergi dan pendapatan siapa yang bertambah;
+	// itu keputusan yang harus diambil orang, bukan efek samping impor.
+	Chapter string
+	// StatusBawaan dipakai untuk baris yang tidak punya kolom status.
+	//
+	// Kosong berarti "active", seperti sebelumnya. Diisi "visitor" oleh tombol
+	// impor tamu: daftar hadir pertemuan tidak pernah memuat kolom status, dan
+	// tanpa ini setiap tamu masuk sebagai anggota penuh.
+	StatusBawaan string
+}
+
+func (s *Service) Jalankan(ctx context.Context, jenis Jenis, data []byte, terapkan bool, opsi Opsi) (*Hasil, error) {
 	rows, format, err := Baca(data)
 	if err != nil {
 		return nil, err
@@ -123,11 +148,24 @@ func (s *Service) Jalankan(ctx context.Context, jenis Jenis, data []byte, terapk
 		return nil, err
 	}
 
+	if opsi.StatusBawaan == "" {
+		opsi.StatusBawaan = string(domain.MemberActive)
+	}
+	if !domain.MemberStatus(opsi.StatusBawaan).Valid() {
+		return nil, fmt.Errorf("status bawaan %q tidak dikenal (%s)", opsi.StatusBawaan, daftarStatus())
+	}
+
 	switch jenis {
 	case JenisChapter:
+		if opsi.Chapter != "" {
+			// Impor chapter yang "ditujukan ke satu chapter" tidak punya arti
+			// yang bisa dipertahankan: berkasnya justru mendefinisikan chapter.
+			// Menerimanya diam-diam berarti mengabaikan niat pemanggilnya.
+			return nil, fmt.Errorf("impor chapter tidak bisa dibatasi ke satu chapter")
+		}
 		return s.chapters(ctx, tabel, format, terapkan)
 	case JenisMember:
-		return s.members(ctx, tabel, format, terapkan)
+		return s.members(ctx, tabel, format, terapkan, opsi)
 	}
 	return nil, fmt.Errorf("jenis import tidak dikenal: %q", jenis)
 }
@@ -237,15 +275,24 @@ var judulMember = []string{
 	"status",
 }
 
-func (s *Service) members(ctx context.Context, t *Tabel, format Format, terapkan bool) (*Hasil, error) {
-	for _, wajib := range [][]string{
+func (s *Service) members(ctx context.Context, t *Tabel, format Format, terapkan bool, opsi Opsi) (*Hasil, error) {
+	wajib := [][]string{
 		{"id", "member_id", "memberid", "kode"},
-		{"chapter_id", "chapterid", "chapter"},
 		{"name", "nama"},
-	} {
-		if !t.Punya(wajib...) {
+	}
+	// Kolom chapter hanya wajib bila impornya TIDAK ditujukan ke satu chapter.
+	//
+	// Kalau tujuannya sudah ditentukan tombolnya, menuntut kolom yang isinya
+	// sama di setiap baris tidak menambah kejelasan apa pun — ia hanya menambah
+	// satu tempat untuk salah ketik, dan salah ketik di kolom itu memindahkan
+	// member ke chapter lain beserta tagihannya.
+	if opsi.Chapter == "" {
+		wajib = append(wajib, []string{"chapter_id", "chapterid", "chapter"})
+	}
+	for _, w := range wajib {
+		if !t.Punya(w...) {
 			return nil, fmt.Errorf("kolom %s tidak ditemukan — judul yang terbaca: %s",
-				wajib[0], strings.Join(t.Judul, ", "))
+				w[0], strings.Join(t.Judul, ", "))
 		}
 	}
 
@@ -274,7 +321,12 @@ func (s *Service) members(ctx context.Context, t *Tabel, format Format, terapkan
 		b := Baris{Nomor: nomor, ID: id, Nama: nama}
 		status := strings.ToLower(t.Sel(baris, "status"))
 		if status == "" {
-			status = "active"
+			status = opsi.StatusBawaan
+		}
+		// Baris tanpa chapter mengikuti chapter tujuan; yang menyebut chapter
+		// lain ditolak di bawah, bukan ditimpa.
+		if chapter == "" && opsi.Chapter != "" {
+			chapter = opsi.Chapter
 		}
 
 		switch {
@@ -284,6 +336,18 @@ func (s *Service) members(ctx context.Context, t *Tabel, format Format, terapkan
 			b.Tindakan, b.Alasan = TindakanDitolak, "name kosong"
 		case chapter == "":
 			b.Tindakan, b.Alasan = TindakanDitolak, "chapter_id kosong"
+		case opsi.Chapter != "" && chapter != opsi.Chapter:
+			// DITOLAK, bukan dipindahkan diam-diam.
+			//
+			// Impor ini ditujukan ke satu chapter, dan baris ini menyebut
+			// chapter lain. Menurutinya berarti memindahkan member keluar dari
+			// tempat yang sedang dibuka orangnya — dan bersamanya, ke mana
+			// tagihannya pergi. Menimpanya dengan chapter tujuan sama buruknya:
+			// berkasnya menyatakan sesuatu, dan kita mengabaikannya tanpa
+			// memberi tahu.
+			b.Tindakan = TindakanDitolak
+			b.Alasan = fmt.Sprintf("baris ini menyebut chapter %q, sedangkan impor ini ditujukan ke %q",
+				chapter, opsi.Chapter)
 		case !chapterAda[chapter]:
 			// Chapter yang tidak ada adalah kesalahan paling sering pada berkas
 			// yang disusun manual, dan yang paling merusak bila lolos: member
@@ -291,9 +355,9 @@ func (s *Service) members(ctx context.Context, t *Tabel, format Format, terapkan
 			// hitung tanpa tanda apa pun.
 			b.Tindakan = TindakanDitolak
 			b.Alasan = fmt.Sprintf("chapter %q tidak ada", chapter)
-		case status != "active" && status != "inactive" && status != "pending":
+		case !domain.MemberStatus(status).Valid():
 			b.Tindakan = TindakanDitolak
-			b.Alasan = fmt.Sprintf("status %q tidak dikenal (active/inactive/pending)", status)
+			b.Alasan = fmt.Sprintf("status %q tidak dikenal (%s)", status, daftarStatus())
 		case terlihat[id] > 0:
 			b.Tindakan = TindakanDitolak
 			b.Alasan = fmt.Sprintf("id %q sudah dipakai di baris %d", id, terlihat[id])
@@ -391,4 +455,18 @@ func bedaMember(lama, baru MemberRow) []string {
 	cek("business_field", lama.BusinessField, baru.BusinessField)
 	cek("status", lama.Status, baru.Status)
 	return out
+}
+
+// daftarStatus merangkai status yang sah untuk pesan galat.
+//
+// Dibaca dari domain, bukan ditulis ulang di sini: daftar yang disalin akan
+// tertinggal saat status baru ditambahkan, dan yang tertinggal justru pesan
+// yang dibaca orang saat imporya gagal — menyuruh mereka memakai nilai yang
+// tidak lagi lengkap.
+func daftarStatus() string {
+	nama := make([]string, 0, len(domain.SemuaStatusMember))
+	for _, s := range domain.SemuaStatusMember {
+		nama = append(nama, string(s))
+	}
+	return strings.Join(nama, "/")
 }

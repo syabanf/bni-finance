@@ -531,6 +531,39 @@ end $$;
 
 
 -- ---------------------------------------------------------------------------
+-- Status member `visitor`
+--
+-- Visitor adalah tamu yang datang ke pertemuan chapter tapi BELUM menjadi
+-- anggota. Ia perlu tercatat — namanya, chapternya, kontaknya — supaya bisa
+-- diundang lagi dan diikuti sampai mendaftar. Yang tidak boleh terjadi adalah
+-- ia ikut tertagih.
+--
+-- Dibuat sebagai status, bukan tabel terpisah, karena perjalanannya satu arah
+-- dan sering: visitor yang mendaftar menjadi member, dan seluruh riwayat
+-- kunjungannya harus ikut. Tabel terpisah menuntut pemindahan baris — dan
+-- pemindahan baris kehilangan id, yang berarti kehilangan tautan ke apa pun
+-- yang pernah menunjuk orang itu.
+--
+-- YANG MENJAGA AGAR VISITOR TIDAK TERTAGIH: dua query yang memanen member
+-- untuk renewal menyaring `status = 'active'` (internal/member/repository.go
+-- RenewalDue dan internal/dashboard/repository.go), jadi visitor terlewat
+-- dengan sendirinya. Pembuatan permintaan renewal yang memakai daftar id
+-- pilihan operator dijaga terpisah di internal/renewal — di sana visitor
+-- dilewati secara eksplisit, karena di sana tidak ada penyaring status.
+--
+-- Idempoten, mengikuti pola invoice_status di atas.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'member_status' and e.enumlabel = 'visitor'
+  ) then
+    alter type member_status add value 'visitor';
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Pengaturan denda keterlambatan
 --
 -- HANYA DITAMPILKAN, tidak pernah ditagih otomatis, dan itu keputusan yang

@@ -48,7 +48,12 @@ func (s *stub) UpsertMembers(_ context.Context, rows []MemberRow) error {
 
 func jalankan(t *testing.T, st *stub, jenis Jenis, csv string, terapkan bool) *Hasil {
 	t.Helper()
-	h, err := NewService(st).Jalankan(context.Background(), jenis, []byte(csv), terapkan)
+	return jalankanOpsi(t, st, jenis, csv, terapkan, Opsi{})
+}
+
+func jalankanOpsi(t *testing.T, st *stub, jenis Jenis, csv string, terapkan bool, opsi Opsi) *Hasil {
+	t.Helper()
+	h, err := NewService(st).Jalankan(context.Background(), jenis, []byte(csv), terapkan, opsi)
 	if err != nil {
 		t.Fatalf("jalankan: %v", err)
 	}
@@ -193,7 +198,7 @@ func TestJudulBahasaIndonesiaTerbaca(t *testing.T) {
 // dengan berkasnya sendiri.
 func TestKolomWajibHilangDitolakDenganJudulYangTerbaca(t *testing.T) {
 	_, err := NewService(stubIsi()).Jalankan(context.Background(), JenisMember,
-		[]byte("nomor,nama\n1,Andi\n"), true)
+		[]byte("nomor,nama\n1,Andi\n"), true, Opsi{})
 	if err == nil {
 		t.Fatal("berkas tanpa kolom wajib diterima")
 	}
@@ -209,5 +214,125 @@ func TestBarisKosongDilewati(t *testing.T) {
 		"id,name\nch-a,Alpha\n,\nch-b,Beta\n", false)
 	if h.Total != 2 || h.Ditolak != 0 {
 		t.Errorf("total=%d ditolak=%d, mau 2 dan 0", h.Total, h.Ditolak)
+	}
+}
+
+// --- impor yang ditujukan ke satu chapter ------------------------------------
+
+// Kolom chapter boleh KOSONG bila impornya sudah ditujukan ke satu chapter.
+//
+// Berkas yang disusun manual — daftar hadir, ekspor dari BNI Connect — sering
+// tidak memuat kolom itu sama sekali. Menuntut orang menambahkannya dengan isi
+// yang sama di setiap baris adalah cara paling mudah menghasilkan satu baris
+// yang salah ketik, dan satu baris salah ketik memindahkan member ke chapter
+// lain beserta tagihannya.
+func TestBarisTanpaChapterMengikutiChapterTujuan(t *testing.T) {
+	st := stubIsi()
+	h := jalankanOpsi(t, st, JenisMember,
+		"id,name\nmem-900,Tamu Satu\n", true, Opsi{Chapter: "ch-garuda"})
+
+	if h.Ditolak != 0 {
+		t.Fatalf("ditolak %d: %+v", h.Ditolak, h.Baris)
+	}
+	if h.Baru != 1 {
+		t.Fatalf("baru = %d, seharusnya 1", h.Baru)
+	}
+	var ketemu bool
+	for _, r := range st.tulisMem {
+		if r.ID == "mem-900" {
+			ketemu = true
+			if r.ChapterID != "ch-garuda" {
+				t.Errorf("chapter = %q, seharusnya ch-garuda", r.ChapterID)
+			}
+		}
+	}
+	if !ketemu {
+		t.Error("barisnya tidak ikut ditulis")
+	}
+}
+
+// BARIS YANG MENYEBUT CHAPTER LAIN DITOLAK — TIDAK DIPINDAHKAN, TIDAK DITIMPA.
+//
+// Dua jalan keliru yang sama-sama masuk akal sekilas. Menurutinya memindahkan
+// member keluar dari chapter yang sedang dibuka orangnya, dan bersamanya ke
+// mana tagihannya pergi serta pendapatan siapa yang bertambah. Menimpanya
+// dengan chapter tujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita
+// mengabaikannya tanpa memberi tahu siapa pun.
+//
+// Yang benar adalah berhenti dan menunjukkan barisnya.
+func TestBarisChapterLainDitolakSaatImporDitujukan(t *testing.T) {
+	st := stubIsi()
+	st.chapters["ch-lain"] = ChapterRow{ID: "ch-lain", Name: "Lain", DisplayName: "BNI Lain"}
+
+	h := jalankanOpsi(t, st, JenisMember,
+		"id,name,chapter_id\nmem-901,Orang Lain,ch-lain\n", true, Opsi{Chapter: "ch-garuda"})
+
+	if h.Ditolak != 1 {
+		t.Fatalf("ditolak = %d, seharusnya 1: %+v", h.Ditolak, h.Baris)
+	}
+	if h.Baru != 0 {
+		t.Errorf("baru = %d — baris chapter lain tidak boleh ikut ditulis", h.Baru)
+	}
+	for _, r := range st.tulisMem {
+		if r.ID == "mem-901" {
+			t.Fatalf("baris chapter lain tetap ditulis sebagai %q", r.ChapterID)
+		}
+	}
+	// Alasannya harus menyebut KEDUA chapter. "Chapter tidak cocok" memaksa
+	// orang menebak yang mana yang salah — berkasnya, atau tombol yang ditekan.
+	alasan := h.Baris[0].Alasan
+	for _, harus := range []string{"ch-lain", "ch-garuda"} {
+		if !strings.Contains(alasan, harus) {
+			t.Errorf("alasan %q tidak menyebut %q", alasan, harus)
+		}
+	}
+}
+
+// Status bawaan dipakai untuk baris tanpa kolom status — dan hanya untuk itu.
+//
+// Daftar hadir pertemuan tidak pernah memuat kolom status. Tanpa ini setiap
+// tamu masuk sebagai anggota penuh, yaitu tepat kebalikan dari yang diinginkan
+// orang yang menekan tombol "Impor Visitor".
+func TestStatusBawaanHanyaUntukBarisTanpaStatus(t *testing.T) {
+	st := stubIsi()
+	h := jalankanOpsi(t, st, JenisMember,
+		"id,name,status\nmem-902,Tamu Dua,\nmem-903,Anggota,active\n",
+		true, Opsi{Chapter: "ch-garuda", StatusBawaan: "visitor"})
+
+	if h.Ditolak != 0 {
+		t.Fatalf("ditolak %d: %+v", h.Ditolak, h.Baris)
+	}
+	punya := map[string]string{}
+	for _, r := range st.tulisMem {
+		punya[r.ID] = r.Status
+	}
+	if punya["mem-902"] != "visitor" {
+		t.Errorf("mem-902 = %q, seharusnya visitor (kolom statusnya kosong)", punya["mem-902"])
+	}
+	if punya["mem-903"] != "active" {
+		t.Errorf("mem-903 = %q — status yang DITULIS di berkas tidak boleh ditimpa bawaan", punya["mem-903"])
+	}
+}
+
+// Status bawaan yang tidak dikenal ditolak SEBELUM apa pun ditulis.
+func TestStatusBawaanAsingDitolak(t *testing.T) {
+	_, err := NewService(stubIsi()).Jalankan(context.Background(), JenisMember,
+		[]byte("id,name\nmem-904,X\n"), true, Opsi{StatusBawaan: "tamu"})
+	if err == nil {
+		t.Fatal("status bawaan asing diterima")
+	}
+	if !strings.Contains(err.Error(), "tamu") {
+		t.Errorf("galat %q tidak menyebut nilai yang salah", err)
+	}
+}
+
+// Impor CHAPTER tidak bisa dibatasi ke satu chapter — berkasnyalah yang
+// mendefinisikan chapter. Menerimanya diam-diam berarti mengabaikan niat
+// pemanggilnya tanpa memberi tahu.
+func TestImporChapterMenolakChapterTujuan(t *testing.T) {
+	_, err := NewService(stubIsi()).Jalankan(context.Background(), JenisChapter,
+		[]byte("id,name,display_name\nch-x,X,BNI X\n"), true, Opsi{Chapter: "ch-garuda"})
+	if err == nil {
+		t.Fatal("impor chapter dengan chapter tujuan diterima")
 	}
 }

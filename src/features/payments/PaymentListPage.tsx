@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Search, Wallet } from 'lucide-react'
 import type { Chapter, PaymentWithInvoice } from '@/types'
 import {
@@ -41,7 +41,14 @@ export function PaymentListPage() {
 
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  // Nilai awal dibaca dari ?q= — pencarian di topbar mengirimkannya ke sini.
+  //
+  // Tanpa ini, memilih "Pembayaran" di kotak pencarian membuka halaman ini dengan
+  // kotak yang kosong: orangnya sudah mengetik, alamatnya sudah membawa
+  // kata kuncinya, dan yang terlihat tetap seluruh daftar. Persis keluhan
+  // yang membuat pencariannya disebut "belum berfungsi".
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
   const [method, setMethod] = useState('all')
   const [chapterId, setChapterId] = useState('all')
   const [dueFrom, setDueFrom] = useState('')

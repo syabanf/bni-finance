@@ -46,13 +46,20 @@ func (h *Handler) jalankan(w http.ResponseWriter, r *http.Request) {
 	// menimpa data keanggotaan tanpa ada yang sempat melihatnya lebih dulu.
 	terapkan := r.URL.Query().Get("terapkan") == "true"
 
+	// Chapter tujuan dan status bawaan datang dari KONTEKS tombolnya, bukan
+	// dari berkasnya. Lihat importer.Opsi.
+	opsi := Opsi{
+		Chapter:      strings.TrimSpace(r.URL.Query().Get("chapter")),
+		StatusBawaan: strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status_bawaan"))),
+	}
+
 	data, err := bacaUnggahan(r)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
 	}
 
-	hasil, err := h.svc.Jalankan(r.Context(), jenis, data, terapkan)
+	hasil, err := h.svc.Jalankan(r.Context(), jenis, data, terapkan, opsi)
 	if err != nil {
 		// Galat dari importer hampir selalu kesalahan BERKASNYA — kolom wajib
 		// hilang, format tidak terbaca — jadi 400, bukan 500. Menjawab 500
