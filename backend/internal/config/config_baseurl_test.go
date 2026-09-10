@@ -2,7 +2,8 @@ package config
 
 import "testing"
 
-// APP_BASE_URL yang menunjuk localhost sementara SMTP menyala adalah kombinasi
+// APP_BASE_URL yang menunjuk localhost sementara pengiriman email menyala
+// adalah kombinasi
 // yang gagal di tempat yang tidak terlihat dari server: emailnya TERKIRIM,
 // lognya bersih, dan yang menerima menekan tautan mati di perangkatnya.
 //

@@ -50,13 +50,19 @@ type Config struct {
 	// invoice menambah dua baris dan tidak ada yang pernah menghapusnya.
 	BlackboxRetain int
 
-	// Seed credentials create the first administrator on an empty users table,
-	// so a fresh database is reachable without hand-writing a password hash.
-	SMTPHost     string
-	SMTPPort     string
-	SMTPUser     string
-	SMTPPassword string
-	SMTPFrom     string
+	// ResendAPIKey adalah kunci REST Resend (diawali "re_"). Kosong = fitur
+	// yang butuh email menjawab 503; aplikasinya tetap berjalan.
+	ResendAPIKey string
+	// MailFrom adalah pengirim, boleh "Nama <alamat@domain>". Domainnya harus
+	// sudah diverifikasi di Resend.
+	MailFrom string
+	// SMTPUsang menandai .env yang masih memakai SMTP_* dan belum diubah.
+	//
+	// Dipakai memperingatkan di startup. Tanpa ini, lingkungan yang kredensial
+	// emailnya masih bernama lama hanya terlihat sebagai "belum dikonfigurasi"
+	// — benar, tapi tidak menyebutkan bahwa nilainya sebenarnya ADA di sana
+	// dengan nama yang salah, dan perbaikannya satu baris.
+	SMTPUsang bool
 	// AppBaseURL adalah alamat aplikasi web, dipakai merakit tautan di email.
 	//
 	// Dari konfigurasi, bukan dari header Host permintaan: Host bisa dipalsukan,
@@ -64,6 +70,8 @@ type Config struct {
 	// penyerang lewat email yang tampak resmi karena memang dari kita.
 	AppBaseURL string
 
+	// Seed credentials create the first administrator on an empty users table,
+	// so a fresh database is reachable without hand-writing a password hash.
 	SeedAdminEmail    string
 	SeedAdminPassword string
 	SeedAdminName     string
@@ -115,11 +123,9 @@ func Load() (Config, error) {
 		BlackboxSize:   int(bytesOr("BLACKBOX_SIZE", 200)),
 		BlackboxRetain: int(bytesOr("BLACKBOX_RETAIN", 10_000)),
 
-		SMTPHost:     strings.TrimSpace(os.Getenv("SMTP_HOST")),
-		SMTPPort:     envOr("SMTP_PORT", "587"),
-		SMTPUser:     strings.TrimSpace(os.Getenv("SMTP_USER")),
-		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
-		SMTPFrom:     strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		ResendAPIKey: strings.TrimSpace(os.Getenv("RESEND_API_KEY")),
+		MailFrom:     strings.TrimSpace(os.Getenv("MAIL_FROM")),
+		SMTPUsang:    strings.TrimSpace(os.Getenv("SMTP_PASSWORD")) != "" || strings.TrimSpace(os.Getenv("SMTP_HOST")) != "",
 		AppBaseURL:   envOr("APP_BASE_URL", "http://localhost:5173"),
 
 		SeedAdminEmail:    strings.TrimSpace(os.Getenv("SEED_ADMIN_EMAIL")),
@@ -219,8 +225,8 @@ func loadDotEnv(path string) {
 //
 // Dipakai memperingatkan konfigurasi yang tampak benar dari sisi server tapi
 // menghasilkan tautan mati di kotak masuk penerimanya: APP_BASE_URL localhost
-// sementara SMTP menyala berarti email TERKIRIM, log bersih, dan penerimanya
-// menekan tautan yang tidak bisa dibuka di perangkatnya.
+// sementara pengiriman email menyala berarti email TERKIRIM, log bersih, dan
+// penerimanya menekan tautan yang tidak bisa dibuka di perangkatnya.
 func Lokal(raw string) bool {
 	u, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil {
