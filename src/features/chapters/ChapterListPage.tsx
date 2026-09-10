@@ -13,6 +13,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { SyncButton } from '@/features/sync/SyncButton'
 import { chapterService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
@@ -20,7 +21,7 @@ import { makeExportHandlers } from '@/lib/exporters'
 export function ChapterListPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { data: chapters, loading } = useAsync<Chapter[]>(() => chapterService.list())
+  const { data: chapters, loading, reload } = useAsync<Chapter[]>(() => chapterService.list())
 
   /**
    * Angka per chapter dari server — satu permintaan, bukan dua tarikan penuh.
@@ -104,7 +105,12 @@ export function ChapterListPage() {
       <PageHeader
         title="Chapter"
         description="Daftar chapter hasil sinkronisasi dari BNI Visitor Management."
-        action={<ExportMenu {...exportHandlers} disabled={filteredChapters.length === 0} />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <SyncButton jenis="chapter" onSelesai={reload} />
+            <ExportMenu {...exportHandlers} disabled={filteredChapters.length === 0} />
+          </div>
+        }
       />
 
       {loading ? (

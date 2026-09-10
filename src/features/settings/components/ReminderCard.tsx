@@ -106,16 +106,16 @@ export function ReminderCard() {
             label="Notifikasi"
             nyala={notifNyala}
             onChange={(v) => ubah('notifications_enabled', String(v))}
-            deskripsi="Sakelar induk. Dimatikan, TIDAK ADA pesan yang keluar — termasuk pengiriman manual."
+            deskripsi="Kalau dimatikan, tidak ada pesan apa pun yang sampai ke member — termasuk yang Anda kirim sendiri."
           />
           <Sakelar
-            label="Worker pengingat otomatis"
+            label="Pengingat otomatis"
             nyala={workerNyala}
             onChange={(v) => ubah('reminder_worker_enabled', String(v))}
-            deskripsi="Mengirim pengingat sendiri sesuai jadwal. Mematikannya tidak menghalangi pengiriman manual."
+            deskripsi="Sistem mengirim pengingat sendiri sesuai jadwal. Kalau dimatikan, Anda tetap bisa mengirim satu per satu."
             peringatan={
               workerNyala
-                ? 'Menyala: pengingat dikirim otomatis ke member, dan tiap pengiriman membakar nomor Paper.id secara permanen.'
+                ? 'Sedang menyala — pengingat dikirim otomatis ke member. Tiap pengiriman memakai satu nomor invoice Paper.id yang tidak bisa dipakai lagi.'
                 : undefined
             }
           />
@@ -123,7 +123,7 @@ export function ReminderCard() {
 
         <Field
           label="Jadwal pengingat"
-          hint='Hari SEBELUM jatuh tempo, dipisah koma. "7,3,1" berarti tiga pengingat: H-7, H-3, dan H-1. Tiap pasangan invoice dan jadwal hanya dikirim SEKALI, bahkan setelah worker direstart.'
+          hint='Berapa hari sebelum jatuh tempo, dipisah koma. Contoh: 7,3,1 mengirim tiga pengingat — tujuh hari, tiga hari, dan sehari sebelum jatuh tempo. Tiap member hanya menerima satu pengingat untuk tiap jadwal, walau sistem sempat dimatikan lalu dinyalakan lagi.'
         >
           <Input
             value={nilai.reminder_offsets}
@@ -138,7 +138,7 @@ export function ReminderCard() {
             label="Denda keterlambatan"
             nyala={dendaNyala}
             onChange={(v) => ubah('denda_aktif', String(v))}
-            deskripsi="HANYA DITAMPILKAN — tidak pernah ditagihkan otomatis dan tidak mengubah nominal invoice."
+            deskripsi="Hanya ditampilkan sebagai informasi. Denda tidak ditagihkan otomatis dan tidak mengubah nominal invoice."
           />
 
           {dendaNyala && (
@@ -163,9 +163,9 @@ export function ReminderCard() {
           )}
 
           <p className="mt-3 text-xs leading-relaxed text-ink-500">
-            Denda dihitung saat invoice dibaca, tidak pernah disimpan. Denda yang menempel dan
-            tumbuh di invoice akan memaksa nominalnya berubah seiring waktu — dan invoice yang
-            sudah terkirim ke Paper.id tidak bisa lagi disamakan dengan yang diterima member.
+            Angka dendanya dihitung ulang tiap kali invoice dibuka, jadi selalu mengikuti
+            keterlambatan hari ini. Nominal invoice yang sudah terkirim ke Paper.id tidak ikut
+            berubah — tagihan yang diterima member harus tetap sama dengan yang tercatat di sini.
           </p>
         </div>
       </CardBody>

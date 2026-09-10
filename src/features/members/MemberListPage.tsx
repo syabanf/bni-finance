@@ -24,6 +24,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { SyncButton } from '@/features/sync/SyncButton'
 import { chapterService, memberService } from '@/services'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
@@ -141,7 +142,12 @@ export function MemberListPage() {
       <PageHeader
         title="Member"
         description="Data member hasil sinkronisasi dari BNI Visitor Management."
-        action={<ExportMenu {...exportHandlers} disabled={filtered.length === 0} />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <SyncButton jenis="member" onSelesai={reload} />
+            <ExportMenu {...exportHandlers} disabled={filtered.length === 0} />
+          </div>
+        }
       />
 
       {/* Summary cards (also filter by status) */}
