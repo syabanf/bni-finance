@@ -364,6 +364,18 @@ export const TOURS: Tour[] = [
           'pada apakah pesannya sampai.',
       },
       {
+        anchor: 'sync-run',
+        title: 'Menarik data terbaru',
+        body:
+          'Tombol ini menarik data keanggotaan dari sistem BNI VM, ' +
+          'supaya daftar di sini tidak perlu dijaga manual. ' +
+          'Menjalankannya dua kali berturut-turut tidak menggandakan data — ' +
+          'yang sudah ada diperbarui, bukan ditambahkan lagi, jadi aman mengulang ' +
+          'bila Anda ragu apakah yang tadi berhasil. ' +
+          'Member yang hilang dari sumber dinonaktifkan, bukan dihapus, ' +
+          'karena tagihan lama mereka harus tetap bisa ditelusuri.',
+      },
+      {
         anchor: 'member-filters',
         title: 'Menemukan yang bermasalah',
         body:
@@ -513,37 +525,6 @@ export const TOURS: Tour[] = [
           'Yang kedua menentukan berapa hari setelah diterbitkan sebuah tagihan jatuh tempo. ' +
           'Menagih terlalu awal membingungkan member, terlalu lambat membuat keanggotaan ' +
           'sempat kosong — dua angka inilah yang mengatur keseimbangannya.',
-      },
-    ],
-  },
-  {
-    path: '/settings/sync',
-    label: 'Sinkronisasi',
-    steps: [
-      {
-        title: 'Menarik data member',
-        body:
-          'Halaman ini menarik data keanggotaan dari sistem BNI VM ' +
-          'supaya daftar member di sini tidak perlu dijaga manual.',
-      },
-      {
-        anchor: 'sync-source',
-        title: 'Dari mana datanya',
-        body:
-          'Bagian ini menunjukkan sumber datanya beserta status sambungannya. ' +
-          'Kalau sinkronisasi gagal, periksa di sini lebih dulu sebelum mencoba lagi.',
-      },
-      {
-        anchor: 'sync-run',
-        title: 'Member dan chapter, terpisah',
-        body:
-          'Keduanya disinkronkan sendiri-sendiri, dan setiap kartu menunjukkan ' +
-          'kapan terakhir kali datanya ditarik. ' +
-          'Menjalankan dua kali berturut-turut tidak menggandakan data — ' +
-          'yang sudah ada diperbarui, bukan ditambahkan lagi, jadi aman mengulang ' +
-          'bila Anda ragu apakah yang tadi berhasil. ' +
-          'Member yang hilang dari sumber dinonaktifkan, bukan dihapus, ' +
-          'karena tagihan lama mereka harus tetap bisa ditelusuri.',
       },
     ],
   },

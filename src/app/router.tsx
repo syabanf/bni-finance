@@ -15,7 +15,6 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ImportPage } from '@/features/import/ImportPage'
 import { RenewalPage } from '@/features/renewal/RenewalPage'
 import { UsersPage } from '@/features/users/UsersPage'
-import { SyncPage } from '@/features/settings/SyncPage'
 import { BlackboxPage } from '@/features/blackbox/BlackboxPage'
 import { ApiConsolePage } from '@/features/apiconsole/ApiConsolePage'
 import { NotFoundPage } from '@/features/misc/NotFoundPage'
@@ -97,14 +96,6 @@ export const router = createBrowserRouter([
             element: (
               <RequirePermission permission="settings:manage">
                 <UsersPage />
-              </RequirePermission>
-            ),
-          },
-          {
-            path: '/settings/sync',
-            element: (
-              <RequirePermission permission="sync:run">
-                <SyncPage />
               </RequirePermission>
             ),
           },
