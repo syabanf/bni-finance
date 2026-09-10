@@ -549,13 +549,18 @@ func nextNumberTx(ctx context.Context, q querier, year int) (string, error) {
 // diminta siapa pun.
 func (r *Repository) LateFeeRule(ctx context.Context) (domain.LateFeeRule, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT key, value FROM app_settings WHERE key IN ('denda_aktif','denda_per_hari','denda_maks_hari')`)
+		`SELECT key, value FROM app_settings
+		 WHERE key IN ('denda_aktif','denda_per_hari','denda_maks_hari',
+		               'denda_jenis','denda_satuan','denda_persen')`)
 	if err != nil {
 		return domain.LateFeeRule{}, fmt.Errorf("baca pengaturan denda: %w", err)
 	}
 	defer rows.Close()
 
-	var out domain.LateFeeRule
+	// Bawaannya rupiah per hari — bentuk yang berlaku sebelum jenis dan satuan
+	// ada. Pengaturan lama yang hanya menyimpan denda_per_hari karena itu tetap
+	// menghasilkan denda yang sama persis, bukan nol dan bukan angka lain.
+	out := domain.LateFeeRule{Jenis: domain.DendaRupiah, Satuan: domain.SatuanHari}
 	for rows.Next() {
 		var k, v string
 		if err := rows.Scan(&k, &v); err != nil {
@@ -573,10 +578,31 @@ func (r *Repository) LateFeeRule(ctx context.Context) (domain.LateFeeRule, error
 				// ditetapkan siapa pun.
 				n = 0
 			}
-			out.PerHari = n
+			out.PerSatuan = n
 		case "denda_maks_hari":
 			n, _ := strconv.Atoi(v)
 			out.MaksHari = n
+		case "denda_jenis":
+			// Nilai yang tidak dikenal jatuh ke rupiah, bukan ke persen.
+			// Salah baca yang menghasilkan persentase dari nominal invoice jauh
+			// lebih besar akibatnya daripada salah baca yang menghasilkan
+			// nominal tetap.
+			if domain.JenisDenda(v) == domain.DendaPersen {
+				out.Jenis = domain.DendaPersen
+			}
+		case "denda_satuan":
+			switch domain.SatuanDenda(v) {
+			case domain.SatuanMinggu:
+				out.Satuan = domain.SatuanMinggu
+			case domain.SatuanBulan:
+				out.Satuan = domain.SatuanBulan
+			}
+		case "denda_persen":
+			f, err := strconv.ParseFloat(v, 64)
+			if err != nil || f < 0 {
+				f = 0
+			}
+			out.PersenPerSatuan = f
 		}
 	}
 	return out, rows.Err()

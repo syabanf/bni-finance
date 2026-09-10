@@ -249,13 +249,14 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 		sendEmail = false
 	}
 
+	namaProduk, descProduk := s.produk(ctx, inv.Type)
 	res, err := s.gateway.CreateInvoice(ctx, CreateInput{
 		Number:        inv.Number,
 		InvoiceDate:   now,
 		DueDate:       dueDate,
 		Amount:        inv.Amount,
-		ItemName:      itemName(inv.Type),
-		ItemDesc:      itemDesc(inv.Type),
+		ItemName:      namaProduk,
+		ItemDesc:      descProduk,
 		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,
@@ -412,18 +413,54 @@ func (s *Service) paidAt(in WebhookInput) time.Time {
 	return s.now()
 }
 
+// Nama dan deskripsi produk yang dikirim ke Paper.id.
+//
+// BISA DIATUR, dengan nilai di bawah sebagai cadangan. Teks inilah yang dibaca
+// member di invoice yang mereka terima — bukan istilah internal kita — dan
+// mengubahnya seharusnya tidak menuntut deploy.
+//
+// Cadangannya bukan string kosong: pengaturan yang belum diisi atau gagal
+// terbaca menghasilkan invoice tanpa nama produk, dan Paper.id menerimanya apa
+// adanya. Baris kosong di invoice orang lebih buruk daripada teks bawaan yang
+// masih masuk akal.
+const (
+	produkPendaftaranBawaan    = "Biaya Pendaftaran Member BNI"
+	deskripsiPendaftaranBawaan = "Pendaftaran anggota baru (berlaku 1 tahun)"
+	produkRenewalBawaan        = "Perpanjangan Keanggotaan BNI"
+	deskripsiRenewalBawaan     = "Perpanjangan keanggotaan tahunan"
+)
+
 func itemName(t domain.InvoiceType) string {
 	if t == domain.TypeRegistration {
-		return "Biaya Pendaftaran Member BNI"
+		return produkPendaftaranBawaan
 	}
-	return "Perpanjangan Keanggotaan BNI"
+	return produkRenewalBawaan
 }
 
 func itemDesc(t domain.InvoiceType) string {
 	if t == domain.TypeRegistration {
-		return "Pendaftaran anggota baru (berlaku 1 tahun)"
+		return deskripsiPendaftaranBawaan
 	}
-	return "Perpanjangan keanggotaan tahunan"
+	return deskripsiRenewalBawaan
+}
+
+// produk membaca nama dan deskripsi dari app_settings, jatuh ke bawaan bila
+// kosong. Galat pembacaan sengaja diabaikan: mengirim invoice dengan teks
+// bawaan jauh lebih baik daripada menggagalkan pengirimannya karena satu baris
+// pengaturan tidak terbaca.
+func (s *Service) produk(ctx context.Context, t domain.InvoiceType) (nama, desc string) {
+	kunciNama, kunciDesc := "paper_produk_renewal", "paper_deskripsi_renewal"
+	if t == domain.TypeRegistration {
+		kunciNama, kunciDesc = "paper_produk_pendaftaran", "paper_deskripsi_pendaftaran"
+	}
+	nama, desc = itemName(t), itemDesc(t)
+	if v, err := s.repo.GetSetting(ctx, kunciNama); err == nil && strings.TrimSpace(v) != "" {
+		nama = strings.TrimSpace(v)
+	}
+	if v, err := s.repo.GetSetting(ctx, kunciDesc); err == nil && strings.TrimSpace(v) != "" {
+		desc = strings.TrimSpace(v)
+	}
+	return nama, desc
 }
 
 // gatewayError maps an upstream failure to a status code, keeping Paper.id's
@@ -561,13 +598,14 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 	// Jatuh tempo TIDAK dihitung ulang dari hari ini. Pengingat atas tagihan
 	// yang sudah lewat jatuh tempo harus tetap menampilkan tanggal aslinya —
 	// memundurkannya akan membuat tunggakan tampak belum jatuh tempo.
+	namaProduk, descProduk := s.produk(ctx, inv.Type)
 	res, err := s.gateway.CreateInvoice(ctx, CreateInput{
 		Number:        reminderNumber(inv.Number, seq),
 		InvoiceDate:   now,
 		DueDate:       inv.DueDate,
 		Amount:        inv.Amount,
-		ItemName:      itemName(inv.Type),
-		ItemDesc:      itemDesc(inv.Type),
+		ItemName:      namaProduk,
+		ItemDesc:      descProduk,
 		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,

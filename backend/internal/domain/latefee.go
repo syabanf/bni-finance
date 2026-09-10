@@ -14,11 +14,52 @@ import "time"
 // Karena tidak disimpan, tidak ada pekerjaan berkala, tidak ada baris yang bisa
 // basi, dan mematikan fiturnya cukup dengan satu sakelar.
 
+// Satuan waktu penghitungan denda.
+type SatuanDenda string
+
+const (
+	SatuanHari   SatuanDenda = "hari"
+	SatuanMinggu SatuanDenda = "minggu"
+	SatuanBulan  SatuanDenda = "bulan"
+)
+
+// hariPerSatuan mengubah satuan menjadi jumlah hari.
+//
+// Bulan dihitung 30 hari, bukan panjang bulan kalender yang sebenarnya. Denda
+// yang besarnya bergantung pada apakah keterlambatannya jatuh di Februari atau
+// Juli tidak bisa dijelaskan kepada member — dan yang perlu dijelaskan adalah
+// angkanya, bukan almanaknya.
+func (s SatuanDenda) hari() int {
+	switch s {
+	case SatuanMinggu:
+		return 7
+	case SatuanBulan:
+		return 30
+	default:
+		return 1
+	}
+}
+
+// JenisDenda menentukan dendanya nominal tetap atau persentase tagihan.
+type JenisDenda string
+
+const (
+	DendaRupiah JenisDenda = "rupiah"
+	DendaPersen JenisDenda = "persen"
+)
+
 // LateFeeRule adalah pengaturan denda dari app_settings.
 type LateFeeRule struct {
-	Aktif    bool  `json:"aktif"`
-	PerHari  int64 `json:"perHari"`
-	MaksHari int   `json:"maksHari"`
+	Aktif bool       `json:"aktif"`
+	Jenis JenisDenda `json:"jenis"`
+	// Satuan waktu: dendanya bertambah tiap satu satuan keterlambatan.
+	Satuan SatuanDenda `json:"satuan"`
+	// PerSatuan adalah nominal rupiah per satuan, dipakai saat Jenis rupiah.
+	PerSatuan int64 `json:"perSatuan"`
+	// PersenPerSatuan adalah persentase dari nominal invoice per satuan,
+	// dipakai saat Jenis persen. Ditulis sebagai 2 untuk 2%, bukan 0,02.
+	PersenPerSatuan float64 `json:"persenPerSatuan"`
+	MaksHari        int     `json:"maksHari"`
 }
 
 // LateFee adalah hasil hitungan untuk satu invoice.
@@ -43,7 +84,14 @@ type LateFee struct {
 // Hanya `sent` dan `overdue` yang menumbuhkannya — keduanya berarti tagihan
 // masih berdiri dan belum dibayar.
 func (r LateFeeRule) Hitung(inv Invoice, now time.Time) LateFee {
-	if !r.Aktif || r.PerHari <= 0 {
+	if !r.Aktif {
+		return LateFee{}
+	}
+	if r.Jenis == DendaPersen {
+		if r.PersenPerSatuan <= 0 {
+			return LateFee{}
+		}
+	} else if r.PerSatuan <= 0 {
 		return LateFee{}
 	}
 	switch inv.Status {
@@ -70,5 +118,26 @@ func (r LateFeeRule) Hitung(inv Invoice, now time.Time) LateFee {
 		hari = r.MaksHari
 		batas = true
 	}
-	return LateFee{HariTelat: hari, Nominal: int64(hari) * r.PerHari, Tercapaikan: batas}
+
+	// SATUAN YANG SUDAH GENAP, bukan pecahannya.
+	//
+	// Denda "per minggu" pada hari keempat adalah nol, bukan empat-per-tujuh
+	// minggu. Membebankan denda satu minggu penuh di hari pertama adalah hal
+	// yang tidak seorang pun harapkan dari kata "per minggu", dan pecahan
+	// minggu adalah angka yang tidak bisa dijelaskan di kuitansi.
+	satuan := int64(hari / r.Satuan.hari())
+	if satuan <= 0 {
+		return LateFee{HariTelat: hari, Tercapaikan: batas}
+	}
+
+	var nominal int64
+	if r.Jenis == DendaPersen {
+		// Dibulatkan ke bawah ke rupiah penuh. Denda berkoma tidak bisa
+		// ditransfer, dan membulatkan ke atas berarti menagih lebih dari
+		// aturannya sendiri.
+		nominal = int64(float64(inv.Amount) * r.PersenPerSatuan / 100 * float64(satuan))
+	} else {
+		nominal = satuan * r.PerSatuan
+	}
+	return LateFee{HariTelat: hari, Nominal: nominal, Tercapaikan: batas}
 }
