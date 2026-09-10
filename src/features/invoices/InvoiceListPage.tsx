@@ -175,16 +175,18 @@ export function InvoiceListPage() {
     [byStatus],
   )
 
+  const byType: Record<string, { count: number; amount: number }> =
+    aktif?.summary?.byType ?? {}
+
   const summary = useMemo(() => {
-    const sent = ambil('sent')
-    const overdue = ambil('overdue')
+    const kosong = { count: 0, amount: 0 }
     return {
-      total: aktif?.summary?.total ?? { count: 0, amount: 0 },
-      outstanding: {
-        count: sent.count + overdue.count,
-        amount: sent.amount + overdue.amount,
-      },
-      overdue,
+      total: aktif?.summary?.total ?? kosong,
+      // Dari byType, jadi keduanya ikut menyempit saat tab status dipilih:
+      // memilih "Overdue" menjawab berapa di antaranya renewal dan berapa
+      // pendaftaran, bukan mengulang angka seluruh status.
+      renewal: byType.renewal ?? kosong,
+      pendaftaran: byType.registration ?? kosong,
       paid: ambil('paid'),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -415,7 +417,11 @@ export function InvoiceListPage() {
         }
       />
 
-      {/* Summary cards (also filter the table by status) */}
+      {/* Kartu ringkasan.
+          Tab di bawah menyaring STATUS; kartu ini menyaring TIPE, dan angkanya
+          mengikuti tab yang sedang aktif. Dua sumbu yang berbeda pada dua
+          kendali yang berbeda — kalau keduanya menyaring status, kartu dan tab
+          akan saling membatalkan dan tidak jelas mana yang sedang berlaku. */}
       <div data-tour="invoice-filters" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
           label="Total Invoice"
@@ -426,20 +432,20 @@ export function InvoiceListPage() {
           onClick={() => setStatus('all')}
         />
         <SummaryCard
-          label="Outstanding"
-          value={summary.outstanding.count}
-          sub={formatCurrencyCompact(summary.outstanding.amount)}
+          label="Renewal"
+          value={summary.renewal.count}
+          sub={formatCurrencyCompact(summary.renewal.amount)}
           tone="amber"
-          active={status === 'outstanding'}
-          onClick={() => setStatus('outstanding')}
+          active={type === 'renewal'}
+          onClick={() => setType(type === 'renewal' ? 'all' : 'renewal')}
         />
         <SummaryCard
-          label="Overdue"
-          value={summary.overdue.count}
-          sub={formatCurrencyCompact(summary.overdue.amount)}
-          tone="red"
-          active={status === 'overdue'}
-          onClick={() => setStatus('overdue')}
+          label="Pendaftaran"
+          value={summary.pendaftaran.count}
+          sub={formatCurrencyCompact(summary.pendaftaran.amount)}
+          tone="blue"
+          active={type === 'registration'}
+          onClick={() => setType(type === 'registration' ? 'all' : 'registration')}
         />
         <SummaryCard
           label="Lunas"

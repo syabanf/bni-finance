@@ -120,11 +120,26 @@ export const mockInvoiceRepository: InvoiceRepository = {
     // dan tab harus tetap menampilkan angka status lain saat satu tab dipilih.
     const semua = saring(store.invoices.map(relations), { ...filters, status: 'all' })
     const byStatus: InvoiceSummary['byStatus'] = {}
+    const byType: InvoiceSummary['byType'] = {}
     let total = { count: 0, amount: 0 }
+
+    // Meniru server: byStatus mengabaikan filter status, byType mengikutinya.
+    // Mock yang memperlakukan keduanya sama akan menyembunyikan bug yang baru
+    // muncul di produksi — dan di sanalah ia paling mahal ditemukan.
+    const diminta = filters?.status && filters.status !== 'all' ? filters.status : ''
+    const cocokStatus = (st: string) =>
+      diminta === '' ||
+      (diminta === 'outstanding' ? st === 'sent' || st === 'overdue' : st === diminta)
+
     for (const i of semua) {
       const b = (byStatus[i.status] ??= { count: 0, amount: 0 })
       b.count += 1
       b.amount += i.amount
+      if (cocokStatus(i.status)) {
+        const t = (byType[i.type] ??= { count: 0, amount: 0 })
+        t.count += 1
+        t.amount += i.amount
+      }
       if (i.status !== 'cancelled' && i.status !== 'terminated') {
         total = { count: total.count + 1, amount: total.amount + i.amount }
       }
@@ -135,7 +150,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
     return delay({
       rows: cocok.slice(offset, offset + (filters?.limit ?? 25)),
       total: cocok.length,
-      summary: { byStatus, total },
+      summary: { byStatus, byType, total },
     })
   },
 

@@ -587,33 +587,81 @@ func (r *Repository) LateFeeRule(ctx context.Context) (domain.LateFeeRule, error
 // Satu query, dikelompokkan per status. Menghitungnya di klien dari halaman yang
 // sedang tampil akan menampilkan angka yang jauh lebih kecil daripada
 // kenyataannya — dan tidak ada satu pun tanda bahwa itu keliru.
+// cocokStatus melaporkan satu baris masuk ke filter status yang diminta.
+//
+// Aturannya SENGAJA meniru klausaFilter, termasuk arti "outstanding" sebagai
+// sent + overdue. Keduanya menjawab pertanyaan yang sama pada dua tempat: SQL
+// menyaring baris yang dikirim, ini menyaring baris yang dijumlahkan ke ByType.
+// Kalau keduanya berbeda, kartu ringkasan akan menghitung invoice yang tidak
+// ada di tabel di bawahnya — dan selisihnya tidak akan terlihat sebagai galat,
+// hanya sebagai angka yang tidak seorang pun bisa jelaskan.
+func cocokStatus(diminta, status string) bool {
+	switch diminta {
+	case "":
+		return true
+	case "outstanding":
+		return status == string(domain.StatusSent) || status == string(domain.StatusOverdue)
+	default:
+		return status == diminta
+	}
+}
+
 func (r *Repository) Summary(ctx context.Context, f domain.InvoiceFilter) (*domain.InvoiceSummary, error) {
-	// Status dikosongkan: kartu ringkasan menampilkan rincian PER status, jadi
+	// Status dikosongkan: tab status menampilkan rincian PER status, jadi
 	// menyaring ke satu status lebih dulu membuat sisanya selalu nol. Filter
 	// lainnya tetap berlaku.
 	tanpaStatus := f
 	tanpaStatus.Status = ""
 	clause, args := klausaFilter(ctx, tanpaStatus)
 
+	// SATU query untuk dua rincian, dikelompokkan status DAN tipe sekaligus.
+	//
+	// Dua query terpisah — satu per status, satu per tipe — akan membaca tabel
+	// yang sama dua kali dengan filter yang sedikit berbeda, dan perbedaan itu
+	// adalah tempat keduanya perlahan tidak lagi cocok. Matriksnya dijumlahkan
+	// di sini, jadi angka tab dan angka kartu berasal dari baris yang sama.
 	rows, err := r.db.Query(ctx,
-		"SELECT status::text, COUNT(*), COALESCE(SUM(amount),0) FROM invoices WHERE "+
-			clause+" GROUP BY status", args...)
+		"SELECT status::text, type::text, COUNT(*), COALESCE(SUM(amount),0) FROM invoices WHERE "+
+			clause+" GROUP BY status, type", args...)
 	if err != nil {
 		return nil, fmt.Errorf("ringkas invoice: %w", err)
 	}
 	defer rows.Close()
 
-	out := &domain.InvoiceSummary{ByStatus: map[string]domain.InvoiceBucket{}}
+	out := &domain.InvoiceSummary{
+		ByStatus: map[string]domain.InvoiceBucket{},
+		ByType:   map[string]domain.InvoiceBucket{},
+	}
+	tambah := func(m map[string]domain.InvoiceBucket, kunci string, b domain.InvoiceBucket) {
+		lama := m[kunci]
+		lama.Count += b.Count
+		lama.Amount += b.Amount
+		m[kunci] = lama
+	}
+
 	for rows.Next() {
-		var status string
+		var status, tipe string
 		var b domain.InvoiceBucket
-		if err := rows.Scan(&status, &b.Count, &b.Amount); err != nil {
+		if err := rows.Scan(&status, &tipe, &b.Count, &b.Amount); err != nil {
 			return nil, fmt.Errorf("scan ringkasan: %w", err)
 		}
-		out.ByStatus[status] = b
+
+		tambah(out.ByStatus, status, b)
+
+		// ByType MENGIKUTI status yang diminta, ByStatus tidak. Perbandingannya
+		// memakai f.Status — permintaan aslinya — bukan tanpaStatus.
+		if cocokStatus(f.Status, status) {
+			tambah(out.ByType, tipe, b)
+		}
+
 		// cancelled dan terminated TIDAK masuk total: tagihan yang ditarik
 		// kembali atau gugur karena keanggotaan diputus bukan pendapatan, dan
-		// memasukkannya menggelembungkan angka yang dibaca sebagai total tertagih.
+		// memasukkannya menggelembungkan angka yang dibaca sebagai total
+		// tertagih.
+		//
+		// Dijumlahkan dari bucket BARIS INI, bukan dari agregat berjalan di
+		// ByStatus — satu status muncul sekali per tipe, jadi memakai agregatnya
+		// akan menghitung status bertipe ganda dua kali.
 		if status != string(domain.StatusCancelled) && status != string(domain.StatusTerminated) {
 			out.Total.Count += b.Count
 			out.Total.Amount += b.Amount

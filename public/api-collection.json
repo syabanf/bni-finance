@@ -446,7 +446,7 @@
           "enum": [
             "true"
           ],
-          "description": "true menambahkan meta.summary: hitungan dan jumlah per status untuk seluruh hasil filter, bukan halaman yang dikirim. Halaman daftar membutuhkannya untuk kartu ringkasan dan angka pada tiap tab — menghitungnya dari satu halaman menampilkan angka jauh lebih kecil daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru. Satu query agregat tambahan, jadi tidak dinyalakan untuk pemanggil yang tidak memerlukannya."
+          "description": "true menambahkan meta.summary: hitungan dan jumlah untuk seluruh hasil filter, bukan halaman yang dikirim. Halaman daftar membutuhkannya untuk kartu ringkasan dan angka pada tiap tab — menghitungnya dari satu halaman menampilkan angka jauh lebih kecil daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru."
         },
         {
           "name": "dueFrom",

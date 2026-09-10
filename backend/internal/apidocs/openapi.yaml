@@ -416,11 +416,28 @@ paths:
         - name: summary
           in: query
           description: >
-            `true` menambahkan `meta.summary`: hitungan dan jumlah per status
-            untuk **seluruh hasil filter**, bukan halaman yang dikirim. Halaman
-            daftar membutuhkannya untuk kartu ringkasan dan angka pada tiap tab —
+            `true` menambahkan `meta.summary`: hitungan dan jumlah untuk
+            **seluruh hasil filter**, bukan halaman yang dikirim. Halaman daftar
+            membutuhkannya untuk kartu ringkasan dan angka pada tiap tab —
             menghitungnya dari satu halaman menampilkan angka jauh lebih kecil
             daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru.
+
+
+            Isinya `byStatus`, `byType`, dan `total`, dan dua yang pertama
+            diperlakukan BERBEDA terhadap parameter `status`. `byStatus`
+            mengabaikannya — kalau tidak, tab status lain akan selalu nol.
+            `byType` mengikutinya, karena kartu pendaftaran/renewal menjawab
+            "dari yang sedang dilihat, berapa masing-masing". Keduanya dihitung
+            dari satu query `GROUP BY status, type` yang sama, sehingga angka tab
+            dan angka kartu tidak bisa saling menyimpang.
+
+
+            `total` mengecualikan `cancelled` dan `terminated`, dan dijumlahkan
+            per baris hasil — bukan dari agregat `byStatus` — karena satu status
+            kini muncul sekali per tipe, dan menjumlahkan agregatnya akan
+            menghitung status bertipe ganda dua kali.
+
+
             Satu query agregat tambahan, jadi tidak dinyalakan untuk pemanggil
             yang tidak memerlukannya.
           schema: { type: string, enum: ["true"] }

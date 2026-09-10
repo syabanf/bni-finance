@@ -247,6 +247,15 @@ export interface InvoiceBucket {
 
 export interface InvoiceSummary {
   byStatus: Record<string, InvoiceBucket>
+  /**
+   * Rincian pendaftaran vs renewal.
+   *
+   * Berbeda dari byStatus, ini MENGIKUTI tab status yang sedang dipilih. Tab
+   * bertanya "ada berapa di tiap status" — jadi menyaringnya lebih dulu membuat
+   * tab lain selalu nol. Kartu bertanya "dari yang sedang saya lihat, berapa
+   * pendaftaran dan berapa renewal".
+   */
+  byType: Record<string, InvoiceBucket>
   /** Tidak termasuk cancelled dan terminated — yang batal bukan yang ditagih. */
   total: InvoiceBucket
 }
