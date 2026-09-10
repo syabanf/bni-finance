@@ -89,7 +89,7 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 	apidocs.NewHandler().Register(root)
 
 	if svc.Auth != nil {
-		auth.NewHandler(svc.Auth).RegisterPublic(root)
+		auth.NewHandler(svc.Auth, cfg.AppBaseURL).RegisterPublic(root)
 	}
 	if svc.PaperID != nil {
 		paperid.NewHandler(svc.PaperID).RegisterPublic(root)
@@ -126,7 +126,9 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 
 func registerProtected(mux *http.ServeMux, svc Services) {
 	if svc.Auth != nil {
-		auth.NewHandler(svc.Auth).RegisterProtected(mux)
+		// baseURL kosong: rute terlindungi (/auth/me, ganti kata sandi) tidak
+		// pernah merakit tautan email, jadi tidak ada yang bisa salah karenanya.
+		auth.NewHandler(svc.Auth, "").RegisterProtected(mux)
 	}
 	if svc.Invoice != nil {
 		invoice.NewHandler(svc.Invoice).Register(mux)

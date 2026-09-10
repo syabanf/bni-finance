@@ -187,3 +187,16 @@ func mustJSON(t *testing.T, v any) string {
 	}
 	return string(raw)
 }
+
+// --- token reset: cukup untuk memenuhi kontrak Store ---
+//
+// Perilakunya diuji sungguhan lewat integration test terhadap Postgres; di sini
+// yang dibutuhkan hanya agar tipe ini tetap memenuhi Store.
+func (f *fakeUsers) SimpanTokenReset(context.Context, string, string, time.Time) error { return nil }
+func (f *fakeUsers) AmbilTokenReset(context.Context, string, time.Time) (string, error) {
+	return "", httpx.ErrNotFound
+}
+func (f *fakeUsers) PakaiTokenReset(context.Context, string, string, string, time.Time) error {
+	return nil
+}
+func (f *fakeUsers) HapusTokenResetLama(context.Context, time.Time) (int64, error) { return 0, nil }

@@ -76,6 +76,116 @@
     }
   ],
   "paths": {
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Minta tautan atur ulang kata sandi",
+        "description": "**Selalu menjawab 200 dengan pesan yang sama**, terdaftar atau tidak.\n\nMembedakannya akan mengubah endpoint ini menjadi alat pemeriksa\nkeanggotaan: siapa pun bisa mencoba daftar alamat dan mengetahui mana\nyang punya akun di sini.\n\nDibatasi per email dengan pembatas yang sama seperti login. Tanpa itu,\nendpoint ini adalah tombol kirim-email gratis — bisa dipakai membanjiri\nkotak masuk orang lain, menghabiskan kuota SMTP, sampai alamat\npengirimnya ditandai spam. Kerusakannya menimpa orang yang tidak\nmelakukan apa-apa.\n\nTautannya berlaku 30 menit dan hanya bisa dipakai sekali. Yang disimpan\ndi basis data adalah HASH tokennya, bukan tokennya — satu dump basis\ndata karena itu tidak menghasilkan satu pun tautan yang bisa dipakai.\n\nMenjawab **503** bila SMTP belum dikonfigurasi.\n",
+        "security": [
+
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Permintaan diterima (tidak menyatakan emailnya terdaftar)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Terlalu banyak permintaan untuk email ini"
+          },
+          "503": {
+            "description": "SMTP belum dikonfigurasi"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Tukar tautan reset dengan kata sandi baru",
+        "description": "Token kedaluwarsa, token yang sudah dipakai, dan token yang tidak pernah\nada dijawab dengan pesan yang **sama persis**. Membedakannya memberi\ntahu penyerang bahwa sebuah token pernah sah.\n\nPenandaan token dan penulisan kata sandi terjadi dalam satu transaksi.\nTerpisah, kegagalan di antaranya meninggalkan salah satu dari dua\nkeadaan yang sama-sama buruk: token terpakai tapi kata sandi belum\nberubah (pengguna terkunci, tautannya sudah mati), atau kata sandi\nberubah tapi tokennya masih hidup.\n",
+        "security": [
+
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token",
+                  "password"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 6
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kata sandi berhasil diubah",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Token tidak berlaku",
+            "atau kata sandi terlalu pendek": null
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [

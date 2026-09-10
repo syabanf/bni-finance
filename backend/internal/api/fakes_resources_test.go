@@ -559,3 +559,18 @@ func (s *fakeUserStore) countAdminsLocked() int {
 	}
 	return n
 }
+
+// --- token reset: cukup untuk memenuhi kontrak Store ---
+//
+// Perilakunya diuji sungguhan lewat integration test terhadap Postgres; di sini
+// yang dibutuhkan hanya agar tipe ini tetap memenuhi Store.
+func (f *fakeUserStore) SimpanTokenReset(context.Context, string, string, time.Time) error {
+	return nil
+}
+func (f *fakeUserStore) AmbilTokenReset(context.Context, string, time.Time) (string, error) {
+	return "", httpx.ErrNotFound
+}
+func (f *fakeUserStore) PakaiTokenReset(context.Context, string, string, string, time.Time) error {
+	return nil
+}
+func (f *fakeUserStore) HapusTokenResetLama(context.Context, time.Time) (int64, error) { return 0, nil }

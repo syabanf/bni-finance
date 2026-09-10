@@ -51,6 +51,18 @@ type Config struct {
 
 	// Seed credentials create the first administrator on an empty users table,
 	// so a fresh database is reachable without hand-writing a password hash.
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
+	// AppBaseURL adalah alamat aplikasi web, dipakai merakit tautan di email.
+	//
+	// Dari konfigurasi, bukan dari header Host permintaan: Host bisa dipalsukan,
+	// dan tautan reset yang dirakit darinya akan mengirim token sah ke domain
+	// penyerang lewat email yang tampak resmi karena memang dari kita.
+	AppBaseURL string
+
 	SeedAdminEmail    string
 	SeedAdminPassword string
 	SeedAdminName     string
@@ -101,6 +113,13 @@ func Load() (Config, error) {
 
 		BlackboxSize:   int(bytesOr("BLACKBOX_SIZE", 200)),
 		BlackboxRetain: int(bytesOr("BLACKBOX_RETAIN", 10_000)),
+
+		SMTPHost:     strings.TrimSpace(os.Getenv("SMTP_HOST")),
+		SMTPPort:     envOr("SMTP_PORT", "587"),
+		SMTPUser:     strings.TrimSpace(os.Getenv("SMTP_USER")),
+		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:     strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		AppBaseURL:   envOr("APP_BASE_URL", "http://localhost:5173"),
 
 		SeedAdminEmail:    strings.TrimSpace(os.Getenv("SEED_ADMIN_EMAIL")),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),

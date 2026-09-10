@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -214,4 +215,85 @@ func (r *Repository) CountAdmins(ctx context.Context) (int, error) {
 	var n int
 	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM users WHERE role = 'admin'").Scan(&n)
 	return n, err
+}
+
+// --- token reset kata sandi -------------------------------------------------
+
+func (r *Repository) SimpanTokenReset(ctx context.Context, userID, hash string, berlaku time.Time) error {
+	// Token lama milik pengguna yang sama dibatalkan lebih dulu.
+	//
+	// Meminta reset dua kali seharusnya membuat tautan PERTAMA mati — kalau
+	// tidak, seseorang yang meminta reset karena curiga akunnya diincar justru
+	// meninggalkan tautan lamanya tetap hidup, dan permintaan barunya tidak
+	// menutup apa pun.
+	if _, err := r.db.Exec(ctx,
+		`UPDATE password_reset_tokens SET used_at = now()
+		 WHERE user_id = $1 AND used_at IS NULL`, userID); err != nil {
+		return fmt.Errorf("batalkan token reset lama: %w", err)
+	}
+	if _, err := r.db.Exec(ctx,
+		`INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+		 VALUES ($1, $2, $3)`, userID, hash, berlaku); err != nil {
+		return fmt.Errorf("simpan token reset: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) AmbilTokenReset(ctx context.Context, hash string, sekarang time.Time) (string, error) {
+	var userID string
+	err := r.db.QueryRow(ctx,
+		`SELECT user_id FROM password_reset_tokens
+		 WHERE token_hash = $1 AND used_at IS NULL AND expires_at > $2`,
+		hash, sekarang).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", httpx.ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("ambil token reset: %w", err)
+	}
+	return userID, nil
+}
+
+func (r *Repository) PakaiTokenReset(ctx context.Context, hash, userID, passwordHash string, sekarang time.Time) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("mulai transaksi reset: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Penandaan token dan penulisan kata sandi HARUS satu transaksi.
+	//
+	// Terpisah, kegagalan di antaranya meninggalkan salah satu dari dua keadaan
+	// yang sama-sama buruk: token terpakai tapi kata sandi belum berubah
+	// (pengguna terkunci, tautannya sudah mati), atau kata sandi berubah tapi
+	// tokennya masih hidup (tautan lama tetap bisa mengambil alih akun).
+	//
+	// Kondisi used_at IS NULL diulang di sini, bukan mengandalkan pemeriksaan
+	// sebelumnya: dua permintaan yang tiba bersamaan sama-sama lolos
+	// pemeriksaan itu, dan hanya klausa ini yang membuat salah satunya kalah.
+	ct, err := tx.Exec(ctx,
+		`UPDATE password_reset_tokens SET used_at = $2
+		 WHERE token_hash = $1 AND used_at IS NULL`, hash, sekarang)
+	if err != nil {
+		return fmt.Errorf("tandai token terpakai: %w", err)
+	}
+	if ct.RowsAffected() == 0 {
+		return httpx.ErrNotFound
+	}
+
+	if _, err := tx.Exec(ctx,
+		`UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`,
+		userID, passwordHash); err != nil {
+		return fmt.Errorf("tulis kata sandi baru: %w", err)
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) HapusTokenResetLama(ctx context.Context, sebelum time.Time) (int64, error) {
+	ct, err := r.db.Exec(ctx,
+		`DELETE FROM password_reset_tokens WHERE expires_at < $1`, sebelum)
+	if err != nil {
+		return 0, fmt.Errorf("bersihkan token reset: %w", err)
+	}
+	return ct.RowsAffected(), nil
 }

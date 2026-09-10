@@ -16,16 +16,34 @@ var timeNow = time.Now
 type Handler struct {
 	svc      *Service
 	pembatas *Pembatas
+	// baseURL adalah alamat aplikasi web, dipakai merakit tautan reset.
+	//
+	// Dari konfigurasi server, BUKAN dari header Host permintaan. Host bisa
+	// dipalsukan siapa pun yang menembak origin langsung — dan tautan reset
+	// yang dirakit dari host palsu akan mengirim token yang sah ke domain
+	// penyerang, lewat email yang tampak resmi karena memang dari kita.
+	baseURL string
 }
 
-func NewHandler(svc *Service) *Handler {
-	return &Handler{svc: svc, pembatas: NewPembatas()}
+// NewHandler membuat handler auth.
+//
+// baseURL adalah parameter, bukan pemanggilan berantai seperti
+// NewHandler(svc).PakaiBaseURL(u), dan itu bukan sekadar selera: penjaga
+// dokumentasi membaca router.go dengan go/ast untuk menentukan rute mana yang
+// publik, dan rantai tambahan membuatnya kehilangan jejak — seluruh rute auth
+// lalu dilaporkan "berada di balik autentikasi" padahal tidak. Ia gagal
+// berisik, jadi arahnya aman; tapi bentuk panggilan yang lebih datar membuatnya
+// tidak perlu gagal sama sekali.
+func NewHandler(svc *Service, baseURL string) *Handler {
+	return &Handler{svc: svc, pembatas: NewPembatas(), baseURL: baseURL}
 }
 
 // RegisterPublic wires the routes that must work WITHOUT a token — login being
 // the obvious one, since you have no token until it succeeds.
 func (h *Handler) RegisterPublic(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
+	mux.HandleFunc("POST /api/v1/auth/forgot-password", h.lupaKataSandi)
+	mux.HandleFunc("POST /api/v1/auth/reset-password", h.resetKataSandi)
 	mux.HandleFunc("GET /api/v1/auth/quick-login", h.quickLoginAccounts)
 	mux.HandleFunc("POST /api/v1/auth/quick-login", h.quickLogin)
 }
@@ -71,6 +89,63 @@ func (h *Handler) RegisterProtected(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/users/{id}/role", RequireAdmin(h.setRole))
 	mux.HandleFunc("PUT /api/v1/users/{id}/password", RequireAdmin(h.resetPassword))
 	mux.HandleFunc("DELETE /api/v1/users/{id}", RequireAdmin(h.deleteUser))
+}
+
+// lupaKataSandi mengirim tautan reset ke email yang terdaftar.
+//
+// Jawabannya SELALU 200 dengan pesan yang sama, ada atau tidak ada akunnya.
+// Membedakannya mengubah formulir ini jadi alat pemeriksa keanggotaan: siapa
+// pun bisa mencoba daftar alamat dan mengetahui mana yang punya akun di sini.
+func (h *Handler) lupaKataSandi(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+	}
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+
+	// Dibatasi per email, memakai pembatas yang sama dengan login.
+	//
+	// Tanpa ini, formulir ini adalah tombol kirim-email gratis: seseorang bisa
+	// menembaknya berulang kali dan membanjiri kotak masuk orang lain, memakai
+	// kuota SMTP kita, sampai alamat pengirimnya ditandai spam oleh penyedia
+	// email penerima. Kerusakannya menimpa orang yang tidak melakukan apa-apa.
+	if sisa, terkunci := h.pembatas.Terkunci(in.Email); terkunci {
+		detik := int(sisa.Seconds()) + 1
+		w.Header().Set("Retry-After", strconv.Itoa(detik))
+		httpx.Fail(w, httpx.NewError(http.StatusTooManyRequests, fmt.Sprintf(
+			"terlalu banyak permintaan — coba lagi dalam %d menit", (detik+59)/60), nil))
+		return
+	}
+	h.pembatas.Gagal(in.Email)
+
+	if err := h.svc.MintaResetKataSandi(r.Context(), in.Email, h.baseURL); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{
+		"message": "Kalau email itu terdaftar, tautan reset sudah dikirim ke sana.",
+	})
+}
+
+// resetKataSandi menukar token yang sah dengan kata sandi baru.
+func (h *Handler) resetKataSandi(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	if err := h.svc.ResetKataSandi(r.Context(), in.Token, in.Password); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]string{
+		"message": "Kata sandi berhasil diubah. Silakan masuk dengan kata sandi baru.",
+	})
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {

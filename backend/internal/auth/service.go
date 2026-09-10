@@ -3,8 +3,14 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/syabanf/bni-finance/backend/internal/mailer"
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
@@ -24,6 +30,21 @@ type Store interface {
 	UpdatePasswordHash(ctx context.Context, id, hash string) error
 	Delete(ctx context.Context, id string) error
 	CountAdmins(ctx context.Context) (int, error)
+
+	// --- token reset kata sandi ---
+	SimpanTokenReset(ctx context.Context, userID, hash string, berlaku time.Time) error
+	// AmbilTokenReset mengembalikan pemilik token yang MASIH BERLAKU dan belum
+	// dipakai. Kedaluwarsa dan sudah-dipakai sama-sama dijawab ErrNotFound —
+	// membedakannya di respons akan memberi tahu penyerang bahwa tokennya
+	// pernah ada.
+	AmbilTokenReset(ctx context.Context, hash string, sekarang time.Time) (userID string, err error)
+	// PakaiTokenReset menandai token terpakai DAN menulis kata sandi baru dalam
+	// satu transaksi. Dipisah, sebuah kegagalan di antaranya bisa meninggalkan
+	// token yang sudah dipakai tapi kata sandinya belum berubah — atau token
+	// yang masih bisa dipakai ulang setelah kata sandinya berubah.
+	PakaiTokenReset(ctx context.Context, hash, userID, passwordHash string, sekarang time.Time) error
+	// HapusTokenResetLama membuang token kedaluwarsa; dipanggil berkala.
+	HapusTokenResetLama(ctx context.Context, sebelum time.Time) (int64, error)
 }
 
 var _ Store = (*Repository)(nil)
@@ -36,6 +57,20 @@ type Service struct {
 	// quickLogin is the lower-cased allow-list for passwordless sign-in.
 	// Empty means the feature is off — see the quick login section below.
 	quickLogin []string
+
+	// mail boleh nil: aplikasinya tetap berjalan tanpa SMTP, hanya fitur yang
+	// membutuhkannya yang menjawab 503 dengan pesan yang jelas.
+	mail PengirimEmail
+}
+
+// PakaiPengirimEmail memasang pengirim email.
+//
+// Terpisah dari NewService, bukan parameter tambahan: seluruh pemanggil yang
+// sudah ada — termasuk belasan tes — tidak perlu diubah hanya untuk menyatakan
+// "tidak pakai email".
+func (s *Service) PakaiPengirimEmail(m PengirimEmail) *Service {
+	s.mail = m
+	return s
 }
 
 func NewService(repo Store, signer *Signer, quickLogin ...string) *Service {
@@ -306,4 +341,105 @@ func (s *Service) isQuickLoginAllowed(email string) bool {
 		}
 	}
 	return false
+}
+
+// --- reset kata sandi lewat email --------------------------------------------
+
+// PengirimEmail adalah bagian mailer yang dibutuhkan service ini.
+//
+// Antarmuka sempit, bukan *mailer.Mailer langsung: paket auth jadi tidak perlu
+// tahu apa pun soal SMTP, dan tesnya tidak perlu server email.
+type PengirimEmail interface {
+	Siap() bool
+	Kirim(ctx context.Context, p mailer.Pesan) error
+}
+
+// MintaResetKataSandi membuat token, menyimpan hash-nya, dan mengirim tautannya.
+//
+// SELALU MENGEMBALIKAN nil UNTUK EMAIL YANG TIDAK DIKENAL.
+//
+// Membalas "email tidak terdaftar" mengubah formulir ini menjadi alat pemeriksa
+// keanggotaan: siapa pun bisa mencoba daftar alamat dan mengetahui mana yang
+// punya akun di sini. Yang berhasil dan yang tidak dijawab persis sama, dan
+// pemanggilnya tidak diberi cara untuk membedakannya.
+func (s *Service) MintaResetKataSandi(ctx context.Context, email, baseURL string) error {
+	if s.mail == nil || !s.mail.Siap() {
+		return httpx.NewError(http.StatusServiceUnavailable,
+			"pengiriman email belum dikonfigurasi — hubungi administrator", nil)
+	}
+
+	user, err := s.repo.GetByEmail(ctx, strings.TrimSpace(email))
+	if err != nil || user == nil {
+		// Sengaja diam. Lihat catatan di atas.
+		return nil
+	}
+
+	tok, err := BuatTokenReset(time.Now())
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SimpanTokenReset(ctx, user.ID, tok.Hash, tok.Berlaku); err != nil {
+		return err
+	}
+
+	tautan := strings.TrimRight(baseURL, "/") + "/reset-password?token=" + url.QueryEscape(tok.Token)
+	menit := int(UmurTokenReset.Minutes())
+
+	return s.mail.Kirim(ctx, mailer.Pesan{
+		Ke:     user.Email,
+		Subjek: "Atur ulang kata sandi — BNI Finance Hub",
+		Teks: "Halo " + user.Name + ",\r\n\r\n" +
+			"Ada permintaan untuk mengatur ulang kata sandi akun Anda.\r\n" +
+			"Buka tautan berikut untuk membuat kata sandi baru:\r\n\r\n" +
+			tautan + "\r\n\r\n" +
+			"Tautan ini berlaku " + strconv.Itoa(menit) + " menit dan hanya bisa dipakai sekali.\r\n\r\n" +
+			"Kalau bukan Anda yang meminta, abaikan saja email ini — " +
+			"kata sandi Anda tidak berubah selama tautannya tidak dibuka.\r\n",
+		HTML: `<div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a">` +
+			`<p>Halo ` + htmlAman(user.Name) + `,</p>` +
+			`<p>Ada permintaan untuk mengatur ulang kata sandi akun Anda.</p>` +
+			`<p style="margin:22px 0"><a href="` + htmlAman(tautan) + `" ` +
+			`style="display:inline-block;background:#c8102e;color:#fff;text-decoration:none;` +
+			`padding:11px 22px;border-radius:8px;font-weight:600">Buat kata sandi baru</a></p>` +
+			`<p style="color:#666;font-size:13px">Tautan ini berlaku ` + strconv.Itoa(menit) +
+			` menit dan hanya bisa dipakai sekali.</p>` +
+			`<p style="color:#666;font-size:13px">Kalau bukan Anda yang meminta, abaikan saja email ini — ` +
+			`kata sandi Anda tidak berubah selama tautannya tidak dibuka.</p></div>`,
+	})
+}
+
+// ResetKataSandi menukar token yang sah dengan kata sandi baru.
+func (s *Service) ResetKataSandi(ctx context.Context, token, kataSandiBaru string) error {
+	if strings.TrimSpace(token) == "" {
+		return httpx.BadRequest("token tidak disertakan")
+	}
+	if len(strings.TrimSpace(kataSandiBaru)) < domain.MinPasswordLength {
+		return httpx.BadRequest(fmt.Sprintf("kata sandi minimal %d karakter", domain.MinPasswordLength))
+	}
+
+	hash := HashToken(token)
+	sekarang := time.Now()
+
+	userID, err := s.repo.AmbilTokenReset(ctx, hash, sekarang)
+	if err != nil {
+		// Kedaluwarsa, sudah dipakai, dan tidak pernah ada dijawab SAMA.
+		// Membedakannya memberi tahu penyerang bahwa tokennya pernah sah.
+		return httpx.BadRequest("tautan reset tidak berlaku lagi — minta yang baru")
+	}
+
+	baru, err := HashPassword(kataSandiBaru)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.PakaiTokenReset(ctx, hash, userID, baru, sekarang); err != nil {
+		return httpx.BadRequest("tautan reset tidak berlaku lagi — minta yang baru")
+	}
+	return nil
+}
+
+// htmlAman meloloskan teks yang masuk ke badan HTML email.
+func htmlAman(v string) string {
+	return strings.NewReplacer(
+		"&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&#39;",
+	).Replace(v)
 }

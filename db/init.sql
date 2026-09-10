@@ -94,6 +94,32 @@ create table if not exists users (
   updated_at    timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- TOKEN RESET KATA SANDI
+--
+-- Yang disimpan adalah HASH-nya, bukan tokennya.
+--
+-- Token reset setara kata sandi sementara: siapa pun yang memegangnya bisa
+-- mengambil alih akun. Menyimpannya apa adanya berarti seseorang yang berhasil
+-- membaca tabel ini — dump, backup yang bocor, atau SQL injection di tempat
+-- lain — bisa langsung memakai setiap token yang masih berlaku. Dengan hash,
+-- isi tabel ini tidak bisa dipakai untuk apa pun.
+--
+-- used_at, bukan DELETE: token yang sudah dipakai tetap tercatat, sehingga
+-- percobaan memakainya lagi bisa dibedakan dari token yang memang tidak pernah
+-- ada. Dibersihkan berkala oleh aplikasinya.
+-- ---------------------------------------------------------------------------
+create table if not exists password_reset_tokens (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  token_hash text not null unique,
+  expires_at timestamptz not null,
+  used_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_reset_tokens_user on password_reset_tokens (user_id);
+create index if not exists idx_reset_tokens_expires on password_reset_tokens (expires_at);
+
 -- Email dibandingkan tanpa membedakan huruf besar/kecil saat login.
 create unique index if not exists idx_users_email_lower on users (lower(email));
 
