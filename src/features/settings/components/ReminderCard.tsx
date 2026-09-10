@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BellRing, Save } from 'lucide-react'
-import { Button, Card, CardBody, CardHeader, Field, Input, useToast } from '@/components/ui'
+import { Button, Card, CardBody, CardHeader, Field, Input, Select, useToast } from '@/components/ui'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
 
 /**
@@ -25,7 +25,10 @@ const KUNCI = [
   'reminder_worker_enabled',
   'reminder_offsets',
   'denda_aktif',
+  'denda_jenis',
+  'denda_satuan',
   'denda_per_hari',
+  'denda_persen',
   'denda_maks_hari',
 ] as const
 
@@ -38,7 +41,10 @@ export function ReminderCard() {
     reminder_worker_enabled: 'false',
     reminder_offsets: '7,3,1',
     denda_aktif: 'false',
+    denda_jenis: 'rupiah',
+    denda_satuan: 'hari',
     denda_per_hari: '0',
+    denda_persen: '0',
     denda_maks_hari: '90',
   })
   const [memuat, setMemuat] = useState(true)
@@ -80,6 +86,20 @@ export function ReminderCard() {
   const workerNyala = nilai.reminder_worker_enabled === 'true'
   const notifNyala = nilai.notifications_enabled === 'true'
   const dendaNyala = nilai.denda_aktif === 'true'
+
+  /** Contoh perhitungan, memakai aturan yang sama dengan server. */
+  const contohDenda = () => {
+    const hariPerSatuan = nilai.denda_satuan === 'minggu' ? 7 : nilai.denda_satuan === 'bulan' ? 30 : 1
+    const maks = Number(nilai.denda_maks_hari) || 0
+    const hari = maks > 0 ? Math.min(30, maks) : 30
+    const satuan = Math.floor(hari / hariPerSatuan)
+    if (satuan <= 0) return 'Rp 0 (belum genap satu satuan)'
+    const n =
+      nilai.denda_jenis === 'persen'
+        ? Math.floor((12_700_000 * (Number(nilai.denda_persen) || 0)) / 100) * satuan
+        : (Number(nilai.denda_per_hari) || 0) * satuan
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n)
+  }
 
   return (
     <Card className="lg:col-span-2">
@@ -142,23 +162,74 @@ export function ReminderCard() {
           />
 
           {dendaNyala && (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Field label="Denda per hari (Rp)">
-                <Input
-                  type="number"
-                  min={0}
-                  value={nilai.denda_per_hari}
-                  onChange={(e) => ubah('denda_per_hari', e.target.value)}
-                />
-              </Field>
-              <Field label="Maksimal hari dihitung" hint="0 berarti tanpa batas.">
-                <Input
-                  type="number"
-                  min={0}
-                  value={nilai.denda_maks_hari}
-                  onChange={(e) => ubah('denda_maks_hari', e.target.value)}
-                />
-              </Field>
+            <div className="mt-4 space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Jenis denda">
+                  <Select
+                    value={nilai.denda_jenis}
+                    onChange={(e) => ubah('denda_jenis', e.target.value)}
+                  >
+                    <option value="rupiah">Nominal tetap (Rp)</option>
+                    <option value="persen">Persentase dari tagihan</option>
+                  </Select>
+                </Field>
+                <Field
+                  label="Dihitung per"
+                  hint="Denda bertambah setiap satu satuan keterlambatan yang GENAP."
+                >
+                  <Select
+                    value={nilai.denda_satuan}
+                    onChange={(e) => ubah('denda_satuan', e.target.value)}
+                  >
+                    <option value="hari">Hari</option>
+                    <option value="minggu">Minggu (7 hari)</option>
+                    <option value="bulan">Bulan (30 hari)</option>
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {nilai.denda_jenis === 'persen' ? (
+                  <Field
+                    label={`Persentase per ${nilai.denda_satuan}`}
+                    hint="Contoh: 2 berarti 2% dari nominal invoice."
+                  >
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={nilai.denda_persen}
+                      onChange={(e) => ubah('denda_persen', e.target.value)}
+                    />
+                  </Field>
+                ) : (
+                  <Field label={`Denda per ${nilai.denda_satuan} (Rp)`}>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={nilai.denda_per_hari}
+                      onChange={(e) => ubah('denda_per_hari', e.target.value)}
+                    />
+                  </Field>
+                )}
+                <Field label="Maksimal hari dihitung" hint="0 berarti tanpa batas.">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={nilai.denda_maks_hari}
+                    onChange={(e) => ubah('denda_maks_hari', e.target.value)}
+                  />
+                </Field>
+              </div>
+
+              {/* Contoh dihitung dari angka yang sedang diisi, bukan angka
+                  contoh yang tetap. Orang perlu melihat akibat dari yang baru
+                  saja mereka ketik — sebelum menyimpannya, bukan sesudah
+                  invoice pertama terlanjur menampilkannya. */}
+              <p className="rounded-lg bg-ink-50 px-3 py-2.5 text-xs leading-relaxed text-ink-600">
+                Contoh: tagihan Rp 12.700.000 yang telat 30 hari kena denda{' '}
+                <span className="font-semibold text-ink-900">{contohDenda()}</span>.
+              </p>
             </div>
           )}
 
