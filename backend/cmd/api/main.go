@@ -104,6 +104,17 @@ func run(log *slog.Logger) error {
 		// Peringatan, bukan galat fatal: aplikasinya tetap berguna tanpa email,
 		// hanya fitur yang membutuhkannya yang menjawab 503 dengan pesan jelas.
 		log.Warn("SMTP belum dikonfigurasi — reset kata sandi lewat email tidak akan berfungsi")
+	} else if config.Lokal(cfg.AppBaseURL) {
+		// SMTP menyala TAPI tautannya menunjuk localhost.
+		//
+		// Kombinasi itu hampir selalu salah di luar mesin pengembang, dan
+		// gagalnya di tempat yang tidak terlihat dari sini: emailnya TERKIRIM,
+		// pengirimnya melihat "berhasil", dan yang menerima menekan tautan yang
+		// mati di perangkatnya. Tidak ada galat yang muncul di log mana pun —
+		// hanya orang yang tidak bisa masuk dan tidak tahu kenapa.
+		log.Warn("APP_BASE_URL menunjuk localhost padahal SMTP aktif — "+
+			"tautan reset yang dikirim TIDAK akan bisa dibuka penerimanya",
+			"app_base_url", cfg.AppBaseURL)
 	}
 	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...).
 		PakaiPengirimEmail(surat)
