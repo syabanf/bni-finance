@@ -42,6 +42,7 @@ func NewHandler(svc *Service, baseURL string) *Handler {
 // the obvious one, since you have no token until it succeeds.
 func (h *Handler) RegisterPublic(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login", h.login)
+	mux.HandleFunc("POST /api/v1/auth/verify-otp", h.verifikasiOTP)
 	mux.HandleFunc("POST /api/v1/auth/forgot-password", h.lupaKataSandi)
 	mux.HandleFunc("POST /api/v1/auth/reset-password", h.resetKataSandi)
 	mux.HandleFunc("GET /api/v1/auth/quick-login", h.quickLoginAccounts)
@@ -89,6 +90,39 @@ func (h *Handler) RegisterProtected(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/users/{id}/role", RequireAdmin(h.setRole))
 	mux.HandleFunc("PUT /api/v1/users/{id}/password", RequireAdmin(h.resetPassword))
 	mux.HandleFunc("DELETE /api/v1/users/{id}", RequireAdmin(h.deleteUser))
+}
+
+// verifikasiOTP menukar kode dari email dengan token.
+//
+// Dibatasi per email memakai pembatas yang sama dengan login. Batas percobaan
+// per KODE sudah ada di basis data; ini melapisi batas per AKUN, sehingga
+// meminta kode baru berulang kali tidak mengulang jatah tebakan dari nol.
+func (h *Handler) verifikasiOTP(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+
+	if sisa, terkunci := h.pembatas.Terkunci(in.Email); terkunci {
+		detik := int(sisa.Seconds()) + 1
+		w.Header().Set("Retry-After", strconv.Itoa(detik))
+		httpx.Fail(w, httpx.NewError(http.StatusTooManyRequests, fmt.Sprintf(
+			"terlalu banyak percobaan — coba lagi dalam %d menit", (detik+59)/60), nil))
+		return
+	}
+
+	hasil, err := h.svc.VerifikasiOTP(r.Context(), in.Email, in.Code)
+	if err != nil {
+		h.pembatas.Gagal(in.Email)
+		httpx.Fail(w, err)
+		return
+	}
+	h.pembatas.Berhasil(in.Email)
+	httpx.JSON(w, http.StatusOK, hasil)
 }
 
 // lupaKataSandi mengirim tautan reset ke email yang terdaftar.

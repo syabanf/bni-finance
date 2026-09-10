@@ -53,13 +53,15 @@ const ROLE_DESC: Record<UserRole, string> = {
 }
 
 export function LoginPage() {
-  const { login, quickLogin: quickLoginAs, user, loading: authLoading } = useAuth()
+  const { login, verifikasiOtp, quickLogin: quickLoginAs, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = useState(useMock ? DEMO_ROLES[0].email : '')
   const [password, setPassword] = useState(useMock ? DEMO_ROLES[0].password : '')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailOtp, setEmailOtp] = useState('')
+  const [kodeOtp, setKodeOtp] = useState('')
   const [loading, setLoading] = useState(false)
   const [quickRole, setQuickRole] = useState<string | null>(null)
   // Akun quick login mode API datang dari server — kata sandinya tidak pernah
@@ -92,11 +94,34 @@ export function LoginPage() {
     setError(null)
     done(true)
     try {
-      await login(e, p)
+      const butuhOtp = await login(e, p)
+      if (butuhOtp) {
+        // Kata sandinya benar, tapi belum jadi sesi. Emailnya disimpan supaya
+        // langkah kedua tahu kode itu milik siapa — kata sandinya TIDAK
+        // disimpan, karena tidak dibutuhkan lagi setelah titik ini.
+        setEmailOtp(e)
+        setKodeOtp('')
+        done(false)
+        return
+      }
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gagal masuk.')
       done(false)
+    }
+  }
+
+  const kirimOtp = async (ev: FormEvent) => {
+    ev.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await verifikasiOtp(emailOtp, kodeOtp.trim())
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kode tidak cocok.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -146,6 +171,63 @@ export function LoginPage() {
 
         {/* Kartu form */}
         <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-card-hover sm:p-7">
+          {emailOtp ? (
+            /* Langkah kedua MENGGANTIKAN formulirnya, bukan muncul di bawahnya.
+               Dua formulir di layar yang sama membuat orang mengetik ulang kata
+               sandi dan menekan tombol yang salah — padahal pada titik ini kata
+               sandinya sudah benar dan tidak dibutuhkan lagi. */
+            <form onSubmit={kirimOtp} className="space-y-4">
+              <div className="text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <p className="text-sm leading-relaxed text-ink-700">
+                  Kode masuk dikirim ke <span className="font-medium">{emailOtp}</span>.
+                </p>
+                <p className="mt-1 text-xs text-ink-500">
+                  Berlaku 10 menit. Salah lima kali, kodenya hangus dan Anda perlu meminta yang baru.
+                </p>
+              </div>
+
+              <Field label="Kode 6 digit">
+                <Input
+                  value={kodeOtp}
+                  onChange={(ev) => setKodeOtp(ev.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  autoFocus
+                  placeholder="000000"
+                  className="text-center font-mono text-xl tracking-[0.5em]"
+                />
+              </Field>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+              )}
+
+              <Button
+                type="submit"
+                size="lg"
+                loading={loading}
+                disabled={kodeOtp.length !== 6}
+                className="w-full"
+              >
+                Verifikasi
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmailOtp('')
+                  setKodeOtp('')
+                  setError(null)
+                }}
+                className="w-full text-center text-sm text-ink-500 hover:text-ink-700"
+              >
+                Masuk dengan akun lain
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <Field label="Email">
               <div className="relative">
@@ -205,6 +287,7 @@ export function LoginPage() {
               </Link>
             </div>
           </form>
+          )}
 
           {/* Masuk cepat — kartu mock, atau akun yang diizinkan server. */}
           {(useMock || apiAccounts.length > 0) && (

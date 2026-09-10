@@ -120,6 +120,30 @@ create table if not exists password_reset_tokens (
 create index if not exists idx_reset_tokens_user on password_reset_tokens (user_id);
 create index if not exists idx_reset_tokens_expires on password_reset_tokens (expires_at);
 
+-- ---------------------------------------------------------------------------
+-- KODE OTP LOGIN
+--
+-- Yang disimpan hash-nya, dengan alasan yang sama seperti token reset: satu
+-- dump basis data tidak boleh menghasilkan kode yang bisa langsung dipakai.
+--
+-- attempts ADA DI SINI, bukan di memori proses. Kode enam digit hanya punya
+-- sejuta kemungkinan — tanpa batas percobaan, menebaknya selesai dalam hitungan
+-- detik. Menyimpan hitungannya di memori berarti hitungannya hilang setiap
+-- restart, dan penyerang yang tahu itu cukup memaksa server restart. Di baris
+-- ini, batasnya bertahan.
+-- ---------------------------------------------------------------------------
+create table if not exists login_otp_codes (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  code_hash  text not null,
+  attempts   integer not null default 0,
+  expires_at timestamptz not null,
+  used_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists idx_login_otp_user on login_otp_codes (user_id);
+create index if not exists idx_login_otp_expires on login_otp_codes (expires_at);
+
 -- Email dibandingkan tanpa membedakan huruf besar/kecil saat login.
 create unique index if not exists idx_users_email_lower on users (lower(email));
 

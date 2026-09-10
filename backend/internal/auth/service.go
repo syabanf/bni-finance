@@ -45,6 +45,20 @@ type Store interface {
 	PakaiTokenReset(ctx context.Context, hash, userID, passwordHash string, sekarang time.Time) error
 	// HapusTokenResetLama membuang token kedaluwarsa; dipanggil berkala.
 	HapusTokenResetLama(ctx context.Context, sebelum time.Time) (int64, error)
+
+	// --- OTP login ---
+	SimpanOTP(ctx context.Context, userID, hash string, berlaku time.Time) error
+	// PakaiOTP memeriksa kode DAN menaikkan hitungan percobaannya dalam satu
+	// transaksi. Dipisah, seseorang bisa menembakkan tebakan secara paralel dan
+	// seluruhnya lolos pemeriksaan batas sebelum satu pun hitungan tersimpan.
+	//
+	// Mengembalikan sisaPercobaan agar pemanggilnya bisa memberi tahu — "kode
+	// salah" tanpa menyebut sisa percobaan membuat orang mengetik ulang sampai
+	// terkunci tanpa peringatan.
+	PakaiOTP(ctx context.Context, userID, hash string, sekarang time.Time, maks int) (sisaPercobaan int, err error)
+	HapusOTPLama(ctx context.Context, sebelum time.Time) (int64, error)
+	// OTPAktif membaca sakelar login_otp_enabled dari app_settings.
+	OTPAktif(ctx context.Context) bool
 }
 
 var _ Store = (*Repository)(nil)
@@ -106,6 +120,79 @@ func (s *Service) Login(ctx context.Context, in domain.LoginInput) (*domain.Logi
 	}
 	if !VerifyPassword(user.PasswordHash, in.Password) {
 		return nil, invalidCredentials()
+	}
+
+	// OTP HANYA BERLAKU BILA EMAIL BENAR-BENAR BISA DIKIRIM.
+	//
+	// Sakelarnya menyala tapi SMTP mati berarti tidak seorang pun bisa masuk —
+	// termasuk admin yang harus mematikan sakelarnya. Lapisan keamanan yang
+	// bisa mengunci seluruh orang di luar aplikasinya, tanpa jalan kembali,
+	// lebih berbahaya daripada ketiadaannya. Jadi syaratnya dua, bukan satu.
+	if s.mail != nil && s.mail.Siap() && s.repo.OTPAktif(ctx) {
+		if err := s.kirimOTP(ctx, user); err != nil {
+			return nil, err
+		}
+		// Token TIDAK diterbitkan di sini. Inilah inti OTP: kata sandi yang
+		// benar saja belum cukup.
+		return &domain.LoginResult{ButuhOTP: true, User: user.AsAuthUser()}, nil
+	}
+
+	token, expires, err := s.signer.Sign(*user, s.now())
+	if err != nil {
+		return nil, err
+	}
+	return &domain.LoginResult{Token: token, ExpiresAt: expires, User: user.AsAuthUser()}, nil
+}
+
+// kirimOTP membangkitkan kode, menyimpan hash-nya, lalu mengirimkannya.
+func (s *Service) kirimOTP(ctx context.Context, user *domain.User) error {
+	kode, hash, berlaku, err := BuatOTP(time.Now())
+	if err != nil {
+		return err
+	}
+	if err := s.repo.SimpanOTP(ctx, user.ID, hash, berlaku); err != nil {
+		return err
+	}
+	menit := int(UmurOTP.Minutes())
+	return s.mail.Kirim(ctx, mailer.Pesan{
+		Ke:     user.Email,
+		Subjek: "Kode masuk " + kode + " — BNI Finance Hub",
+		Teks: "Halo " + user.Name + ",\r\n\r\n" +
+			"Kode masuk Anda: " + kode + "\r\n\r\n" +
+			"Berlaku " + strconv.Itoa(menit) + " menit dan hanya bisa dipakai sekali.\r\n\r\n" +
+			"Kalau bukan Anda yang mencoba masuk, abaikan email ini dan " +
+			"segera ganti kata sandi Anda — seseorang mengetahuinya.\r\n",
+		HTML: `<div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a">` +
+			`<p>Halo ` + htmlAman(user.Name) + `,</p>` +
+			`<p>Kode masuk Anda:</p>` +
+			`<p style="font:700 32px/1 ui-monospace,SFMono-Regular,Menlo,monospace;` +
+			`letter-spacing:8px;margin:20px 0;color:#c8102e">` + htmlAman(kode) + `</p>` +
+			`<p style="color:#666;font-size:13px">Berlaku ` + strconv.Itoa(menit) +
+			` menit dan hanya bisa dipakai sekali.</p>` +
+			`<p style="color:#666;font-size:13px">Kalau bukan Anda yang mencoba masuk, abaikan email ini ` +
+			`dan segera ganti kata sandi Anda — seseorang mengetahuinya.</p></div>`,
+	})
+}
+
+// VerifikasiOTP menukar kode yang benar dengan token.
+func (s *Service) VerifikasiOTP(ctx context.Context, email, kode string) (*domain.LoginResult, error) {
+	user, err := s.repo.GetByEmail(ctx, strings.TrimSpace(email))
+	if err != nil || user == nil {
+		// Sama seperti login: email tak dikenal dan kode salah tidak dibedakan.
+		return nil, httpx.BadRequest("kode tidak cocok atau sudah kedaluwarsa")
+	}
+
+	sisa, err := s.repo.PakaiOTP(ctx, user.ID, HashToken(strings.TrimSpace(kode)), time.Now(), MaksPercobaanOTP)
+	if err != nil {
+		if sisa > 0 {
+			// Sisa percobaan DISEBUTKAN. Tanpa itu orang mengetik ulang sampai
+			// terkunci tanpa peringatan, lalu meminta kode baru berulang kali —
+			// yang justru menghasilkan lebih banyak email dan lebih banyak kode
+			// hidup sekaligus.
+			return nil, httpx.BadRequest(fmt.Sprintf(
+				"kode tidak cocok — sisa %d percobaan", sisa))
+		}
+		return nil, httpx.BadRequest("kode tidak cocok atau sudah kedaluwarsa — minta kode baru")
 	}
 
 	token, expires, err := s.signer.Sign(*user, s.now())

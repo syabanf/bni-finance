@@ -297,3 +297,104 @@ func (r *Repository) HapusTokenResetLama(ctx context.Context, sebelum time.Time)
 	}
 	return ct.RowsAffected(), nil
 }
+
+// --- OTP login ---------------------------------------------------------------
+
+func (r *Repository) SimpanOTP(ctx context.Context, userID, hash string, berlaku time.Time) error {
+	// Kode lama milik pengguna yang sama dibatalkan. Dua kode hidup sekaligus
+	// berarti dua peluang menebak untuk satu akun, dan jatah percobaannya
+	// terpisah — batas lima berubah jadi sepuluh tanpa ada yang menyadarinya.
+	if _, err := r.db.Exec(ctx,
+		`UPDATE login_otp_codes SET used_at = now()
+		 WHERE user_id = $1 AND used_at IS NULL`, userID); err != nil {
+		return fmt.Errorf("batalkan OTP lama: %w", err)
+	}
+	if _, err := r.db.Exec(ctx,
+		`INSERT INTO login_otp_codes (user_id, code_hash, expires_at) VALUES ($1,$2,$3)`,
+		userID, hash, berlaku); err != nil {
+		return fmt.Errorf("simpan OTP: %w", err)
+	}
+	return nil
+}
+
+// PakaiOTP memeriksa kode dan mencatat percobaannya dalam SATU transaksi.
+//
+// Pemeriksaan dan pencatatan yang terpisah adalah balapan yang bisa dimenangkan:
+// sepuluh tebakan yang dikirim bersamaan semuanya membaca attempts yang sama,
+// semuanya lolos pemeriksaan batas, dan batas lima tidak pernah berlaku.
+// FOR UPDATE membuat mereka mengantre.
+func (r *Repository) PakaiOTP(ctx context.Context, userID, hash string, sekarang time.Time, maks int) (int, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("mulai transaksi OTP: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var id, simpanan string
+	var percobaan int
+	err = tx.QueryRow(ctx,
+		`SELECT id, code_hash, attempts FROM login_otp_codes
+		 WHERE user_id = $1 AND used_at IS NULL AND expires_at > $2
+		 ORDER BY created_at DESC LIMIT 1
+		 FOR UPDATE`, userID, sekarang).Scan(&id, &simpanan, &percobaan)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, httpx.ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("ambil OTP: %w", err)
+	}
+
+	if percobaan >= maks {
+		// Dihanguskan, bukan dibiarkan menunggu kedaluwarsa: kode yang sudah
+		// habis jatahnya tidak boleh bisa dicoba lagi setelah restart.
+		if _, err := tx.Exec(ctx, `UPDATE login_otp_codes SET used_at = $2 WHERE id = $1`, id, sekarang); err != nil {
+			return 0, fmt.Errorf("hanguskan OTP: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return 0, fmt.Errorf("commit hangus OTP: %w", err)
+		}
+		return 0, httpx.ErrNotFound
+	}
+
+	if !TokenCocok(simpanan, hash) {
+		if _, err := tx.Exec(ctx,
+			`UPDATE login_otp_codes SET attempts = attempts + 1 WHERE id = $1`, id); err != nil {
+			return 0, fmt.Errorf("catat percobaan OTP: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return 0, fmt.Errorf("commit percobaan OTP: %w", err)
+		}
+		return maks - percobaan - 1, httpx.ErrNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `UPDATE login_otp_codes SET used_at = $2 WHERE id = $1`, id, sekarang); err != nil {
+		return 0, fmt.Errorf("tandai OTP terpakai: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("commit OTP: %w", err)
+	}
+	return maks - percobaan, nil
+}
+
+func (r *Repository) HapusOTPLama(ctx context.Context, sebelum time.Time) (int64, error) {
+	ct, err := r.db.Exec(ctx, `DELETE FROM login_otp_codes WHERE expires_at < $1`, sebelum)
+	if err != nil {
+		return 0, fmt.Errorf("bersihkan OTP: %w", err)
+	}
+	return ct.RowsAffected(), nil
+}
+
+// OTPAktif membaca sakelar dari app_settings.
+//
+// BAWAANNYA MATI, dan galat apa pun juga dibaca mati. Pengaturan yang gagal
+// terbaca tidak boleh MENGAKTIFKAN lapisan yang bisa mengunci semua orang di
+// luar aplikasinya — termasuk admin yang harus mematikannya.
+func (r *Repository) OTPAktif(ctx context.Context) bool {
+	var v string
+	err := r.db.QueryRow(ctx,
+		`SELECT value FROM app_settings WHERE key = 'login_otp_enabled'`).Scan(&v)
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(v) == "true"
+}

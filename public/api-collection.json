@@ -264,6 +264,40 @@
       "admin": false
     },
     {
+      "id": "post:/api/v1/auth/verify-otp",
+      "method": "POST",
+      "path": "/api/v1/auth/verify-otp",
+      "tag": "Auth",
+      "summary": "Tukar kode OTP dengan token",
+      "description": "Langkah kedua login, dipakai bila `/auth/login` menjawab\n`otpRequired: true`.\n\n**Kode enam digit hanya sejuta kemungkinan.** Yang membuatnya aman bukan\npanjangnya melainkan tiga batas di sekelilingnya: umurnya 10 menit,\nsekali pakai, dan percobaannya dibatasi lima per kode. Tanpa batas\npercobaan, menebaknya selesai dalam hitungan detik.\n\nHitungan percobaan disimpan **di basis data**, bukan di memori proses —\nhitungan yang hilang tiap restart bisa dikosongkan penyerang dengan\nmemaksa server restart. Pemeriksaan dan pencatatannya terjadi dalam satu\ntransaksi dengan `FOR UPDATE`; terpisah, sepuluh tebakan yang dikirim\nbersamaan semuanya membaca hitungan yang sama dan batas lima tidak\npernah berlaku.\n\nSisa percobaan **disebutkan** dalam pesan galat. Tanpa itu orang\nmengetik ulang sampai terkunci tanpa peringatan, lalu meminta kode baru\nberulang kali — yang justru menghasilkan lebih banyak email dan lebih\nbanyak kode hidup sekaligus.\n\nEmail tak dikenal dan kode salah dijawab sama.\n",
+      "params": [],
+      "body": {
+        "email": "nama@contoh.com",
+        "code": ""
+      },
+      "bodyFields": [
+        {
+          "name": "email",
+          "type": "string",
+          "format": "email",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "code",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": false,
+      "admin": false
+    },
+    {
       "id": "get:/api/v1/users",
       "method": "GET",
       "path": "/api/v1/users",

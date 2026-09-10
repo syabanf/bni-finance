@@ -87,6 +87,52 @@ paths:
   # ===========================================================================
   # Auth
   # ===========================================================================
+  /api/v1/auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Tukar kode OTP dengan token
+      description: |
+        Langkah kedua login, dipakai bila `/auth/login` menjawab
+        `otpRequired: true`.
+
+        **Kode enam digit hanya sejuta kemungkinan.** Yang membuatnya aman bukan
+        panjangnya melainkan tiga batas di sekelilingnya: umurnya 10 menit,
+        sekali pakai, dan percobaannya dibatasi lima per kode. Tanpa batas
+        percobaan, menebaknya selesai dalam hitungan detik.
+
+        Hitungan percobaan disimpan **di basis data**, bukan di memori proses —
+        hitungan yang hilang tiap restart bisa dikosongkan penyerang dengan
+        memaksa server restart. Pemeriksaan dan pencatatannya terjadi dalam satu
+        transaksi dengan `FOR UPDATE`; terpisah, sepuluh tebakan yang dikirim
+        bersamaan semuanya membaca hitungan yang sama dan batas lima tidak
+        pernah berlaku.
+
+        Sisa percobaan **disebutkan** dalam pesan galat. Tanpa itu orang
+        mengetik ulang sampai terkunci tanpa peringatan, lalu meminta kode baru
+        berulang kali — yang justru menghasilkan lebih banyak email dan lebih
+        banyak kode hidup sekaligus.
+
+        Email tak dikenal dan kode salah dijawab sama.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, code]
+              properties:
+                email: { type: string, format: email }
+                code: { type: string, minLength: 6, maxLength: 6 }
+      responses:
+        "200":
+          description: Kode benar; token diterbitkan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResult" }
+        "400": { description: Kode salah, kedaluwarsa, atau jatah percobaannya habis }
+        "429": { description: Terlalu banyak percobaan untuk akun ini }
+
   /api/v1/auth/forgot-password:
     post:
       tags: [Auth]
@@ -2696,12 +2742,29 @@ components:
 
     LoginResult:
       type: object
-      required: [token, expiresAt, user]
+      required: [user]
       properties:
         token:
           type: string
-          description: "JWT HS256. Kirim sebagai `Authorization: Bearer <token>`."
+          description: >
+            JWT HS256, dikirim sebagai `Authorization: Bearer <token>`.
+
+
+            **Kosong bila `otpRequired` true** — kata sandi yang benar saja
+            belum menerbitkan token saat OTP menyala.
         expiresAt: { type: string, format: date-time }
+        otpRequired:
+          type: boolean
+          description: >
+            `true` berarti kata sandinya benar tapi belum cukup: kode sudah
+            dikirim ke email, dan token baru terbit setelah kode itu
+            diverifikasi lewat `/auth/verify-otp`.
+
+
+            OTP hanya berlaku bila sakelar `login_otp_enabled` menyala DAN SMTP
+            terkonfigurasi. Dua syarat, bukan satu: sakelar menyala sementara
+            email mati berarti tidak seorang pun bisa masuk — termasuk admin
+            yang harus mematikan sakelarnya.
         user: { $ref: "#/components/schemas/AuthUser" }
 
     CreateUserInput:

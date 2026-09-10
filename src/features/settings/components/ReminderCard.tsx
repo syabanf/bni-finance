@@ -21,6 +21,7 @@ import { getAppSetting, setAppSetting } from '@/services/appSettings'
  */
 
 const KUNCI = [
+  'login_otp_enabled',
   'notifications_enabled',
   'reminder_worker_enabled',
   'reminder_offsets',
@@ -34,6 +35,7 @@ type Kunci = (typeof KUNCI)[number]
 export function ReminderCard() {
   const { toast } = useToast()
   const [nilai, setNilai] = useState<Record<Kunci, string>>({
+    login_otp_enabled: 'false',
     notifications_enabled: 'true',
     reminder_worker_enabled: 'false',
     reminder_offsets: '7,3,1',
@@ -102,6 +104,17 @@ export function ReminderCard() {
       />
       <CardBody className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
+          <Sakelar
+            label="Kode masuk lewat email (OTP)"
+            nyala={nilai.login_otp_enabled === 'true'}
+            onChange={(v) => ubah('login_otp_enabled', String(v))}
+            deskripsi="Setelah kata sandi benar, sistem mengirim kode 6 digit ke email dan meminta kode itu sebelum bisa masuk."
+            peringatan={
+              nilai.login_otp_enabled === 'true'
+                ? 'Menyala: kalau pengiriman email bermasalah, tidak ada yang bisa masuk — termasuk Anda. Sistem otomatis melewati OTP bila email belum dikonfigurasi.'
+                : undefined
+            }
+          />
           <Sakelar
             label="Notifikasi"
             nyala={notifNyala}

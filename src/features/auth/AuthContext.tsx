@@ -11,7 +11,13 @@ const useMock = isMockMode()
 interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  /**
+   * Masuk. Mengembalikan `true` bila kata sandinya benar tapi masih perlu kode
+   * OTP dari email — pada keadaan itu sesi BELUM terpasang.
+   */
+  login: (email: string, password: string) => Promise<boolean>
+  /** Menukar kode OTP dengan sesi. */
+  verifikasiOtp: (email: string, code: string) => Promise<void>
   /** Passwordless sign-in for allow-listed demo accounts (Backend API mode). */
   quickLogin: (email: string) => Promise<void>
   logout: () => Promise<void>
@@ -63,9 +69,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  /**
+   * Masuk. Mengembalikan true bila masih perlu kode OTP.
+   *
+   * Pengguna TIDAK dipasang saat OTP diminta — memasangnya di sini akan
+   * membuat aplikasi menganggap orangnya sudah masuk padahal langkah
+   * keduanya belum dilewati, dan seluruh gunanya OTP hilang.
+   */
   const login = useCallback(async (email: string, password: string) => {
-    const u = await authService.login(email, password)
-    setUser(u)
+    const hasil = await authService.login(email, password)
+    if (hasil.otpRequired) return true
+    setUser(hasil.user)
+    return false
+  }, [])
+
+  const verifikasiOtp = useCallback(async (email: string, code: string) => {
+    setUser(await authService.verifikasiOtp(email, code))
   }, [])
 
   const quickLoginAs = useCallback(async (email: string) => {
@@ -92,8 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, quickLogin: quickLoginAs, logout, updateProfile, updatePassword }),
-    [user, loading, login, quickLoginAs, logout, updateProfile, updatePassword],
+    () => ({
+      user,
+      loading,
+      login,
+      verifikasiOtp,
+      quickLogin: quickLoginAs,
+      logout,
+      updateProfile,
+      updatePassword,
+    }),
+    [user, loading, login, verifikasiOtp, quickLoginAs, logout, updateProfile, updatePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
