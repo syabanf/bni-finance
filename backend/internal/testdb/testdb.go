@@ -32,6 +32,16 @@ const lockQuery = "SELECT pg_advisory_lock(hashtext('bni-integration-tests'))"
 // Serialize memegang advisory lock sesi sampai tes (beserta seluruh subtesnya)
 // selesai. Panggil SEBELUM TRUNCATE pertama.
 //
+// TUTUP POOL LEWAT t.Cleanup, JANGAN defer. Defer berjalan lebih dulu daripada
+// Cleanup, sedangkan koneksi pemegang kunci baru dilepas di Cleanup — sehingga
+// `defer pool.Close()` menunggu koneksi yang justru akan dilepas sesudahnya.
+// Tesnya lalu MENGGANTUNG sampai timeout alih-alih gagal, dan jejaknya menunjuk
+// ke Pool.Close, bukan ke penyebabnya. Cleanup berjalan LIFO, jadi yang
+// didaftarkan Serialize dijalankan lebih dulu:
+//
+//	t.Cleanup(pool.Close)
+//	testdb.Serialize(t, pool)
+//
 // Lock sesi menempel pada koneksi, dan koneksi dari pool bisa dikembalikan —
 // karena itu satu koneksi diambil khusus dan ditahan sampai Cleanup. Menutup
 // koneksi melepas kuncinya, jadi tidak ada jalur yang meninggalkan kunci

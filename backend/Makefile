@@ -101,12 +101,14 @@ db-seed-baru: ## Terapkan seluruh seed bertanggal di db/seeds/ (idempoten)
 # app_settings sengaja TIDAK ikut: di sanalah kredensial Paper.id yang dipasang
 # admin tersimpan, dan menghapusnya setiap reset berarti memasangnya ulang
 # setiap kali.
+# SQL-nya ada di db/reset.sql, bukan di sini, supaya tes bisa menjalankan
+# berkas YANG SAMA. Alasan tiap keputusannya ditulis di berkas itu.
 db-reset: db-create db-init ## Siapkan database lokal dari nol — MENGOSONGKAN tabel bisnis
 	@echo "mengosongkan tabel bisnis lalu memuat ulang data contoh…"
-	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -c \
-		"truncate invoice_audit_log, payments, invoices, members, chapters, fee_settings restart identity cascade"
+	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/reset.sql
 	@$(PSQL) "$(DB_URL)" -v ON_ERROR_STOP=1 -q -f ../db/init.sql
-	@echo "data contoh disegarkan (users dan app_settings tidak disentuh)"
+	@echo "data contoh disegarkan (akun nasional dan app_settings tidak disentuh;"
+	@echo "akun ST/MC ikut terhapus karena chapter yang mengikatnya sudah tidak ada)"
 
 db-drop:  ## Hapus database — menghapus SEMUA data di dalamnya
 	@printf 'Hapus database %s beserta seluruh isinya? [y/N] ' "$(DB_NAME)"; \
