@@ -2761,8 +2761,9 @@ components:
             diverifikasi lewat `/auth/verify-otp`.
 
 
-            OTP hanya berlaku bila sakelar `login_otp_enabled` menyala DAN SMTP
-            terkonfigurasi. Dua syarat, bukan satu: sakelar menyala sementara
+            OTP hanya berlaku bila sakelar `login_otp_enabled` menyala DAN
+            pengiriman email terkonfigurasi (`RESEND_API_KEY` + `MAIL_FROM`).
+            Dua syarat, bukan satu: sakelar menyala sementara
             email mati berarti tidak seorang pun bisa masuk — termasuk admin
             yang harus mematikan sakelarnya.
         user: { $ref: "#/components/schemas/AuthUser" }

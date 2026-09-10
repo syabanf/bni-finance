@@ -1,9 +1,11 @@
 package mailer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -272,5 +274,56 @@ func TestPenerimaKosongDitolak(t *testing.T) {
 	}
 	if got := cacah.Load(); got != 0 {
 		t.Errorf("percobaan = %d, seharusnya tidak menyentuh jaringan sama sekali", got)
+	}
+}
+
+// SUBJEK TIDAK BOLEH SAMPAI KE LOG.
+//
+// Subjek email OTP berbunyi "Kode masuk 817810 — BNI Finance Hub": kodenya ada
+// di dalamnya supaya terbaca dari pratinjau notifikasi tanpa membuka email.
+// Mencatat subjek berarti setiap kode masuk yang masih berlaku tersimpan apa
+// adanya di log aplikasi.
+//
+// Ini bukan bahaya yang dibawa satu perubahan. Menaruh kode di subjek masuk
+// akal. Mencatat subjek — alih-alih alamat penerima — juga masuk akal, justru
+// karena hati-hati soal data pribadi. Keduanya digabung tanpa satu pun konflik
+// teks, dan kebocorannya baru terlihat saat log-nya dibaca.
+func TestSubjekTidakMasukLog(t *testing.T) {
+	m, _, _ := resendPalsu(t, nil)
+
+	var catatan bytes.Buffer
+	m.log = slog.New(slog.NewJSONHandler(&catatan, nil))
+
+	const kode = "817810"
+	err := m.Kirim(context.Background(), Pesan{
+		Ke:     "a@b.test",
+		Jenis:  "otp",
+		Subjek: "Kode masuk " + kode + " — BNI Finance Hub",
+		Teks:   "Kode masuk Anda: " + kode,
+	})
+	if err != nil {
+		t.Fatalf("kirim: %v", err)
+	}
+
+	log := catatan.String()
+	if log == "" {
+		t.Fatal("tidak ada yang tercatat — penjaga ini akan hijau selamanya")
+	}
+	if strings.Contains(log, kode) {
+		t.Errorf("kode OTP tercatat di log:\n%s", log)
+	}
+	if strings.Contains(log, "Kode masuk") {
+		t.Errorf("subjek tercatat di log:\n%s", log)
+	}
+	// Isi pesannya juga tidak, dan alamat penerimanya juga tidak.
+	if strings.Contains(log, "a@b.test") {
+		t.Errorf("alamat penerima tercatat di log:\n%s", log)
+	}
+	// Yang HARUS ada: id, supaya pesannya bisa ditelusuri di dasbor Resend,
+	// dan jenisnya, supaya log-nya masih bisa dibaca orang.
+	for _, harus := range []string{"pesan-1", "otp"} {
+		if !strings.Contains(log, harus) {
+			t.Errorf("log kehilangan %q — tanpa itu ia tidak berguna:\n%s", harus, log)
+		}
 	}
 }

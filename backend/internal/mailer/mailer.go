@@ -101,6 +101,23 @@ func (m *Mailer) Siap() bool {
 type Pesan struct {
 	Ke     string
 	Subjek string
+	// Jenis adalah label pendek untuk log, mis. "otp" atau "reset-kata-sandi".
+	//
+	// ADA KARENA SUBJEK TIDAK BOLEH DICATAT. Subjek email OTP berbunyi
+	// "Kode masuk 817810 — BNI Finance Hub": kodenya ada di dalamnya, supaya
+	// terbaca dari pratinjau notifikasi tanpa membuka email. Mencatat subjek
+	// berarti setiap kode masuk yang masih berlaku tersimpan apa adanya di log
+	// aplikasi — yang dibaca lebih banyak orang, disimpan lebih lama, dan
+	// sering dikirim ke pihak ketiga untuk dianalisis.
+	//
+	// Bahayanya baru muncul dari GABUNGAN dua perubahan yang masing-masing
+	// masuk akal: satu menaruh kode di subjek, satu lagi mencatat subjek.
+	// Keduanya digabung tanpa satu pun konflik teks.
+	//
+	// Label ini disediakan pemanggil, bukan diturunkan dari isi pesan. Yang
+	// lupa mengisinya menghasilkan log tanpa jenis — kehilangan konteks, bukan
+	// kebocoran.
+	Jenis string
 	// Teks selalu dikirim; HTML opsional.
 	//
 	// Keduanya, bukan salah satu: klien yang menolak HTML — dan penyaring spam
@@ -135,12 +152,13 @@ func (m *Mailer) Kirim(ctx context.Context, p Pesan) error {
 	if err != nil {
 		return err
 	}
-	// Penerimanya TIDAK dicatat, subjeknya saja.
+	// Yang dicatat hanya id dan jenis — bukan penerima, bukan subjek.
 	//
-	// id-nya cukup untuk menemukan pesan itu di dasbor Resend — lengkap dengan
-	// alamat tujuan dan status pengirimannya — sementara log aplikasi ini
-	// dibaca lebih banyak orang daripada dasbor itu.
-	m.log.Info("email terkirim", "id", id, "subjek", bersih(p.Subjek))
+	// id-nya cukup untuk menemukan pesan itu di dasbor Resend, lengkap dengan
+	// alamat tujuan, subjek, dan status pengirimannya. Log aplikasi ini dibaca
+	// lebih banyak orang daripada dasbor itu, jadi apa pun yang sudah ada di
+	// sana tidak perlu diulang di sini.
+	m.log.Info("email terkirim", "id", id, "jenis", bersih(p.Jenis))
 	return nil
 }
 

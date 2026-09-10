@@ -156,6 +156,7 @@ func (s *Service) kirimOTP(ctx context.Context, user *domain.User) error {
 	menit := int(UmurOTP.Minutes())
 	return s.mail.Kirim(ctx, mailer.Pesan{
 		Ke:     user.Email,
+		Jenis:  "otp",
 		Subjek: "Kode masuk " + kode + " — BNI Finance Hub",
 		Teks: "Halo " + user.Name + ",\r\n\r\n" +
 			"Kode masuk Anda: " + kode + "\r\n\r\n" +
@@ -474,6 +475,7 @@ func (s *Service) MintaResetKataSandi(ctx context.Context, email, baseURL string
 
 	return s.mail.Kirim(ctx, mailer.Pesan{
 		Ke:     user.Email,
+		Jenis:  "reset-kata-sandi",
 		Subjek: "Atur ulang kata sandi — BNI Finance Hub",
 		Teks: "Halo " + user.Name + ",\r\n\r\n" +
 			"Ada permintaan untuk mengatur ulang kata sandi akun Anda.\r\n" +
