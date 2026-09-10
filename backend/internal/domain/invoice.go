@@ -255,6 +255,14 @@ type InvoiceFilter struct {
 // daripada kenyataannya, tanpa satu pun tanda bahwa itu keliru.
 type InvoiceSummary struct {
 	ByStatus map[string]InvoiceBucket `json:"byStatus"`
+	// ByType memecah hasilnya menjadi pendaftaran dan renewal.
+	//
+	// Berbeda dari ByStatus, ini MENGIKUTI filter status yang sedang dipilih.
+	// Kartu ringkasan dan tab status menjawab dua pertanyaan yang berbeda: tab
+	// bertanya "ada berapa di tiap status" — jadi menyaring ke satu status
+	// membuat sisanya nol — sedangkan kartu bertanya "dari yang sedang saya
+	// lihat, berapa pendaftaran dan berapa renewal".
+	ByType map[string]InvoiceBucket `json:"byType"`
 	// Total mencakup semua KECUALI cancelled dan terminated: tagihan yang
 	// ditarik kembali atau gugur tidak boleh menggelembungkan total tertagih.
 	Total InvoiceBucket `json:"total"`
