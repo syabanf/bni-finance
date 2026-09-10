@@ -56,6 +56,10 @@ const MEMBER_STATUS: Record<MemberStatus, { tone: Tone; label: string }> = {
   active: { tone: 'green', label: 'Active' },
   inactive: { tone: 'gray', label: 'Inactive' },
   pending: { tone: 'amber', label: 'Pending' },
+  // Biru, bukan abu: tamu bukan keadaan yang gagal — ia calon anggota yang
+  // sedang diikuti. Menyamakan warnanya dengan "inactive" membuat orang
+  // membacanya sebagai sesuatu yang perlu dibereskan, bukan ditindaklanjuti.
+  visitor: { tone: 'blue', label: 'Visitor' },
 }
 
 export function MemberStatusBadge({ status }: { status: MemberStatus }) {

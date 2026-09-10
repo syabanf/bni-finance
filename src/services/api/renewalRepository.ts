@@ -18,7 +18,7 @@ export const apiRenewalRepository: RenewalRepository = {
   },
 
   async request(memberIds, period, assignedMc) {
-    return api.post<{ dibuat: number; dilewati: number; total: number }>('/renewal-requests', {
+    return api.post<{ dibuat: number; dilewati: number; visitor: number; total: number }>('/renewal-requests', {
       memberIds,
       period,
       // null, bukan string kosong: backend menyimpannya sebagai foreign key ke

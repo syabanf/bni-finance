@@ -96,6 +96,7 @@ export function MemberListPage() {
       active: list.filter((m) => m.status === 'active').length,
       pending: list.filter((m) => m.status === 'pending').length,
       inactive: list.filter((m) => m.status === 'inactive').length,
+      visitor: list.filter((m) => m.status === 'visitor').length,
     }
   }, [baseFiltered])
 
@@ -151,7 +152,7 @@ export function MemberListPage() {
       />
 
       {/* Summary cards (also filter by status) */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <SummaryCard
           label="Total Member"
           value={statusCounts.all}
@@ -179,6 +180,13 @@ export function MemberListPage() {
           tone="default"
           active={memberStatus === 'inactive'}
           onClick={() => setMemberStatus('inactive')}
+        />
+        <SummaryCard
+          label="Visitor"
+          value={statusCounts.visitor}
+          tone="blue"
+          active={memberStatus === 'visitor'}
+          onClick={() => setMemberStatus('visitor')}
         />
       </div>
 

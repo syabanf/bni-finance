@@ -3249,7 +3249,7 @@
           "Member"
         ],
         "summary": "ST meminta konfirmasi renewal ke MC",
-        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n",
+        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n\n**Visitor dilewati**, dan dihitung terpisah dari `dilewati`. Tamu belum\nmenjadi anggota, jadi tidak ada keanggotaan yang bisa diperpanjang —\ndan inilah satu-satunya jalur yang bisa mengirimkan permintaan itu\nkepadanya, karena daftar id-nya dipilih operator, bukan dipanen query\nyang menyaring status. Disatukan dengan `dilewati`, tamu yang terlewat\ntidak bisa dibedakan dari pekerjaan yang memang sudah beres.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -3296,6 +3296,10 @@
                     "dilewati": {
                       "type": "integer",
                       "description": "Sudah ada untuk periode itu"
+                    },
+                    "visitor": {
+                      "type": "integer",
+                      "description": "Dilewati karena belum menjadi anggota"
                     },
                     "total": {
                       "type": "integer"
@@ -5018,8 +5022,10 @@
         "enum": [
           "active",
           "inactive",
-          "pending"
-        ]
+          "pending",
+          "visitor"
+        ],
+        "description": "`visitor` adalah tamu yang datang ke pertemuan chapter tapi **belum** menjadi anggota. Ia dicatat supaya bisa diikuti sampai mendaftar, dan **tidak pernah ditagih**: dua query yang memanen member untuk renewal menyaring `active`, dan permintaan renewal yang memakai daftar id pilihan operator melewatinya secara eksplisit.\n"
       },
       "Chapter": {
         "type": "object",

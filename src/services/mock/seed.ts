@@ -138,6 +138,15 @@ const memberSeeds: MemberSeed[] = [
   { name: 'Bambang Setiadi', chapterId: 'ch-khatulistiwa', joined: '2025-09-03', history: [] },
   { name: 'Novi Andriani', chapterId: 'ch-khatulistiwa', joined: '2025-09-10', history: [] },
   { name: 'Yusuf Maulana', chapterId: 'ch-khatulistiwa', joined: '2026-08-09', history: [] },
+
+  // --- Seed 2026-09-11: visitor --------------------------------------------
+  // Cerminan db/seeds/2026-09-11-visitor.sql. Tamu yang datang ke pertemuan
+  // tapi belum mendaftar — history: [] dan tanpa tanggal perpanjangan, karena
+  // keanggotaannya memang belum ada.
+  { name: 'Bayu Anggara', chapterId: 'ch-garuda', joined: '2026-08-28', status: 'visitor', history: [] },
+  { name: 'Nadia Prameswari', chapterId: 'ch-garuda', joined: '2026-09-04', status: 'visitor', history: [] },
+  { name: 'Reza Firmansyah', chapterId: 'ch-nusantara', joined: '2026-08-21', status: 'visitor', history: [] },
+  { name: 'Clara Simanjuntak', chapterId: 'ch-bhinneka', joined: '2026-09-08', status: 'visitor', history: [] },
 ]
 
 // ---------------------------------------------------------------------------

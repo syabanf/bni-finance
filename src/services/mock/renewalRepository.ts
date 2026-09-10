@@ -43,9 +43,19 @@ export const mockRenewalRepository: RenewalRepository = {
   async request(memberIds, period, assignedMc) {
     let dibuat = 0
     let dilewati = 0
+    let visitor = 0
     for (const memberId of memberIds) {
       const m = store.members.find((x) => x.id === memberId)
       if (!m) throw new Error(`Member ${memberId} tidak ditemukan.`)
+      // Visitor dilewati — meniru penjaga di backend.
+      //
+      // Mock yang lebih longgar daripada server adalah mock yang berbohong:
+      // demo memperlihatkan permintaan renewal terkirim ke tamu, lalu produksi
+      // menolaknya. Yang salah kemudian dikira produksinya.
+      if (m.status === 'visitor') {
+        visitor++
+        continue
+      }
       // Kunci (member, periode) — persis indeks unik di basis data.
       if (requests.some((r) => r.memberId === memberId && r.period === period)) {
         dilewati++
@@ -72,7 +82,7 @@ export const mockRenewalRepository: RenewalRepository = {
       dibuat++
     }
     await delay(null, 300)
-    return { dibuat, dilewati, total: dibuat + dilewati }
+    return { dibuat, dilewati, visitor, total: dibuat + dilewati + visitor }
   },
 
   async answer(id, answer: RenewalAnswer, note) {

@@ -131,16 +131,16 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*domain.RenewalReq
 // harus melihat "0 baru, 12 sudah ada", bukan "12 dibuat" yang membuatnya
 // mengira permintaan pertamanya hilang.
 func (r *Repository) Create(ctx context.Context, memberIDs []string, period string,
-	requestedBy string, assignedMC *string) (dibuat, dilewati int, err error) {
+	requestedBy string, assignedMC *string) (dibuat, dilewati, visitor int, err error) {
 
 	lim := scope.Chapter(ctx)
 	if lim.Buntu {
-		return 0, 0, httpx.Forbidden("tidak ada lingkup chapter pada permintaan ini")
+		return 0, 0, 0, httpx.Forbidden("tidak ada lingkup chapter pada permintaan ini")
 	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return 0, 0, fmt.Errorf("mulai transaksi: %w", err)
+		return 0, 0, 0, fmt.Errorf("mulai transaksi: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -149,16 +149,31 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 		// menentukan chapter berarti ST bisa membuat permintaan atas nama
 		// chapter lain hanya dengan mengirim id yang berbeda.
 		var chapterID string
+		var status domain.MemberStatus
 		switch err := tx.QueryRow(ctx,
-			"SELECT chapter_id FROM members WHERE id = $1", id).Scan(&chapterID); {
+			"SELECT chapter_id, status FROM members WHERE id = $1", id).Scan(&chapterID, &status); {
 		case errors.Is(err, pgx.ErrNoRows):
-			return 0, 0, httpx.BadRequest(fmt.Sprintf("member %q tidak ditemukan", id))
+			return 0, 0, 0, httpx.BadRequest(fmt.Sprintf("member %q tidak ditemukan", id))
 		case err != nil:
-			return 0, 0, fmt.Errorf("baca chapter member: %w", err)
+			return 0, 0, 0, fmt.Errorf("baca chapter member: %w", err)
 		}
 		if lim.Terbatas && chapterID != lim.ChapterID {
-			return 0, 0, httpx.Forbidden(fmt.Sprintf(
+			return 0, 0, 0, httpx.Forbidden(fmt.Sprintf(
 				"member %q ada di chapter lain (%s)", id, chapterID))
+		}
+
+		// VISITOR DILEWATI. Di sinilah satu-satunya jalan tagihan keanggotaan
+		// bisa sampai ke orang yang belum menjadi anggota: daftar id-nya
+		// dipilih operator, bukan dipanen query yang menyaring status. Memilih
+		// "semua di chapter ini" lalu menekan kirim sudah cukup.
+		//
+		// Dihitung terpisah dari `dilewati`, bukan disatukan: "dilewati" pada
+		// alur ini berarti permintaannya memang sudah ada, dan menyatukan
+		// keduanya membuat tamu yang terlewat tidak bisa dibedakan dari
+		// pekerjaan yang sudah beres. Yang satu wajar, yang satu perlu dilihat.
+		if !status.BolehDitagih() {
+			visitor++
+			continue
 		}
 
 		// ON CONFLICT DO NOTHING mengandalkan indeks unik (member_id, period).
@@ -171,7 +186,7 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 			ON CONFLICT (member_id, period) DO NOTHING`,
 			id, chapterID, period, requestedBy, assignedMC)
 		if err != nil {
-			return 0, 0, fmt.Errorf("simpan permintaan renewal: %w", err)
+			return 0, 0, 0, fmt.Errorf("simpan permintaan renewal: %w", err)
 		}
 		if tag.RowsAffected() == 1 {
 			dibuat++
@@ -181,9 +196,9 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return 0, 0, fmt.Errorf("simpan permintaan renewal: %w", err)
+		return 0, 0, 0, fmt.Errorf("simpan permintaan renewal: %w", err)
 	}
-	return dibuat, dilewati, nil
+	return dibuat, dilewati, visitor, nil
 }
 
 // Answer mencatat jawaban MC.

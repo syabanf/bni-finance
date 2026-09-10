@@ -115,7 +115,7 @@ export interface RenewalRepository {
     memberIds: string[],
     period: string,
     assignedMc?: string | null,
-  ): Promise<{ dibuat: number; dilewati: number; total: number }>
+  ): Promise<{ dibuat: number; dilewati: number; visitor: number; total: number }>
   /** MC menjawab satu permintaan. */
   answer(id: string, answer: RenewalAnswer, note?: string): Promise<RenewalRequest>
 }

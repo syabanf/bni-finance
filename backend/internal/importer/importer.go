@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/syabanf/bni-finance/backend/internal/domain"
 )
 
 // Import chapter dan member dari berkas, DENGAN PRATINJAU LEBIH DULU.
@@ -291,9 +293,9 @@ func (s *Service) members(ctx context.Context, t *Tabel, format Format, terapkan
 			// hitung tanpa tanda apa pun.
 			b.Tindakan = TindakanDitolak
 			b.Alasan = fmt.Sprintf("chapter %q tidak ada", chapter)
-		case status != "active" && status != "inactive" && status != "pending":
+		case !domain.MemberStatus(status).Valid():
 			b.Tindakan = TindakanDitolak
-			b.Alasan = fmt.Sprintf("status %q tidak dikenal (active/inactive/pending)", status)
+			b.Alasan = fmt.Sprintf("status %q tidak dikenal (%s)", status, daftarStatus())
 		case terlihat[id] > 0:
 			b.Tindakan = TindakanDitolak
 			b.Alasan = fmt.Sprintf("id %q sudah dipakai di baris %d", id, terlihat[id])
@@ -391,4 +393,18 @@ func bedaMember(lama, baru MemberRow) []string {
 	cek("business_field", lama.BusinessField, baru.BusinessField)
 	cek("status", lama.Status, baru.Status)
 	return out
+}
+
+// daftarStatus merangkai status yang sah untuk pesan galat.
+//
+// Dibaca dari domain, bukan ditulis ulang di sini: daftar yang disalin akan
+// tertinggal saat status baru ditambahkan, dan yang tertinggal justru pesan
+// yang dibaca orang saat imporya gagal — menyuruh mereka memakai nilai yang
+// tidak lagi lengkap.
+func daftarStatus() string {
+	nama := make([]string, 0, len(domain.SemuaStatusMember))
+	for _, s := range domain.SemuaStatusMember {
+		nama = append(nama, string(s))
+	}
+	return strings.Join(nama, "/")
 }
