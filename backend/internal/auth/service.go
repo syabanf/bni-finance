@@ -72,7 +72,7 @@ type Service struct {
 	// Empty means the feature is off — see the quick login section below.
 	quickLogin []string
 
-	// mail boleh nil: aplikasinya tetap berjalan tanpa SMTP, hanya fitur yang
+	// mail boleh nil: aplikasinya tetap berjalan tanpa pengirim email, hanya fitur yang
 	// membutuhkannya yang menjawab 503 dengan pesan yang jelas.
 	mail PengirimEmail
 }
@@ -435,7 +435,7 @@ func (s *Service) isQuickLoginAllowed(email string) bool {
 // PengirimEmail adalah bagian mailer yang dibutuhkan service ini.
 //
 // Antarmuka sempit, bukan *mailer.Mailer langsung: paket auth jadi tidak perlu
-// tahu apa pun soal SMTP, dan tesnya tidak perlu server email.
+// tahu apa pun soal cara pengirimannya, dan tesnya tidak perlu jaringan.
 type PengirimEmail interface {
 	Siap() bool
 	Kirim(ctx context.Context, p mailer.Pesan) error

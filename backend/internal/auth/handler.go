@@ -143,7 +143,7 @@ func (h *Handler) lupaKataSandi(w http.ResponseWriter, r *http.Request) {
 	//
 	// Tanpa ini, formulir ini adalah tombol kirim-email gratis: seseorang bisa
 	// menembaknya berulang kali dan membanjiri kotak masuk orang lain, memakai
-	// kuota SMTP kita, sampai alamat pengirimnya ditandai spam oleh penyedia
+	// kuota kirim kita, sampai alamat pengirimnya ditandai spam oleh penyedia
 	// email penerima. Kerusakannya menimpa orang yang tidak melakukan apa-apa.
 	if sisa, terkunci := h.pembatas.Terkunci(in.Email); terkunci {
 		detik := int(sisa.Seconds()) + 1
