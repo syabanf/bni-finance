@@ -24,6 +24,19 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+/**
+ * Tanggal pada contoh body — TETAP, bukan hari ini.
+ *
+ * Sebelumnya `new Date()`, sehingga keluarannya berubah setiap hari dan berkas
+ * yang ter-commit langsung tidak sesuai keesokan harinya. Begitu --check
+ * dipasang di `npm run typecheck`, itu berarti typecheck gagal setiap hari
+ * untuk sesuatu yang sama sekali bukan drift — dan penjaga yang menuduh keliru
+ * akan dimatikan orang, lalu berhenti menjaga apa pun.
+ *
+ * Nilainya cuma contoh di konsol API; yang penting bentuknya, bukan tanggalnya.
+ */
+const TANGGAL_CONTOH = '2026-01-31'
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SPEC = resolve(root, 'backend/internal/apidocs/openapi.json')
 const OUT = resolve(root, 'public/api-collection.json')
@@ -73,8 +86,8 @@ function sampleFor(schema, key = '', depth = 0) {
     case 'boolean':
       return false
     default:
-      if (s.format === 'date') return new Date().toISOString().slice(0, 10)
-      if (s.format === 'date-time') return new Date().toISOString()
+      if (s.format === 'date') return TANGGAL_CONTOH
+      if (s.format === 'date-time') return `${TANGGAL_CONTOH}T09:00:00Z`
       if (s.format === 'uuid') return ''
       if (/email/i.test(key)) return 'nama@contoh.com'
       if (/password|sandi/i.test(key)) return ''
