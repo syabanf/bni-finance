@@ -13,6 +13,7 @@ import {
   Input,
   PageHeader,
   Select,
+  InvoiceTypeBadge,
   SummaryCard,
   TBody,
   THead,
@@ -24,9 +25,9 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
+import { cn } from '@/lib/cn'
 import { chapterService, paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
-import { monthNowKey } from '@/lib/date'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
@@ -45,6 +46,42 @@ export function PaymentListPage() {
   const [chapterId, setChapterId] = useState('all')
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
+  const [tipe, setTipe] = useState<'all' | 'renewal' | 'registration'>('all')
+
+  /**
+   * Pintasan rentang tanggal.
+   *
+   * Mengisi rentang yang SAMA dengan yang bisa diketik manual, bukan menjadi
+   * mode tersendiri. Itu penting: pintasan yang menyimpan keadaannya sendiri
+   * akan bertengkar dengan kolom tanggal — orang menekan "Bulan Ini", lalu
+   * mengubah satu tanggal, dan tidak ada yang bisa menjelaskan rentang mana
+   * yang sebenarnya berlaku. Di sini pintasan hanya mengisi kolomnya, dan
+   * setelah itu kolom itulah satu-satunya kebenaran.
+   */
+  const hariIni = new Date()
+
+  /**
+   * Tanggal dirakit dari komponen LOKAL, bukan lewat toISOString().
+   *
+   * toISOString() memindahkan waktunya ke UTC lebih dulu. Tengah malam 1
+   * September di WIB adalah pukul 17.00 tanggal 31 Agustus di UTC — jadi
+   * "Bulan Berjalan" akan mengisi 2026-08-31 dan diam-diam menarik pembayaran
+   * hari terakhir bulan LALU. Bukan galat, hanya laporan yang salah sehari,
+   * dan selisih sehari pada laporan bulanan adalah selisih yang tidak
+   * seorang pun cari sampai angkanya dipertanyakan.
+   */
+  const lokal = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const awalBulan = lokal(new Date(hariIni.getFullYear(), hariIni.getMonth(), 1))
+  const awalTahun = lokal(new Date(hariIni.getFullYear(), 0, 1))
+  const akhir = lokal(hariIni)
+
+  const setRentang = (dari: string) => {
+    setDueFrom(dari)
+    setDueTo(akhir)
+  }
+  const mtdAktif = dueFrom === awalBulan && dueTo === akhir
+  const ytdAktif = dueFrom === awalTahun && dueTo === akhir
 
   const methodOptions = useMemo(() => {
     const set = new Set<string>()
@@ -59,6 +96,7 @@ export function PaymentListPage() {
     return (payments ?? []).filter((p) => {
       if (method !== 'all' && (p.paymentMethod ?? '') !== method) return false
       if (chapterId !== 'all' && p.invoice?.chapterId !== chapterId) return false
+      if (tipe !== 'all' && p.invoice?.type !== tipe) return false
       const day = p.paidAt ? p.paidAt.slice(0, 10) : ''
       if (dueFrom && (!day || day < dueFrom)) return false
       if (dueTo && (!day || day > dueTo)) return false
@@ -70,24 +108,33 @@ export function PaymentListPage() {
         return false
       return true
     })
-  }, [payments, search, method, chapterId, dueFrom, dueTo])
+  }, [payments, search, method, chapterId, tipe, dueFrom, dueTo])
 
-  // Summary reflects the active filters.
+  // Ringkasan mengikuti filter yang sedang aktif.
   const total = filtered.reduce((acc, p) => acc + p.amount, 0)
-  const ym = monthNowKey()
-  const thisMonth = filtered.filter((p) => (p.paidAt ?? '').slice(0, 7) === ym)
-  const thisMonthTotal = thisMonth.reduce((acc, p) => acc + p.amount, 0)
+
+  // MOM: "setiap yang berbau data payment - outstanding terbagi 2 pendaftaran
+  // dan renewal". Tipenya diambil dari invoice yang dibayar, bukan dari
+  // pembayarannya — pembayaran sendiri tidak punya tipe, dan menebaknya dari
+  // nominal akan salah begitu harga pendaftaran dan renewal berdekatan.
+  const jumlahTipe = (t: string) =>
+    filtered.filter((p) => p.invoice?.type === t).reduce((a, p) => a + p.amount, 0)
+  const totalRenewal = jumlahTipe('renewal')
+  const totalPendaftaran = jumlahTipe('registration')
 
   const chapterName = (id?: string) =>
     id ? (chapters?.find((c) => c.id === id)?.displayName ?? '') : ''
 
-  const EXPORT_HEADERS = ['Member', 'Chapter', 'No. Invoice', 'Nominal', 'Metode', 'Waktu Bayar']
+  const EXPORT_HEADERS = ['Member', 'Chapter', 'No. Invoice', 'Tipe', 'Nominal', 'Metode', 'Waktu Bayar']
+  const labelTipe = (t?: string) =>
+    t === 'renewal' ? 'Renewal' : t === 'registration' ? 'Pendaftaran' : ''
   // Raw rows (amount numeric so Excel can sum) — always the FILTERED set.
   const exportRows = () =>
     filtered.map((p) => [
       p.member?.name ?? '',
       chapterName(p.invoice?.chapterId),
       p.invoice?.number ?? '',
+      labelTipe(p.invoice?.type),
       p.amount,
       paymentMethodLabel(p.paymentMethod),
       formatDateTime(p.paidAt),
@@ -104,6 +151,7 @@ export function PaymentListPage() {
         { label: 'Member' },
         { label: 'Chapter' },
         { label: 'No. Invoice' },
+        { label: 'Tipe' },
         { label: 'Nominal', align: 'right' },
         { label: 'Metode' },
         { label: 'Waktu Bayar' },
@@ -112,11 +160,12 @@ export function PaymentListPage() {
         p.member?.name ?? '—',
         chapterName(p.invoice?.chapterId) || '—',
         p.invoice?.number ?? '—',
+        labelTipe(p.invoice?.type) || '—',
         formatCurrency(p.amount),
         paymentMethodLabel(p.paymentMethod),
         formatDateTime(p.paidAt),
       ]),
-      totals: ['Total', '', '', formatCurrency(total), '', ''],
+      totals: ['Total', '', '', '', formatCurrency(total), '', ''],
       documentTitle: 'Riwayat Pembayaran — BNI Finance',
     })
     if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
@@ -133,13 +182,26 @@ export function PaymentListPage() {
       />
 
       {hasData && (
-        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryCard label="Total Diterima" value={formatCurrency(total)} tone="green" />
           <SummaryCard label="Jumlah Transaksi" value={filtered.length} tone="brand" />
+          {/* Kartunya juga menyaring, sama seperti di halaman invoice: menekan
+              "Renewal" mempersempit tabel di bawahnya. Angka yang bisa ditekan
+              menjawab pertanyaan berikutnya — "yang mana saja itu" — tanpa
+              memaksa mencarinya lewat dropdown terpisah. */}
           <SummaryCard
-            label="Bulan Ini"
-            value={formatCurrency(thisMonthTotal)}
-            sub={`${thisMonth.length} transaksi`}
+            label="Renewal"
+            value={formatCurrency(totalRenewal)}
+            tone="amber"
+            active={tipe === 'renewal'}
+            onClick={() => setTipe(tipe === 'renewal' ? 'all' : 'renewal')}
+          />
+          <SummaryCard
+            label="Pendaftaran"
+            value={formatCurrency(totalPendaftaran)}
+            tone="blue"
+            active={tipe === 'registration'}
+            onClick={() => setTipe(tipe === 'registration' ? 'all' : 'registration')}
           />
         </div>
       )}
@@ -180,6 +242,35 @@ export function PaymentListPage() {
                 ))}
               </Select>
               {/* Filter waktu bayar (rentang tanggal) */}
+              {/* Pintasan rentang. Mengisi kolom tanggal di sebelahnya, bukan
+                  menjadi mode tersendiri — lihat catatan di setRentang. */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setRentang(awalBulan)}
+                  className={cn(
+                    'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                    mtdAktif
+                      ? 'border-brand-500 bg-brand-50 text-brand-600'
+                      : 'border-ink-200 text-ink-600 hover:bg-ink-50',
+                  )}
+                >
+                  Bulan Berjalan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRentang(awalTahun)}
+                  className={cn(
+                    'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                    ytdAktif
+                      ? 'border-brand-500 bg-brand-50 text-brand-600'
+                      : 'border-ink-200 text-ink-600 hover:bg-ink-50',
+                  )}
+                >
+                  Tahun Berjalan
+                </button>
+              </div>
+
               <DateRangeFilter
                 label="Waktu bayar"
                 from={dueFrom}
@@ -218,7 +309,7 @@ export function PaymentListPage() {
               {filtered.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => p.invoice && navigate(`/invoices/${p.invoice.id}`)}
+                  onClick={() => navigate(`/payments/${p.id}`)}
                   className="flex items-center gap-3 px-4 py-3.5 active:bg-ink-50"
                 >
                   <Avatar name={p.member?.name ?? '?'} size="sm" />
@@ -251,6 +342,7 @@ export function PaymentListPage() {
                   <Tr>
                     <Th>Member</Th>
                     <Th>No. Invoice</Th>
+                    <Th>Tipe</Th>
                     <Th>Nominal</Th>
                     <Th>Metode</Th>
                     <Th>Waktu Bayar</Th>
@@ -258,7 +350,7 @@ export function PaymentListPage() {
                 </THead>
                 <TBody>
                   {filtered.map((p) => (
-                    <Tr key={p.id} onClick={() => p.invoice && navigate(`/invoices/${p.invoice.id}`)}>
+                    <Tr key={p.id} onClick={() => navigate(`/payments/${p.id}`)}>
                       <Td>
                         <div className="flex items-center gap-3">
                           <Avatar name={p.member?.name ?? '?'} size="sm" />
@@ -267,6 +359,13 @@ export function PaymentListPage() {
                       </Td>
                       <Td>
                         <span className="font-mono text-[13px] text-ink-600">{p.invoice?.number ?? '—'}</span>
+                      </Td>
+                      <Td>
+                        {p.invoice ? (
+                          <InvoiceTypeBadge type={p.invoice.type} />
+                        ) : (
+                          <span className="text-ink-400">—</span>
+                        )}
                       </Td>
                       <Td className="font-medium text-emerald-600">{formatCurrency(p.amount)}</Td>
                       <Td>
