@@ -276,6 +276,8 @@ func (s *fakeSettingsStore) UpdateFees(_ context.Context, in domain.UpdateFeeSet
 	if in.Notes != nil {
 		s.fees.Notes = in.Notes
 	}
+	// Direkam supaya tes bisa memeriksa SIAPA yang tercatat mengubah biaya.
+	s.fees.UpdatedBy = in.UpdatedBy
 	s.fees.UpdatedAt = time.Now().UTC()
 	f := s.fees
 	return &f, nil
