@@ -3,6 +3,7 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -212,4 +213,19 @@ func loadDotEnv(path string) {
 			_ = os.Setenv(key, value)
 		}
 	}
+}
+
+// Lokal melaporkan URL ini menunjuk mesin yang sama.
+//
+// Dipakai memperingatkan konfigurasi yang tampak benar dari sisi server tapi
+// menghasilkan tautan mati di kotak masuk penerimanya: APP_BASE_URL localhost
+// sementara SMTP menyala berarti email TERKIRIM, log bersih, dan penerimanya
+// menekan tautan yang tidak bisa dibuka di perangkatnya.
+func Lokal(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == ""
 }
