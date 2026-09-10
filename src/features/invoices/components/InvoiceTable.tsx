@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, BellRing, Eye } from 'lucide-react'
+import { ArrowRight, Eye, Send } from 'lucide-react'
 import type { InvoiceWithRelations } from '@/types'
 import {
   Avatar,
@@ -84,10 +84,10 @@ function RemindAction({
         'inline-flex items-center justify-center rounded-lg text-brand-600 transition-colors hover:bg-brand-50 disabled:opacity-50',
         dim,
       )}
-      aria-label="Kirim pengingat via Paper.id"
-      title="Kirim pengingat via Paper.id"
+      aria-label="Kirim ulang invoice via Paper.id"
+      title="Kirim Ulang"
     >
-      <BellRing className={icon} />
+      <Send className={icon} />
     </button>
   )
 }
@@ -249,7 +249,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
               <Th {...sortProps('member')}>Member</Th>
               <Th>Chapter</Th>
               {!compact && <Th {...sortProps('number')}>No. Invoice</Th>}
-              {!compact && <Th>Tipe</Th>}
+              <Th>Tipe</Th>
               <Th {...sortProps('amount')}>Nominal</Th>
               <Th {...sortProps('status')}>Status</Th>
               <Th {...sortProps('dueDate')}>Jatuh Tempo</Th>
@@ -291,11 +291,9 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                       <span className="font-mono text-[13px] text-ink-600">{inv.number}</span>
                     </Td>
                   )}
-                  {!compact && (
-                    <Td>
-                      <InvoiceTypeBadge type={inv.type} />
-                    </Td>
-                  )}
+                  <Td>
+                    <InvoiceTypeBadge type={inv.type} />
+                  </Td>
                   <Td className="font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
                   <Td>
                     <InvoiceStatusBadge status={inv.status} />

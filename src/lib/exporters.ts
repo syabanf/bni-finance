@@ -1,4 +1,3 @@
-import { downloadCsv } from './csv'
 import { downloadXlsx } from './xlsx'
 import {
   printTableReport,
@@ -36,7 +35,6 @@ export function makeExportHandlers(cfg: PageExport) {
   const headers = cfg.columns.map((c) => c.label)
   return {
     onExcel: () => downloadXlsx(cfg.filename, cfg.title, headers, cfg.rows),
-    onCsv: () => downloadCsv(`${cfg.filename}.csv`, headers, cfg.rows),
     onPdf: () => {
       const ok = printTableReport({
         title: cfg.title,

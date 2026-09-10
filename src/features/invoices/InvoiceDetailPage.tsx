@@ -376,8 +376,8 @@ export function InvoiceDetailPage() {
                       </Button>
                       {(status === 'sent' || status === 'overdue') && (
                         <Button onClick={kirimPengingat}>
-                          <BellRing className="h-4 w-4" />
-                          Kirim Pengingat
+                          <Send className="h-4 w-4" />
+                          Kirim Ulang
                         </Button>
                       )}
                     </div>

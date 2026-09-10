@@ -1,9 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronLeft, ChevronRight, Volume2, VolumeX, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { TourStep } from './tourSteps'
-import { useNarration } from './useNarration'
 
 /** Kotak sorotan pada layar, atau null bila langkahnya tidak menunjuk elemen. */
 interface Spot {
@@ -27,15 +26,11 @@ function measure(anchor?: string): Spot | null {
 export function TourOverlay({
   steps,
   index,
-  soundOn,
-  onSound,
   onIndex,
   onClose,
 }: {
   steps: TourStep[]
   index: number
-  soundOn: boolean
-  onSound: (on: boolean) => void
   onIndex: (i: number) => void
   onClose: () => void
 }) {
@@ -46,7 +41,6 @@ export function TourOverlay({
   // yang teksnya paling panjang — tepat langkah yang paling perlu terbaca.
   const panelRef = useRef<HTMLDivElement>(null)
   const [panelH, setPanelH] = useState(240)
-  const narration = useNarration(soundOn)
 
   // Ukur SETELAH elemen digulir ke layar, bukan sebelumnya: mengukur lebih dulu
   // menghasilkan koordinat posisi lama, dan sorotannya mendarat di tempat yang
@@ -75,15 +69,6 @@ export function TourOverlay({
     const h = panelRef.current?.offsetHeight
     if (h && h !== panelH) setPanelH(h)
   }, [step, panelH])
-
-  // Narasikan tiap langkah. Judul dan isi dibaca sebagai satu kalimat supaya
-  // tidak ada jeda janggal di antaranya.
-  useEffect(() => {
-    if (step) narration.speak(`${step.title}. ${step.body}`)
-    // narration sengaja tidak masuk dependensi: identitasnya berubah tiap
-    // render, dan memasukkannya akan mengulang narasi tanpa henti.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, soundOn])
 
   // Escape menutup, panah berpindah — tur yang hanya bisa ditutup dengan mouse
   // menjebak pengguna keyboard.
@@ -160,14 +145,6 @@ export function TourOverlay({
             <h3 className="text-[15px] font-bold leading-snug text-ink-900">{step.title}</h3>
           </div>
           <button
-            onClick={() => onSound(!soundOn)}
-            className="rounded-lg p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-600"
-            aria-label={soundOn ? 'Matikan narasi suara' : 'Nyalakan narasi suara'}
-            title={soundOn ? 'Matikan narasi suara' : 'Nyalakan narasi suara'}
-          >
-            {soundOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </button>
-          <button
             onClick={onClose}
             className="rounded-lg p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-600"
             aria-label="Tutup panduan"
@@ -191,17 +168,6 @@ export function TourOverlay({
             />
           ))}
         </div>
-
-        {soundOn && narration.supported && !narration.hasIndonesian && (
-          <p className="mt-2 text-[11px] leading-snug text-amber-700">
-            Peramban ini belum punya suara Bahasa Indonesia, jadi narasinya memakai suara bawaan.
-          </p>
-        )}
-        {soundOn && !narration.supported && (
-          <p className="mt-2 text-[11px] leading-snug text-amber-700">
-            Peramban ini tidak mendukung narasi suara. Panduannya tetap bisa dibaca.
-          </p>
-        )}
 
         <div className="mt-3 flex items-center gap-2">
           <button

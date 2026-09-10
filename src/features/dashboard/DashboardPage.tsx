@@ -202,7 +202,6 @@ export function DashboardPage() {
             value={summary.total.count}
             label="Total Invoice"
             hint={formatCurrencyCompact(summary.total.amount)}
-            trend={{ value: summary.total.trend, intent: summary.total.trend >= 0 ? 'good' : 'bad' }}
             onClick={() => navigate('/invoices')}
           />
           <StatCard
@@ -211,7 +210,6 @@ export function DashboardPage() {
             value={summary.paid.count}
             label="Sudah Dibayar"
             hint={formatCurrencyCompact(summary.paid.amount)}
-            trend={{ value: summary.paid.trend, intent: summary.paid.trend >= 0 ? 'good' : 'bad' }}
             onClick={() => navigate('/invoices?status=paid')}
           />
           <StatCard
@@ -220,7 +218,6 @@ export function DashboardPage() {
             value={summary.outstanding.count}
             label="Outstanding"
             hint={formatCurrencyCompact(summary.outstanding.amount)}
-            trend={{ value: summary.outstanding.trend, intent: 'bad' }}
             onClick={() => navigate('/invoices?status=outstanding')}
           />
           <StatCard
@@ -229,7 +226,6 @@ export function DashboardPage() {
             value={summary.overdue.count}
             label="Overdue"
             hint={formatCurrencyCompact(summary.overdue.amount)}
-            trend={{ value: summary.overdue.trend, format: 'absolute', intent: 'bad' }}
             onClick={() => navigate('/invoices?status=overdue')}
           />
         </div>

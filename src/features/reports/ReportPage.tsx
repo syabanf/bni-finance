@@ -21,7 +21,6 @@ import { chapterService, invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
 import { todayISO } from '@/lib/date'
-import { downloadCsv } from '@/lib/csv'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
@@ -205,7 +204,6 @@ export function ReportPage() {
     report.chapterRows.map((r) => [r.name, r.count, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`])
   const exportBase = `laporan-${range.from || 'awal'}_${range.to || todayISO()}`
 
-  const exportCsv = () => downloadCsv(`${exportBase}.csv`, EXPORT_HEADERS, exportRows())
   const exportExcel = () => downloadXlsx(exportBase, 'Laporan Keuangan', EXPORT_HEADERS, exportRows())
 
   const exportPdf = () => {
@@ -290,7 +288,7 @@ export function ReportPage() {
         description="Ringkasan penagihan dan penerimaan per periode."
         action={
           <span data-tour="report-export">
-            <ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
+            <ExportMenu onExcel={exportExcel} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
           </span>
         }
       />
