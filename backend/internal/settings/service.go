@@ -33,8 +33,14 @@ func (s *Service) UpdateFees(ctx context.Context, in domain.UpdateFeeSettingsInp
 	if err := in.Validate(); err != nil {
 		return nil, httpx.BadRequest(err.Error())
 	}
+	// UpdatedBy TIDAK ikut dihitung di sini.
+	//
+	// Nilainya diisi server dari token, jadi ia selalu ada — memasukkannya ke
+	// pemeriksaan ini membuat penjaganya tidak pernah menyala, dan permintaan
+	// dengan body kosong akan lolos lalu menulis baris audit tanpa satu pun
+	// perubahan nyata.
 	if in.RegistrationFee == nil && in.RenewalFee == nil &&
-		in.Currency == nil && in.Notes == nil && in.UpdatedBy == nil {
+		in.Currency == nil && in.Notes == nil {
 		return nil, httpx.BadRequest("tidak ada field yang diubah")
 	}
 	return s.repo.UpdateFees(ctx, in)

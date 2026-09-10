@@ -39,6 +39,27 @@ func (h *Handler) updateFees(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
+
+	// SIAPA yang mengubah diambil dari TOKEN, bukan dari body.
+	//
+	// Sebelumnya nilainya diteruskan apa adanya dari permintaan, sehingga siapa
+	// pun yang boleh mengubah biaya juga boleh menuliskan nama orang lain di
+	// kolom auditnya. Sudah dibuktikan: masuk sebagai Admin Nasional lalu
+	// mengirim {"updatedBy":"Bukan Saya"} tersimpan persis seperti itu.
+	//
+	// Jejak audit yang bisa ditulis sendiri oleh yang diaudit bukan jejak audit
+	// — ia justru lebih berbahaya daripada kolom kosong, karena kolom kosong
+	// tidak menuduh siapa-siapa.
+	//
+	// Emailnya yang dicatat, bukan namanya: nama bisa sama antar orang dan bisa
+	// diubah sendiri lewat halaman profil.
+	if u, ok := auth.UserFrom(r.Context()); ok {
+		email := u.Email
+		in.UpdatedBy = &email
+	} else {
+		in.UpdatedBy = nil
+	}
+
 	fees, err := h.svc.UpdateFees(r.Context(), in)
 	if err != nil {
 		httpx.Fail(w, err)
