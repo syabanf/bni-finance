@@ -72,6 +72,9 @@ interface ChapterRow {
   name: string
   count: number
   ditagih: number
+  /** Ditagih, dipecah per tipe. renewal + pendaftaran === ditagih. */
+  renewal: number
+  pendaftaran: number
   diterima: number
   outstanding: number
   rate: number
@@ -126,18 +129,40 @@ export function ReportPage() {
     // payments received (keyed by the paid invoice's chapter).
     const chapMap = new Map<string, ChapterRow>()
     const chapterName = (id: string) => chapters?.find((c) => c.id === id)?.displayName ?? '—'
-    const ensureRow = (id: string, name: string) => {
-      let row = chapMap.get(id)
+    const ensureRow = (id: string, name: string): ChapterRow => {
+      let row: ChapterRow | undefined = chapMap.get(id)
       if (!row) {
-        row = { id, name, count: 0, ditagih: 0, diterima: 0, outstanding: 0, rate: 0 }
+        row = {
+          id, name, count: 0, ditagih: 0, diterima: 0, outstanding: 0, rate: 0,
+          // Dipecah per tipe sejak di sumbernya, bukan dihitung ulang di
+          // tampilan: MOM meminta "setiap yang berbau data payment dan
+          // outstanding terbagi dua", dan angka yang dipecah di dua tempat
+          // adalah angka yang bisa berbeda di dua tempat.
+          renewal: 0, pendaftaran: 0,
+        }
         chapMap.set(id, row)
       }
       return row
     }
+    // SETIAP chapter disiapkan lebih dulu, termasuk yang tanpa invoice.
+    //
+    // Sebelumnya baris hanya lahir dari invoice yang ada, sehingga chapter yang
+    // belum ditagih sama sekali HILANG dari laporan. Itu justru membuang
+    // informasi yang paling perlu dilihat: chapter dengan nol tagihan bukan
+    // chapter yang baik-baik saja, ia chapter yang belum disentuh — dan
+    // ketiadaannya di tabel terbaca seperti ia tidak ada.
+    //
+    // Dashboard sudah melakukan ini (LEFT JOIN di sisi server); laporan yang
+    // tidak melakukannya membuat dua halaman menjawab pertanyaan sama dengan
+    // daftar chapter yang berbeda.
+    for (const c of chapters ?? []) ensureRow(c.id, c.displayName)
+
     for (const i of invs) {
       const row = ensureRow(i.chapterId, i.chapter?.displayName ?? chapterName(i.chapterId))
       row.count += 1
       row.ditagih += i.amount
+      if (i.type === 'renewal') row.renewal += i.amount
+      else row.pendaftaran += i.amount
       if (i.status === 'sent' || i.status === 'overdue') row.outstanding += i.amount
     }
     for (const p of pays) {
@@ -146,7 +171,9 @@ export function ReportPage() {
     }
     const chapterRows = [...chapMap.values()]
       .map((r) => ({ ...r, rate: r.ditagih > 0 ? Math.round((r.diterima / r.ditagih) * 100) : 0 }))
-      .sort((a, b) => b.ditagih - a.ditagih)
+      // Nilai turun dulu, lalu abjad. Tanpa pengurutan kedua, chapter yang
+      // sama-sama nol muncul dalam urutan acak yang berubah tiap muat.
+      .sort((a, b) => b.ditagih - a.ditagih || a.name.localeCompare(b.name))
 
     // Per type (invoices issued)
     const reg = invs.filter((i) => i.type === 'registration')
@@ -194,6 +221,8 @@ export function ReportPage() {
   const EXPORT_HEADERS = [
     'Chapter',
     'Jumlah Invoice',
+    'Renewal',
+    'Pendaftaran',
     'Ditagih',
     'Diterima',
     'Outstanding',
@@ -201,7 +230,9 @@ export function ReportPage() {
   ]
   // Raw rows (amounts numeric so Excel can sum) — reflects the active period.
   const exportRows = () =>
-    report.chapterRows.map((r) => [r.name, r.count, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`])
+    report.chapterRows.map((r) => [
+      r.name, r.count, r.renewal, r.pendaftaran, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`,
+    ])
   const exportBase = `laporan-${range.from || 'awal'}_${range.to || todayISO()}`
 
   const exportExcel = () => downloadXlsx(exportBase, 'Laporan Keuangan', EXPORT_HEADERS, exportRows())
@@ -221,6 +252,8 @@ export function ReportPage() {
       columns: [
         { label: 'Chapter' },
         { label: 'Invoice', align: 'center' },
+        { label: 'Renewal', align: 'right' },
+        { label: 'Pendaftaran', align: 'right' },
         { label: 'Ditagih', align: 'right' },
         { label: 'Diterima', align: 'right' },
         { label: 'Outstanding', align: 'right' },
@@ -229,6 +262,8 @@ export function ReportPage() {
       rows: report.chapterRows.map((r) => [
         r.name,
         r.count,
+        formatCurrency(r.renewal),
+        formatCurrency(r.pendaftaran),
         formatCurrency(r.ditagih),
         formatCurrency(r.diterima),
         formatCurrency(r.outstanding),
@@ -237,6 +272,8 @@ export function ReportPage() {
       totals: [
         'Total',
         report.count,
+        formatCurrency(report.chapterRows.reduce((a, r) => a + r.renewal, 0)),
+        formatCurrency(report.chapterRows.reduce((a, r) => a + r.pendaftaran, 0)),
         formatCurrency(report.ditagih),
         formatCurrency(report.diterima),
         formatCurrency(report.outstanding),
@@ -392,6 +429,8 @@ export function ReportPage() {
                   <tr className="border-y border-ink-100 text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
                     <th className="px-5 py-3">Chapter</th>
                     <th className="px-3 py-3 text-center">Invoice</th>
+                    <th className="px-3 py-3 text-right">Renewal</th>
+                    <th className="px-3 py-3 text-right">Pendaftaran</th>
                     <th className="px-3 py-3 text-right">Ditagih</th>
                     <th className="px-3 py-3 text-right">Diterima</th>
                     <th className="px-3 py-3 text-right">Outstanding</th>
@@ -407,6 +446,8 @@ export function ReportPage() {
                     >
                       <td className="px-5 py-3 font-medium text-ink-900">{r.name}</td>
                       <td className="px-3 py-3 text-center text-ink-600">{r.count}</td>
+                      <td className="px-3 py-3 text-right text-ink-600">{formatCurrency(r.renewal)}</td>
+                      <td className="px-3 py-3 text-right text-ink-600">{formatCurrency(r.pendaftaran)}</td>
                       <td className="px-3 py-3 text-right text-ink-700">{formatCurrency(r.ditagih)}</td>
                       <td className="px-3 py-3 text-right text-emerald-600">{formatCurrency(r.diterima)}</td>
                       <td className="px-3 py-3 text-right text-amber-600">{formatCurrency(r.outstanding)}</td>
@@ -418,6 +459,12 @@ export function ReportPage() {
                   <tr className="border-t border-ink-100 bg-ink-50/50 text-sm font-semibold text-ink-900">
                     <td className="px-5 py-3">Total</td>
                     <td className="px-3 py-3 text-center">{report.count}</td>
+                    <td className="px-3 py-3 text-right text-ink-600">
+                      {formatCurrency(report.chapterRows.reduce((a, r) => a + r.renewal, 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-ink-600">
+                      {formatCurrency(report.chapterRows.reduce((a, r) => a + r.pendaftaran, 0))}
+                    </td>
                     <td className="px-3 py-3 text-right">{formatCurrency(report.ditagih)}</td>
                     <td className="px-3 py-3 text-right text-emerald-600">{formatCurrency(report.diterima)}</td>
                     <td className="px-3 py-3 text-right text-amber-600">{formatCurrency(report.outstanding)}</td>
@@ -492,20 +539,42 @@ function MonthlyBars({ data }: { data: { month: string; issued: number; paid: nu
       </div>
       <div className="flex items-end gap-2 overflow-x-auto pb-1">
         {data.map((d) => (
-          <div key={d.month} className="flex min-w-[36px] flex-1 flex-col items-center gap-2">
+          /* Tooltip menempel pada SATU kolom bulan, bukan pada tiap batang.
+             Angka yang dicari orang adalah perbandingannya — "bulan itu ditagih
+             berapa dan masuk berapa" — dan tooltip per batang memaksa mereka
+             mengarahkan kursor dua kali lalu mengingat angka pertama. */
+          <div
+            key={d.month}
+            className="group relative flex min-w-[36px] flex-1 flex-col items-center gap-2"
+          >
             <div className="flex h-[160px] w-full items-end justify-center gap-1">
               <div
-                className="w-1/2 max-w-[16px] rounded-t bg-ink-300"
+                className="w-1/2 max-w-[16px] rounded-t bg-ink-300 transition-opacity group-hover:opacity-80"
                 style={{ height: `${(d.issued / max) * 100}%` }}
-                title={`Ditagih ${formatCurrency(d.issued)}`}
               />
               <div
-                className="w-1/2 max-w-[16px] rounded-t bg-brand-500"
+                className="w-1/2 max-w-[16px] rounded-t bg-brand-500 transition-opacity group-hover:opacity-80"
                 style={{ height: `${(d.paid / max) * 100}%` }}
-                title={`Diterima ${formatCurrency(d.paid)}`}
               />
             </div>
             <span className="whitespace-nowrap text-[11px] text-ink-400">{monthLabel(d.month)}</span>
+
+            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink-900 px-3 py-2 text-xs text-white shadow-lg group-hover:block">
+              <div className="mb-1 font-semibold">{monthLabel(d.month)}</div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-sm bg-ink-300" />
+                Ditagih {formatCurrency(d.issued)}
+              </div>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-sm bg-brand-500" />
+                Diterima {formatCurrency(d.paid)}
+              </div>
+              {d.issued > 0 && (
+                <div className="mt-1 border-t border-white/20 pt-1 text-white/70">
+                  {Math.round((d.paid / d.issued) * 100)}% tertagih
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
