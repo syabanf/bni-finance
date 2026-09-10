@@ -75,7 +75,14 @@ export function DonutChart({
                 onClick={onSelect ? () => onSelect(i) : undefined}
                 style={onSelect ? { cursor: 'pointer' } : undefined}
                 className={onSelect ? 'transition-opacity hover:opacity-80' : undefined}
-              />
+              >
+                {/* <title> di dalam SVG, bukan atribut title.
+                    Peramban menampilkannya sebagai tooltip DAN pembaca layar
+                    membacakannya sebagai nama elemennya — satu penanda yang
+                    melayani keduanya, alih-alih grafik yang bisu bagi yang
+                    tidak melihat warnanya. */}
+                <title>{`${s.label}: ${s.value}${total > 0 ? ` (${s.pct}%)` : ''}`}</title>
+              </circle>
             ))}
         </svg>
         {(centerValue !== undefined || centerLabel) && (
