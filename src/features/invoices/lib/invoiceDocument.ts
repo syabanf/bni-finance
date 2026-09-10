@@ -1,163 +1,191 @@
 import type { InvoiceWithRelations } from '@/types'
-import { formatCurrency, formatDate, formatDateLong } from '@/lib/format'
+import { formatCurrency, formatDate } from '@/lib/format'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 
 /**
- * Self-contained invoice renderer.
+ * Invoice, dibuat menyerupai dokumen yang diterbitkan Paper.id.
  *
- * Everything is inline-styled so the exact same markup renders identically:
- *  - on-screen inside the preview modal (via dangerouslySetInnerHTML), and
- *  - inside a fresh print window for "Save as PDF" (no Tailwind dependency).
+ * KENAPA MENIRU, BUKAN MEMAKAI TATA LETAK SENDIRI. Member menerima invoice dari
+ * Paper.id lewat email, lalu sebagian meminta salinannya ke pengurus. Dua
+ * dokumen dengan tata letak berbeda untuk tagihan yang sama menimbulkan
+ * pertanyaan yang tidak perlu — "ini tagihan yang mana, yang mana yang harus
+ * saya bayar?" — dan pertanyaan itu paling sering muncul justru saat orang
+ * sedang ragu membayar.
+ *
+ * Versi sebelumnya memakai kop merah BNI dengan badge status. Bagus dipandang,
+ * tapi tidak menyerupai apa pun yang pernah diterima member.
+ *
+ * Seluruh gaya ditulis inline supaya markup yang SAMA PERSIS tampil identik di
+ * dua tempat: pratinjau di layar (lewat dangerouslySetInnerHTML) dan jendela
+ * cetak untuk "Simpan sebagai PDF", yang tidak memuat Tailwind.
  */
 
-const BRAND = '#E11900'
-const INK = '#0f172a'
-const MUTED = '#64748b'
-const LINE = '#e2e8f0'
+const INK = '#2c3e50'
+const MUTED = '#4a5b6b'
+const LINE = '#d8dee5'
+const HEAD = '#34495e'
 
-/** Escape DB/user-controlled values before inlining into invoice HTML (anti-XSS). */
+/** Escape nilai dari basis data sebelum masuk markup (anti-XSS). */
 function esc(s: unknown): string {
   return String(s ?? '').replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string,
   )
 }
 
-function metaRow(label: string, value: string): string {
-  return `
-    <div style="display:flex;justify-content:space-between;gap:24px;padding:7px 0;border-bottom:1px solid ${LINE};">
-      <span style="color:${MUTED};font-size:13px;">${esc(label)}</span>
-      <span style="color:${INK};font-size:13px;font-weight:600;text-align:right;">${esc(value)}</span>
-    </div>`
+/**
+ * Warna watermark mengikuti ARTI statusnya, bukan sekadar berbeda-beda.
+ *
+ * Hijau untuk yang selesai, merah untuk yang perlu tindakan, abu untuk yang
+ * tidak berlaku lagi. Orang membaca warnanya lebih dulu daripada tulisannya.
+ */
+const WATERMARK: Record<string, string> = {
+  paid: '16,145,96',
+  overdue: '200,16,46',
+  sent: '91,141,184',
+  cancelled: '120,120,128',
+  terminated: '120,120,128',
+  draft: '150,150,158',
 }
 
-/** Inner invoice markup (no <html>/<body> wrapper). */
+function barisMeta(label: string, nilai: string): string {
+  return `
+    <tr>
+      <td style="text-align:right;font-weight:700;color:${INK};padding:2px 14px 2px 0;white-space:nowrap;">${esc(label)}</td>
+      <td style="text-align:right;white-space:nowrap;padding:2px 0;">${esc(nilai)}</td>
+    </tr>`
+}
+
+function barisTotal(label: string, nilai: string, tebal = false): string {
+  const ukuran = tebal ? '14px' : '12.5px'
+  return `
+    <tr>
+      <td style="padding:11px 0;border-bottom:1px solid #eceff2;font-weight:700;font-size:${ukuran};">${esc(label)}</td>
+      <td style="padding:11px 0 11px 30px;border-bottom:1px solid #eceff2;text-align:right;font-weight:700;font-size:${ukuran};white-space:nowrap;">${esc(nilai)}</td>
+    </tr>`
+}
+
+/** Markup bagian dalam invoice (tanpa pembungkus <html>/<body>). */
 export function renderInvoiceBody(inv: InvoiceWithRelations): string {
   const m = inv.member
-  const ch = inv.chapter
-  const itemTitle =
-    inv.type === 'registration' ? 'Biaya Pendaftaran Member BNI' : 'Biaya Renewal Keanggotaan BNI'
-  const itemSub = `Periode ${formatDate(inv.periodStart)} – ${formatDate(inv.periodEnd)}`
+  const produk =
+    inv.type === 'registration' ? 'Pendaftaran Keanggotaan BNI' : 'Perpanjangan Keanggotaan BNI'
+  const deskripsi =
+    inv.type === 'registration'
+      ? 'Pendaftaran anggota baru'
+      : 'Perpanjangan keanggotaan tahunan'
+
+  const terbayar = inv.status === 'paid' ? inv.amount : 0
+  const sisa = Math.max(0, inv.amount - terbayar)
+  const rgb = WATERMARK[inv.status] ?? '150,150,158'
+  const label = (INVOICE_STATUS_LABEL[inv.status] ?? 'Draft').toUpperCase()
+
+  // Watermark ada di SETIAP status, termasuk yang masih berjalan.
+  //
+  // Salinan cetak beredar lebih lama daripada keadaannya: invoice lunas masih
+  // tersimpan di map orang, yang dibatalkan masih terbawa ke rapat. Tanpa
+  // penanda, dokumen yang sama terbaca sebagai tagihan yang masih hidup.
+  //
+  // print-color-adjust dipaksa karena peramban membuang latar berwarna saat
+  // mencetak — watermark yang hilang justru pada cetakan adalah watermark yang
+  // gagal tepat di tempat ia paling dibutuhkan.
+  const watermark = `
+    <div style="position:absolute;top:44%;left:50%;
+                transform:translate(-50%,-50%) rotate(-24deg);
+                font-size:88px;font-weight:800;letter-spacing:6px;white-space:nowrap;
+                color:rgba(${rgb},0.13);z-index:0;pointer-events:none;
+                -webkit-print-color-adjust:exact;print-color-adjust:exact;">${esc(label)}</div>`
 
   return `
-  <div style="max-width:760px;margin:0 auto;background:#fff;color:${INK};
-              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-              box-shadow:0 10px 40px rgba(15,23,42,.08);border-radius:16px;overflow:hidden;">
+  <div style="position:relative;max-width:820px;margin:0 auto;background:#fff;color:${INK};
+              padding:46px 52px;border-radius:14px;
+              font:12.5px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+              box-shadow:0 10px 40px rgba(15,23,42,.08);">
+    ${watermark}
+    <div style="position:relative;z-index:1;">
 
-    <!-- Header band -->
-    <div style="background:linear-gradient(135deg,${BRAND} 0%,#9d1200 100%);padding:36px 48px;color:#fff;
-                display:flex;justify-content:space-between;align-items:flex-start;">
-      <div>
-        <div style="display:inline-flex;align-items:center;background:#fff;border-radius:8px;padding:9px 14px;">
-          <svg width="70" height="25" viewBox="0 0 112 40" xmlns="http://www.w3.org/2000/svg">
-            <text x="0" y="33" font-family="'Arial Black','Helvetica Neue',Arial,sans-serif" font-weight="900" font-size="40" letter-spacing="-3" fill="#E2231A">BNI</text>
-            <text x="100" y="13" font-family="Arial, sans-serif" font-size="10" fill="#E2231A">&#174;</text>
-          </svg>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;">
+        <div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px;">BNI Finance Hub</div>
+          <div style="font-size:10.5px;color:#7f8c9a;margin-top:2px;">Invoice &amp; pembayaran keanggotaan BNI</div>
         </div>
-        <div style="font-size:12px;opacity:.85;margin-top:8px;letter-spacing:.4px;">PAYMENT PLATFORM</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:30px;font-weight:800;letter-spacing:1px;line-height:1;">INVOICE</div>
-        <div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;opacity:.9;margin-top:8px;">
-          ${esc(inv.number)}
-        </div>
-        <div style="display:inline-block;margin-top:10px;background:rgba(255,255,255,.18);
-                    padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.6px;">
-          ${esc((INVOICE_STATUS_LABEL[inv.status] ?? 'Draft').toUpperCase())}
-        </div>
-      </div>
-    </div>
-
-    <!-- Body -->
-    <div style="padding:40px 48px;">
-
-      <!-- Parties -->
-      <div style="display:flex;justify-content:space-between;gap:40px;margin-bottom:34px;">
-        <div style="flex:1;">
-          <div style="font-size:11px;font-weight:700;letter-spacing:.8px;color:${MUTED};margin-bottom:10px;">
-            DITAGIHKAN KEPADA
-          </div>
-          <div style="font-size:17px;font-weight:700;color:${INK};">${esc(m?.name ?? '—')}</div>
-          ${m?.email ? `<div style="font-size:13px;color:${MUTED};margin-top:5px;">${esc(m.email)}</div>` : ''}
-          ${m?.phone ? `<div style="font-size:13px;color:${MUTED};margin-top:2px;">${esc(m.phone)}</div>` : ''}
-          ${ch ? `<div style="display:inline-block;margin-top:10px;background:#f8fafc;border:1px solid ${LINE};
-                  padding:4px 11px;border-radius:8px;font-size:12px;color:${INK};font-weight:600;">${esc(ch.displayName)}</div>` : ''}
-        </div>
-        <div style="width:280px;">
-          ${metaRow('Tipe', inv.type === 'registration' ? 'Pendaftaran' : 'Renewal')}
-          ${metaRow('Tanggal Terbit', formatDate(inv.createdAt))}
-          ${inv.dueDate ? metaRow('Jatuh Tempo', formatDate(inv.dueDate)) : ''}
-          ${metaRow('Mata Uang', inv.currency)}
+        <div>
+          <div style="font-size:30px;font-weight:400;color:#5b8db8;line-height:1;margin-bottom:12px;text-align:right;">Invoice</div>
+          <table style="border-collapse:collapse;margin-left:auto;font-size:12px;">
+            ${barisMeta('Referensi', inv.number)}
+            ${barisMeta('Tgl. Invoice', formatDate(inv.createdAt ?? inv.dueDate))}
+            ${barisMeta('Tgl. Jatuh Tempo', formatDate(inv.dueDate))}
+            ${barisMeta('NPWP', '-')}
+          </table>
         </div>
       </div>
 
-      <!-- Items -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
+      <div style="display:flex;gap:40px;margin-bottom:26px;">
+        <div style="flex:1;min-width:0;">
+          <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Info Perusahaan</h2>
+          <div style="font-size:15px;font-weight:700;margin-bottom:5px;">BNI Indonesia</div>
+          <p style="margin:1px 0;color:${MUTED};">Chapter : ${esc(inv.chapter?.displayName ?? '-')}</p>
+          <p style="margin:1px 0;color:${MUTED};">Email : no-reply@reddie.id</p>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Tagihan Untuk</h2>
+          <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${esc(m?.name ?? '-')}</div>
+          <p style="margin:1px 0;color:${MUTED};">Telp : ${esc(m?.phone || '-')}</p>
+          <p style="margin:1px 0;color:${MUTED};">Email : ${esc(m?.email || '-')}</p>
+        </div>
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;margin-bottom:22px;">
         <thead>
-          <tr style="background:${INK};">
-            <th style="text-align:left;padding:12px 18px;font-size:11px;font-weight:700;letter-spacing:.6px;color:#fff;border-radius:10px 0 0 10px;">
-              DESKRIPSI
-            </th>
-            <th style="text-align:right;padding:12px 18px;font-size:11px;font-weight:700;letter-spacing:.6px;color:#fff;border-radius:0 10px 10px 0;">
-              JUMLAH
-            </th>
+          <tr>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Produk</th>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Deskripsi</th>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Kuantitas</th>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Harga</th>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Diskon</th>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Pajak</th>
+            <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:right;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Jumlah</th>
           </tr>
         </thead>
         <tbody>
-          <tr style="border-bottom:1px solid ${LINE};">
-            <td style="padding:18px;vertical-align:top;">
-              <div style="font-size:15px;font-weight:600;color:${INK};">${itemTitle}</div>
-              <div style="font-size:12px;color:${MUTED};margin-top:4px;">${itemSub}</div>
-              ${inv.notes ? `<div style="font-size:12px;color:#94a3b8;margin-top:4px;font-style:italic;">${esc(inv.notes)}</div>` : ''}
-            </td>
-            <td style="padding:18px;text-align:right;font-size:15px;font-weight:600;color:${INK};white-space:nowrap;vertical-align:top;">
-              ${formatCurrency(inv.amount)}
-            </td>
+          <tr>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;vertical-align:top;">${esc(produk)}</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;vertical-align:top;">${esc(deskripsi)}</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:center;">1</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:right;white-space:nowrap;">${esc(formatCurrency(inv.amount))}</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:center;">0%</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:center;">-</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:right;white-space:nowrap;">${esc(formatCurrency(inv.amount))}</td>
           </tr>
         </tbody>
       </table>
 
-      <!-- Totals -->
-      <div style="display:flex;justify-content:flex-end;margin-top:18px;">
-        <div style="width:300px;">
-          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;color:${MUTED};">
-            <span>Subtotal</span><span style="color:${INK};font-weight:600;">${formatCurrency(inv.amount)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;
-                      background:#fff5f4;border:1px solid #fcd9d3;border-radius:12px;padding:14px 18px;">
-            <span style="font-size:13px;font-weight:700;color:${INK};">TOTAL TAGIHAN</span>
-            <span style="font-size:21px;font-weight:800;color:${BRAND};">${formatCurrency(inv.amount)}</span>
-          </div>
-        </div>
+      <div style="display:flex;justify-content:flex-end;">
+        <table style="border-collapse:collapse;min-width:300px;">
+          ${barisTotal('Subtotal', formatCurrency(inv.amount))}
+          ${barisTotal('Diskon Total', formatCurrency(0))}
+          ${barisTotal('Pajak', '-')}
+          ${barisTotal('Total', formatCurrency(inv.amount), true)}
+          ${barisTotal('Total Terbayar', formatCurrency(terbayar))}
+          ${barisTotal('Sisa Tagihan', formatCurrency(sisa), true)}
+        </table>
       </div>
 
-      ${
-        inv.dueDate && inv.status !== 'paid' && inv.status !== 'cancelled'
-          ? `<div style="margin-top:30px;background:#fffbeb;border:1px solid #fde68a;border-left:4px solid #f59e0b;
-                  border-radius:10px;padding:14px 18px;font-size:13px;color:#92400e;">
-              Mohon lakukan pembayaran sebelum <strong>${formatDateLong(inv.dueDate)}</strong>
-              untuk menghindari keterlambatan.
-            </div>`
-          : ''
-      }
-      ${
-        inv.status === 'paid' && inv.paidAt
-          ? `<div style="margin-top:30px;background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #22c55e;
-                  border-radius:10px;padding:14px 18px;font-size:13px;color:#166534;">
-              Invoice ini telah <strong>LUNAS</strong> pada ${formatDateLong(inv.paidAt)}. Terima kasih.
-            </div>`
-          : ''
-      }
-    </div>
-
-    <!-- Footer -->
-    <div style="border-top:1px solid ${LINE};padding:24px 48px;text-align:center;">
-      <div style="font-size:12px;color:${MUTED};">BNI Indonesia — dokumen ini diterbitkan secara otomatis oleh sistem.</div>
-      <div style="font-size:12px;color:#94a3b8;margin-top:3px;">Terima kasih atas kepercayaan Anda.</div>
+      <div style="margin-top:34px;">
+        <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Keterangan</h2>
+        <p style="margin:0 0 20px;color:${MUTED};">
+          Periode keanggotaan ${esc(formatDate(inv.periodStart))} – ${esc(formatDate(inv.periodEnd))}.
+        </p>
+        <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Syarat dan Ketentuan</h2>
+        <p style="margin:0;color:${MUTED};">
+          Pembayaran dilakukan melalui tautan Paper.id yang dikirim ke email member.
+          Invoice ini diterbitkan otomatis oleh sistem dan sah tanpa tanda tangan.
+        </p>
+      </div>
     </div>
   </div>`
 }
 
-/** Full standalone HTML document for the print / Save-as-PDF window. */
+/** Dokumen HTML utuh untuk jendela cetak / Simpan sebagai PDF. */
 export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
   return `<!DOCTYPE html>
 <html lang="id">
@@ -170,7 +198,7 @@ export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
     body{background:#f1f5f9;padding:32px 16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     @media print{
       body{background:#fff;padding:0}
-      @page{margin:12mm}
+      @page{margin:14mm}
     }
   </style>
 </head>
@@ -178,17 +206,16 @@ export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
 </html>`
 }
 
-/** Open a fresh window with the invoice and trigger the browser print/save dialog. */
+/** Membuka invoice di jendela baru lalu memanggil dialog cetak. */
 export function downloadInvoice(inv: InvoiceWithRelations): boolean {
-  const win = window.open('', '_blank', 'width=900,height=820')
+  const win = window.open('', '_blank', 'width=900,height=1000')
   if (!win) return false
   win.document.open()
   win.document.write(buildInvoiceDocument(inv))
   win.document.close()
   win.focus()
-  // give the new document a tick to lay out before printing
   const trigger = () => win.print()
-  if (win.document.readyState === 'complete') setTimeout(trigger, 350)
-  else win.onload = () => setTimeout(trigger, 250)
+  if (win.document.readyState === 'complete') setTimeout(trigger, 400)
+  else win.onload = () => setTimeout(trigger, 300)
   return true
 }
