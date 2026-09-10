@@ -32,6 +32,15 @@ import type {
 
 export interface AuthRepository {
   login(email: string, password: string): Promise<AuthUser>
+  /**
+   * Meminta tautan reset dikirim ke email.
+   *
+   * SELALU berhasil, ada atau tidak ada akunnya — jawabannya sengaja tidak
+   * bisa dipakai memeriksa siapa yang punya akun di sini.
+   */
+  mintaResetSandi(email: string): Promise<string>
+  /** Menukar token dari email dengan kata sandi baru. */
+  resetSandi(token: string, password: string): Promise<string>
   logout(): Promise<void>
   getCurrentUser(): AuthUser | null
   /** Update the signed-in user's display name. */

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound, Users } from 'lucide-react'
 import type { UserRole } from '@/types'
 import { BniLogo, Button, Field, Input } from '@/components/ui'
@@ -191,6 +191,19 @@ export function LoginPage() {
               Masuk
               {!loading && <ArrowRight className="h-4 w-4" />}
             </Button>
+
+            {/* Di BAWAH tombol masuk, bukan di samping kolom kata sandi.
+                Di samping kolomnya, tautan ini bersaing perhatian dengan
+                pekerjaan utamanya — dan orang yang sekadar salah ketik akan
+                menekannya sebelum sempat mencoba lagi. */}
+            <div className="text-center">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-ink-500 transition-colors hover:text-brand-600"
+              >
+                Lupa kata sandi?
+              </Link>
+            </div>
           </form>
 
           {/* Masuk cepat — kartu mock, atau akun yang diizinkan server. */}

@@ -42,6 +42,16 @@ export const mockAuthRepository: AuthRepository = {
     return user
   },
 
+  async mintaResetSandi() {
+    // Mode Data Contoh tidak punya email; jawabannya sengaja sama persis
+    // dengan mode API supaya alurnya tetap bisa ditelusuri tanpa backend.
+    return delay('Kalau email itu terdaftar, tautan reset sudah dikirim ke sana.')
+  },
+
+  async resetSandi() {
+    return delay('Kata sandi berhasil diubah. Silakan masuk dengan kata sandi baru.')
+  },
+
   async logout() {
     await delay(null, 150)
     localStorage.removeItem(STORAGE_KEY)

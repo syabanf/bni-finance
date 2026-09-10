@@ -23,6 +23,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/database"
 	"github.com/syabanf/bni-finance/backend/internal/importer"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
+	"github.com/syabanf/bni-finance/backend/internal/mailer"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
@@ -95,7 +96,17 @@ func run(log *slog.Logger) error {
 	})
 
 	// Wire: repository → service → handler, one chain per resource.
-	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...)
+	surat := mailer.New(mailer.Config{
+		Host: cfg.SMTPHost, Port: cfg.SMTPPort,
+		User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom,
+	})
+	if !surat.Siap() {
+		// Peringatan, bukan galat fatal: aplikasinya tetap berguna tanpa email,
+		// hanya fitur yang membutuhkannya yang menjawab 503 dengan pesan jelas.
+		log.Warn("SMTP belum dikonfigurasi — reset kata sandi lewat email tidak akan berfungsi")
+	}
+	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...).
+		PakaiPengirimEmail(surat)
 
 	// Passwordless sign-in is a deliberate hole in authentication. Say so at
 	// every start, naming the accounts, so it can never be on unnoticed.
