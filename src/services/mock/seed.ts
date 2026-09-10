@@ -235,7 +235,17 @@ export function buildSeedData(): BuiltData {
       // member aktif tanpa invoice, sementara mock menampilkannya "—". Beralih
       // sumber data mengubah dunia yang dilihat pengguna, dan itu justru yang
       // paling ingin dihindari dari punya dua sumber.
-      renewalDate: seed.status === 'pending' || !seed.joined ? null : addYear(seed.joined),
+      // Visitor ikut null, sama seperti `pending`.
+      //
+      // Bukan kosmetik: renewal_date adalah kolom yang dibaca pemanen renewal.
+      // Tamu yang punya tanggal jatuh tempo masuk antrean tagihan lewat pintu
+      // yang tidak dijaga penyaring status — dan mock yang lebih longgar
+      // daripada seed SQL (yang menulisnya null) membuat demo memperlihatkan
+      // sesuatu yang tidak akan terjadi di server.
+      renewalDate:
+        seed.status === 'pending' || seed.status === 'visitor' || !seed.joined
+          ? null
+          : addYear(seed.joined),
       syncedAt: SYNCED_AT,
     }
     members.push(member)

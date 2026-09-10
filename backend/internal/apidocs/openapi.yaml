@@ -2157,8 +2157,18 @@ paths:
         impor yang tampak wajar.
 
         Baris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis
-        data, `status` tidak dikenal, atau `id` ganda di dalam berkas yang sama.
-        Setiap penolakan menyebut **nomor barisnya seperti di Excel**.
+        data, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau
+        barisnya menyebut chapter lain padahal impornya ditujukan ke satu
+        chapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.
+
+        **Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom
+        `chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter
+        tujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan
+        dan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana
+        tagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang
+        harus diambil orang, bukan efek samping impor. Menimpanya dengan chapter
+        tujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita
+        mengabaikannya tanpa memberi tahu siapa pun.
       parameters:
         - name: jenis
           in: path
@@ -2174,6 +2184,26 @@ paths:
           schema:
             type: string
             enum: ["true"]
+        - name: chapter
+          in: query
+          required: false
+          description: >
+            Batasi impor ke satu chapter. Membuat kolom `chapter_id` opsional;
+            baris yang menyebut chapter lain **ditolak**. Tidak berlaku untuk
+            `jenis=chapters` — berkasnyalah yang mendefinisikan chapter, jadi
+            kombinasi itu dijawab 400 alih-alih diabaikan diam-diam.
+          schema: { type: string }
+        - name: status_bawaan
+          in: query
+          required: false
+          description: >
+            Status untuk baris yang kolom `status`-nya KOSONG. Bawaannya
+            `active`. Diisi `visitor` oleh tombol impor tamu: daftar hadir
+            pertemuan tidak pernah memuat kolom status, dan tanpa ini setiap
+            tamu masuk sebagai anggota penuh. Status yang DITULIS di berkas
+            tidak pernah ditimpa nilai ini.
+          schema:
+            $ref: "#/components/schemas/MemberStatus"
       requestBody:
         required: true
         description: >

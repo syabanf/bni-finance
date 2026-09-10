@@ -2184,7 +2184,7 @@
       "path": "/api/v1/import/{jenis}",
       "tag": "Sinkronisasi",
       "summary": "Impor chapter atau member dari berkas CSV/XLSX",
-      "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, atau `id` ganda di dalam berkas yang sama.\nSetiap penolakan menyebut **nomor barisnya seperti di Excel**.\n",
+      "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
       "params": [
         {
           "name": "jenis",
@@ -2206,6 +2206,26 @@
             "true"
           ],
           "description": "true menulis perubahannya. Tanpa ini, hasilnya hanya pratinjau."
+        },
+        {
+          "name": "chapter",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Batasi impor ke satu chapter. Membuat kolom chapter_id opsional; baris yang menyebut chapter lain ditolak. Tidak berlaku untuk jenis=chapters — berkasnyalah yang mendefinisikan chapter, jadi kombinasi itu dijawab 400 alih-alih diabaikan diam-diam."
+        },
+        {
+          "name": "status_bawaan",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "active",
+            "inactive",
+            "pending",
+            "visitor"
+          ],
+          "description": "Status untuk baris yang kolom status-nya KOSONG. Bawaannya active. Diisi visitor oleh tombol impor tamu: daftar hadir pertemuan tidak pernah memuat kolom status, dan tanpa ini setiap tamu masuk sebagai anggota penuh. Status yang DITULIS di berkas tidak pernah ditimpa nilai ini."
         }
       ],
       "bodyRequired": true,

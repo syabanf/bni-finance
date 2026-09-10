@@ -10,6 +10,7 @@
 
 import type {
   ImportHasil,
+  MemberStatus,
   ManagedUser,
   RenewalAnswer,
   RenewalRequest,
@@ -97,9 +98,23 @@ export interface CreateUserInput {
  * ganda di balik satu kalimat "berhasil" — dan pada data keanggotaan, itu baru
  * ketahuan saat tagihannya salah kirim.
  */
+/**
+ * Mempersempit impor ke satu chapter, dan menentukan status bawaannya.
+ *
+ * Keduanya datang dari KONTEKS tombolnya — kartu chapter tertentu, tombol
+ * "Impor Visitor" — bukan dari isi berkasnya. Daftar hadir pertemuan tidak
+ * pernah memuat kolom chapter maupun status.
+ */
+export interface ImportOpsi {
+  /** Baris tanpa kolom chapter mengikutinya; baris chapter LAIN ditolak. */
+  chapter?: string
+  /** Dipakai hanya untuk baris yang kolom statusnya kosong. */
+  statusBawaan?: MemberStatus
+}
+
 export interface ImportRepository {
-  preview(jenis: 'chapters' | 'members', file: File): Promise<ImportHasil>
-  apply(jenis: 'chapters' | 'members', file: File): Promise<ImportHasil>
+  preview(jenis: 'chapters' | 'members', file: File, opsi?: ImportOpsi): Promise<ImportHasil>
+  apply(jenis: 'chapters' | 'members', file: File, opsi?: ImportOpsi): Promise<ImportHasil>
 }
 
 export interface RenewalRepository {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Building2, MapPin, Search, Users, X } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Building2, MapPin, Search, Upload, Users, X } from 'lucide-react'
 import type { Chapter, ChapterCounts } from '@/types'
 import {
   Card,
@@ -14,12 +14,20 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
+import { useAuth } from '@/features/auth/AuthContext'
+import { can } from '@/lib/rbac'
 import { chapterService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
 
 export function ChapterListPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  // Impor dijaga `settings:manage` di router DAN admin-saja di server.
+  // Menampilkan tombolnya kepada yang tidak boleh hanya memindahkan
+  // penolakannya satu klik lebih jauh, ke halaman yang menolak tanpa
+  // menyebutkan chapter yang tadi ditekan.
+  const bolehImpor = can(user?.role, 'settings:manage')
   const { toast } = useToast()
   const { data: chapters, loading, reload } = useAsync<Chapter[]>(() => chapterService.list())
 
@@ -41,7 +49,14 @@ export function ChapterListPage() {
   }, [counts])
 
   const [city, setCity] = useState('all')
-  const [search, setSearch] = useState('')
+  const [searchParams] = useSearchParams()
+  // Nilai awal dibaca dari ?q= — pencarian di topbar mengirimkannya ke sini.
+  //
+  // Tanpa ini, memilih "Chapter" di kotak pencarian membuka halaman ini dengan
+  // kotak yang kosong: orangnya sudah mengetik, alamatnya sudah membawa
+  // kata kuncinya, dan yang terlihat tetap seluruh daftar. Persis keluhan
+  // yang membuat pencariannya disebut "belum berfungsi".
+  const [search, setSearch] = useState(searchParams.get('q') ?? '')
 
   const cities = useMemo(
     () =>
@@ -175,12 +190,25 @@ export function ChapterListPage() {
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-500">
                       <Building2 className="h-[22px] w-[22px]" />
                     </div>
-                    <button
-                      onClick={() => navigate(`/members?chapter=${c.id}`)}
-                      className="text-xs font-medium text-brand-500 hover:text-brand-600"
-                    >
-                      Lihat member
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {bolehImpor && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/settings/import?chapter=${c.id}`)}
+                          title={`Impor member ke ${c.displayName}`}
+                          className="flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-800"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          Impor
+                        </button>
+                      )}
+                      <button
+                        onClick={() => navigate(`/members?chapter=${c.id}`)}
+                        className="text-xs font-medium text-brand-500 hover:text-brand-600"
+                      >
+                        Lihat member
+                      </button>
+                    </div>
                   </div>
                   <h3 className="mt-4 text-lg font-bold text-ink-900">{c.displayName}</h3>
                   <div className="mt-1 flex items-center gap-1.5 text-sm text-ink-500">

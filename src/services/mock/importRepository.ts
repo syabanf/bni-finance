@@ -1,4 +1,4 @@
-import type { ImportRepository } from '@/services/types'
+import type { ImportOpsi, ImportRepository } from '@/services/types'
 import type { ImportBaris, ImportHasil } from '@/types'
 import { delay, store } from './store'
 
@@ -37,11 +37,11 @@ function normal(s: string) {
 }
 
 export const mockImportRepository: ImportRepository = {
-  async preview(jenis, file) {
-    return jalankan(jenis, file, false)
+  async preview(jenis, file, opsi) {
+    return jalankan(jenis, file, false, opsi)
   },
-  async apply(jenis, file) {
-    return jalankan(jenis, file, true)
+  async apply(jenis, file, opsi) {
+    return jalankan(jenis, file, true, opsi)
   },
 }
 
@@ -49,6 +49,7 @@ async function jalankan(
   jenis: 'chapters' | 'members',
   file: File,
   terapkan: boolean,
+  opsi?: ImportOpsi,
 ): Promise<ImportHasil> {
   if (!file.name.toLowerCase().endsWith('.csv')) {
     throw new Error(
@@ -103,7 +104,10 @@ async function jalankan(
     if (!id && !nama) continue
 
     const b: ImportBaris = { nomor, id, nama, tindakan: 'baru' }
-    const chapter = jenis === 'members' ? ambil(rows[i], 'chapter') : ''
+    const tertulis = jenis === 'members' ? ambil(rows[i], 'chapter') : ''
+    // Baris tanpa chapter mengikuti chapter tujuan; yang menyebut chapter lain
+    // ditolak di bawah — TIDAK ditimpa. Aturan yang sama dengan server.
+    const chapter = tertulis || (jenis === 'members' ? (opsi?.chapter ?? '') : '')
 
     if (!id) {
       b.tindakan = 'ditolak'
@@ -117,6 +121,11 @@ async function jalankan(
     } else if (jenis === 'members' && !chapter) {
       b.tindakan = 'ditolak'
       b.alasan = 'chapter_id kosong'
+    } else if (jenis === 'members' && opsi?.chapter && tertulis && tertulis !== opsi.chapter) {
+      // Memindahkan member antar chapter mengubah ke mana tagihannya pergi.
+      // Itu keputusan yang harus diambil orang, bukan efek samping impor.
+      b.tindakan = 'ditolak'
+      b.alasan = `baris ini menyebut chapter "${tertulis}", sedangkan impor ini ditujukan ke "${opsi.chapter}"`
     } else if (jenis === 'members' && !store.chapters.some((c) => c.id === chapter)) {
       // Kesalahan paling merusak yang bisa lolos: member berpindah ke chapter
       // yang salah, dan pendapatan chapter ikut salah hitung tanpa tanda apa pun.
