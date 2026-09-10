@@ -4,8 +4,6 @@ import { HelpCircle } from 'lucide-react'
 import { TourOverlay } from './TourOverlay'
 import { tourFor } from './tourSteps'
 
-const SOUND_KEY = 'bni.tour.sound'
-
 /**
  * Pemicu panduan. Hanya muncul di halaman yang benar-benar punya tur —
  * tombol bantuan yang membuka panduan kosong lebih buruk daripada tidak ada.
@@ -15,7 +13,6 @@ export function TourButton() {
   const tour = tourFor(pathname)
   const [open, setOpen] = useState(false)
   const [index, setIndex] = useState(0)
-  const [soundOn, setSoundOn] = useState(() => localStorage.getItem(SOUND_KEY) !== 'off')
 
   // Berpindah halaman saat tur terbuka akan menyorot elemen yang sudah tidak
   // ada, jadi turnya ditutup mengikuti navigasi.
@@ -23,11 +20,6 @@ export function TourButton() {
     setOpen(false)
     setIndex(0)
   }, [pathname])
-
-  const setSound = (on: boolean) => {
-    setSoundOn(on)
-    localStorage.setItem(SOUND_KEY, on ? 'on' : 'off')
-  }
 
   if (!tour) return null
 
@@ -50,8 +42,6 @@ export function TourButton() {
         <TourOverlay
           steps={tour.steps}
           index={index}
-          soundOn={soundOn}
-          onSound={setSound}
           onIndex={setIndex}
           onClose={() => setOpen(false)}
         />

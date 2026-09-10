@@ -1,17 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, Download, FileDown, FileSpreadsheet, FileText } from 'lucide-react'
+import { ChevronDown, Download, FileSpreadsheet, FileText } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
 interface ExportMenuProps {
   onExcel?: () => void
-  onCsv?: () => void
   onPdf?: () => void
   disabled?: boolean
   label?: string
 }
 
 /** "Export ▾" button with Excel / CSV / PDF options (each optional). */
-export function ExportMenu({ onExcel, onCsv, onPdf, disabled, label = 'Export' }: ExportMenuProps) {
+export function ExportMenu({ onExcel, onPdf, disabled, label = 'Export' }: ExportMenuProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -51,16 +50,6 @@ export function ExportMenu({ onExcel, onCsv, onPdf, disabled, label = 'Export' }
             >
               <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
               Export Excel
-            </button>
-          )}
-          {onCsv && (
-            <button
-              type="button"
-              onClick={() => pick(onCsv)}
-              className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-ink-600 hover:bg-ink-50"
-            >
-              <FileDown className="h-4 w-4 text-ink-400" />
-              Export CSV
             </button>
           )}
           {onPdf && (

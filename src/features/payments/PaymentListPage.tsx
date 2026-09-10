@@ -27,7 +27,6 @@ import { useAsync } from '@/hooks/useAsync'
 import { chapterService, paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { monthNowKey } from '@/lib/date'
-import { downloadCsv } from '@/lib/csv'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
@@ -94,7 +93,6 @@ export function PaymentListPage() {
       formatDateTime(p.paidAt),
     ])
 
-  const exportCsv = () => downloadCsv('pembayaran.csv', EXPORT_HEADERS, exportRows())
   const exportExcel = () =>
     downloadXlsx('pembayaran', 'Riwayat Pembayaran', EXPORT_HEADERS, exportRows())
 
@@ -131,7 +129,7 @@ export function PaymentListPage() {
       <PageHeader
         title="Pembayaran"
         description="Riwayat pembayaran yang diterima melalui webhook Paper.id."
-        action={<ExportMenu onExcel={exportExcel} onCsv={exportCsv} onPdf={exportPdf} disabled={filtered.length === 0} />}
+        action={<ExportMenu onExcel={exportExcel} onPdf={exportPdf} disabled={filtered.length === 0} />}
       />
 
       {hasData && (

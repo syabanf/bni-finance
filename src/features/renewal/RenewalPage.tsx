@@ -43,8 +43,8 @@ import { formatDate } from '@/lib/format'
 
 const LABEL: Record<RenewalAnswer, string> = {
   pending: 'Belum dijawab',
-  will_renew: 'Akan perpanjang',
-  will_not: 'Tidak perpanjang',
+  will_renew: 'Diterima',
+  will_not: 'Tolak',
   unsure: 'Belum pasti',
 }
 
@@ -188,7 +188,7 @@ export function RenewalPage() {
                   <Th>Jatuh tempo</Th>
                   <Th>Ditugaskan ke</Th>
                   <Th>Jawaban</Th>
-                  {bolehMenjawab && <Th className="text-right">Jawab</Th>}
+                  {bolehMenjawab && <Th className="text-right">Tindakan</Th>}
                 </Tr>
               </THead>
               <TBody>
@@ -218,14 +218,14 @@ export function RenewalPage() {
                         <div className="inline-flex gap-1">
                           <TombolJawab
                             icon={CheckCircle2}
-                            label="Akan"
+                            label="Diterima"
                             tone="hover:text-emerald-600"
                             disabled={memproses === r.id}
                             onClick={() => jawab(r, 'will_renew')}
                           />
                           <TombolJawab
                             icon={XCircle}
-                            label="Tidak"
+                            label="Tolak"
                             tone="hover:text-red-600"
                             disabled={memproses === r.id}
                             onClick={() => jawab(r, 'will_not')}

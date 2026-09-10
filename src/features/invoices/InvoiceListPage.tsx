@@ -29,7 +29,6 @@ import { InvoiceTable } from './components/InvoiceTable'
 import { cn } from '@/lib/cn'
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
-import { downloadCsv } from '@/lib/csv'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 
@@ -58,7 +57,7 @@ const TYPE_OPTIONS: { value: InvoiceType | 'all'; label: string }[] = [
 type Aging = 'all' | '1-30' | '31-60' | '60+'
 
 const AGING_OPTIONS: { value: Aging; label: string }[] = [
-  { value: 'all', label: 'Semua Umur' },
+  { value: 'all', label: 'Semua Jatuh Tempo' },
   { value: '1-30', label: 'Telat 1–30 hari' },
   { value: '31-60', label: 'Telat 31–60 hari' },
   { value: '60+', label: 'Telat > 60 hari' },
@@ -354,9 +353,6 @@ export function InvoiceListPage() {
       formatDate(inv.dueDate),
     ])
 
-  const exportCsv = () =>
-    jalankanEkspor((b) => downloadCsv('invoice.csv', EXPORT_HEADERS, barisEkspor(b)))
-
   const exportExcel = () =>
     jalankanEkspor((b) => downloadXlsx('invoice', 'Daftar Invoice', EXPORT_HEADERS, barisEkspor(b)))
 
@@ -406,7 +402,6 @@ export function InvoiceListPage() {
           <div className="flex flex-wrap items-center gap-2">
             <ExportMenu
               onExcel={exportExcel}
-              onCsv={exportCsv}
               onPdf={exportPdf}
               disabled={mengekspor || totalBaris === 0}
             />

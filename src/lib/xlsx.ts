@@ -199,7 +199,7 @@ export function buildXlsx(
   ])
 }
 
-/** Trigger a client-side .xlsx download. Mirrors downloadCsv's signature. */
+/** Trigger a client-side .xlsx download. */
 export function downloadXlsx(
   filename: string,
   sheetName: string,
