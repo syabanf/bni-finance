@@ -158,25 +158,37 @@ export function MemberListPage() {
         action={
           <div className="flex flex-wrap items-center gap-2">
             {/*
-              Tombol impor tamu muncul HANYA di tab Visitor.
+              Satu tombol yang mengikuti tab yang sedang dibuka.
               
-              Di sanalah orang sedang memikirkan tamu, dan di sanalah daftar
-              hadir pertemuan ada di tangannya. Menaruhnya permanen di samping
-              "Sinkron" membuatnya jadi tombol keempat yang tidak jelas bedanya
-              dari impor member biasa — dan bedanya justru penting: yang ini
-              memberi status `visitor` pada baris yang kolom statusnya kosong.
+              Versi sebelumnya hanya menampilkannya di tab Visitor, dengan alasan
+              tombol keempat yang permanen akan kabur bedanya dari impor member
+              biasa. Alasan itu benar soal kaburnya, dan salah soal
+              menyembunyikannya: orang yang berdiri di tab Member dengan berkas
+              di tangan tidak punya jalan masuk sama sekali, dan tab Visitor
+              bukan tempat yang terpikir untuk dicari.
+              
+              Bedanya dijaga di tujuannya, bukan di ada-tidaknya tombol. Dari tab
+              Visitor ia membawa `status=visitor`, yang memberi status itu pada
+              baris yang kolom statusnya kosong. Dari tab lain ia tidak membawa
+              apa pun, dan labelnya ikut berganti supaya yang menekan tahu mana
+              yang sedang ia lakukan.
+              
+              Chapter yang sedang disaring ikut terbawa, jadi daftar yang dilihat
+              di layar dan lingkup yang dituju impor adalah hal yang sama.
             */}
-            {memberStatus === 'visitor' && bolehImpor && (
+            {bolehImpor && (
               <Button
                 variant="secondary"
-                onClick={() =>
-                  navigate(
-                    `/settings/import?status=visitor${chapterId !== 'all' ? `&chapter=${chapterId}` : ''}`,
-                  )
-                }
+                onClick={() => {
+                  const q = new URLSearchParams()
+                  if (memberStatus === 'visitor') q.set('status', 'visitor')
+                  if (chapterId !== 'all') q.set('chapter', chapterId)
+                  const qs = q.toString()
+                  navigate(`/settings/import${qs ? `?${qs}` : ''}`)
+                }}
               >
                 <Upload className="h-4 w-4" />
-                Impor Visitor
+                {memberStatus === 'visitor' ? 'Impor Visitor' : 'Impor Member'}
               </Button>
             )}
             <SyncButton jenis="member" onSelesai={reload} />

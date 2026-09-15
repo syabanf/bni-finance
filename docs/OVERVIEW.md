@@ -29,7 +29,8 @@ seluruhnya terekam dengan jejak audit.
 ## 2. Dua sumber data
 
 Aplikasi bisa berjalan **tanpa backend sama sekali**. Pilihannya lewat tombol
-_Sumber Data_ — ada di halaman Pengaturan **dan** di bawah form login.
+_Sumber Data_ di **Alat Teknis → Integrasi & Sumber Data**, dan di bawah form
+login.
 
 | Mode | Data | Untuk |
 |---|---|---|

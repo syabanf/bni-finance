@@ -76,6 +76,7 @@ export const NAV: NavNode[] = [
     icon: TerminalSquare,
     permission: 'settings:manage',
     children: [
+      { to: '/integrasi', label: 'Integrasi & Sumber Data' },
       { to: '/api-console', label: 'Konsol API' },
       { to: '/blackbox', label: 'Blackbox Integrasi' },
     ],
