@@ -124,8 +124,8 @@ func (s *Service) Login(ctx context.Context, in domain.LoginInput) (*domain.Logi
 
 	// OTP HANYA BERLAKU BILA EMAIL BENAR-BENAR BISA DIKIRIM.
 	//
-	// Sakelarnya menyala tapi SMTP mati berarti tidak seorang pun bisa masuk —
-	// termasuk admin yang harus mematikan sakelarnya. Lapisan keamanan yang
+	// Sakelarnya menyala tapi pengiriman email mati berarti tidak seorang pun
+	// bisa masuk, termasuk admin yang harus mematikan sakelarnya. Lapisan keamanan yang
 	// bisa mengunci seluruh orang di luar aplikasinya, tanpa jalan kembali,
 	// lebih berbahaya daripada ketiadaannya. Jadi syaratnya dua, bukan satu.
 	if s.mail != nil && s.mail.Siap() && s.repo.OTPAktif(ctx) {

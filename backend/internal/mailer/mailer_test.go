@@ -172,10 +172,9 @@ func TestBelumDikonfigurasiDitolakJelas(t *testing.T) {
 
 // PENJELASAN RESEND HARUS SAMPAI KE PEMANGGIL.
 //
-// Inilah alasan pindah dari SMTP. Domain yang belum diverifikasi, kunci yang
-// dicabut, alamat yang salah bentuk — semuanya punya pesan yang menyebutkan
-// perbaikannya, dan membuangnya jadi "gagal kirim" mengubah masalah lima menit
-// jadi masalah setengah hari.
+// Domain yang belum diverifikasi, kunci yang dicabut, alamat yang salah bentuk:
+// semuanya punya pesan yang menyebutkan perbaikannya. Membuangnya jadi "gagal
+// kirim" mengubah masalah lima menit jadi masalah setengah hari.
 func TestGalatResendDisampaikanApaAdanya(t *testing.T) {
 	m, _, _ := resendPalsu(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

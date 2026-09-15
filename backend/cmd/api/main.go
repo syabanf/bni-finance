@@ -100,16 +100,8 @@ func run(log *slog.Logger) error {
 	if !surat.Siap() {
 		// Peringatan, bukan galat fatal: aplikasinya tetap berguna tanpa email,
 		// hanya fitur yang membutuhkannya yang menjawab 503 dengan pesan jelas.
-		log.Warn("email belum dikonfigurasi — reset kata sandi dan OTP tidak akan berfungsi",
+		log.Warn("email belum dikonfigurasi, reset kata sandi dan OTP tidak akan berfungsi",
 			"perlu", "RESEND_API_KEY dan MAIL_FROM")
-		if cfg.SMTPUsang {
-			// Nama variabelnya BERUBAH, dan lingkungan yang belum ikut berubah
-			// gagal tanpa suara: kredensialnya ada, isinya benar, hanya
-			// namanya yang tidak dibaca lagi. Peringatan di atas akan menyuruh
-			// orang mengisi sesuatu yang sudah mereka isi.
-			log.Warn("SMTP_* masih terpasang tapi tidak dipakai lagi — pengiriman email sekarang lewat REST API Resend",
-				"ganti", "SMTP_PASSWORD → RESEND_API_KEY, SMTP_FROM → MAIL_FROM")
-		}
 	} else if config.Lokal(cfg.AppBaseURL) {
 		// Pengiriman email menyala TAPI tautannya menunjuk localhost.
 		//

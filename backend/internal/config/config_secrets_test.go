@@ -35,14 +35,6 @@ func TestDaftarSecretsShTidakBasi(t *testing.T) {
 		}
 	}
 
-	// Nama lama sengaja dikenali secrets.sh supaya dilaporkan sebagai BASI,
-	// bukan ASING. Ia tidak dibaca config.go untuk konfigurasi — hanya untuk
-	// mendeteksi berkas yang belum ikut berganti nama.
-	usang := map[string]bool{
-		"SMTP_HOST": true, "SMTP_PORT": true, "SMTP_USER": true,
-		"SMTP_PASSWORD": true, "SMTP_FROM": true,
-	}
-
 	dibaca := map[string]bool{}
 	re := regexp.MustCompile(`(?:os\.Getenv|envOr|durationOr|bytesOr)\("([A-Z_0-9]+)"`)
 	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
@@ -54,7 +46,7 @@ func TestDaftarSecretsShTidakBasi(t *testing.T) {
 
 	var hilang, hantu []string
 	for v := range dibaca {
-		if !didaftar[v] && !usang[v] {
+		if !didaftar[v] {
 			hilang = append(hilang, v)
 		}
 	}

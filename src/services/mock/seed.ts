@@ -155,8 +155,12 @@ const memberSeeds: MemberSeed[] = [
 
 export const seedFeeSettings: FeeSettings = {
   id: 'fee-default',
-  registrationFee: 1_500_000,
-  renewalFee: 1_500_000,
+  // Harga yang berlaku sejak MOM 10 September 2026, sama dengan nilai bawaan
+  // di db/init.sql. Mock yang membawa harga lain membuat halaman Pengaturan
+  // menampilkan angka berbeda tergantung mode, dan yang melihatnya tidak punya
+  // cara tahu mana yang benar.
+  registrationFee: 18_000_000,
+  renewalFee: 12_700_000,
   currency: 'IDR',
   notes: 'Biaya pendaftaran berlaku untuk visitor yang resmi bergabung. Renewal dibayar tahunan.',
   updatedBy: 'admin-national',
@@ -254,12 +258,16 @@ export function buildSeedData(): BuiltData {
     let periodStart = seed.joined
     seed.history.forEach(({ status, type }, hIdx) => {
       invoiceSeq += 1
-      // Nominal registrasi 2 juta mengikuti invoice contoh di db/init.sql,
-      // bukan seedFeeSettings.registrationFee. Keduanya memang berbeda di data
-      // nyata, dan mencerminkannya apa adanya lebih jujur daripada menyamakan
-      // diam-diam lalu membuat demo dan sistem sebenarnya menampilkan angka
-      // yang tidak sama.
-      const amount = type === 'registration' ? 2_000_000 : seedFeeSettings.renewalFee
+      // Nominal invoice contoh mengikuti angka di db/init.sql apa adanya, bukan
+      // diturunkan dari seedFeeSettings. Tagihan yang sudah terbit memang
+      // memakai harga yang berlaku saat itu, dan menurunkannya dari pengaturan
+      // sekarang akan menulis ulang sejarah setiap kali harganya diubah.
+      //
+      // Renewal sempat memakai seedFeeSettings.renewalFee. Itu kebetulan cocok
+      // selama keduanya sama-sama 1.500.000, lalu berhenti cocok begitu harga
+      // pengaturan diperbarui ke 12.700.000 sementara db/init.sql tetap
+      // menyeed 1.500.000.
+      const amount = type === 'registration' ? 2_000_000 : 1_500_000
       const periodEnd = addYear(periodStart)
       // Issued shortly before the period starts (registration on join day; renewal ~ when prior ends).
       const dueDate = hIdx === 0 ? periodStart : addDays(periodStart, -2)

@@ -51,11 +51,6 @@ func main() {
 	if !surat.Siap() {
 		fmt.Fprintln(os.Stderr, "\nBELUM SIAP — RESEND_API_KEY dan MAIL_FROM harus terisi,")
 		fmt.Fprintln(os.Stderr, "dan MAIL_FROM harus memuat alamat email (boleh \"Nama <a@b>\").")
-		if cfg.SMTPUsang {
-			fmt.Fprintln(os.Stderr, "\nSMTP_* masih terpasang tapi tidak dipakai lagi:")
-			fmt.Fprintln(os.Stderr, "  SMTP_PASSWORD → RESEND_API_KEY")
-			fmt.Fprintln(os.Stderr, "  SMTP_FROM     → MAIL_FROM")
-		}
 		os.Exit(1)
 	}
 
