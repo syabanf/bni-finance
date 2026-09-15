@@ -434,11 +434,36 @@ BNI_SECRETS_KEY="$(cat backend/.secrets-key)" ./backend/secrets.sh lock   # -> .
 git add backend/.env.production.gpg && git commit && git push
 ```
 
-Di server, sekali saja setelah `git pull`:
+Di server, setelah `git pull`:
 
 ```bash
-BNI_SECRETS_KEY='<kata kunci>' ./backend/secrets.sh unlock   # -> backend/.env
-docker compose up -d --build
+BNI_SECRETS_KEY='<kata kunci>' make deploy
+```
+
+`make deploy` membuka env, **memeriksanya**, lalu menyalakan compose. Ketiganya
+dalam satu perintah karena langkah tengahnya yang paling mudah hilang: orang
+membuka env lalu langsung menyalakan server, dan `secrets.sh check` hanya
+dijalankan yang sudah curiga ada yang salah. Justru saat tidak ada yang curiga
+itulah env yang salah lolos. Ia tetap terbaca, servernya tetap menyala, dan
+yang gagal muncul belakangan di tempat yang tidak menyebut berkas env sama
+sekali: tautan reset yang menunjuk localhost, CORS yang menolak setiap
+panggilan, atau akun yang bisa masuk tanpa kata sandi.
+
+Pemeriksaannya **memblokir** compose. Diuji pada empat keadaan:
+
+| env | hasil |
+|---|---|
+| lengkap dan aman | `exit 0`, compose jalan |
+| `APP_BASE_URL` localhost | `exit 1`, compose diblokir |
+| `AUTH_QUICK_LOGIN` terisi | `exit 1`, compose diblokir |
+| kata kunci salah | `exit 2`, compose diblokir |
+
+Langkahnya masih bisa dijalankan sendiri-sendiri bila perlu:
+
+```bash
+./backend/secrets.sh unlock            # buka saja
+./backend/secrets.sh check             # periksa backend/.env
+make deploy-check                      # periksa .env.production tanpa membuka apa pun
 ```
 
 `gpg --symmetric --cipher-algo AES256` dipilih karena **berautentikasi** —

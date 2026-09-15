@@ -19,6 +19,7 @@
 #   ./secrets.sh lock      .env.production  -> .env.production.gpg   (aman di-commit)
 #   ./secrets.sh unlock    .env.production.gpg -> .env               (di server)
 #   ./secrets.sh check     periksa .env sebelum menyalakan server
+#   ./secrets.sh deploy    unlock + check, dipakai di server sebelum compose
 #
 # `check` ada karena berkas env yang SALAH tidak terlihat seperti berkas env
 # yang salah. Ia tetap terbaca, servernya tetap menyala, dan yang gagal
@@ -131,13 +132,37 @@ periksa() {
   echo >&2
   if [ "$galat" -gt 0 ]; then
     echo "TIDAK LULUS — $galat galat, $peringatan peringatan" >&2
-    exit 1
+    # return, bukan exit: `deploy` perlu memutuskan sendiri apa yang terjadi
+    # sesudahnya. Fungsi yang mengakhiri skrip pemanggilnya tidak bisa dipakai
+    # sebagai langkah dari langkah yang lebih besar.
+    return 1
   fi
   if [ "$peringatan" -gt 0 ]; then
     echo "LULUS dengan $peringatan peringatan" >&2
   else
     echo "LULUS — semua variabel terisi dan tidak ada yang mencurigakan" >&2
   fi
+}
+
+# buka mendekripsi .env.production.gpg menjadi .env.
+#
+# Menulis ke .env, bukan menimpa .env.production: di server, .env adalah berkas
+# yang benar-benar dibaca compose.
+#
+# Yang lama disalin dulu. Di server .env memang selalu hasil unlock, tapi di
+# mesin pengembang ia berisi konfigurasi lokal seperti DATABASE_URL ke basis
+# data dev dan APP_BASE_URL ke localhost. Menimpanya diam-diam berarti
+# kehilangannya tanpa satu pun pertanyaan. Saya menabraknya sendiri saat
+# menyegel berkas ini.
+buka() {
+  [ -f "$cipher" ] || { echo "tidak ada $cipher" >&2; exit 1; }
+  if [ -f ".env" ]; then
+    cp -p ".env" ".env.sebelum-unlock"
+    echo "salinan .env lama -> backend/.env.sebelum-unlock" >&2
+  fi
+  gpg --batch --yes --decrypt --passphrase-fd 0 -o ".env" "$cipher" <<< "$(key)" 2>/dev/null
+  chmod 600 .env
+  echo "terbuka -> backend/.env  ($(grep -c '^[A-Z]' .env) variabel)" >&2
 }
 
 case "${1:-}" in
@@ -149,28 +174,34 @@ case "${1:-}" in
     echo "terkunci -> backend/$cipher  ($(wc -c < "$cipher" | tr -d ' ') byte)" >&2
     ;;
   unlock)
-    [ -f "$cipher" ] || { echo "tidak ada $cipher" >&2; exit 1; }
-    # Menulis ke .env, bukan menimpa .env.production: di server, .env adalah
-    # berkas yang benar-benar dibaca compose.
-    #
-    # Yang lama disalin dulu. Di server .env memang selalu hasil unlock, tapi di
-    # mesin pengembang ia berisi konfigurasi lokal — DATABASE_URL ke basis data
-    # dev, APP_BASE_URL ke localhost — dan menimpanya diam-diam berarti
-    # kehilangannya tanpa satu pun pertanyaan. (Saya menabraknya sendiri saat
-    # menyegel berkas ini.)
-    if [ -f ".env" ]; then
-      cp -p ".env" ".env.sebelum-unlock"
-      echo "salinan .env lama -> backend/.env.sebelum-unlock" >&2
-    fi
-    gpg --batch --yes --decrypt --passphrase-fd 0 -o ".env" "$cipher" <<< "$(key)" 2>/dev/null
-    chmod 600 .env
-    echo "terbuka -> backend/.env  ($(grep -c '^[A-Z]' .env) variabel)" >&2
+    buka
     ;;
   check)
     berkas="${2:-.env}"
     [ -f "$berkas" ] || { echo "tidak ada $berkas" >&2; exit 1; }
-    periksa "$berkas"
+    periksa "$berkas" || exit 1
+    ;;
+  deploy)
+    # SATU PERINTAH, karena dua perintah berarti yang kedua bisa dilewatkan.
+    #
+    # Selama `unlock` dan `check` terpisah, urutan yang paling mudah diketik
+    # adalah unlock lalu langsung menyalakan server, dan `check` hanya
+    # dijalankan orang yang sudah curiga ada yang salah. Justru saat tidak ada
+    # yang curiga itulah berkas env yang salah lolos: ia tetap terbaca,
+    # servernya tetap menyala, dan yang gagal muncul belakangan di tempat lain.
+    buka
+    echo >&2
+    if ! periksa ".env"; then
+      echo >&2
+      echo "DEPLOYMENT DIHENTIKAN. Perbaiki backend/.env.production di mesin" >&2
+      echo "pengembang, jalankan ./secrets.sh lock, commit, push, lalu ulangi." >&2
+      echo "Menyalakan server dengan env di atas akan gagal di tempat yang" >&2
+      echo "tidak menyebut berkas ini sama sekali." >&2
+      exit 1
+    fi
+    echo >&2
+    echo "env siap. Lanjutkan dengan: docker compose up -d --build" >&2
     ;;
   *)
-    echo "pakai: ./secrets.sh lock | unlock | check [berkas]" >&2; exit 2 ;;
+    echo "pakai: ./secrets.sh lock | unlock | check [berkas] | deploy" >&2; exit 2 ;;
 esac
