@@ -89,26 +89,57 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
   // mencetak — watermark yang hilang justru pada cetakan adalah watermark yang
   // gagal tepat di tempat ia paling dibutuhkan.
   const watermark = `
-    <div style="position:absolute;top:44%;left:50%;
+    <div class="inv-wm" style="position:absolute;top:44%;left:50%;
                 transform:translate(-50%,-50%) rotate(-24deg);
                 font-size:88px;font-weight:800;letter-spacing:6px;white-space:nowrap;
                 color:rgba(${rgb},0.13);z-index:0;pointer-events:none;
                 -webkit-print-color-adjust:exact;print-color-adjust:exact;">${esc(label)}</div>`
 
+  // Gaya responsif, DILINGKUP ke .inv-doc.
+  //
+  // Dokumen ini disuntikkan ke dalam DOM aplikasi lewat dangerouslySetInnerHTML,
+  // jadi selektor tanpa awalan akan ikut mewarnai halaman di sekitarnya.
+  //
+  // Lebarnya dipaku 820px supaya rupanya sama dengan yang dicetak. Di layar
+  // 375px itu berarti dokumen meluber dan tabelnya terpotong di tengah kolom
+  // "Pajak". Mengecilkan seluruhnya sampai muat membuat teks 12,5px jadi
+  // sekitar 5px, yang terbaca lebih buruk daripada menggulir. Jadi yang
+  // menumpuk hanya bagian yang memang bisa menumpuk, dan tabel barangnya
+  // menggulir DI DALAM kotaknya sendiri, bukan menggeser seluruh halaman.
+  //
+  // Ambangnya 640px, jauh di bawah lebar cetak A4 (sekitar 692px setelah
+  // margin 12mm), jadi hasil cetak tidak ikut berubah.
+  const gaya = `
+    <style>
+      .inv-doc .inv-items{overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .inv-doc .inv-items table{min-width:540px}
+      @media (max-width:640px){
+        .inv-doc{padding:26px 18px !important;border-radius:10px !important}
+        .inv-doc .inv-head{flex-direction:column;gap:16px}
+        .inv-doc .inv-head-kanan>div:first-child{text-align:left !important}
+        .inv-doc .inv-head-kanan table{margin-left:0 !important}
+        .inv-doc .inv-parties{flex-direction:column;gap:20px}
+        .inv-doc .inv-totals{justify-content:stretch !important}
+        .inv-doc .inv-totals table{min-width:0 !important;width:100%}
+        .inv-doc .inv-wm{font-size:52px !important;letter-spacing:3px !important}
+      }
+    </style>`
+
   return `
-  <div style="position:relative;max-width:820px;margin:0 auto;background:#fff;color:${INK};
+  ${gaya}
+  <div class="inv-doc" style="position:relative;max-width:820px;margin:0 auto;background:#fff;color:${INK};
               padding:46px 52px;border-radius:14px;
               font:12.5px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
               box-shadow:0 10px 40px rgba(15,23,42,.08);">
     ${watermark}
     <div style="position:relative;z-index:1;">
 
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;">
+      <div class="inv-head" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;">
         <div>
           <div style="font-size:21px;font-weight:800;letter-spacing:-.4px;">BNI Finance Hub</div>
           <div style="font-size:10.5px;color:#7f8c9a;margin-top:2px;">Invoice &amp; pembayaran keanggotaan BNI</div>
         </div>
-        <div>
+        <div class="inv-head-kanan">
           <div style="font-size:30px;font-weight:400;color:#5b8db8;line-height:1;margin-bottom:12px;text-align:right;">Invoice</div>
           <table style="border-collapse:collapse;margin-left:auto;font-size:12px;">
             ${barisMeta('Referensi', inv.number)}
@@ -119,7 +150,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
         </div>
       </div>
 
-      <div style="display:flex;gap:40px;margin-bottom:26px;">
+      <div class="inv-parties" style="display:flex;gap:40px;margin-bottom:26px;">
         <div style="flex:1;min-width:0;">
           <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Info Perusahaan</h2>
           <div style="font-size:15px;font-weight:700;margin-bottom:5px;">BNI Indonesia</div>
@@ -134,7 +165,8 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
         </div>
       </div>
 
-      <table style="width:100%;border-collapse:collapse;margin-bottom:22px;">
+      <div class="inv-items" style="margin-bottom:22px;">
+      <table style="width:100%;border-collapse:collapse;">
         <thead>
           <tr>
             <th style="background:${HEAD};color:#fff;font-size:11px;font-weight:600;padding:9px 10px;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact;">Produk</th>
@@ -158,8 +190,9 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
           </tr>
         </tbody>
       </table>
+      </div>
 
-      <div style="display:flex;justify-content:flex-end;">
+      <div class="inv-totals" style="display:flex;justify-content:flex-end;">
         <table style="border-collapse:collapse;min-width:300px;">
           ${barisTotal('Subtotal', formatCurrency(inv.amount))}
           ${barisTotal('Diskon Total', formatCurrency(0))}
