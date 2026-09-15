@@ -26,9 +26,9 @@ export function ForgotPasswordPage() {
       await authService.mintaResetSandi(email.trim())
       setTerkirim(true)
     } catch (err) {
-      // Hanya galat NYATA yang tampil di sini — SMTP mati, jaringan putus,
-      // terlalu sering mencoba. "Email tidak terdaftar" tidak pernah sampai
-      // sejauh ini; server menjawabnya sebagai keberhasilan.
+      // Hanya galat NYATA yang tampil di sini: pengiriman email mati, jaringan
+      // putus, terlalu sering mencoba. "Email tidak terdaftar" tidak pernah
+      // sampai sejauh ini; server menjawabnya sebagai keberhasilan.
       setGalat(err instanceof Error ? err.message : 'Gagal mengirim permintaan.')
     } finally {
       setMengirim(false)

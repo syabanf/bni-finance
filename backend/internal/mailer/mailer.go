@@ -1,26 +1,20 @@
 // Package mailer mengirim email transaksional lewat REST API Resend.
 //
-// Hanya net/http dari pustaka standar — tidak ada dependensi baru. Yang
-// dibutuhkan aplikasi ini sempit: beberapa pesan pendek, satu penerima, tanpa
-// lampiran. SDK resmi membawa retry, batch, dan tipe untuk audience/broadcast
-// yang tidak satu pun dipakai di sini.
+// Hanya net/http dari pustaka standar, tanpa dependensi baru. Yang dibutuhkan
+// aplikasi ini sempit: beberapa pesan pendek, satu penerima, tanpa lampiran.
+// SDK resmi membawa retry, batch, dan tipe untuk audience/broadcast yang tidak
+// satu pun dipakai di sini.
 //
-// # Kenapa REST, bukan SMTP
+// # Kegagalan yang bisa dibaca
 //
-// Versi sebelumnya memakai net/smtp. Ia bekerja, tapi menyembunyikan kegagalan:
-// percakapan SMTP membalas dengan kode tiga digit yang net/smtp bungkus jadi
-// satu string, dan galat yang paling penting justru muncul PALING AWAL — saat
-// MAIL FROM — di mana pesannya cuma "501 Bad sender address syntax" tanpa
-// menyebut alamat mana yang ditolak.
-//
-// REST menjawab dengan JSON yang menyebutkan namanya sendiri:
+// Resend menjawab galat dengan JSON yang menyebutkan sebabnya sendiri:
 //
 //	{"statusCode":403,"name":"validation_error",
 //	 "message":"The reddie.id domain is not verified..."}
 //
 // dan pada keberhasilan mengembalikan id pesan yang bisa dicari di dasbor
-// Resend. Untuk pertanyaan yang sebenarnya diajukan orang — "email saya belum
-// sampai, kenapa" — selisih itu adalah selisih antara punya jawaban dan tidak.
+// Resend. Pertanyaan yang sebenarnya diajukan orang berbunyi "email saya belum
+// sampai, kenapa", dan kedua hal itulah yang menjawabnya.
 package mailer
 
 import (
@@ -89,10 +83,9 @@ func New(cfg Config) *Mailer {
 
 // Siap melaporkan konfigurasinya lengkap.
 //
-// From ikut diwajibkan, tidak seperti pada versi SMTP yang bisa memakai
-// username sebagai cadangan. Resend tidak punya cadangan: "from" wajib ada di
-// badan permintaan, dan yang kosong ditolak saat kirim — jauh dari tempat
-// orang bisa melihatnya.
+// From ikut diwajibkan. Resend tidak menyediakan cadangan: "from" wajib ada di
+// badan permintaan, dan yang kosong ditolak saat kirim, jauh dari tempat orang
+// bisa melihatnya.
 func (m *Mailer) Siap() bool {
 	return m != nil && m.cfg.APIKey != "" && alamatSaja(m.cfg.From) != ""
 }

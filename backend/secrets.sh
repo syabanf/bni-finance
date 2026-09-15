@@ -23,8 +23,8 @@
 # `check` ada karena berkas env yang SALAH tidak terlihat seperti berkas env
 # yang salah. Ia tetap terbaca, servernya tetap menyala, dan yang gagal
 # muncul jauh kemudian di tempat lain: tautan reset yang menunjuk localhost,
-# CORS yang menolak setiap panggilan, atau kunci email yang namanya sudah
-# berganti. `check` menanyakan semuanya sekaligus, sebelum ada yang menyala.
+# CORS yang menolak setiap panggilan, atau nama variabel yang salah ketik.
+# `check` menanyakan semuanya sekaligus, sebelum ada yang menyala.
 #
 # Kata kuncinya dibaca dari BNI_SECRETS_KEY, atau ditanyakan bila kosong. Kunci
 # itu SATU-SATUNYA hal yang tidak boleh lewat git — kirim sekali lewat pengelola
@@ -51,8 +51,6 @@ key() {
 nilai() {
   sed -n "s/^$2=//p" "$1" | head -1 | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'\$//"
 }
-
-ada() { grep -qE "^$2=" "$1"; }
 
 # --- daftar variabel ---------------------------------------------------------
 #
@@ -117,22 +115,12 @@ periksa() {
     echo "  GALAT  MAIL_FROM=\"$dari\" tidak memuat alamat email" >&2; galat=$((galat+1))
   fi
 
-  # Nama variabel email BERUBAH saat pengiriman pindah dari SMTP ke REST API
-  # Resend. Berkas yang belum ikut berubah kehilangan kemampuan mengirim email
-  # tanpa satu pun galat: kredensialnya masih ada, isinya masih benar, hanya
-  # namanya yang tidak dibaca lagi.
-  if ada "$f" SMTP_PASSWORD || ada "$f" SMTP_HOST; then
-    echo "  BASI   SMTP_* masih ada tapi tidak dibaca lagi:" >&2
-    echo "         SMTP_PASSWORD -> RESEND_API_KEY, SMTP_FROM -> MAIL_FROM" >&2
-    peringatan=$((peringatan+1))
-  fi
-
   # Variabel yang tidak dikenal siapa pun: salah ketik terlihat persis seperti
   # ini, dan salah ketik pada nama variabel tidak pernah memunculkan galat.
-  # SMTP_* sengaja ikut "dikenal": ia sudah dilaporkan sebagai BASI di atas,
-  # dengan penggantinya disebutkan. Melaporkannya dua kali dengan dua nama
-  # masalah yang berbeda membuat orang berhenti membaca keluaran ini.
-  local dikenal=" $WAJIB $PENTING $SANTAI SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD SMTP_FROM "
+  #
+  # Sisa SMTP_* dari konfigurasi email lama jatuh ke sini juga, dan memang itu
+  # tempatnya sekarang: tidak ada satu baris kode pun yang membacanya.
+  local dikenal=" $WAJIB $PENTING $SANTAI "
   while read -r v; do
     case "$dikenal" in *" $v "*) ;; *)
       echo "  ASING  $v tidak dibaca kode mana pun — salah ketik, atau sisa lama" >&2
