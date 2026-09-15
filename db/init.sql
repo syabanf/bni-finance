@@ -190,8 +190,12 @@ create index if not exists idx_members_renewal_date on members (renewal_date)
 -- ---------------------------------------------------------------------------
 create table if not exists fee_settings (
   id               text primary key default 'default',
-  registration_fee integer not null default 1500000,
-  renewal_fee      integer not null default 1500000,
+  -- Harga yang berlaku sejak MOM 10 September 2026. Sebelumnya keduanya
+  -- 1.500.000, angka contoh yang tidak pernah dipakai BNI. Basis data baru
+  -- mulai dari angka itu tanpa peringatan apa pun, dan angka itulah yang
+  -- tercetak di tagihan orang.
+  registration_fee integer not null default 18000000,
+  renewal_fee      integer not null default 12700000,
   currency         text not null default 'IDR',
   notes            text,
   updated_by       text,
@@ -562,6 +566,27 @@ begin
     alter type member_status add value 'visitor';
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Harga pendaftaran dan renewal
+--
+-- Nilai bawaan kolomnya sudah benar di atas, tapi itu hanya menolong basis
+-- data BARU. Yang sudah terlanjur berisi baris `default` membawa 1.500.000
+-- selamanya, dan tidak ada yang memberi tahu: halaman Pengaturan menampilkan
+-- angka itu sebagai fakta, dan invoice pertama yang terbit memakainya.
+--
+-- Diperbarui HANYA bila kedua kolomnya masih persis pasangan lama. Pasangan
+-- itu adalah tanda "belum pernah disentuh orang": 1.500.000 bukan harga BNI
+-- mana pun, dan menyamakan keduanya adalah ciri nilai bawaan, bukan pilihan.
+-- Yang sudah pernah mengisi harganya sendiri tidak ikut tertimpa.
+-- ---------------------------------------------------------------------------
+update fee_settings
+   set registration_fee = 18000000,
+       renewal_fee      = 12700000,
+       updated_at       = now()
+ where id = 'default'
+   and registration_fee = 1500000
+   and renewal_fee      = 1500000;
 
 -- ---------------------------------------------------------------------------
 -- Pengaturan denda keterlambatan

@@ -77,6 +77,43 @@ if (mockMembers.length !== sqlMembers.size) {
   masalah.push(`jumlah member berbeda — mock ${mockMembers.length}, SQL ${sqlMembers.size}`)
 }
 
+// --- harga pendaftaran & renewal ---------------------------------------------
+//
+// Harga hidup di dua tempat: nilai bawaan kolom di db/init.sql dan
+// seedFeeSettings di mock. Keduanya mengisi halaman Pengaturan, jadi selisih di
+// antara keduanya membuat halaman yang sama menampilkan angka berbeda
+// tergantung mode, dan yang melihatnya tidak punya cara tahu mana yang benar.
+//
+// Angka ini tercetak di tagihan orang. Ia pernah salah selama berminggu-minggu
+// karena tidak ada yang membandingkan keduanya.
+const angka = (teks) => Number(String(teks).replace(/_/g, ''))
+const bacaSql = (kolom) => {
+  const m = sql.match(new RegExp(`${kolom}\\s+integer not null default (\\d+)`))
+  return m ? angka(m[1]) : null
+}
+const bacaMock = (kunci) => {
+  const m = mock.match(new RegExp(`${kunci}:\\s*([\\d_]+)`))
+  return m ? angka(m[1]) : null
+}
+for (const [kolom, kunci, label] of [
+  ['registration_fee', 'registrationFee', 'pendaftaran'],
+  ['renewal_fee', 'renewalFee', 'renewal'],
+]) {
+  const a = bacaSql(kolom)
+  const b = bacaMock(kunci)
+  if (a === null || b === null) {
+    masalah.push(
+      `harga ${label} tidak terbaca — SQL ${a === null ? 'TIDAK KETEMU' : a}, ` +
+        `mock ${b === null ? 'TIDAK KETEMU' : b}. Polanya yang rusak, bukan datanya.`,
+    )
+  } else if (a !== b) {
+    masalah.push(
+      `harga ${label} berbeda — db/init.sql ${a.toLocaleString('id-ID')}, ` +
+        `mock ${b.toLocaleString('id-ID')}`,
+    )
+  }
+}
+
 // --- hasil -------------------------------------------------------------------
 if (masalah.length) {
   console.error(merah('✗ data contoh tidak konsisten'))
