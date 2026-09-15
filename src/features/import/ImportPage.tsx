@@ -60,7 +60,7 @@ const TONE: Record<ImportBaris['tindakan'], 'green' | 'amber' | 'gray' | 'red'> 
 export function ImportPage() {
   const { toast } = useToast()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
 
   /**
    * Chapter tujuan dan status bawaan dibaca dari URL.
@@ -79,30 +79,52 @@ export function ImportPage() {
       : undefined
 
   const [jenis, setJenis] = useState<'members' | 'chapters'>('members')
-  const [namaChapter, setNamaChapter] = useState('')
+  const [daftarChapter, setDaftarChapter] = useState<Chapter[]>([])
+  const [file, setFile] = useState<File | null>(null)
+  const [hasil, setHasil] = useState<ImportHasil | null>(null)
+  const [sibuk, setSibuk] = useState(false)
 
   useEffect(() => {
-    if (!chapterTujuan) return
-    // Impor yang ditujukan ke satu chapter selalu tentang member.
-    setJenis('members')
     let aktif = true
     chapterService
       .list()
       .then((cs) => {
-        if (!aktif) return
-        // Nama yang dibaca orang, bukan id. Layar yang cuma menampilkan
-        // "ch-garuda" menuntut orang mengingat pemetaannya sendiri — dan salah
-        // ingat di sini berarti mengunggah daftar ke chapter yang salah.
-        setNamaChapter(cs.find((c) => c.id === chapterTujuan)?.displayName ?? '')
+        if (aktif) setDaftarChapter(cs)
       })
       .catch(() => undefined)
     return () => {
       aktif = false
     }
-  }, [chapterTujuan])
-  const [file, setFile] = useState<File | null>(null)
-  const [hasil, setHasil] = useState<ImportHasil | null>(null)
-  const [sibuk, setSibuk] = useState(false)
+  }, [])
+
+  // Nama yang dibaca orang, bukan id. Layar yang cuma menampilkan "ch-garuda"
+  // menuntut orang mengingat pemetaannya sendiri, dan salah ingat di sini
+  // berarti mengunggah daftar ke chapter yang salah.
+  const namaChapter = daftarChapter.find((c) => c.id === chapterTujuan)?.displayName ?? ''
+
+  /**
+   * Mengganti chapter tujuan lewat dropdown.
+   *
+   * Ditulis ke URL, bukan disimpan di state saja. Tombol "Impor" di kartu
+   * chapter sudah mengirim `?chapter=`, jadi satu sumber kebenaran menjaga
+   * kedua jalan masuk itu tetap sama, dan alamatnya tetap bisa disalin ke orang
+   * lain.
+   *
+   * PRATINJAU LAMA DIBUANG. Ia menggambarkan chapter yang tadi dipilih, sedang
+   * tombol "Terapkan" di sebelahnya akan menulis ke chapter yang baru. Angka
+   * yang terbaca "12 baru" dari daftar BNI Merdeka bisa berarti 12 penolakan di
+   * BNI Garuda, dan yang menekan tombolnya tidak punya cara melihat bedanya.
+   * Aturannya sama dengan pergantian berkas di bawah.
+   */
+  const pilihChapter = (id: string) => {
+    const baru = new URLSearchParams(params)
+    if (id) baru.set('chapter', id)
+    else baru.delete('chapter')
+    setParams(baru, { replace: true })
+    setHasil(null)
+    // Impor yang ditujukan ke satu chapter selalu tentang member.
+    if (id) setJenis('members')
+  }
 
   const pilihBerkas = (f: File | null) => {
     setFile(f)
@@ -214,6 +236,29 @@ export function ImportPage() {
         <Card>
           <CardHeader title="Berkas" subtitle="Kolom dicari lewat judulnya, bukan urutannya." />
           <CardBody className="space-y-4">
+            {/* Chapter tujuan bisa dipilih di sini, bukan hanya diwarisi dari
+                tombol "Impor" di kartu chapter. Orang yang sudah berada di
+                halaman ini tidak punya jalan lain selain menyunting alamatnya
+                sendiri, dan yang tidak tahu caranya akan mengunggah daftar satu
+                chapter ke lingkup nasional. */}
+            <Field
+              label="Chapter tujuan"
+              hint={
+                chapterTujuan
+                  ? 'Kolom chapter_id di berkas boleh dikosongkan.'
+                  : 'Nasional: setiap baris wajib menyebut chapter_id sendiri.'
+              }
+            >
+              <Select value={chapterTujuan} onChange={(e) => pilihChapter(e.target.value)}>
+                <option value="">Semua chapter (nasional)</option>
+                {daftarChapter.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.displayName}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
             <Field
               label="Jenis data"
               hint={chapterTujuan ? 'Terkunci: impor per chapter selalu tentang member.' : undefined}

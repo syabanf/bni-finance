@@ -15,6 +15,7 @@ import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentDetailPage } from '@/features/payments/PaymentDetailPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { IntegrasiPage } from '@/features/settings/IntegrasiPage'
 import { ImportPage } from '@/features/import/ImportPage'
 import { RenewalPage } from '@/features/renewal/RenewalPage'
 import { UsersPage } from '@/features/users/UsersPage'
@@ -106,6 +107,14 @@ export const router = createBrowserRouter([
             ),
           },
 
+          {
+            path: '/integrasi',
+            element: (
+              <RequirePermission permission="settings:manage">
+                <IntegrasiPage />
+              </RequirePermission>
+            ),
+          },
           {
             path: '/blackbox',
             element: (
