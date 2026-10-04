@@ -40,6 +40,14 @@ type Config struct {
 	PaperIDClientID      string
 	PaperIDClientSecret  string
 	PaperIDCallbackToken string
+	// PaperIDCallbackOpen membuat webhook Paper.id menerima callback TANPA
+	// token. Dipakai saat mendaftarkan dan menguji callback di dashboard
+	// Paper.id, sebelum tokennya ikut dipasang di URL.
+	//
+	// Bawaannya false, dan itu harus tetap begitu. Endpoint ini duduk di luar
+	// middleware autentikasi, jadi menyalakannya berarti siapa pun yang tahu
+	// alamatnya bisa menandai invoice lunas tanpa uang pernah masuk.
+	PaperIDCallbackOpen bool
 
 	// BlackboxSize is how many integration calls the in-memory recorder keeps,
 	// and how many rows the blackbox page reads back at once.
@@ -112,6 +120,7 @@ func Load() (Config, error) {
 		PaperIDClientID:      strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_ID")),
 		PaperIDClientSecret:  strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_SECRET")),
 		PaperIDCallbackToken: strings.TrimSpace(os.Getenv("PAPER_ID_CALLBACK_TOKEN")),
+		PaperIDCallbackOpen:  boolOr("PAPER_ID_CALLBACK_OPEN", false),
 
 		BlackboxSize:   int(bytesOr("BLACKBOX_SIZE", 200)),
 		BlackboxRetain: int(bytesOr("BLACKBOX_RETAIN", 10_000)),
@@ -211,6 +220,24 @@ func loadDotEnv(path string) {
 			_ = os.Setenv(key, value)
 		}
 	}
+}
+
+// boolOr membaca sakelar dari environment.
+//
+// GAGAL KE NILAI BAWAAN, bukan ke true. Nilai yang tidak bisa dibaca seperti
+// "yes" atau "aktif" berarti sakelarnya tidak menyala, dan untuk sakelar yang
+// melemahkan keamanan itu arah gagal yang benar: yang salah ketik mendapati
+// fiturnya tidak jalan, bukan mendapati pintunya terbuka tanpa ia tahu.
+func boolOr(key string, bawaan bool) bool {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return bawaan
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return bawaan
+	}
+	return v
 }
 
 // Lokal melaporkan URL ini menunjuk mesin yang sama.

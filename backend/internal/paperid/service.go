@@ -46,8 +46,11 @@ type Service struct {
 	gateway       Gateway
 	baseURL       string
 	callbackToken string
-	now           func() time.Time
-	rec           *blackbox.Recorder
+	// callbackTerbuka mematikan pemeriksaan token pada webhook.
+	// Lihat IzinkanCallbackTanpaToken.
+	callbackTerbuka bool
+	now             func() time.Time
+	rec             *blackbox.Recorder
 }
 
 // NewService wires the integration. An empty clientID/secret leaves Paper.id
@@ -66,6 +69,24 @@ func NewService(repo Store, baseURL, clientID, clientSecret, callbackToken strin
 		repo: repo, gateway: gw, baseURL: baseURL,
 		callbackToken: callbackToken, now: time.Now, rec: rec,
 	}
+}
+
+// IzinkanCallbackTanpaToken mematikan pemeriksaan token pada webhook.
+//
+// Ada untuk satu keperluan: mendaftarkan dan menguji callback di dashboard
+// Paper.id sebelum tokennya ikut dipasang di URL. Selama menyala, SIAPA PUN
+// yang tahu alamatnya bisa mengirim callback pembayaran dan menandai invoice
+// lunas tanpa uang pernah masuk, karena endpoint ini memang duduk di luar
+// middleware autentikasi.
+//
+// Dibuat sebagai sakelar terpisah, bukan dengan mengosongkan
+// PAPER_ID_CALLBACK_TOKEN. Token kosong sudah punya arti sendiri di sini, yaitu
+// "belum dikonfigurasi, tolak semuanya", dan arti itu yang menjaga instalasi
+// baru. Memakai ulang nilai yang sama untuk dua maksud berlawanan membuat
+// keadaan paling berbahaya tidak bisa dibedakan dari keadaan paling aman.
+func (s *Service) IzinkanCallbackTanpaToken(izin bool) *Service {
+	s.callbackTerbuka = izin
+	return s
 }
 
 // recordInbound captures a callback we received, so the blackbox shows both
@@ -307,15 +328,17 @@ func (s *Service) dueDays(ctx context.Context) int {
 // header) that we compare here. An unconfigured token rejects every callback
 // rather than accepting them all.
 func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []byte) (settled bool, err error) {
-	if s.callbackToken == "" {
-		err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
-		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-		return false, err
-	}
-	if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
-		err := httpx.Unauthorized("token callback tidak valid")
-		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-		return false, err
+	if !s.callbackTerbuka {
+		if s.callbackToken == "" {
+			err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
+			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+			return false, err
+		}
+		if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
+			err := httpx.Unauthorized("token callback tidak valid")
+			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+			return false, err
+		}
 	}
 
 	var in WebhookInput
@@ -663,15 +686,17 @@ func (s *Service) recordRemind(invoiceID string, opts SendOptions, started time.
 // tempat menumpuknya sampah, dan rekaman yang tidak bisa dipercaya asalnya
 // tidak berguna saat dipakai menelusuri masalah.
 func (s *Service) AcknowledgeWebhook(_ context.Context, path, token string, raw []byte) error {
-	if s.callbackToken == "" {
-		err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
-		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-		return err
-	}
-	if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
-		err := httpx.Unauthorized("token callback tidak valid")
-		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-		return err
+	if !s.callbackTerbuka {
+		if s.callbackToken == "" {
+			err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
+			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+			return err
+		}
+		if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
+			err := httpx.Unauthorized("token callback tidak valid")
+			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+			return err
+		}
 	}
 	s.recordAcknowledged(path, raw)
 	return nil

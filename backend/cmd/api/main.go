@@ -136,7 +136,19 @@ func run(log *slog.Logger) error {
 
 	paperSvc := paperid.NewService(paperid.NewRepository(pool),
 		cfg.PaperIDBaseURL, cfg.PaperIDClientID, cfg.PaperIDClientSecret,
-		cfg.PaperIDCallbackToken, recorder)
+		cfg.PaperIDCallbackToken, recorder).
+		IzinkanCallbackTanpaToken(cfg.PaperIDCallbackOpen)
+	if cfg.PaperIDCallbackOpen {
+		// Diucapkan di setiap start, dengan akibatnya disebut utuh.
+		//
+		// Sakelar sementara yang dipasang untuk satu sore pengujian adalah
+		// sakelar yang paling mudah tertinggal menyala, dan yang tertinggal di
+		// sini membiarkan siapa pun yang tahu alamat callback menandai invoice
+		// lunas tanpa uang pernah masuk.
+		log.Warn("WEBHOOK PAPER.ID TERBUKA TANPA TOKEN — siapa pun yang tahu alamatnya "+
+			"bisa menandai invoice lunas; matikan PAPER_ID_CALLBACK_OPEN sebelum dipakai sungguhan",
+			"endpoint", "/api/v1/webhooks/paperid/*")
+	}
 
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
