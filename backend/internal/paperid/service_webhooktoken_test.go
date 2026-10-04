@@ -1,0 +1,85 @@
+package paperid
+
+import (
+	"context"
+	"testing"
+)
+
+// TOKEN KOSONG TIDAK BOLEH LOLOS, TERMASUK SAAT KONFIGURASINYA JUGA KOSONG.
+//
+// Endpoint ini duduk di luar middleware autentikasi, karena Paper.id memanggil
+// tanpa login. Tokennya satu-satunya yang membedakan callback sungguhan dari
+// siapa pun yang tahu alamatnya.
+//
+// Bahayanya ada pada subtle.ConstantTimeCompare: membandingkan dua string
+// kosong menghasilkan 1, yaitu COCOK. Jadi tanpa penjaga eksplisit, instalasi
+// yang PAPER_ID_CALLBACK_TOKEN-nya belum diisi akan menerima callback tanpa
+// token apa pun dan menandai invoice lunas. Dibuktikan dengan menghapus
+// penjaganya: settle dipanggil, galat nil.
+//
+// Tes yang sudah ada mengirim token "apa pun", yang tidak pernah menyentuh
+// kombinasi itu. Menghapus penjaganya membuat seluruh paket tetap hijau.
+func TestWebhookTokenKosongDitolak(t *testing.T) {
+	kasus := []struct {
+		nama        string
+		terkonfigur string
+		dikirim     string
+	}{
+		{"konfigurasi kosong, token kosong", "", ""},
+		{"konfigurasi kosong, token diisi", "", "apa pun"},
+		{"konfigurasi diisi, token kosong", "rahasia", ""},
+	}
+	for _, k := range kasus {
+		t.Run(k.nama, func(t *testing.T) {
+			store := &stubStore{}
+			svc := newService(store, &stubGateway{}, k.terkonfigur)
+			_, err := svc.HandleWebhook(context.Background(),
+				"/api/v1/webhooks/paperid", k.dikirim, mustJSONBytes(paidWebhook()))
+			if statusOf(err) != 401 {
+				t.Errorf("harus 401, dapat %v", err)
+			}
+			// Yang menentukan bukan kode statusnya, melainkan ini: tidak boleh
+			// ada invoice yang berpindah status.
+			if store.settleRef.called {
+				t.Error("settle dipanggil padahal tokennya tidak sah")
+			}
+		})
+	}
+}
+
+// Jalur acknowledge memeriksa token dengan aturan yang sama.
+//
+// Ia tidak menyentuh invoice, jadi godaan untuk membiarkannya terbuka besar.
+// Tapi endpoint terbuka yang menerima apa saja adalah tempat menumpuknya
+// sampah, dan rekaman yang tidak bisa dipercaya asalnya justru tidak berguna
+// saat dipakai menelusuri masalah. Sebelum ini ia tidak punya satu pun tes.
+func TestAcknowledgeMemeriksaToken(t *testing.T) {
+	kasus := []struct {
+		nama        string
+		terkonfigur string
+		dikirim     string
+		mau401      bool
+	}{
+		{"konfigurasi kosong, token kosong", "", "", true},
+		{"konfigurasi kosong, token diisi", "", "apa pun", true},
+		{"konfigurasi diisi, token kosong", "rahasia", "", true},
+		{"konfigurasi diisi, token salah", "rahasia", "salah", true},
+		{"token benar", "rahasia", "rahasia", false},
+	}
+	for _, k := range kasus {
+		t.Run(k.nama, func(t *testing.T) {
+			svc := newService(&stubStore{}, &stubGateway{}, k.terkonfigur)
+			err := svc.AcknowledgeWebhook(context.Background(),
+				"/api/v1/webhooks/paperid/payment-out", k.dikirim, mustJSONBytes(paidWebhook()))
+			if k.mau401 {
+				if statusOf(err) != 401 {
+					t.Errorf("harus 401, dapat %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("token benar harus diterima, dapat %v", err)
+			}
+		})
+	}
+}
