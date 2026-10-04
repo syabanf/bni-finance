@@ -36,7 +36,10 @@ func TestDaftarSecretsShTidakBasi(t *testing.T) {
 	}
 
 	dibaca := map[string]bool{}
-	re := regexp.MustCompile(`(?:os\.Getenv|envOr|durationOr|bytesOr)\("([A-Z_0-9]+)"`)
+	// Setiap pembantu pembaca environment harus disebut di sini. Yang terlewat
+	// membuat variabelnya tampak "tidak dibaca", dan penjaga ini menuduh daftar
+	// di secrets.sh basi padahal yang basi justru polanya sendiri.
+	re := regexp.MustCompile(`(?:os\.Getenv|envOr|durationOr|bytesOr|boolOr)\("([A-Z_0-9]+)"`)
 	for _, m := range re.FindAllStringSubmatch(string(src), -1) {
 		dibaca[m[1]] = true
 	}

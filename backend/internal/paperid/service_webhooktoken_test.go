@@ -83,3 +83,66 @@ func TestAcknowledgeMemeriksaToken(t *testing.T) {
 		})
 	}
 }
+
+// SAKELAR TERBUKA MELEWATI PEMERIKSAAN, DAN BAWAANNYA MATI.
+//
+// Keduanya diuji bersama karena yang berbahaya bukan modenya, melainkan
+// kemungkinan ia menyala tanpa seorang pun meminta. Service yang dibangun
+// tanpa menyentuh sakelar ini harus tetap menolak callback tanpa token.
+func TestCallbackTerbukaMelewatiToken(t *testing.T) {
+	t.Run("bawaan: tertutup", func(t *testing.T) {
+		store := &stubStore{}
+		svc := newService(store, &stubGateway{}, "rahasia") // sakelar tidak disentuh
+		if _, err := svc.HandleWebhook(context.Background(),
+			"/api/v1/webhooks/paperid", "", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
+			t.Fatalf("tanpa sakelar harus tetap 401, dapat %v", err)
+		}
+		if store.settleRef.called {
+			t.Error("settle dipanggil padahal sakelarnya tidak dinyalakan")
+		}
+	})
+
+	t.Run("terbuka: token kosong diterima", func(t *testing.T) {
+		// settleReturns menentukan apakah ADA invoice yang cocok dengan
+		// referensinya. Tanpa itu, settle tetap dipanggil tapi melaporkan nol
+		// baris berubah, dan tesnya memerah pada hal yang bukan intinya.
+		store := &stubStore{settleReturns: true}
+		svc := newService(store, &stubGateway{}, "rahasia").IzinkanCallbackTanpaToken(true)
+		settled, err := svc.HandleWebhook(context.Background(),
+			"/api/v1/webhooks/paperid", "", mustJSONBytes(paidWebhook()))
+		if err != nil {
+			t.Fatalf("mode terbuka harus menerima, dapat %v", err)
+		}
+		if !settled || !store.settleRef.called {
+			t.Errorf("invoice harus dilunasi: settled=%v settleDipanggil=%v", settled, store.settleRef.called)
+		}
+	})
+
+	t.Run("terbuka: tanpa token terkonfigurasi sama sekali", func(t *testing.T) {
+		store := &stubStore{}
+		svc := newService(store, &stubGateway{}, "").IzinkanCallbackTanpaToken(true)
+		if _, err := svc.HandleWebhook(context.Background(),
+			"/api/v1/webhooks/paperid", "", mustJSONBytes(paidWebhook())); err != nil {
+			t.Fatalf("mode terbuka tidak boleh menuntut token terkonfigurasi, dapat %v", err)
+		}
+	})
+
+	t.Run("terbuka: jalur acknowledge ikut terbuka", func(t *testing.T) {
+		svc := newService(&stubStore{}, &stubGateway{}, "rahasia").IzinkanCallbackTanpaToken(true)
+		if err := svc.AcknowledgeWebhook(context.Background(),
+			"/api/v1/webhooks/paperid/payment-out", "", mustJSONBytes(paidWebhook())); err != nil {
+			t.Errorf("mode terbuka harus menerima, dapat %v", err)
+		}
+	})
+
+	t.Run("terbuka lalu dimatikan lagi", func(t *testing.T) {
+		store := &stubStore{}
+		svc := newService(store, &stubGateway{}, "rahasia").
+			IzinkanCallbackTanpaToken(true).
+			IzinkanCallbackTanpaToken(false)
+		if _, err := svc.HandleWebhook(context.Background(),
+			"/api/v1/webhooks/paperid", "", mustJSONBytes(paidWebhook())); statusOf(err) != 401 {
+			t.Fatalf("sakelar harus bisa dimatikan lagi, dapat %v", err)
+		}
+	})
+}

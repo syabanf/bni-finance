@@ -61,7 +61,7 @@ nilai() {
 # perlahan jadi hiasan yang selalu hijau.
 WAJIB="DATABASE_URL JWT_SECRET"
 PENTING="ALLOWED_ORIGINS APP_BASE_URL RESEND_API_KEY MAIL_FROM PAPER_ID_BASE_URL PAPER_ID_CLIENT_ID PAPER_ID_CLIENT_SECRET PAPER_ID_CALLBACK_TOKEN"
-SANTAI="PORT TOKEN_TTL UPLOAD_DIR MAX_UPLOAD_SIZE SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_ADMIN_NAME AUTH_QUICK_LOGIN DB_MAX_CONNS METRICS_TOKEN BNI_VM_URL BNI_VM_TOKEN BLACKBOX_SIZE BLACKBOX_RETAIN"
+SANTAI="PORT TOKEN_TTL UPLOAD_DIR MAX_UPLOAD_SIZE SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_ADMIN_NAME AUTH_QUICK_LOGIN DB_MAX_CONNS METRICS_TOKEN BNI_VM_URL BNI_VM_TOKEN BLACKBOX_SIZE BLACKBOX_RETAIN PAPER_ID_CALLBACK_OPEN"
 
 periksa() {
   local f="$1" galat=0 peringatan=0
@@ -110,6 +110,20 @@ periksa() {
     echo "  BAHAYA AUTH_QUICK_LOGIN terisi — akun itu bisa masuk TANPA kata sandi" >&2
     galat=$((galat+1))
   fi
+
+  # Peringatan, bukan galat, dan itu disengaja.
+  #
+  # Sakelar ini memang dipasang orang yang sedang mendaftarkan callback di
+  # dashboard Paper.id, jadi menolak deploy akan menghalangi justru pekerjaan
+  # yang membuatnya dinyalakan. Yang perlu terjadi adalah ia terbaca keras tiap
+  # kali env diperiksa, supaya tidak tertinggal menyala tanpa ada yang sadar.
+  case "$(nilai "$f" PAPER_ID_CALLBACK_OPEN)" in
+    true|TRUE|1|t|T)
+      echo "  BAHAYA PAPER_ID_CALLBACK_OPEN menyala — webhook Paper.id menerima" >&2
+      echo "         callback TANPA token. Siapa pun yang tahu alamatnya bisa" >&2
+      echo "         menandai invoice lunas tanpa uang pernah masuk." >&2
+      peringatan=$((peringatan+1)) ;;
+  esac
 
   local dari; dari="$(nilai "$f" MAIL_FROM)"
   if [ -n "$dari" ] && ! printf '%s' "$dari" | grep -q '@'; then
