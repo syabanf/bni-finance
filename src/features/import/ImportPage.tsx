@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Download, FileUp, Upload } from 'lucide-react'
-import type { Chapter, ImportBaris, ImportHasil, MemberWithChapter } from '@/types'
+import type { Chapter, ImportBaris, ImportHasil, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Badge,
   Button,
@@ -49,6 +49,20 @@ import { downloadXlsx } from '@/lib/xlsx'
  */
 const KOLOM_MEMBER = ['id', 'name', 'chapter_id', 'status', 'email', 'phone', 'company', 'business_field']
 const KOLOM_CHAPTER = ['id', 'name', 'display_name', 'area_name', 'city_name']
+
+/**
+ * Judul kolom laporan "Membership Dues" BNI Connect, persis seperti ekspornya.
+ *
+ * Importer mengenali laporan itu dari pasangan "Member Name" + "Due Date" dan
+ * mencocokkan barisnya ke member lewat nama di chapter tujuan. Template dengan
+ * judul yang sama berarti berkas yang diisi tangan dan berkas yang diunduh dari
+ * BNI Connect menempuh jalur baca yang satu, bukan dua format yang harus
+ * dirawat berdampingan.
+ */
+const KOLOM_JATUH_TEMPO = ['Member Name', 'Industry', 'Type', 'Membership Status', 'Due Date', 'Start Date']
+
+/** Nilai "Membership Status" yang dipahami importer; status lain dibiarkan kosong. */
+const STATUS_BNI: Partial<Record<MemberStatus, string>> = { active: 'Active', inactive: 'Dropped' }
 
 const TONE: Record<ImportBaris['tindakan'], 'green' | 'amber' | 'gray' | 'red'> = {
   baru: 'green',
@@ -149,6 +163,40 @@ export function ImportPage() {
    * telepon dibiarkan kosong persis di baris yang memang belum punya. Yang
    * sudah terisi ikut dibawa supaya tidak terhapus saat diimpor kembali.
    */
+  /**
+   * Template kedua, untuk tanggal jatuh tempo, mengikuti format BNI Connect.
+   *
+   * Impor member jadi dua berkas: data member yang sekarang (template di atas)
+   * dan tanggal jatuh tempo per nama (yang ini). Terikat ke chapter tujuan
+   * karena laporan BNI Connect tidak memuat kolom chapter, dan importer
+   * mencocokkan nama hanya di dalam chapter itu.
+   */
+  const unduhTemplateJatuhTempo = async () => {
+    setMenyiapkan(true)
+    try {
+      const semua: MemberWithChapter[] = await memberService.list()
+      const anggota = semua.filter((m) => m.chapterId === chapterTujuan)
+      downloadXlsx(
+        `template-jatuh-tempo-${chapterTujuan}`,
+        'Membership Dues',
+        KOLOM_JATUH_TEMPO,
+        anggota.map((m) => [
+          m.name,
+          m.businessField ?? '',
+          'Member',
+          STATUS_BNI[m.status] ?? '',
+          (m.renewalDate ?? '').slice(0, 10),
+          (m.joinedDate ?? '').slice(0, 10),
+        ]),
+      )
+      toast('Template jatuh tempo diunduh. Isi kolom Due Date, lalu unggah kembali di halaman ini.')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menyiapkan template.', 'error')
+    } finally {
+      setMenyiapkan(false)
+    }
+  }
+
   const unduhTemplate = async () => {
     setMenyiapkan(true)
     try {
@@ -320,6 +368,29 @@ export function ImportPage() {
                 </span>
               </span>
             </button>
+
+            {/* Berkas kedua untuk member: tanggal jatuh tempo, dalam format
+                laporan Membership Dues BNI Connect. Hanya muncul bila chapter
+                tujuan sudah dipilih, karena importer mencocokkan namanya di
+                dalam chapter itu. */}
+            {jenis === 'members' && chapterTujuan && (
+              <button
+                onClick={unduhTemplateJatuhTempo}
+                disabled={menyiapkan}
+                className="flex w-full items-center gap-3 rounded-xl border border-ink-200 p-3 text-left transition-colors hover:bg-ink-50 disabled:opacity-50"
+              >
+                <Download className="h-4 w-4 shrink-0 text-brand-500" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink-800">
+                    {menyiapkan ? 'Menyiapkan…' : 'Unduh template jatuh tempo'}
+                  </span>
+                  <span className="block text-xs leading-snug text-ink-500">
+                    Format laporan Membership Dues BNI Connect: nama member {namaChapter} sudah terisi,
+                    tinggal isi kolom Due Date.
+                  </span>
+                </span>
+              </button>
+            )}
 
             <div className="space-y-2">
               <Button className="w-full" disabled={!file} loading={sibuk && !hasil} onClick={() => jalankan(false)}>
