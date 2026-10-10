@@ -231,7 +231,7 @@ export function DashboardPage() {
             icon={Wallet}
             iconTone="amber"
             value={summary.outstanding.count}
-            label="Outstanding"
+            label="Belum Dibayar"
             hint={formatCurrencyCompact(summary.outstanding.amount)}
             onClick={() => navigate('/invoices?status=outstanding')}
           />
