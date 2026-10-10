@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -26,6 +27,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { dashboardService, invoiceService } from '@/services'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/format'
 import { InvoiceTable } from '@/features/invoices/components/InvoiceTable'
+import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
 import { INVOICE_STATUS_COLOR, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { cn } from '@/lib/cn'
 
@@ -140,8 +142,11 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { data: summary, loading, error, reload } = useAsync<DashboardSummary>(() =>
-    dashboardService.summary(),
+  const [tipe, setTipe] = useState<InvoiceTypeFilterValue>('all')
+  const tipeQuery = tipe === 'all' ? '' : `type=${tipe}`
+  const { data: summary, loading, error, reload } = useAsync<DashboardSummary>(
+    () => dashboardService.summary(tipe === 'all' ? undefined : { type: tipe }),
+    [tipe],
   )
   const { data: recent, loading: recentLoading } = useAsync<InvoiceWithRelations[]>(() =>
     invoiceService.list(),
@@ -202,6 +207,14 @@ export function DashboardPage() {
         </button>
       )}
 
+      {/* Saringan tipe: berlaku untuk kartu, statistik chapter, donat, dan tren. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <InvoiceTypeFilter value={tipe} onChange={setTipe} />
+        {tipe !== 'all' && (
+          <span className="text-xs text-ink-400">Angka di bawah hanya invoice {tipe === 'renewal' ? 'renewal' : 'pendaftaran'}.</span>
+        )}
+      </div>
+
       {/* KPI cards */}
       {loading || !summary ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -217,7 +230,7 @@ export function DashboardPage() {
             value={summary.total.count}
             label="Total Invoice"
             hint={formatCurrencyCompact(summary.total.amount)}
-            onClick={() => navigate('/invoices')}
+            onClick={() => navigate(`/invoices${tipeQuery ? `?${tipeQuery}` : ''}`)}
           />
           <StatCard
             icon={CheckCircle2}
@@ -225,7 +238,7 @@ export function DashboardPage() {
             value={summary.paid.count}
             label="Sudah Dibayar"
             hint={formatCurrencyCompact(summary.paid.amount)}
-            onClick={() => navigate('/invoices?status=paid')}
+            onClick={() => navigate(`/invoices?status=paid${tipeQuery && `&${tipeQuery}`}`)}
           />
           <StatCard
             icon={Wallet}
@@ -233,7 +246,7 @@ export function DashboardPage() {
             value={summary.outstanding.count}
             label="Belum Dibayar"
             hint={formatCurrencyCompact(summary.outstanding.amount)}
-            onClick={() => navigate('/invoices?status=outstanding')}
+            onClick={() => navigate(`/invoices?status=outstanding${tipeQuery && `&${tipeQuery}`}`)}
           />
           <StatCard
             icon={TriangleAlert}
@@ -241,7 +254,7 @@ export function DashboardPage() {
             value={summary.overdue.count}
             label="Overdue"
             hint={formatCurrencyCompact(summary.overdue.amount)}
-            onClick={() => navigate('/invoices?status=overdue')}
+            onClick={() => navigate(`/invoices?status=overdue${tipeQuery && `&${tipeQuery}`}`)}
           />
         </div>
       )}

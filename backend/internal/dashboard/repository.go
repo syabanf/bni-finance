@@ -39,6 +39,21 @@ func syaratChapter(ctx context.Context, kolom string, n int) (string, []any) {
 	}
 }
 
+// syarat menggabungkan pembatasan chapter dengan saringan tipe invoice menjadi
+// satu ekspresi boolean, dengan nomor parameter berurut mulai dari n.
+//
+// Tipe kosong berarti semua tipe. Saringan ini ada untuk dashboard dan
+// laporan: harga renewal dan pendaftaran jauh berbeda, dan angka gabungannya
+// tidak menjawab "berapa yang masuk dari pendaftaran bulan ini".
+func syarat(ctx context.Context, tipe domain.InvoiceType, kolomChapter, kolomTipe string, n int) (string, []any) {
+	expr, arg := syaratChapter(ctx, kolomChapter, n)
+	if tipe != "" {
+		expr = fmt.Sprintf("%s AND %s = $%d", expr, kolomTipe, n+len(arg))
+		arg = append(arg, string(tipe))
+	}
+	return expr, arg
+}
+
 // TrendWindowDays is the length of the comparison window behind every trend
 // figure: the last N days against the N days before them.
 const TrendWindowDays = 30
@@ -96,10 +111,10 @@ SELECT
                                            AND created_at <  now() - make_interval(days => $1::int))
 FROM invoices`
 
-func (r *Repository) totals(ctx context.Context) (*totals, error) {
-	syarat, arg := syaratChapter(ctx, "chapter_id", 2)
+func (r *Repository) totals(ctx context.Context, tipe domain.InvoiceType) (*totals, error) {
+	expr, arg := syarat(ctx, tipe, "chapter_id", "type", 2)
 	var t totals
-	err := r.db.QueryRow(ctx, totalsQuery+" WHERE "+syarat,
+	err := r.db.QueryRow(ctx, totalsQuery+" WHERE "+expr,
 		append([]any{TrendWindowDays}, arg...)...).Scan(
 		&t.totalCount, &t.totalAmount,
 		&t.paidCount, &t.paidAmount,
@@ -136,10 +151,10 @@ func (r *Repository) renewalDue(ctx context.Context) (current, previous int, err
 	return current, previous, nil
 }
 
-func (r *Repository) statusBreakdown(ctx context.Context) ([]domain.StatusCount, error) {
-	syarat, arg := syaratChapter(ctx, "chapter_id", 1)
+func (r *Repository) statusBreakdown(ctx context.Context, tipe domain.InvoiceType) ([]domain.StatusCount, error) {
+	expr, arg := syarat(ctx, tipe, "chapter_id", "type", 1)
 	rows, err := r.db.Query(ctx,
-		"SELECT status, count(*) FROM invoices WHERE "+syarat+" GROUP BY status ORDER BY status", arg...)
+		"SELECT status, count(*) FROM invoices WHERE "+expr+" GROUP BY status ORDER BY status", arg...)
 	if err != nil {
 		return nil, fmt.Errorf("hitung sebaran status: %w", err)
 	}
@@ -158,7 +173,7 @@ func (r *Repository) statusBreakdown(ctx context.Context) ([]domain.StatusCount,
 
 // monthly returns the last `months` calendar months, including empty ones —
 // generate_series keeps gaps in the chart from silently disappearing.
-func (r *Repository) monthly(ctx context.Context, months int) ([]domain.MonthlyPoint, error) {
+func (r *Repository) monthly(ctx context.Context, months int, tipe domain.InvoiceType) ([]domain.MonthlyPoint, error) {
 	const q = `
 	WITH bulan AS (
 	  SELECT date_trunc('month', now()) - make_interval(months => n) AS m
@@ -174,12 +189,13 @@ func (r *Repository) monthly(ctx context.Context, months int) ([]domain.MonthlyP
 	FROM bulan
 	ORDER BY m`
 
-	// payments tidak punya chapter_id sendiri; lingkupnya diwarisi dari invoice
-	// induknya. Keduanya memakai $2 yang sama, jadi argumennya cukup sekali.
-	syaratInv, arg := syaratChapter(ctx, "i.chapter_id", 2)
-	syaratBayar, _ := syaratChapter(ctx, "p.invoice_id IN (SELECT id FROM invoices WHERE chapter_id", 2)
-	if len(arg) > 0 {
-		syaratBayar += ")"
+	// payments tidak punya chapter_id maupun type sendiri; keduanya diwarisi
+	// dari invoice induknya. Parameternya sama persis dengan syaratInv, jadi
+	// argumennya cukup sekali.
+	syaratInv, arg := syarat(ctx, tipe, "i.chapter_id", "i.type", 2)
+	syaratBayar := "true"
+	if dalam, _ := syarat(ctx, tipe, "chapter_id", "type", 2); dalam != "true" {
+		syaratBayar = "p.invoice_id IN (SELECT id FROM invoices WHERE " + dalam + ")"
 	}
 	rows, err := r.db.Query(ctx, fmt.Sprintf(q, syaratInv, syaratBayar),
 		append([]any{months}, arg...)...)
@@ -201,7 +217,9 @@ func (r *Repository) monthly(ctx context.Context, months int) ([]domain.MonthlyP
 
 // chapterStats keeps chapters with no invoices in the result (LEFT JOIN) so the
 // table shows every chapter, not just the billed ones.
-func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, error) {
+func (r *Repository) chapterStats(ctx context.Context, tipe domain.InvoiceType) ([]domain.ChapterStat, error) {
+	// Saringan tipe menempel di ON, bukan di WHERE: chapter tanpa invoice
+	// bertipe itu harus tetap muncul dengan angka nol.
 	const q = `
 	SELECT c.id, c.display_name,
 	  count(i.id) FILTER (WHERE i.status <> 'cancelled'),
@@ -214,7 +232,7 @@ func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, er
 	  count(i.id) FILTER (WHERE i.type = 'registration' AND i.status <> 'cancelled'),
 	  coalesce(sum(i.amount) FILTER (WHERE i.type = 'registration' AND i.status <> 'cancelled'), 0)
 	FROM chapters c
-	LEFT JOIN invoices i ON i.chapter_id = c.id
+	LEFT JOIN invoices i ON i.chapter_id = c.id%s
 	WHERE %s
 	GROUP BY c.id, c.display_name
 	ORDER BY 7 DESC, c.display_name ASC`
@@ -222,8 +240,13 @@ func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, er
 	// Membatasi CHAPTER-nya, bukan hanya invoicenya. Membatasi invoice saja
 	// tetap menampilkan setiap chapter dengan nominal nol — yang masih
 	// membocorkan nama dan keberadaan seluruh chapter.
-	syarat, arg := syaratChapter(ctx, "c.id", 1)
-	rows, err := r.db.Query(ctx, fmt.Sprintf(q, syarat), arg...)
+	expr, arg := syaratChapter(ctx, "c.id", 1)
+	saringTipe := ""
+	if tipe != "" {
+		saringTipe = fmt.Sprintf(" AND i.type = $%d", len(arg)+1)
+		arg = append(arg, string(tipe))
+	}
+	rows, err := r.db.Query(ctx, fmt.Sprintf(q, saringTipe, expr), arg...)
 	if err != nil {
 		return nil, fmt.Errorf("hitung statistik chapter: %w", err)
 	}
@@ -242,9 +265,10 @@ func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, er
 	return items, rows.Err()
 }
 
-// Summary assembles the whole payload.
-func (r *Repository) Summary(ctx context.Context, months int) (*domain.DashboardSummary, error) {
-	t, err := r.totals(ctx)
+// Summary assembles the whole payload. tipe kosong berarti semua tipe;
+// renewalDue tidak ikut disaring karena ia menghitung keanggotaan, bukan invoice.
+func (r *Repository) Summary(ctx context.Context, months int, tipe domain.InvoiceType) (*domain.DashboardSummary, error) {
+	t, err := r.totals(ctx, tipe)
 	if err != nil {
 		return nil, err
 	}
@@ -252,15 +276,15 @@ func (r *Repository) Summary(ctx context.Context, months int) (*domain.Dashboard
 	if err != nil {
 		return nil, err
 	}
-	breakdown, err := r.statusBreakdown(ctx)
+	breakdown, err := r.statusBreakdown(ctx, tipe)
 	if err != nil {
 		return nil, err
 	}
-	trend, err := r.monthly(ctx, months)
+	trend, err := r.monthly(ctx, months, tipe)
 	if err != nil {
 		return nil, err
 	}
-	chapters, err := r.chapterStats(ctx)
+	chapters, err := r.chapterStats(ctx, tipe)
 	if err != nil {
 		return nil, err
 	}

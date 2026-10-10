@@ -2161,6 +2161,17 @@
           "type": "integer",
           "default": 6,
           "description": "Panjang grafik tren bulanan."
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "renewal",
+            "registration"
+          ],
+          "description": "Saring seluruh angka invoice ke satu tipe. Kosong = semua."
         }
       ],
       "bodyRequired": false,

@@ -2185,6 +2185,18 @@
               "maximum": 24,
               "default": 6
             }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Saring seluruh angka invoice ke satu tipe. Kosong = semua.\n`renewalDue` tidak ikut tersaring karena menghitung keanggotaan.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "renewal",
+                "registration"
+              ]
+            }
           }
         ],
         "responses": {

@@ -1,4 +1,4 @@
-import { api } from '@/lib/apiClient'
+import { api, query } from '@/lib/apiClient'
 import type { DashboardRepository } from '@/services/types'
 import type { DashboardSummary } from '@/types'
 
@@ -6,7 +6,7 @@ import type { DashboardSummary } from '@/types'
 // DashboardSummary describes, so this is a straight pass-through.
 
 export const apiDashboardRepository: DashboardRepository = {
-  summary() {
-    return api.get<DashboardSummary>('/dashboard/summary?months=6')
+  summary(params) {
+    return api.get<DashboardSummary>(`/dashboard/summary${query({ months: 6, type: params?.type })}`)
   },
 }

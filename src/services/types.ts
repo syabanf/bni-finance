@@ -229,5 +229,6 @@ export interface UrgentCount {
 }
 
 export interface DashboardRepository {
-  summary(): Promise<DashboardSummary>
+  /** type kosong = semua tipe. */
+  summary(params?: { type?: InvoiceType }): Promise<DashboardSummary>
 }

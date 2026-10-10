@@ -102,7 +102,7 @@ func TestDashboardTidakBocorAntarChapter(t *testing.T) {
 	chA, chB := duaChapterBerinvoice(t, pool)
 	stA := scope.WithChapter(context.Background(), chA)
 
-	ringkasan, err := repo.Summary(stA, 6)
+	ringkasan, err := repo.Summary(stA, 6, "")
 	if err != nil {
 		t.Fatalf("ringkasan sebagai ST: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestDashboardAdminTetapMelihatSemua(t *testing.T) {
 	chA, chB := duaChapterBerinvoice(t, pool)
 	nasional := scope.WithoutLimit(context.Background())
 
-	ringkasan, err := repo.Summary(nasional, 6)
+	ringkasan, err := repo.Summary(nasional, 6, "")
 	if err != nil {
 		t.Fatalf("ringkasan sebagai admin: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestDashboardTanpaScopeGagalTertutup(t *testing.T) {
 
 	duaChapterBerinvoice(t, pool)
 
-	ringkasan, err := repo.Summary(context.Background(), 6)
+	ringkasan, err := repo.Summary(context.Background(), 6, "")
 	if err != nil {
 		t.Fatalf("ringkasan tanpa scope: %v", err)
 	}

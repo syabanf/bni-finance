@@ -378,7 +378,7 @@ func (s *fakeAuditStore) InvoiceExists(_ context.Context, invoiceID string) erro
 
 type fakeDashboardStore struct{}
 
-func (fakeDashboardStore) Summary(_ context.Context, months int) (*domain.DashboardSummary, error) {
+func (fakeDashboardStore) Summary(_ context.Context, months int, _ domain.InvoiceType) (*domain.DashboardSummary, error) {
 	monthly := make([]domain.MonthlyPoint, months)
 	for i := range monthly {
 		monthly[i] = domain.MonthlyPoint{Month: fmt.Sprintf("2026-%02d", i+1)}

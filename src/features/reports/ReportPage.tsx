@@ -25,6 +25,7 @@ import { todayISO } from '@/lib/date'
 import { downloadXlsxSheets } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
+import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 
 type Preset = 'this-month' | 'last-month' | 'this-year' | 'all' | 'custom'
@@ -114,6 +115,7 @@ export function ReportPage() {
   }
 
   const [preset, setPreset] = useState<Preset>('this-year')
+  const [tipe, setTipe] = useState<InvoiceTypeFilterValue>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
@@ -132,12 +134,18 @@ export function ReportPage() {
 
   const report = useMemo(() => {
     // Billing basis: invoices ISSUED in the period (by createdAt).
-    const invs = (invoices ?? []).filter((i) => i.status !== 'cancelled' && inRange(i.createdAt))
+    // Saringan tipe berlaku untuk dua dasar sekaligus: invoice yang terbit
+    // dan pembayaran yang diterima (lewat tipe invoice induknya), supaya
+    // "Diterima" tetap bisa dibandingkan dengan "Ditagih" pada tipe yang sama.
+    const cocokTipe = (t: string | undefined) => tipe === 'all' || t === tipe
+    const invs = (invoices ?? []).filter(
+      (i) => i.status !== 'cancelled' && inRange(i.createdAt) && cocokTipe(i.type),
+    )
     const outstandingInvs = invs.filter((i) => i.status === 'sent' || i.status === 'overdue')
     // Cash basis: payments RECEIVED in the period (by paidAt). "Diterima", the
     // method breakdown, and the monthly "paid" bars all use this set, so they
     // reconcile with one another instead of mixing bases.
-    const pays = (payments ?? []).filter((p) => inRange(p.paidAt))
+    const pays = (payments ?? []).filter((p) => inRange(p.paidAt) && cocokTipe(p.invoice?.type))
 
     const ditagih = sum(invs.map((i) => i.amount))
     const diterima = sum(pays.map((p) => p.amount))
@@ -250,11 +258,12 @@ export function ReportPage() {
       .sort((a, b) => b.terbit.localeCompare(a.terbit) || a.number.localeCompare(b.number))
 
     return { ditagih, diterima, outstanding, rate, count: invs.length, chapterRows, typeData, monthly, methods, detail }
-  }, [invoices, payments, chapters, inRange])
+  }, [invoices, payments, chapters, inRange, tipe])
 
   const loading = invLoading || payLoading
 
   const periodLabel = PRESETS.find((p) => p.value === preset)?.label ?? 'Semua'
+  const tipeLabel = tipe === 'all' ? '' : tipe === 'renewal' ? ' · Renewal' : ' · Pendaftaran'
   const periodRange = `${range.from || 'awal'} – ${range.to || todayISO()}`
 
   const EXPORT_HEADERS = [
@@ -272,7 +281,7 @@ export function ReportPage() {
     report.chapterRows.map((r) => [
       r.name, r.count, r.renewal, r.pendaftaran, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`,
     ])
-  const exportBase = `laporan-${range.from || 'awal'}_${range.to || todayISO()}`
+  const exportBase = `laporan${tipe === 'all' ? '' : `-${tipe}`}-${range.from || 'awal'}_${range.to || todayISO()}`
 
   const DETAIL_HEADERS = ['Nomor', 'Member', 'Chapter', 'Tipe', 'Terbit', 'Jatuh Tempo', 'Status', 'Ditagih', 'Diterima']
   const detailRows = (uang: (n: number) => string | number = (n) => n) =>
@@ -299,7 +308,7 @@ export function ReportPage() {
   const exportPdf = () => {
     const ok = printTableReport({
       title: 'Laporan Keuangan',
-      subtitle: `${periodLabel} · ${periodRange}`,
+      subtitle: `${periodLabel}${tipeLabel} · ${periodRange}`,
       meta: [`${report.count} invoice`, `Dibuat ${formatDateTime(new Date())}`],
       summary: [
         { label: 'Total Ditagih', value: formatCurrency(report.ditagih) },
@@ -433,6 +442,9 @@ export function ReportPage() {
           <span className="ml-auto text-xs text-ink-400">
             {range.from || 'awal'} – {range.to || todayISO()}
           </span>
+        </div>
+        <div className="border-t border-ink-100 px-4 py-3">
+          <InvoiceTypeFilter value={tipe} onChange={setTipe} />
         </div>
       </Card>
 

@@ -19,13 +19,14 @@ function pct(current: number, previous: number): number {
 }
 
 export const mockDashboardRepository: DashboardRepository = {
-  async summary() {
+  async summary(params) {
     const now = new Date()
     const thisMonth = monthKey(now.toISOString())
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const prevMonth = monthKey(prev.toISOString())
 
-    const all = store.invoices
+    // Saringan tipe berlaku untuk seluruh angka invoice, seperti di server.
+    const all = params?.type ? store.invoices.filter((i) => i.type === params.type) : store.invoices
     const active = all.filter((i) => i.status !== 'cancelled')
     const issuedThis = active.filter((i) => monthKey(i.dueDate) === thisMonth)
     const issuedPrev = active.filter((i) => monthKey(i.dueDate) === prevMonth)
