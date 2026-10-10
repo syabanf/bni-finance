@@ -33,21 +33,23 @@ type Config struct {
 	BNIVMToken string
 
 	// Paper.id: pushes invoices and receives payment callbacks. Credentials are
-	// secrets — server-side only, never in a VITE_* variable. PaperIDCallbackToken
-	// is embedded in the callback URL registered in Paper.id's dashboard, since
-	// their webhook carries no signature of its own.
-	PaperIDBaseURL       string
-	PaperIDClientID      string
-	PaperIDClientSecret  string
-	PaperIDCallbackToken string
+	// secrets: server-side only, never in a VITE_* variable.
+	PaperIDBaseURL      string
+	PaperIDClientID     string
+	PaperIDClientSecret string
 	// PaperIDCallbackOpen membuat webhook Paper.id menerima callback TANPA
 	// token. Dipakai saat mendaftarkan dan menguji callback di dashboard
-	// Paper.id, sebelum tokennya ikut dipasang di URL.
+	// Paper.id, sebelum PAPER_ID_COMPANY_ID terisi.
 	//
 	// Bawaannya false, dan itu harus tetap begitu. Endpoint ini duduk di luar
 	// middleware autentikasi, jadi menyalakannya berarti siapa pun yang tahu
 	// alamatnya bisa menandai invoice lunas tanpa uang pernah masuk.
 	PaperIDCallbackOpen bool
+	// PaperIDCompanyID adalah id perusahaan di Paper.id, satu-satunya kredensial
+	// callback: dashboard mengirimnya di header Paper-Company-Id (centang "Kirim
+	// paper company id") karena webhook Paper.id tidak membawa tanda tangan.
+	// Kosong = webhook menolak semua callback.
+	PaperIDCompanyID string
 
 	// BlackboxSize is how many integration calls the in-memory recorder keeps,
 	// and how many rows the blackbox page reads back at once.
@@ -116,11 +118,11 @@ func Load() (Config, error) {
 		BNIVMURL:   envOr("BNI_VM_URL", "https://www.bni-vh.com/api/external/v1"),
 		BNIVMToken: strings.TrimSpace(os.Getenv("BNI_VM_TOKEN")),
 
-		PaperIDBaseURL:       envOr("PAPER_ID_BASE_URL", "https://open-api.stag-v2.paper.id"),
-		PaperIDClientID:      strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_ID")),
-		PaperIDClientSecret:  strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_SECRET")),
-		PaperIDCallbackToken: strings.TrimSpace(os.Getenv("PAPER_ID_CALLBACK_TOKEN")),
-		PaperIDCallbackOpen:  boolOr("PAPER_ID_CALLBACK_OPEN", false),
+		PaperIDBaseURL:      envOr("PAPER_ID_BASE_URL", "https://open-api.stag-v2.paper.id"),
+		PaperIDClientID:     strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_ID")),
+		PaperIDClientSecret: strings.TrimSpace(os.Getenv("PAPER_ID_CLIENT_SECRET")),
+		PaperIDCallbackOpen: boolOr("PAPER_ID_CALLBACK_OPEN", false),
+		PaperIDCompanyID:    strings.TrimSpace(os.Getenv("PAPER_ID_COMPANY_ID")),
 
 		BlackboxSize:   int(bytesOr("BLACKBOX_SIZE", 200)),
 		BlackboxRetain: int(bytesOr("BLACKBOX_RETAIN", 10_000)),

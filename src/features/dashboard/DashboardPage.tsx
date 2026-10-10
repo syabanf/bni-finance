@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -26,6 +27,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { dashboardService, invoiceService } from '@/services'
 import { formatCurrency, formatCurrencyCompact } from '@/lib/format'
 import { InvoiceTable } from '@/features/invoices/components/InvoiceTable'
+import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
 import { INVOICE_STATUS_COLOR, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { cn } from '@/lib/cn'
 
@@ -69,13 +71,15 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
               <div className="font-medium text-ink-900 text-sm">{s.chapterName}</div>
               <div className="text-sm font-semibold text-ink-900">{formatCurrencyCompact(s.totalAmount)}</div>
             </div>
-            <div className="mt-2 flex items-center gap-3 text-xs">
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="text-ink-500">{s.total} invoice</span>
+              <span className="text-ink-500">{s.renewal} renewal</span>
+              <span className="text-ink-500">{s.registration} pendaftaran</span>
               {s.overdue > 0 && (
-                <span className="font-semibold text-red-600">{s.overdue} overdue</span>
+                <span className="font-semibold text-red-600">{s.overdue} terlambat</span>
               )}
               {s.outstanding > 0 && (
-                <span className="font-semibold text-amber-600">{s.outstanding} outstanding</span>
+                <span className="font-semibold text-amber-600">{s.outstanding} belum dibayar</span>
               )}
               <span className="text-emerald-600">{s.paid} lunas</span>
             </div>
@@ -89,8 +93,10 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
             <tr className="border-b border-ink-100 text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
               <th className="px-5 py-3">Chapter</th>
               <th className="px-3 py-3 text-center">Total</th>
-              <th className="px-3 py-3 text-center">Overdue</th>
-              <th className="px-3 py-3 text-center">Outstanding</th>
+              <th className="px-3 py-3 text-center">Renewal</th>
+              <th className="px-3 py-3 text-center">Pendaftaran</th>
+              <th className="px-3 py-3 text-center">Terlambat</th>
+              <th className="px-3 py-3 text-center">Belum Dibayar</th>
               <th className="px-3 py-3 text-center">Lunas</th>
               <th className="px-5 py-3 text-right">Total Nilai</th>
             </tr>
@@ -104,6 +110,17 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
               >
                 <td className="px-5 py-3 font-medium text-ink-900">{s.chapterName}</td>
                 <td className="px-3 py-3 text-center text-ink-600">{s.total}</td>
+                {/* Jumlah di atas, nominal di bawah. Renewal dan pendaftaran
+                    harganya jauh berbeda, jadi "3 renewal" dan "3 pendaftaran"
+                    bukan jumlah uang yang sama. */}
+                <td className="px-3 py-3 text-center">
+                  <div className="text-ink-700">{s.renewal}</div>
+                  <div className="text-[11px] text-ink-400">{formatCurrencyCompact(s.renewalAmount)}</div>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <div className="text-ink-700">{s.registration}</div>
+                  <div className="text-[11px] text-ink-400">{formatCurrencyCompact(s.registrationAmount)}</div>
+                </td>
                 <td className="px-3 py-3 text-center">
                   <StatCell value={s.overdue} tone="text-red-600" onSelect={() => drill(s.chapterId, 'overdue')} />
                 </td>
@@ -125,8 +142,11 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { data: summary, loading, error, reload } = useAsync<DashboardSummary>(() =>
-    dashboardService.summary(),
+  const [tipe, setTipe] = useState<InvoiceTypeFilterValue>('all')
+  const tipeQuery = tipe === 'all' ? '' : `type=${tipe}`
+  const { data: summary, loading, error, reload } = useAsync<DashboardSummary>(
+    () => dashboardService.summary(tipe === 'all' ? undefined : { type: tipe }),
+    [tipe],
   )
   const { data: recent, loading: recentLoading } = useAsync<InvoiceWithRelations[]>(() =>
     invoiceService.list(),
@@ -187,6 +207,14 @@ export function DashboardPage() {
         </button>
       )}
 
+      {/* Saringan tipe: berlaku untuk kartu, statistik chapter, donat, dan tren. */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <InvoiceTypeFilter value={tipe} onChange={setTipe} />
+        {tipe !== 'all' && (
+          <span className="text-xs text-ink-400">Angka di bawah hanya invoice {tipe === 'renewal' ? 'renewal' : 'pendaftaran'}.</span>
+        )}
+      </div>
+
       {/* KPI cards */}
       {loading || !summary ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -202,7 +230,7 @@ export function DashboardPage() {
             value={summary.total.count}
             label="Total Invoice"
             hint={formatCurrencyCompact(summary.total.amount)}
-            onClick={() => navigate('/invoices')}
+            onClick={() => navigate(`/invoices${tipeQuery ? `?${tipeQuery}` : ''}`)}
           />
           <StatCard
             icon={CheckCircle2}
@@ -210,15 +238,15 @@ export function DashboardPage() {
             value={summary.paid.count}
             label="Sudah Dibayar"
             hint={formatCurrencyCompact(summary.paid.amount)}
-            onClick={() => navigate('/invoices?status=paid')}
+            onClick={() => navigate(`/invoices?status=paid${tipeQuery && `&${tipeQuery}`}`)}
           />
           <StatCard
             icon={Wallet}
             iconTone="amber"
             value={summary.outstanding.count}
-            label="Outstanding"
+            label="Belum Dibayar"
             hint={formatCurrencyCompact(summary.outstanding.amount)}
-            onClick={() => navigate('/invoices?status=outstanding')}
+            onClick={() => navigate(`/invoices?status=outstanding${tipeQuery && `&${tipeQuery}`}`)}
           />
           <StatCard
             icon={TriangleAlert}
@@ -226,7 +254,7 @@ export function DashboardPage() {
             value={summary.overdue.count}
             label="Overdue"
             hint={formatCurrencyCompact(summary.overdue.amount)}
-            onClick={() => navigate('/invoices?status=overdue')}
+            onClick={() => navigate(`/invoices?status=overdue${tipeQuery && `&${tipeQuery}`}`)}
           />
         </div>
       )}

@@ -2093,6 +2093,30 @@
           "complex": false
         },
         {
+          "name": "registrationFeeUsd",
+          "label": "Biaya Pendaftaran (USD)",
+          "type": "number",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "renewalFeeUsd",
+          "label": "Biaya Perpanjangan (USD)",
+          "type": "number",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "usdRate",
+          "label": "Kurs USD ke IDR",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
           "name": "currency",
           "label": "Mata Uang",
           "type": "string",
@@ -2137,6 +2161,17 @@
           "type": "integer",
           "default": 6,
           "description": "Panjang grafik tren bulanan."
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "renewal",
+            "registration"
+          ],
+          "description": "Saring seluruh angka invoice ke satu tipe. Kosong = semua."
         }
       ],
       "bodyRequired": false,
@@ -2184,7 +2219,7 @@
       "path": "/api/v1/import/{jenis}",
       "tag": "Sinkronisasi",
       "summary": "Impor chapter atau member dari berkas CSV/XLSX",
-      "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
+      "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar. Ekspor BNI Connect\n(berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.\n\n**Laporan BNI Connect** (Membership Dues, Chapter Roster, Membership\nLength) dikenali dari judul kolomnya di baris mana pun dan dibaca\ndengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan\nlewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan\nyang belum ada dibuat baru dengan id `bc-…`. Dues mengisi jatuh tempo\ndan status (Active/Dropped), Roster mengisi perusahaan, telepon, dan\nbidang usaha, Length mengisi tanggal bergabung. Laporan Dues yang\nmenumpuk beberapa tabel di satu lembar dibaca seluruhnya.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
       "params": [
         {
           "name": "jenis",
@@ -2564,21 +2599,14 @@
       "path": "/api/v1/webhooks/paperid",
       "tag": "Paper.id",
       "summary": "Callback pembayaran dari Paper.id",
-      "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
+      "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan. Yang dikirim dashboard adalah id perusahaan di header\n`Paper-Company-Id` (centang \"Kirim paper company id\"), dibandingkan\n**constant-time** dengan `PAPER_ID_COMPANY_ID`. Id yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
-          "type": "string",
-          "description": "Secret bersama, alternatif dari header."
-        },
-        {
-          "name": "x-paper-callback-token",
+          "name": "Paper-Company-Id",
           "in": "header",
-          "required": false,
+          "required": true,
           "type": "string",
-          "description": ""
+          "description": "Id perusahaan Paper.id, lihat keterangan di atas."
         }
       ],
       "body": {},
@@ -2638,11 +2666,11 @@
       "description": "Diterima, direkam, diakui. Tidak menyentuh invoice.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2660,11 +2688,11 @@
       "description": "Dipicu saat jumlah tagihan berubah, misalnya setelah pembayaran sebagian.\n\nSaat ini direkam dan diakui saja: melunasi sebagian belum didukung, dan menebak\nakan lebih berbahaya daripada tidak berbuat apa-apa. Rekamannya tersimpan\nlengkap sehingga bisa ditindaklanjuti begitu perilakunya diputuskan.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2682,11 +2710,11 @@
       "description": "Hanya dipicu saat status invoice di Paper.id berubah menjadi `paid`.\n\nBentuknya BERBEDA dari callback pembayaran: tidak ada `payment_info` sama\nsekali, dan identitas invoicenya ada di `data.invoice.id` serta\n`data.invoice.number`.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2704,11 +2732,11 @@
       "description": "Diterima, direkam, diakui. Tidak menyentuh invoice.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2726,11 +2754,11 @@
       "description": "Dipanggil Paper.id saat pembayaran masuk mendapat respons balik.\n\nPayloadnya IDENTIK dengan pembayaran keluar — dokumentasi Paper.id menyebutnya\neksplisit — dan hanya URL pendaftarannya yang membedakan. Itulah sebabnya\nkeduanya punya alamat sendiri meski penanganannya sama.\n\nStatus dibaca dari `payment_info.status`, dan bila tidak ada di sana, dari objek\nyang dinamai menurut metode pembayaran: `payment_info.bank_transfer.status`,\n`payment_info.qris.status`, `payment_info.credit_card.status`,\n`payment_info.ewallet.status`. Contoh di dashboard Paper.id hanya memuat yang\nbersarang, jadi membaca satu tempat saja membuat separuh payload sah terbaca\nkosong.\n\nHanya PAID, SETTLED, SUCCESS, SUCCEEDED, dan FULLY_RECONCILED yang melunasi.\nSelainnya diakui dengan 200 tanpa mengubah apa pun.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2748,11 +2776,11 @@
       "description": "Direkam dan diakui 200. TIDAK melunasi invoice, dan itu keputusan.\n\nPembayaran keluar adalah uang yang kita bayarkan, bukan yang kita\nterima — sistem ini hanya menagih iuran keanggotaan dan tidak pernah\nmembayar siapa pun. Payload masuk dan keluar IDENTIK menurut\ndokumentasi Paper.id, sehingga URL-nya adalah satu-satunya penanda\narah. Merutekannya ke penangan yang melunasi berarti membuang penanda\nitu, dan satu callback pembayaran keluar yang kebetulan menyebut nomor\ninvoice kita akan menandainya lunas tanpa uang pernah masuk.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2770,11 +2798,11 @@
       "description": "Pembayaran lewat virtual account statis, DAN callback rekonsiliasi —\nkeduanya datang lewat bagian ini di dashboard Paper.id.\n\nNominal dan statusnya dibaca dari `payment_info.static_va`.\n`FULLY_RECONCILED` melunasi; `PARTIALLY_RECONCILED` sengaja TIDAK —\ntagihannya belum lunas, dan menandainya lunas akan menghentikan\npenagihan atas sisa yang masih terutang.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2792,11 +2820,11 @@
       "description": "Kejadian Paper.id yang tidak menyentuh penagihan keanggotaan. Direkam ke\nblackbox lalu diakui dengan 200.\n\nMenolaknya akan membuat Paper.id mengulang-ulang pengiriman untuk kejadian yang\nmemang bukan urusan sistem ini, dan rekamannya tetap berguna bila suatu saat\ndipakai.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},

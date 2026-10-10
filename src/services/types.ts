@@ -211,7 +211,7 @@ export interface ManualPaymentInput {
 
 export interface SettingsRepository {
   getFees(): Promise<FeeSettings>
-  updateFees(input: Pick<FeeSettings, 'registrationFee' | 'renewalFee' | 'notes'>): Promise<FeeSettings>
+  updateFees(input: Pick<FeeSettings, 'registrationFeeUsd' | 'renewalFeeUsd' | 'usdRate' | 'notes'>): Promise<FeeSettings>
 }
 
 export interface PaymentRepository {
@@ -229,5 +229,6 @@ export interface UrgentCount {
 }
 
 export interface DashboardRepository {
-  summary(): Promise<DashboardSummary>
+  /** type kosong = semua tipe. */
+  summary(params?: { type?: InvoiceType }): Promise<DashboardSummary>
 }

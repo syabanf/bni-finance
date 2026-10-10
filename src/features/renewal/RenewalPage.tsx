@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, HelpCircle, Send, XCircle } from 'lucide-react'
+import { CheckCircle2, FileUp, HelpCircle, Send, XCircle } from 'lucide-react'
 import type { RenewalAnswer, RenewalRequest } from '@/types'
 import {
   Badge,
@@ -23,7 +23,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { chapterService, memberService, renewalService, userService } from '@/services'
+import { chapterService, importService, memberService, renewalService, userService } from '@/services'
 import { useAuth } from '@/features/auth/AuthContext'
 import { formatDate } from '@/lib/format'
 
@@ -490,27 +490,63 @@ function TombolMinta({
   const [buka, setBuka] = useState(false)
   const [assignedMc, setAssignedMc] = useState('')
   const [chapterId, setChapterId] = useState('all')
+  const [berkas, setBerkas] = useState<File | null>(null)
   const [mengirim, setMengirim] = useState(false)
 
+  /**
+   * Member yang ditanyakan datang dari salah satu dua sumber.
+   *
+   * Tanpa berkas: seluruh member aktif di chapter terpilih. Dengan berkas:
+   * nama-nama di laporan Membership Dues BNI Connect (format yang sama dengan
+   * yang diterima halaman Impor), dicocokkan ke member chapter itu lewat
+   * pratinjau impor. Pratinjau tidak menulis apa pun; ia hanya meminjam
+   * pencocokan namanya, supaya ST yang sudah memegang laporan jatuh tempo dari
+   * BNI Connect tidak perlu memilih nama satu per satu.
+   */
+  const idDariBerkas = async (f: File): Promise<{ ids: string[]; takDikenal: string[] }> => {
+    const hasil = await importService.preview('members', f, { chapter: chapterId })
+    const ids: string[] = []
+    const takDikenal: string[] = []
+    for (const b of hasil.baris) {
+      // "baru" berarti namanya tidak ada di chapter ini; id-nya hanya usulan
+      // dan belum ada barisnya, jadi tidak bisa ditanyai.
+      if (b.tindakan === 'diperbarui' || b.tindakan === 'sama') ids.push(b.id)
+      else takDikenal.push(b.nama)
+    }
+    return { ids, takDikenal }
+  }
+
   const minta = async () => {
+    if (berkas && chapterId === 'all') {
+      toast('Pilih chapternya dulu: laporan BNI Connect tidak memuat kolom chapter.', 'error')
+      return
+    }
     setMengirim(true)
     try {
-      // Diambil dari daftar member yang jatuh tempo, bukan seluruh member:
-      // menanyakan konfirmasi kepada orang yang keanggotaannya masih lama
-      // membuat daftar tugas MC penuh hal yang belum perlu dijawab.
-      const semua = await memberService.list()
-      const aktif = semua.filter((m) => m.status === 'active')
-      // Disaring per chapter bila dipilih. MOM: "Konfirmasi Renewal ada yang
-      // kirim by chapter" — ST yang menangani satu chapter tidak seharusnya
-      // membuat tugas untuk seluruh MC di chapter lain hanya karena menekan
-      // satu tombol.
-      const relevan = chapterId === 'all' ? aktif : aktif.filter((m) => m.chapterId === chapterId)
-      const ids = relevan.map((m) => m.id)
+      let ids: string[]
+      let takDikenal: string[] = []
+      if (berkas) {
+        ;({ ids, takDikenal } = await idDariBerkas(berkas))
+      } else {
+        // Diambil dari daftar member yang jatuh tempo, bukan seluruh member:
+        // menanyakan konfirmasi kepada orang yang keanggotaannya masih lama
+        // membuat daftar tugas MC penuh hal yang belum perlu dijawab.
+        const semua = await memberService.list()
+        const aktif = semua.filter((m) => m.status === 'active')
+        // Disaring per chapter bila dipilih. MOM: "Konfirmasi Renewal ada yang
+        // kirim by chapter" — ST yang menangani satu chapter tidak seharusnya
+        // membuat tugas untuk seluruh MC di chapter lain hanya karena menekan
+        // satu tombol.
+        const relevan = chapterId === 'all' ? aktif : aktif.filter((m) => m.chapterId === chapterId)
+        ids = relevan.map((m) => m.id)
+      }
       if (ids.length === 0) {
         toast(
-          chapterId === 'all'
-            ? 'Tidak ada member aktif yang perlu dikonfirmasi.'
-            : 'Tidak ada member aktif di chapter itu.',
+          berkas
+            ? 'Tidak ada nama di laporan yang cocok dengan member chapter itu.'
+            : chapterId === 'all'
+              ? 'Tidak ada member aktif yang perlu dikonfirmasi.'
+              : 'Tidak ada member aktif di chapter itu.',
           'error',
         )
         return
@@ -530,6 +566,7 @@ function TombolMinta({
         hasil.visitor > 0
           ? `${hasil.visitor} dilewati karena masih berstatus visitor`
           : null,
+        takDikenal.length > 0 ? `${takDikenal.length} nama di laporan tidak dikenal` : null,
       ].filter(Boolean)
       toast(
         bagian.length > 0
@@ -565,6 +602,36 @@ function TombolMinta({
                 <option key={c.id} value={c.id}>{c.displayName}</option>
               ))}
             </Select>
+          </Field>
+
+          <Field
+            label="Dari laporan BNI Connect (opsional)"
+            hint="Laporan Membership Dues (.xls) atau template jatuh tempo dari halaman Impor. Hanya nama di laporan yang ditanyakan; tanpa berkas, seluruh member aktif di chapter."
+          >
+            <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-300 px-4 py-3 text-sm transition-colors hover:bg-ink-50">
+              <FileUp className="h-4 w-4 shrink-0 text-brand-500" />
+              <span className="min-w-0 flex-1 truncate text-ink-700">
+                {berkas ? berkas.name : 'Pilih berkas…'}
+              </span>
+              {berkas && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setBerkas(null)
+                  }}
+                  className="text-xs text-ink-500 hover:text-ink-700"
+                >
+                  Hapus
+                </button>
+              )}
+              <input
+                type="file"
+                accept=".xls,.xlsx,.csv"
+                className="hidden"
+                onChange={(e) => setBerkas(e.target.files?.[0] ?? null)}
+              />
+            </label>
           </Field>
 
           <Field

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 )
@@ -9,22 +10,41 @@ import (
 // FeeSettings is the singleton row (`id = 'default'`) holding the current
 // registration and renewal fees used when an invoice is created.
 type FeeSettings struct {
-	ID              string    `json:"id"`
-	RegistrationFee int64     `json:"registrationFee"`
-	RenewalFee      int64     `json:"renewalFee"`
-	Currency        string    `json:"currency"`
-	Notes           *string   `json:"notes,omitempty"`
-	UpdatedBy       *string   `json:"updatedBy,omitempty"`
-	UpdatedAt       time.Time `json:"updatedAt"`
-	CreatedAt       time.Time `json:"createdAt"`
+	ID string `json:"id"`
+	// RegistrationFee dan RenewalFee adalah angka yang DITAGIHKAN, dalam
+	// Rupiah. Keduanya diturunkan server dari USD × kurs; lihat
+	// TurunkanRupiah.
+	RegistrationFee int64  `json:"registrationFee"`
+	RenewalFee      int64  `json:"renewalFee"`
+	Currency        string `json:"currency"`
+
+	// Harga dasar dalam Dollar, seperti yang ditetapkan BNI, beserta kurs
+	// yang dipakai mengubahnya ke Rupiah. Kursnya diisi manual oleh admin.
+	RegistrationFeeUSD float64 `json:"registrationFeeUsd"`
+	RenewalFeeUSD      float64 `json:"renewalFeeUsd"`
+	UsdRate            int64   `json:"usdRate"`
+
+	Notes     *string   `json:"notes,omitempty"`
+	UpdatedBy *string   `json:"updatedBy,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type UpdateFeeSettingsInput struct {
-	RegistrationFee *int64  `json:"registrationFee"`
-	RenewalFee      *int64  `json:"renewalFee"`
-	Currency        *string `json:"currency"`
-	Notes           *string `json:"notes"`
-	UpdatedBy       *string `json:"updatedBy"`
+	RegistrationFee    *int64   `json:"registrationFee"`
+	RenewalFee         *int64   `json:"renewalFee"`
+	RegistrationFeeUSD *float64 `json:"registrationFeeUsd"`
+	RenewalFeeUSD      *float64 `json:"renewalFeeUsd"`
+	UsdRate            *int64   `json:"usdRate"`
+	Currency           *string  `json:"currency"`
+	Notes              *string  `json:"notes"`
+	UpdatedBy          *string  `json:"updatedBy"`
+}
+
+// MenyentuhDollar melaporkan permintaan ini mengubah USD atau kurs, yang
+// berarti Rupiahnya harus dihitung ulang.
+func (in UpdateFeeSettingsInput) MenyentuhDollar() bool {
+	return in.RegistrationFeeUSD != nil || in.RenewalFeeUSD != nil || in.UsdRate != nil
 }
 
 func (in UpdateFeeSettingsInput) Validate() error {
@@ -33,10 +53,26 @@ func (in UpdateFeeSettingsInput) Validate() error {
 		return fmt.Errorf("registrationFee tidak boleh negatif")
 	case in.RenewalFee != nil && *in.RenewalFee < 0:
 		return fmt.Errorf("renewalFee tidak boleh negatif")
+	case in.RegistrationFeeUSD != nil && *in.RegistrationFeeUSD < 0:
+		return fmt.Errorf("registrationFeeUsd tidak boleh negatif")
+	case in.RenewalFeeUSD != nil && *in.RenewalFeeUSD < 0:
+		return fmt.Errorf("renewalFeeUsd tidak boleh negatif")
+	case in.UsdRate != nil && *in.UsdRate <= 0:
+		return fmt.Errorf("usdRate harus lebih dari nol")
 	case in.Currency != nil && *in.Currency == "":
 		return fmt.Errorf("currency tidak boleh kosong")
 	}
 	return nil
+}
+
+// TurunkanRupiah mengubah harga Dollar ke Rupiah dengan kurs yang diberikan,
+// dibulatkan ke rupiah terdekat.
+//
+// Dibulatkan, bukan dipotong: 793,75 × 16.000 memang bulat, tapi kurs yang
+// diketik orang jarang serapi itu, dan pemotongan selalu merugikan satu pihak
+// yang sama. Hasilnya adalah angka yang tercetak di invoice member.
+func TurunkanRupiah(usd float64, rate int64) int64 {
+	return int64(math.Round(usd * float64(rate)))
 }
 
 // FeeFor returns the fee that applies to an invoice type.

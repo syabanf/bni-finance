@@ -1,4 +1,5 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
+import { bolehDitagih } from '@/lib/status'
 import type { MemberRepository } from '@/services/types'
 import type { Invoice, MemberWithChapter } from '@/types'
 import { isNotFound } from './chapterRepository'
@@ -25,11 +26,14 @@ export const apiMemberRepository: MemberRepository = {
   },
 
   async eligibleForRegistration() {
-    // "Eligible" = active with no registration invoice yet. The API has no
-    // dedicated endpoint, so it's two reads and a set difference — cheap at
-    // this data size, and it keeps the backend free of a one-caller query.
+    // "Eligible" = belum menjadi anggota (visitor, pending) dan belum punya
+    // invoice pendaftaran. API tidak punya endpoint khusus, jadi dua kali baca
+    // lalu selisih himpunan; murah pada ukuran data ini, dan backend tidak
+    // perlu query yang pemanggilnya satu.
     const [members, invoices] = await Promise.all([
-      api.get<ListResponse<MemberWithChapter>>(`/members${query({ status: 'active', limit: 200 })}`),
+      api
+        .get<ListResponse<MemberWithChapter>>(`/members${query({ limit: 200 })}`)
+        .then((r) => ({ data: r.data.filter((m) => bolehDitagih(m.status, 'registration')) })),
       api.get<ListResponse<Invoice>>(`/invoices${query({ type: 'registration', limit: 200 })}`),
     ])
 

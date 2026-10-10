@@ -10,6 +10,7 @@ import {
   EmptyState,
   ErrorState,
   ExportMenu,
+  InvoiceStatusBadge,
   PageHeader,
   StatCard,
   TableSkeleton,
@@ -18,12 +19,14 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService, paymentService } from '@/services'
-import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
+import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
 import { todayISO } from '@/lib/date'
-import { downloadXlsx } from '@/lib/xlsx'
+import { downloadXlsxSheets } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
+import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
+import { INVOICE_STATUS_LABEL } from '@/lib/status'
 
 type Preset = 'this-month' | 'last-month' | 'this-year' | 'all' | 'custom'
 
@@ -80,6 +83,23 @@ interface ChapterRow {
   rate: number
 }
 
+/** Satu baris tabel detail: satu invoice yang terbit pada periode. */
+interface DetailRow {
+  id: string
+  number: string
+  member: string
+  chapter: string
+  type: InvoiceWithRelations['type']
+  terbit: string
+  jatuhTempo: string
+  status: InvoiceWithRelations['status']
+  ditagih: number
+  /** Pembayaran yang DITERIMA pada periode untuk invoice ini. */
+  diterima: number
+}
+
+const TIPE_LABEL = { registration: 'Pendaftaran', renewal: 'Renewal' } as const
+
 export function ReportPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -95,6 +115,7 @@ export function ReportPage() {
   }
 
   const [preset, setPreset] = useState<Preset>('this-year')
+  const [tipe, setTipe] = useState<InvoiceTypeFilterValue>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
 
@@ -113,12 +134,18 @@ export function ReportPage() {
 
   const report = useMemo(() => {
     // Billing basis: invoices ISSUED in the period (by createdAt).
-    const invs = (invoices ?? []).filter((i) => i.status !== 'cancelled' && inRange(i.createdAt))
+    // Saringan tipe berlaku untuk dua dasar sekaligus: invoice yang terbit
+    // dan pembayaran yang diterima (lewat tipe invoice induknya), supaya
+    // "Diterima" tetap bisa dibandingkan dengan "Ditagih" pada tipe yang sama.
+    const cocokTipe = (t: string | undefined) => tipe === 'all' || t === tipe
+    const invs = (invoices ?? []).filter(
+      (i) => i.status !== 'cancelled' && inRange(i.createdAt) && cocokTipe(i.type),
+    )
     const outstandingInvs = invs.filter((i) => i.status === 'sent' || i.status === 'overdue')
     // Cash basis: payments RECEIVED in the period (by paidAt). "Diterima", the
     // method breakdown, and the monthly "paid" bars all use this set, so they
     // reconcile with one another instead of mixing bases.
-    const pays = (payments ?? []).filter((p) => inRange(p.paidAt))
+    const pays = (payments ?? []).filter((p) => inRange(p.paidAt) && cocokTipe(p.invoice?.type))
 
     const ditagih = sum(invs.map((i) => i.amount))
     const diterima = sum(pays.map((p) => p.amount))
@@ -210,12 +237,33 @@ export function ReportPage() {
       .map(([method, v]) => ({ method, ...v }))
       .sort((a, b) => b.amount - a.amount)
 
-    return { ditagih, diterima, outstanding, rate, count: invs.length, chapterRows, typeData, monthly, methods }
-  }, [invoices, payments, chapters, inRange])
+    // Detail per invoice, dasar yang sama dengan tabel chapter: invoice yang
+    // terbit pada periode, dan penerimaan yang masuk pada periode. Angka di
+    // baris-baris ini harus bisa dijumlahkan kembali ke baris chapternya.
+    const diterimaPerInvoice = new Map<string, number>()
+    for (const p of pays) diterimaPerInvoice.set(p.invoiceId, (diterimaPerInvoice.get(p.invoiceId) ?? 0) + p.amount)
+    const detail: DetailRow[] = invs
+      .map((i) => ({
+        id: i.id,
+        number: i.number,
+        member: i.member?.name ?? '—',
+        chapter: i.chapter?.displayName ?? chapterName(i.chapterId),
+        type: i.type,
+        terbit: i.createdAt,
+        jatuhTempo: i.dueDate,
+        status: i.status,
+        ditagih: i.amount,
+        diterima: diterimaPerInvoice.get(i.id) ?? 0,
+      }))
+      .sort((a, b) => b.terbit.localeCompare(a.terbit) || a.number.localeCompare(b.number))
+
+    return { ditagih, diterima, outstanding, rate, count: invs.length, chapterRows, typeData, monthly, methods, detail }
+  }, [invoices, payments, chapters, inRange, tipe])
 
   const loading = invLoading || payLoading
 
   const periodLabel = PRESETS.find((p) => p.value === preset)?.label ?? 'Semua'
+  const tipeLabel = tipe === 'all' ? '' : tipe === 'renewal' ? ' · Renewal' : ' · Pendaftaran'
   const periodRange = `${range.from || 'awal'} – ${range.to || todayISO()}`
 
   const EXPORT_HEADERS = [
@@ -233,14 +281,34 @@ export function ReportPage() {
     report.chapterRows.map((r) => [
       r.name, r.count, r.renewal, r.pendaftaran, r.ditagih, r.diterima, r.outstanding, `${r.rate}%`,
     ])
-  const exportBase = `laporan-${range.from || 'awal'}_${range.to || todayISO()}`
+  const exportBase = `laporan${tipe === 'all' ? '' : `-${tipe}`}-${range.from || 'awal'}_${range.to || todayISO()}`
 
-  const exportExcel = () => downloadXlsx(exportBase, 'Laporan Keuangan', EXPORT_HEADERS, exportRows())
+  const DETAIL_HEADERS = ['Nomor', 'Member', 'Chapter', 'Tipe', 'Terbit', 'Jatuh Tempo', 'Status', 'Ditagih', 'Diterima']
+  const detailRows = (uang: (n: number) => string | number = (n) => n) =>
+    report.detail.map((d) => [
+      d.number,
+      d.member,
+      d.chapter,
+      TIPE_LABEL[d.type],
+      formatDate(d.terbit),
+      formatDate(d.jatuhTempo),
+      INVOICE_STATUS_LABEL[d.status],
+      uang(d.ditagih),
+      uang(d.diterima),
+    ])
+
+  // Dua lembar: rekap per chapter dan detail per invoice. Detail di lembar
+  // sendiri supaya rekapnya tetap bisa dijumlahkan tanpa tercampur.
+  const exportExcel = () =>
+    downloadXlsxSheets(exportBase, [
+      { name: 'Per Chapter', headers: EXPORT_HEADERS, rows: exportRows() },
+      { name: 'Detail Invoice', headers: DETAIL_HEADERS, rows: detailRows() },
+    ])
 
   const exportPdf = () => {
     const ok = printTableReport({
       title: 'Laporan Keuangan',
-      subtitle: `${periodLabel} · ${periodRange}`,
+      subtitle: `${periodLabel}${tipeLabel} · ${periodRange}`,
       meta: [`${report.count} invoice`, `Dibuat ${formatDateTime(new Date())}`],
       summary: [
         { label: 'Total Ditagih', value: formatCurrency(report.ditagih) },
@@ -280,6 +348,21 @@ export function ReportPage() {
         `${report.rate}%`,
       ],
       extraSections: [
+        {
+          heading: 'Detail Invoice',
+          columns: [
+            { label: 'Nomor' },
+            { label: 'Member' },
+            { label: 'Chapter' },
+            { label: 'Tipe' },
+            { label: 'Terbit' },
+            { label: 'Jatuh Tempo' },
+            { label: 'Status' },
+            { label: 'Ditagih', align: 'right' },
+            { label: 'Diterima', align: 'right' },
+          ],
+          rows: detailRows(formatCurrency),
+        },
         {
           heading: 'Per Tipe Invoice',
           columns: [{ label: 'Tipe' }, { label: 'Jumlah', align: 'right' }],
@@ -359,6 +442,9 @@ export function ReportPage() {
           <span className="ml-auto text-xs text-ink-400">
             {range.from || 'awal'} – {range.to || todayISO()}
           </span>
+        </div>
+        <div className="border-t border-ink-100 px-4 py-3">
+          <InvoiceTypeFilter value={tipe} onChange={setTipe} />
         </div>
       </Card>
 
@@ -516,6 +602,71 @@ export function ReportPage() {
           </Card>
         </div>
       </div>
+
+      {/* Detail per invoice */}
+      <Card className="mt-5">
+        <CardHeader
+          title="Detail Invoice"
+          subtitle="Setiap invoice yang terbit pada periode, berikut penerimaannya. Klik baris untuk membukanya."
+        />
+        {loading ? (
+          <TableSkeleton rows={6} cols={6} />
+        ) : report.detail.length === 0 ? (
+          <EmptyState icon={CreditCard} title="Tidak ada data" description="Tidak ada invoice pada periode ini." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-y border-ink-100 text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
+                  <th className="px-5 py-3">Nomor</th>
+                  <th className="px-3 py-3">Member</th>
+                  <th className="px-3 py-3">Chapter</th>
+                  <th className="px-3 py-3">Tipe</th>
+                  <th className="px-3 py-3">Terbit</th>
+                  <th className="px-3 py-3">Jatuh Tempo</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3 text-right">Ditagih</th>
+                  <th className="px-5 py-3 text-right">Diterima</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-50">
+                {report.detail.map((d) => (
+                  <tr
+                    key={d.id}
+                    onClick={() => navigate(`/invoices/${d.id}`)}
+                    className="cursor-pointer hover:bg-ink-50/50"
+                  >
+                    <td className="px-5 py-3 font-medium text-ink-900">{d.number}</td>
+                    <td className="px-3 py-3 text-ink-700">{d.member}</td>
+                    <td className="px-3 py-3 text-ink-600">{d.chapter}</td>
+                    <td className="px-3 py-3 text-ink-600">{TIPE_LABEL[d.type]}</td>
+                    <td className="px-3 py-3 text-ink-600">{formatDate(d.terbit)}</td>
+                    <td className="px-3 py-3 text-ink-600">{formatDate(d.jatuhTempo)}</td>
+                    <td className="px-3 py-3">
+                      <InvoiceStatusBadge status={d.status} />
+                    </td>
+                    <td className="px-3 py-3 text-right text-ink-700">{formatCurrency(d.ditagih)}</td>
+                    <td className="px-5 py-3 text-right text-emerald-600">
+                      {d.diterima > 0 ? formatCurrency(d.diterima) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-ink-100 bg-ink-50/50 text-sm font-semibold text-ink-900">
+                  <td className="px-5 py-3" colSpan={7}>
+                    Total · {report.detail.length} invoice
+                  </td>
+                  <td className="px-3 py-3 text-right">{formatCurrency(report.ditagih)}</td>
+                  <td className="px-5 py-3 text-right text-emerald-600">
+                    {formatCurrency(report.detail.reduce((a, d) => a + d.diterima, 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </Card>
     </div>
   )
 }

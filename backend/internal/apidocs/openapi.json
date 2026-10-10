@@ -2185,6 +2185,18 @@
               "maximum": 24,
               "default": 6
             }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "Saring seluruh angka invoice ke satu tipe. Kosong = semua.\n`renewalDue` tidak ikut tersaring karena menghitung keanggotaan.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "renewal",
+                "registration"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2404,13 +2416,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2445,7 +2457,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2469,13 +2481,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2510,7 +2522,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2534,13 +2546,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2575,7 +2587,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2599,13 +2611,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2640,7 +2652,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2664,13 +2676,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2705,7 +2717,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2729,13 +2741,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2770,7 +2782,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2794,13 +2806,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2835,7 +2847,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2859,13 +2871,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2900,7 +2912,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2918,24 +2930,16 @@
           "Paper.id"
         ],
         "summary": "Callback pembayaran dari Paper.id",
-        "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
+        "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan. Yang dikirim dashboard adalah id perusahaan di header\n`Paper-Company-Id` (centang \"Kirim paper company id\"), dibandingkan\n**constant-time** dengan `PAPER_ID_COMPANY_ID`. Id yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
         "security": [
 
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "description": "Secret bersama, alternatif dari header.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "x-paper-callback-token",
+            "name": "Paper-Company-Id",
             "in": "header",
-            "required": false,
+            "required": true,
+            "description": "Id perusahaan Paper.id, lihat keterangan di atas.",
             "schema": {
               "type": "string"
             }
@@ -2972,7 +2976,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "401": {
-            "description": "Token callback tidak valid atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id tidak valid atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -3461,7 +3465,7 @@
           "Sinkronisasi"
         ],
         "summary": "Impor chapter atau member dari berkas CSV/XLSX",
-        "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
+        "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar. Ekspor BNI Connect\n(berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.\n\n**Laporan BNI Connect** (Membership Dues, Chapter Roster, Membership\nLength) dikenali dari judul kolomnya di baris mana pun dan dibaca\ndengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan\nlewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan\nyang belum ada dibuat baru dengan id `bc-…`. Dues mengisi jatuh tempo\ndan status (Active/Dropped), Roster mengisi perusahaan, telepon, dan\nbidang usaha, Length mengisi tanggal bergabung. Laporan Dues yang\nmenumpuk beberapa tabel di satu lembar dibaca seluruhnya.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
         "parameters": [
           {
             "name": "jenis",
@@ -3541,7 +3545,8 @@
                       "type": "string",
                       "enum": [
                         "csv",
-                        "xlsx"
+                        "xlsx",
+                        "spreadsheetml"
                       ]
                     },
                     "jenis": {
@@ -5350,16 +5355,35 @@
           },
           "registrationFee": {
             "title": "Biaya Pendaftaran",
-            "type": "integer"
+            "type": "integer",
+            "description": "Rupiah yang ditagihkan. Diturunkan server dari `registrationFeeUsd` × `usdRate`."
           },
           "renewalFee": {
             "title": "Biaya Perpanjangan",
-            "type": "integer"
+            "type": "integer",
+            "description": "Rupiah yang ditagihkan. Diturunkan server dari `renewalFeeUsd` × `usdRate`."
           },
           "currency": {
             "title": "Mata Uang",
             "type": "string",
             "default": "IDR"
+          },
+          "registrationFeeUsd": {
+            "title": "Biaya Pendaftaran (USD)",
+            "type": "number",
+            "example": 1125
+          },
+          "renewalFeeUsd": {
+            "title": "Biaya Perpanjangan (USD)",
+            "type": "number",
+            "example": 793.75
+          },
+          "usdRate": {
+            "title": "Kurs USD ke IDR",
+            "type": "integer",
+            "example": 16000,
+            "description": "Rupiah per satu dolar",
+            "diisi manual.": null
           },
           "notes": {
             "title": "Catatan",
@@ -5381,7 +5405,7 @@
       },
       "UpdateFeeSettingsInput": {
         "type": "object",
-        "description": "Minimal satu field harus dikirim.",
+        "description": "Minimal satu field harus dikirim.\n\nMengirim salah satu dari `registrationFeeUsd`, `renewalFeeUsd`, atau\n`usdRate` membuat server menghitung ulang **kedua** harga Rupiah dari\nnilai efektifnya (yang dikirim, atau yang tersimpan bila tidak\ndikirim). `registrationFee`/`renewalFee` yang ikut dikirim dalam\npermintaan yang sama ditimpa; satu angka yang tercetak di invoice\nhanya boleh punya satu sumber.\n",
         "properties": {
           "registrationFee": {
             "title": "Biaya Pendaftaran",
@@ -5392,6 +5416,21 @@
             "title": "Biaya Perpanjangan",
             "type": "integer",
             "minimum": 0
+          },
+          "registrationFeeUsd": {
+            "title": "Biaya Pendaftaran (USD)",
+            "type": "number",
+            "minimum": 0
+          },
+          "renewalFeeUsd": {
+            "title": "Biaya Perpanjangan (USD)",
+            "type": "number",
+            "minimum": 0
+          },
+          "usdRate": {
+            "title": "Kurs USD ke IDR",
+            "type": "integer",
+            "minimum": 1
           },
           "currency": {
             "title": "Mata Uang",
@@ -5568,6 +5607,22 @@
                   "type": "integer"
                 },
                 "totalAmount": {
+                  "type": "integer"
+                },
+                "renewal": {
+                  "type": "integer",
+                  "description": "Jumlah invoice renewal",
+                  "tanpa yang dibatalkan": null
+                },
+                "renewalAmount": {
+                  "type": "integer"
+                },
+                "registration": {
+                  "type": "integer",
+                  "description": "Jumlah invoice pendaftaran",
+                  "tanpa yang dibatalkan": null
+                },
+                "registrationAmount": {
                   "type": "integer"
                 }
               }

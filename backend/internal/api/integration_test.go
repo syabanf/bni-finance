@@ -280,7 +280,7 @@ func TestLiveConcurrentSettle(t *testing.T) {
 	json.Unmarshal(memberBody, &m)
 
 	invoiceBody := s.req(t, http.MethodPost, "/api/v1/invoices",
-		`{"memberId":"`+m.ID+`","chapterId":"ch-race","type":"registration","amount":2000000,`+
+		`{"memberId":"`+m.ID+`","chapterId":"ch-race","type":"renewal","amount":2000000,`+
 			`"dueDate":"2026-09-01","periodStart":"2026-09-01","periodEnd":"2027-09-01"}`,
 		http.StatusCreated)
 	var inv domain.Invoice

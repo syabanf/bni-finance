@@ -69,15 +69,55 @@ var known = map[string]map[string]bool{
 // tagihan lunas. Mengeluhkan itu setiap kali membuat catatan berbunyi terus,
 // dan catatan yang selalu berbunyi berhenti dibaca tepat saat ia penting.
 func keluargaPencairan(top map[string]json.RawMessage) bool {
-	if _, ada := top["disbursement_id"]; ada {
+	if terisi(top, "disbursement_id") {
 		return true
 	}
 	if d, ok := objectAt(top, "data"); ok {
-		if _, ada := d["payment_references"]; ada {
+		if terisi(d, "payment_references") {
 			return true
 		}
 	}
+	// Pembayaran ke Supplier: seluruh detailnya datar di akar, tanpa
+	// payment_info maupun additional_info. Ditandai oleh payment_id bersama
+	// rekening tujuan. Sebelum ini keluarga itu tidak dikenali, dan setiap
+	// callback-nya, yang di produksi datang berulang karena memang setiap
+	// pembayaran ke vendor memicunya, tercatat sebagai "TIDAK ADA identitas
+	// invoice ... payment_info TIDAK ADA". Benar secara harfiah, keliru
+	// sebagai keluhan: uang keluar memang tidak punya invoice untuk dilunasi.
+	if terisi(top, "payment_id") && (terisi(top, "account_number") || terisi(top, "bank_code")) &&
+		!terisi(top, "payment_info") && !terisi(top, "additional_info") {
+		return true
+	}
 	return false
+}
+
+// terisi melaporkan kunci itu ada DAN membawa nilai.
+//
+// Keberadaan kunci saja tidak cukup: payload yang dibangun dari struct
+// memarshal setiap field, sehingga "disbursement_id": "" ikut hadir pada
+// callback pembayaran biasa. Memeriksa keberadaan membuat callback PAID
+// dikira pencairan dan tidak pernah melunasi.
+func terisi(m map[string]json.RawMessage, key string) bool {
+	raw, ok := m[key]
+	if !ok {
+		return false
+	}
+	switch strings.TrimSpace(string(raw)) {
+	case "", "null", `""`, "{}", "[]", "0":
+		return false
+	}
+	return true
+}
+
+// Pencairan melaporkan payload ini keluarga uang KELUAR: disbursement atau
+// pembayaran ke supplier. Dipakai HandleWebhook untuk berhenti sebelum
+// mencoba melunasi apa pun, di URL mana pun callback-nya mendarat.
+func Pencairan(raw []byte) bool {
+	var top map[string]json.RawMessage
+	if json.Unmarshal(raw, &top) != nil {
+		return false
+	}
+	return keluargaPencairan(top)
 }
 
 // inspectPayload melaporkan selisih antara payload nyata dan harapan kita.

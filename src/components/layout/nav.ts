@@ -5,6 +5,7 @@ import {
   Users,
   Building2,
   CalendarCheck,
+  CalendarClock,
   Settings,
   AlertTriangle,
   BarChart3,
@@ -53,6 +54,7 @@ export const NAV: NavNode[] = [
 
   { kind: 'section', label: 'Data Member' },
   { kind: 'item', to: '/members', label: 'Member', icon: Users },
+  { kind: 'item', to: '/members/lama-keanggotaan', label: 'Lama Keanggotaan', icon: CalendarClock },
   { kind: 'item', to: '/chapters', label: 'Chapter', icon: Building2 },
   { kind: 'item', to: '/renewal', label: 'Konfirmasi Renewal', icon: CalendarCheck },
 

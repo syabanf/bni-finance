@@ -111,6 +111,38 @@ func TestLiveMarkSent(t *testing.T) {
 	}
 }
 
+// Callback atas DOKUMEN PENGINGAT harus melunasi invoice kanoniknya.
+//
+// Pengingat diterbitkan sebagai dokumen baru bernomor INV-2026-001-R1, dan
+// callback pembayarannya membawa nomor itu. Baris di tabel invoices bernomor
+// INV-2026-001. Uuid-nya sengaja dibuat tidak cocok supaya yang teruji adalah
+// jalur nomor, bukan jalur uuid yang kebetulan menutupinya.
+func TestLiveSettleByRefNomorPengingat(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := context.Background()
+	id := seedDraft(t, pool)
+
+	if _, err := repo.MarkSent(ctx, id, CreateResult{PaperInvoiceID: "pp-uuid-asli"},
+		time.Now().AddDate(0, 0, 30), time.Now(), "Admin"); err != nil {
+		t.Fatalf("MarkSent: %v", err)
+	}
+
+	settled, err := repo.SettleByRef(ctx, "pp-uuid-lain", "INV-2026-001-R1",
+		"bank_transfer:bni", "PAID", 1_500_000, time.Now())
+	if err != nil || !settled {
+		t.Fatalf("callback atas nomor pengingat harus melunasi: settled=%v err=%v", settled, err)
+	}
+
+	var status string
+	if err := pool.QueryRow(ctx, "SELECT status FROM invoices WHERE id = $1", id).Scan(&status); err != nil {
+		t.Fatalf("baca status: %v", err)
+	}
+	if status != "paid" {
+		t.Errorf("status = %q, seharusnya paid", status)
+	}
+}
+
 func TestLiveSettleByRefIdempotent(t *testing.T) {
 	pool := livePool(t)
 	repo := NewRepository(pool)

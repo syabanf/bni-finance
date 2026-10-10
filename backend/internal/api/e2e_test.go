@@ -53,7 +53,9 @@ import (
 // because a fake there would prove nothing about the one integration that
 // actually breaks.
 
-const e2eCallbackToken = "token-callback-e2e"
+// e2eCompanyID berperan sebagai PAPER_ID_COMPANY_ID: isi header Paper-Company-Id
+// yang menjadi satu-satunya kredensial webhook Paper.id.
+const e2eCompanyID = "company-e2e"
 
 type e2eStack struct {
 	srv        *httptest.Server
@@ -84,7 +86,7 @@ func newE2EStack(t *testing.T) *e2eStack {
 	clientSecret := os.Getenv("PAPER_ID_CLIENT_SECRET")
 	baseURL := os.Getenv("PAPER_ID_BASE_URL")
 	paperSvc := paperid.NewService(paperid.NewRepository(pool),
-		baseURL, clientID, clientSecret, e2eCallbackToken, recorder)
+		baseURL, clientID, clientSecret, e2eCompanyID, recorder)
 
 	h := api.NewHandler(log, config.Config{AllowedOrigins: []string{"*"}}, signer, api.Services{
 		Auth:      authSvc,
@@ -179,6 +181,39 @@ func (s *e2eStack) do(t *testing.T, method, path, token, body string, wantStatus
 	if out != nil && len(raw) > 0 {
 		if err := json.Unmarshal(raw, out); err != nil {
 			t.Fatalf("%s %s: body bukan JSON — %s", method, path, raw)
+		}
+	}
+}
+
+// postCallback mengirim callback Paper.id dengan header Paper-Company-Id, yang
+// menjadi satu-satunya kredensial webhook. Tidak fatal pada galat transport:
+// tes konkurensi memanggilnya dari banyak goroutine.
+func (s *e2eStack) postCallback(companyID, body string) (int, string) {
+	req, err := http.NewRequest("POST", s.srv.URL+"/api/v1/webhooks/paperid", strings.NewReader(body))
+	if err != nil {
+		return 0, err.Error()
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Paper-Company-Id", companyID)
+	res, err := s.client.Do(req)
+	if err != nil {
+		return 0, err.Error()
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	return res.StatusCode, string(raw)
+}
+
+// callback adalah postCallback yang menuntut status tertentu dan membaca JSON-nya.
+func (s *e2eStack) callback(t *testing.T, companyID, body string, wantStatus int, out any) {
+	t.Helper()
+	status, raw := s.postCallback(companyID, body)
+	if status != wantStatus {
+		t.Fatalf("callback Paper.id: status %d, diharapkan %d: %s", status, wantStatus, raw)
+	}
+	if out != nil && raw != "" {
+		if err := json.Unmarshal([]byte(raw), out); err != nil {
+			t.Fatalf("callback Paper.id: body bukan JSON: %s", raw)
 		}
 	}
 }
@@ -473,16 +508,15 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		"additional_info": {"invoices":[{"uuid":%q,"number":%q}]}
 	}`, inv.PaperIDInvoiceID, inv.Number)
 
-	t.Run("callback dengan token salah ditolak", func(t *testing.T) {
-		s.do(t, "POST", "/api/v1/webhooks/paperid?token=salah", "", callback, http.StatusUnauthorized, nil)
+	t.Run("callback dengan company id salah ditolak", func(t *testing.T) {
+		s.callback(t, "perusahaan-lain", callback, http.StatusUnauthorized, nil)
 	})
 
 	t.Run("callback melunasi invoice", func(t *testing.T) {
 		var res struct {
 			Settled bool `json:"settled"`
 		}
-		s.do(t, "POST", "/api/v1/webhooks/paperid?token="+e2eCallbackToken, "",
-			callback, http.StatusOK, &res)
+		s.callback(t, e2eCompanyID, callback, http.StatusOK, &res)
 		if !res.Settled {
 			t.Fatal("callback pertama harus melunasi")
 		}
@@ -503,8 +537,7 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		var res struct {
 			Settled bool `json:"settled"`
 		}
-		s.do(t, "POST", "/api/v1/webhooks/paperid?token="+e2eCallbackToken, "",
-			callback, http.StatusOK, &res)
+		s.callback(t, e2eCompanyID, callback, http.StatusOK, &res)
 		if res.Settled {
 			t.Error("callback kedua tidak boleh melunasi ulang")
 		}

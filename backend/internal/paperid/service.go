@@ -42,11 +42,14 @@ type Gateway interface {
 var _ Gateway = (*Client)(nil)
 
 type Service struct {
-	repo          Store
-	gateway       Gateway
-	baseURL       string
-	callbackToken string
-	// callbackTerbuka mematikan pemeriksaan token pada webhook.
+	repo    Store
+	gateway Gateway
+	baseURL string
+	// companyID adalah kredensial webhook: isi header Paper-Company-Id yang
+	// dikirim dashboard Paper.id bila opsi "Kirim paper company id" dicentang.
+	// Kosong = setiap callback ditolak. Lihat periksaKredensial.
+	companyID string
+	// callbackTerbuka mematikan pemeriksaan kredensial pada webhook.
 	// Lihat IzinkanCallbackTanpaToken.
 	callbackTerbuka bool
 	now             func() time.Time
@@ -57,7 +60,7 @@ type Service struct {
 // unavailable rather than half-working: Send returns a clear 503.
 //
 // rec may be nil; recording is then disabled.
-func NewService(repo Store, baseURL, clientID, clientSecret, callbackToken string, rec *blackbox.Recorder) *Service {
+func NewService(repo Store, baseURL, clientID, clientSecret, companyID string, rec *blackbox.Recorder) *Service {
 	var gw Gateway
 	if clientID != "" && clientSecret != "" {
 		gw = NewClient(baseURL, clientID, clientSecret).WithRecorder(rec)
@@ -67,20 +70,20 @@ func NewService(repo Store, baseURL, clientID, clientSecret, callbackToken strin
 	}
 	return &Service{
 		repo: repo, gateway: gw, baseURL: baseURL,
-		callbackToken: callbackToken, now: time.Now, rec: rec,
+		companyID: companyID, now: time.Now, rec: rec,
 	}
 }
 
-// IzinkanCallbackTanpaToken mematikan pemeriksaan token pada webhook.
+// IzinkanCallbackTanpaToken mematikan pemeriksaan kredensial pada webhook.
 //
 // Ada untuk satu keperluan: mendaftarkan dan menguji callback di dashboard
-// Paper.id sebelum tokennya ikut dipasang di URL. Selama menyala, SIAPA PUN
+// Paper.id sebelum PAPER_ID_COMPANY_ID terisi. Selama menyala, SIAPA PUN
 // yang tahu alamatnya bisa mengirim callback pembayaran dan menandai invoice
 // lunas tanpa uang pernah masuk, karena endpoint ini memang duduk di luar
 // middleware autentikasi.
 //
 // Dibuat sebagai sakelar terpisah, bukan dengan mengosongkan
-// PAPER_ID_CALLBACK_TOKEN. Token kosong sudah punya arti sendiri di sini, yaitu
+// PAPER_ID_COMPANY_ID. Nilai kosong sudah punya arti sendiri di sini, yaitu
 // "belum dikonfigurasi, tolak semuanya", dan arti itu yang menjaga instalasi
 // baru. Memakai ulang nilai yang sama untuk dua maksud berlawanan membuat
 // keadaan paling berbahaya tidak bisa dibedakan dari keadaan paling aman.
@@ -321,24 +324,15 @@ func (s *Service) dueDays(ctx context.Context) int {
 // WebhookInput pindah ke webhookpayload.go — bentuk sebenarnya jauh lebih
 // rumit daripada tebakan awal, dan tempatnya sendiri membuatnya bisa dibaca.
 
-// HandleWebhook verifies the shared secret and settles the invoice.
+// HandleWebhook memverifikasi asal callback lalu melunasi invoice.
 //
-// Paper.id's docs describe no signature, so the callback URL registered in their
-// dashboard carries a secret token (?token=… or the x-paper-callback-token
-// header) that we compare here. An unconfigured token rejects every callback
-// rather than accepting them all.
-func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []byte) (settled bool, err error) {
-	if !s.callbackTerbuka {
-		if s.callbackToken == "" {
-			err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
-			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-			return false, err
-		}
-		if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
-			err := httpx.Unauthorized("token callback tidak valid")
-			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-			return false, err
-		}
+// Dokumentasi Paper.id tidak mendefinisikan tanda tangan. Yang dibawa callback
+// hanyalah header Paper-Company-Id dari dashboard, dan itulah yang dibandingkan
+// di sini. Company id yang belum dikonfigurasi menolak setiap callback, bukan
+// menerima semuanya.
+func (s *Service) HandleWebhook(ctx context.Context, path, kredensial string, raw []byte) (settled bool, err error) {
+	if err := s.periksaKredensial(path, kredensial, raw); err != nil {
+		return false, err
 	}
 
 	var in WebhookInput
@@ -346,6 +340,19 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 		e := httpx.BadRequest("payload callback bukan JSON yang sah")
 		s.recordInboundAt(path, raw, http.StatusBadRequest, false, e)
 		return false, e
+	}
+
+	// Uang KELUAR tidak pernah melunasi apa pun, di URL mana pun ia mendarat.
+	//
+	// Disbursement dan pembayaran ke supplier punya endpoint acknowledge
+	// sendiri, tapi dashboard Paper.id membiarkan satu URL didaftarkan untuk
+	// beberapa jenis, dan di produksi keluarga ini memang sampai ke endpoint
+	// pembayaran masuk. Status "SUCCESS" pada pembayaran ke vendor yang
+	// kebetulan menyebut nomor invoice kita tidak boleh menandai tagihan
+	// member lunas. Dikenali dari bentuknya, bukan dari alamatnya.
+	if Pencairan(raw) {
+		s.recordInboundAt(path, raw, http.StatusOK, true, nil)
+		return false, nil
 	}
 
 	// Only a completed payment settles; other events are acknowledged (200) but
@@ -372,9 +379,22 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 			s.recordInboundAt(path, raw, http.StatusOK, true, nil)
 			return false, nil
 		}
-		err := httpx.BadRequest("callback tidak memuat invoice yang bisa dicocokkan")
-		s.recordInboundAt(path, raw, http.StatusBadRequest, false, err)
-		return false, err
+		// Tanpa identitas apa pun: diakui 200, direkam, tidak melunasi apa-apa.
+		//
+		// Sebelumnya dijawab 400. Setiap bentuk callback yang didokumentasikan
+		// Paper.id (Payment In/Out, Invoice, Reconciliation) membawa identitas
+		// invoice, jadi payload tanpa satu pun identitas bukan pembayaran yang
+		// bisa dicocokkan, dan mengulanginya tidak akan pernah berhasil. 400
+		// hanya membuat Paper.id mengirim ulang tanpa henti dan menandai URL
+		// callback kita gagal saat diuji dari dashboard mereka. Terjadi
+		// sungguhan di produksi: satu callback tanpa payment_info maupun
+		// identitas tercatat sebagai galat, padahal tidak ada yang bisa
+		// dilakukan atasnya selain menyimpannya untuk dibaca.
+		//
+		// Yang tidak hilang: catatan formatnya tetap tersimpan di blackbox,
+		// jadi bentuk payload yang belum kita kenal tetap terlihat di sana.
+		s.recordInboundAt(path, raw, http.StatusOK, true, nil)
+		return false, nil
 	}
 
 	pay := summarizePayment(in.paymentInfo())
@@ -648,6 +668,27 @@ func reminderNumber(base string, n int) string {
 	return fmt.Sprintf("%s-R%d", base, n)
 }
 
+// nomorKanonik membalikkan reminderNumber: INV-2026-023-R1 kembali menjadi
+// INV-2026-023. Nomor tanpa sufiks pengingat dikembalikan apa adanya.
+//
+// Dipakai saat callback datang. Pembayaran atas dokumen pengingat membawa
+// nomor turunannya, sedangkan tabel invoices hanya menyimpan nomor kanonik.
+// Tanpa pembalikan ini, pelunasan dari pengingat jatuh ke "invoice tidak
+// ditemukan" dan member yang sudah membayar tetap tercatat menunggak.
+// Terjadi sungguhan pada INV-2026-023-R1.
+func nomorKanonik(number string) string {
+	i := strings.LastIndex(number, "-R")
+	if i < 0 || i+2 >= len(number) {
+		return number
+	}
+	for _, c := range number[i+2:] {
+		if c < '0' || c > '9' {
+			return number
+		}
+	}
+	return number[:i]
+}
+
 // recordRemind mencerminkan recordSend: setiap hasil, berhasil maupun gagal,
 // meninggalkan satu entri di blackbox lengkap dengan request dan response.
 func (s *Service) recordRemind(invoiceID string, opts SendOptions, started time.Time, err error) {
@@ -685,21 +726,40 @@ func (s *Service) recordRemind(invoiceID string, opts SendOptions, started time.
 // Tokennya tetap diperiksa: endpoint terbuka yang menerima apa saja adalah
 // tempat menumpuknya sampah, dan rekaman yang tidak bisa dipercaya asalnya
 // tidak berguna saat dipakai menelusuri masalah.
-func (s *Service) AcknowledgeWebhook(_ context.Context, path, token string, raw []byte) error {
-	if !s.callbackTerbuka {
-		if s.callbackToken == "" {
-			err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
-			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-			return err
-		}
-		if subtle.ConstantTimeCompare([]byte(token), []byte(s.callbackToken)) != 1 {
-			err := httpx.Unauthorized("token callback tidak valid")
-			s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
-			return err
-		}
+func (s *Service) AcknowledgeWebhook(_ context.Context, path, kredensial string, raw []byte) error {
+	if err := s.periksaKredensial(path, kredensial, raw); err != nil {
+		return err
 	}
 	s.recordAcknowledged(path, raw)
 	return nil
+}
+
+// periksaKredensial memutuskan apakah sebuah callback boleh dipercaya asalnya.
+//
+// kredensial adalah isi header Paper-Company-Id yang dikirim dashboard Paper.id
+// (centang "Kirim paper company id"). Ia sah bila cocok dengan
+// PAPER_ID_COMPANY_ID, dibandingkan constant-time. Id itu tampil di dashboard
+// dan ikut di setiap panggilan API, jadi bukan rahasia sekelas token, tapi
+// tetap harus diketahui, bukan ditebak.
+//
+// Dua string kosong dianggap COCOK oleh subtle.ConstantTimeCompare, jadi
+// konfigurasi kosong harus ditolak dulu sebelum dibandingkan. Tanpa itu,
+// instalasi yang belum mengisi apa pun menerima callback tanpa kredensial.
+func (s *Service) periksaKredensial(path, kredensial string, raw []byte) error {
+	if s.callbackTerbuka {
+		return nil
+	}
+	if s.companyID == "" {
+		err := httpx.Unauthorized("callback Paper.id belum dikonfigurasi")
+		s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+		return err
+	}
+	if subtle.ConstantTimeCompare([]byte(kredensial), []byte(s.companyID)) == 1 {
+		return nil
+	}
+	err := httpx.Unauthorized("kredensial callback tidak valid")
+	s.recordInboundAt(path, raw, http.StatusUnauthorized, false, err)
+	return err
 }
 
 // recordAcknowledged mencatat callback yang memang tidak menyentuh invoice.

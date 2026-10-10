@@ -28,6 +28,7 @@ import {
   CardHeader,
   Field,
   Input,
+  MoneyInput,
   InvoiceStatusBadge,
   InvoiceTypeBadge,
   LoadingState,
@@ -377,10 +378,24 @@ export function InvoiceDetailPage() {
                       {(status === 'sent' || status === 'overdue') && (
                         <Button onClick={kirimPengingat}>
                           <Send className="h-4 w-4" />
-                          Kirim Ulang
+                          Kirim Pengingat
                         </Button>
                       )}
                     </div>
+                    {/* Berapa kali pengingat sudah berangkat. Tanpa angka ini,
+                        orang menekan tombolnya lagi "untuk memastikan", dan tiap
+                        pengiriman memakai satu nomor invoice Paper.id. */}
+                    <p className="text-xs text-ink-500">
+                      {invoice.paperIdReminderCount ? (
+                        <>
+                          Sudah diingatkan{' '}
+                          <span className="font-semibold text-ink-800">{invoice.paperIdReminderCount}×</span> lewat
+                          Paper.id.
+                        </>
+                      ) : (
+                        'Belum pernah diingatkan.'
+                      )}
+                    </p>
                   </>
                 ) : (
                   // Tanpa tautan Paper.id tidak ada yang bisa dibagikan, dan
@@ -587,13 +602,7 @@ export function InvoiceDetailPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Nominal (Rp)" required>
-              <Input
-                type="number"
-                value={mpAmount}
-                min={0}
-                step={50000}
-                onChange={(e) => setMpAmount(Number(e.target.value))}
-              />
+              <MoneyInput value={mpAmount} onChange={setMpAmount} />
             </Field>
             <Field label="Tanggal Bayar" required>
               <Input

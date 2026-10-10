@@ -294,9 +294,10 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 	}
 
 	var chapterMember string
+	var statusMember domain.MemberStatus
 	switch err := tx.QueryRow(ctx,
-		"SELECT chapter_id FROM members WHERE id = $1", in.MemberID,
-	).Scan(&chapterMember); {
+		"SELECT chapter_id, status FROM members WHERE id = $1", in.MemberID,
+	).Scan(&chapterMember, &statusMember); {
 	case errors.Is(err, pgx.ErrNoRows):
 		return nil, httpx.BadRequest("memberId tidak ditemukan")
 	case err != nil:
@@ -304,6 +305,11 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 	case chapterMember != in.ChapterID:
 		return nil, httpx.BadRequest(fmt.Sprintf(
 			"chapterId %q bukan chapter member tersebut (%q)", in.ChapterID, chapterMember))
+	// Tipe mengikuti status: pendaftaran untuk yang belum anggota (visitor,
+	// pending), renewal untuk yang sudah (active, inactive). Pesannya menunjuk
+	// tipe yang seharusnya, supaya yang menolak sekaligus memberi jalan.
+	case !statusMember.BolehDitagih(in.Type):
+		return nil, httpx.BadRequest(pesanTipeSalah(statusMember, in.Type))
 	}
 
 	const q = `
@@ -694,4 +700,13 @@ func (r *Repository) Summary(ctx context.Context, f domain.InvoiceFilter) (*doma
 		}
 	}
 	return out, rows.Err()
+}
+
+// pesanTipeSalah menyusun alasan penolakan tipe invoice yang tidak cocok dengan
+// status member, berikut tipe yang seharusnya dipakai.
+func pesanTipeSalah(status domain.MemberStatus, tipe domain.InvoiceType) string {
+	if tipe == domain.TypeRenewal {
+		return fmt.Sprintf("member berstatus %s belum menjadi anggota, jadi tidak bisa ditagih renewal; terbitkan invoice pendaftaran", status)
+	}
+	return fmt.Sprintf("member berstatus %s sudah menjadi anggota, jadi tidak bisa ditagih pendaftaran; terbitkan invoice renewal", status)
 }

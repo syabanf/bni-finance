@@ -217,6 +217,9 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <InvoiceStatusBadge status={inv.status} />
                   <InvoiceTypeBadge type={inv.type} />
+                  {!!inv.paperIdReminderCount && (
+                    <span className="text-xs text-ink-500">{inv.paperIdReminderCount}× diingatkan</span>
+                  )}
                   {canRemind(inv) && (
                     <span className="ml-auto">
                       <RemindAction invoice={inv} size="sm" />
@@ -253,6 +256,7 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
               <Th {...sortProps('amount')}>Nominal</Th>
               <Th {...sortProps('status')}>Status</Th>
               <Th {...sortProps('dueDate')}>Jatuh Tempo</Th>
+              {!compact && <Th className="text-center">Diingatkan</Th>}
               {!compact && <Th className="text-right">Aksi</Th>}
             </Tr>
           </THead>
@@ -304,6 +308,19 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
                       <DueHint dueDate={inv.dueDate} status={inv.status} />
                     </div>
                   </Td>
+                  {/* Berapa kali tagihan ini dikirim ulang sebagai pengingat.
+                      Pertanyaan pertama saat ada keluhan "saya diteror invoice",
+                      dan juga saat MC ingin tahu siapa yang sudah diingatkan
+                      berkali-kali tanpa membayar. */}
+                  {!compact && (
+                    <Td className="text-center">
+                      {inv.paperIdReminderCount ? (
+                        <span className="font-medium text-ink-700">{inv.paperIdReminderCount}×</span>
+                      ) : (
+                        <span className="text-ink-300">—</span>
+                      )}
+                    </Td>
+                  )}
                   {!compact && (
                     <Td className="text-right">
                       <div className="flex items-center justify-end gap-1">

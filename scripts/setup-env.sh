@@ -10,8 +10,6 @@
 #   - JWT_SECRET dibangkitkan acak. Ini alasan utama skrip ini ada: satu-satunya
 #     cara menaruh rahasia yang benar-benar dipakai ke dalam env tanpa pernah
 #     menulisnya ke berkas yang ikut ter-commit.
-#   - PAPER_ID_CALLBACK_TOKEN juga dibangkitkan — tanpa itu SETIAP callback
-#     Paper.id ditolak, termasuk yang asli.
 #   - Kata sandi admin awal dibangkitkan, lalu dicetak sekali di akhir.
 #
 # Tidak pernah menimpa berkas yang sudah ada. Kredensial pihak ketiga (Paper.id,
@@ -81,15 +79,13 @@ else
   cp backend/.env.example backend/.env
 
   JWT_SECRET=$(rand 48 60)
-  CALLBACK_TOKEN=$(rand 24 32)
   ADMIN_PASSWORD=$(rand 18 24)
 
   set_var backend/.env JWT_SECRET "$JWT_SECRET"
-  set_var backend/.env PAPER_ID_CALLBACK_TOKEN "$CALLBACK_TOKEN"
   set_var backend/.env SEED_ADMIN_PASSWORD "$ADMIN_PASSWORD"
   set_var backend/.env DATABASE_URL "postgres://postgres@localhost:5432/bni_finance_dev?sslmode=disable"
 
-  green "✓ backend/.env dibuat — JWT_SECRET, callback token, dan kata sandi admin dibangkitkan"
+  green "✓ backend/.env dibuat — JWT_SECRET dan kata sandi admin dibangkitkan"
   made_any=true
 fi
 
@@ -121,7 +117,6 @@ fi
 warn "Belum diisi — hanya Anda yang punya nilainya:"
 cat <<'TODO'
     PAPER_ID_CLIENT_ID / PAPER_ID_CLIENT_SECRET   penerbitan invoice
-    XENDIT_SECRET_KEY / XENDIT_CALLBACK_TOKEN     pembayaran mandiri
     BNI_VM_TOKEN                                  sinkronisasi member
 
 Semuanya opsional: fitur yang bersangkutan menjawab 503 dengan pesan yang

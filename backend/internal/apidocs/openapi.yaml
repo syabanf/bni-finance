@@ -1304,6 +1304,12 @@ paths:
           in: query
           description: Panjang grafik tren bulanan.
           schema: { type: integer, minimum: 1, maximum: 24, default: 6 }
+        - name: type
+          in: query
+          description: |
+            Saring seluruh angka invoice ke satu tipe. Kosong = semua.
+            `renewalDue` tidak ikut tersaring karena menghitung keanggotaan.
+          schema: { type: string, enum: [renewal, registration] }
       responses:
         "200":
           description: Ringkasan
@@ -1498,14 +1504,15 @@ paths:
         Selainnya diakui dengan 200 tanpa mengubah apa pun.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1523,7 +1530,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1544,14 +1551,15 @@ paths:
         invoice kita akan menandainya lunas tanpa uang pernah masuk.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1569,7 +1577,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1586,14 +1594,15 @@ paths:
         `data.invoice.number`.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1611,7 +1620,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1630,14 +1639,15 @@ paths:
         penagihan atas sisa yang masih terutang.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1655,7 +1665,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1673,14 +1683,15 @@ paths:
         dipakai.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1698,7 +1709,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1711,14 +1722,15 @@ paths:
         Diterima, direkam, diakui. Tidak menyentuh invoice.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1736,7 +1748,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1749,14 +1761,15 @@ paths:
         Diterima, direkam, diakui. Tidak menyentuh invoice.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1774,7 +1787,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1791,14 +1804,15 @@ paths:
         lengkap sehingga bisa ditindaklanjuti begitu perilakunya diputuskan.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
+        - name: Paper-Company-Id
+          in: header
+          required: true
           schema: { type: string }
           description: |
-            Token callback bersama. Bisa juga dikirim lewat header
-            `x-paper-callback-token` — Paper.id tidak menandatangani callback,
-            jadi token inilah satu-satunya pembuktian asalnya.
+            Id perusahaan Paper.id, dikirim dashboard bila opsi "Kirim paper
+            company id" dicentang. Paper.id tidak menandatangani callback, jadi
+            header ini satu-satunya pembuktian asalnya; dibandingkan dengan
+            PAPER_ID_COMPANY_ID.
       requestBody:
         required: true
         content:
@@ -1816,7 +1830,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "401":
-          description: Token callback salah atau belum dikonfigurasi
+          description: Header Paper-Company-Id salah atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -1827,9 +1841,9 @@ paths:
       summary: Callback pembayaran dari Paper.id
       description: |
         **Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda
-        tangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa
-        secret bersama (lewat `?token=…` atau header `x-paper-callback-token`)
-        yang dibandingkan **constant-time** di sini. Secret yang belum
+        tangan. Yang dikirim dashboard adalah id perusahaan di header
+        `Paper-Company-Id` (centang "Kirim paper company id"), dibandingkan
+        **constant-time** dengan `PAPER_ID_COMPANY_ID`. Id yang belum
         dikonfigurasi menolak **setiap** callback, bukan menerima semuanya.
 
         **Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice
@@ -1842,14 +1856,10 @@ paths:
       # Bearer global tidak berlaku: Paper.id memanggil tanpa sesi kita.
       security: []
       parameters:
-        - name: token
-          in: query
-          required: false
-          description: Secret bersama, alternatif dari header.
-          schema: { type: string }
-        - name: x-paper-callback-token
+        - name: Paper-Company-Id
           in: header
-          required: false
+          required: true
+          description: Id perusahaan Paper.id, lihat keterangan di atas.
           schema: { type: string }
       requestBody:
         required: true
@@ -1869,7 +1879,7 @@ paths:
                     description: Apakah callback ini benar-benar melunasi invoice.
         "400": { $ref: "#/components/responses/BadRequest" }
         "401":
-          description: Token callback tidak valid atau belum dikonfigurasi
+          description: Header Paper-Company-Id tidak valid atau belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -2143,7 +2153,17 @@ paths:
         dihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.
 
         Format ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang
-        di-rename menjadi `.csv` tetap terbaca benar.
+        di-rename menjadi `.csv` tetap terbaca benar. Ekspor BNI Connect
+        (berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.
+
+        **Laporan BNI Connect** (Membership Dues, Chapter Roster, Membership
+        Length) dikenali dari judul kolomnya di baris mana pun dan dibaca
+        dengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan
+        lewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan
+        yang belum ada dibuat baru dengan id `bc-…`. Dues mengisi jatuh tempo
+        dan status (Active/Dropped), Roster mengisi perusahaan, telepon, dan
+        bidang usaha, Length mengisi tanggal bergabung. Laporan Dues yang
+        menumpuk beberapa tabel di satu lembar dibaca seluruhnya.
 
         Kolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa
         Indonesia maupun Inggris sama-sama diterima (`nama`/`name`,
@@ -2229,7 +2249,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  format: { type: string, enum: [csv, xlsx] }
+                  format: { type: string, enum: [csv, xlsx, spreadsheetml] }
                   jenis: { type: string, enum: [chapters, members] }
                   diterapkan: { type: boolean }
                   total: { type: integer }
@@ -3135,9 +3155,18 @@ components:
       required: [id, registrationFee, renewalFee, currency, updatedAt, createdAt]
       properties:
         id: { title: ID, type: string, default: "default" }
-        registrationFee: { title: Biaya Pendaftaran, type: integer }
-        renewalFee: { title: Biaya Perpanjangan, type: integer }
+        registrationFee:
+          title: Biaya Pendaftaran
+          type: integer
+          description: Rupiah yang ditagihkan. Diturunkan server dari `registrationFeeUsd` × `usdRate`.
+        renewalFee:
+          title: Biaya Perpanjangan
+          type: integer
+          description: Rupiah yang ditagihkan. Diturunkan server dari `renewalFeeUsd` × `usdRate`.
         currency: { title: Mata Uang, type: string, default: IDR }
+        registrationFeeUsd: { title: Biaya Pendaftaran (USD), type: number, example: 1125 }
+        renewalFeeUsd: { title: Biaya Perpanjangan (USD), type: number, example: 793.75 }
+        usdRate: { title: Kurs USD ke IDR, type: integer, example: 16000, description: Rupiah per satu dolar, diisi manual. }
         notes: { title: Catatan, type: string }
         updatedBy: { title: Diubah Oleh, type: string }
         updatedAt: { type: string, format: date-time }
@@ -3145,10 +3174,21 @@ components:
 
     UpdateFeeSettingsInput:
       type: object
-      description: Minimal satu field harus dikirim.
+      description: |
+        Minimal satu field harus dikirim.
+
+        Mengirim salah satu dari `registrationFeeUsd`, `renewalFeeUsd`, atau
+        `usdRate` membuat server menghitung ulang **kedua** harga Rupiah dari
+        nilai efektifnya (yang dikirim, atau yang tersimpan bila tidak
+        dikirim). `registrationFee`/`renewalFee` yang ikut dikirim dalam
+        permintaan yang sama ditimpa; satu angka yang tercetak di invoice
+        hanya boleh punya satu sumber.
       properties:
         registrationFee: { title: Biaya Pendaftaran, type: integer, minimum: 0 }
         renewalFee: { title: Biaya Perpanjangan, type: integer, minimum: 0 }
+        registrationFeeUsd: { title: Biaya Pendaftaran (USD), type: number, minimum: 0 }
+        renewalFeeUsd: { title: Biaya Perpanjangan (USD), type: number, minimum: 0 }
+        usdRate: { title: Kurs USD ke IDR, type: integer, minimum: 1 }
         currency: { title: Mata Uang, type: string, minLength: 1 }
         notes: { title: Catatan, type: string }
         updatedBy: { title: Diubah Oleh, type: string }
@@ -3232,6 +3272,10 @@ components:
               outstanding: { type: integer }
               overdue: { type: integer }
               totalAmount: { type: integer }
+              renewal: { type: integer, description: Jumlah invoice renewal, tanpa yang dibatalkan }
+              renewalAmount: { type: integer }
+              registration: { type: integer, description: Jumlah invoice pendaftaran, tanpa yang dibatalkan }
+              registrationAmount: { type: integer }
 
     # --- Publik --------------------------------------------------------------
     PublicInvoice:

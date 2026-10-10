@@ -102,6 +102,11 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 	root.Handle("/api/", auth.RequireAuth(signer)(protected))
 
 	chain := []httpx.Middleware{
+		// Paling luar, sebelum mux sempat menjawab 301 atas "//" di path.
+		// Redirect itu mengubah POST menjadi GET dan membuang body, dan untuk
+		// webhook pembayaran itu berarti callback yang sampai dalam keadaan
+		// kosong. Lihat httpx.RapikanPath.
+		httpx.RapikanPath,
 		httpx.RequestID,
 		httpx.Logger(log),
 		httpx.Recoverer(log),

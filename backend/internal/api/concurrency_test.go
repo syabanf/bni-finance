@@ -196,7 +196,7 @@ func TestConcurrentWebhooksSettleExactlyOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-gate
-			status, body := s.post("/api/v1/webhooks/paperid?token="+e2eCallbackToken, "", callback)
+			status, body := s.postCallback(e2eCompanyID, callback)
 			if status != http.StatusOK {
 				return
 			}

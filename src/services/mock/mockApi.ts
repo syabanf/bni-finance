@@ -509,7 +509,16 @@ export async function mockApiFetch(
       if (typeof b.renewalFee === 'number' && b.renewalFee < 0) {
         return fail(400, 'renewalFee tidak boleh negatif')
       }
-      return ok({ ...store.feeSettings, ...b, updatedAt: nowISO() })
+      if (typeof b.usdRate === 'number' && b.usdRate <= 0) {
+        return fail(400, 'usdRate harus lebih dari nol')
+      }
+      const next = { ...store.feeSettings, ...b, updatedAt: nowISO() } as typeof store.feeSettings
+      // Meniru server: USD atau kurs yang berubah menurunkan ulang Rupiah.
+      if ('registrationFeeUsd' in b || 'renewalFeeUsd' in b || 'usdRate' in b) {
+        next.registrationFee = Math.round(next.registrationFeeUsd * next.usdRate)
+        next.renewalFee = Math.round(next.renewalFeeUsd * next.usdRate)
+      }
+      return ok(next)
     }
   }
 
@@ -592,6 +601,10 @@ export async function mockApiFetch(
           outstanding: rows.filter((i) => i.status === 'sent' || i.status === 'overdue').length,
           overdue: rows.filter((i) => i.status === 'overdue').length,
           totalAmount: sum(rows.filter((i) => i.status !== 'cancelled')),
+          renewal: rows.filter((i) => i.type === 'renewal' && i.status !== 'cancelled').length,
+          renewalAmount: sum(rows.filter((i) => i.type === 'renewal' && i.status !== 'cancelled')),
+          registration: rows.filter((i) => i.type === 'registration' && i.status !== 'cancelled').length,
+          registrationAmount: sum(rows.filter((i) => i.type === 'registration' && i.status !== 'cancelled')),
         }
       }),
     })
@@ -720,9 +733,9 @@ export async function mockApiFetch(
       durationMs: 2,
       success: false,
       request: body ?? {},
-      error: 'token callback tidak valid',
+      error: 'kredensial callback tidak valid',
     })
-    return fail(401, 'token callback tidak valid')
+    return fail(401, 'kredensial callback tidak valid')
   }
 
   // --- routes outside /api/v1 ---------------------------------------------

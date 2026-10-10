@@ -61,8 +61,8 @@ npm run dev        # http://localhost:5173
 
 Masuk dengan kredensial apa pun, atau tekan tombol **Masuk Cepat**.
 
-`npm run setup` menyalin kedua `.env.example` lalu membangkitkan `JWT_SECRET`,
-token callback Paper.id, dan kata sandi admin awal. Kredensial pihak ketiga
+`npm run setup` menyalin kedua `.env.example` lalu membangkitkan `JWT_SECRET`
+dan kata sandi admin awal. Kredensial pihak ketiga
 dibiarkan kosong — fitur terkait menjawab 503 dengan pesan jelas sampai diisi.
 Berkas yang sudah ada tidak pernah ditimpa.
 
@@ -272,7 +272,7 @@ VITE_USE_MOCK=true          # hanya nilai awal
 
 ```
 DATABASE_URL, JWT_SECRET               # wajib
-PAPER_ID_CLIENT_ID, PAPER_ID_CLIENT_SECRET, PAPER_ID_CALLBACK_TOKEN
+PAPER_ID_CLIENT_ID, PAPER_ID_CLIENT_SECRET, PAPER_ID_COMPANY_ID
 BNI_VM_URL, BNI_VM_TOKEN
 SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
 AUTH_QUICK_LOGIN                       # kosong = mati

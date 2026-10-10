@@ -171,7 +171,7 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 		// alur ini berarti permintaannya memang sudah ada, dan menyatukan
 		// keduanya membuat tamu yang terlewat tidak bisa dibedakan dari
 		// pekerjaan yang sudah beres. Yang satu wajar, yang satu perlu dilihat.
-		if !status.BolehDitagih() {
+		if !status.BolehDitagih(domain.TypeRenewal) {
 			visitor++
 			continue
 		}

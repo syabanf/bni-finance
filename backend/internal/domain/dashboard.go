@@ -36,6 +36,14 @@ type ChapterStat struct {
 	Outstanding int    `json:"outstanding"`
 	Overdue     int    `json:"overdue"`
 	TotalAmount int64  `json:"totalAmount"`
+
+	// Per tipe. Renewal dan pendaftaran punya harga yang jauh berbeda, jadi
+	// jumlah invoice saja tidak menjelaskan nominalnya; keduanya dibawa.
+	// Sama seperti Total: invoice yang dibatalkan tidak dihitung.
+	Renewal            int   `json:"renewal"`
+	RenewalAmount      int64 `json:"renewalAmount"`
+	Registration       int   `json:"registration"`
+	RegistrationAmount int64 `json:"registrationAmount"`
 }
 
 // DashboardSummary matches the frontend's DashboardSummary type so the

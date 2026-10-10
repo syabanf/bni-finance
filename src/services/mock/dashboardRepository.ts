@@ -19,13 +19,14 @@ function pct(current: number, previous: number): number {
 }
 
 export const mockDashboardRepository: DashboardRepository = {
-  async summary() {
+  async summary(params) {
     const now = new Date()
     const thisMonth = monthKey(now.toISOString())
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const prevMonth = monthKey(prev.toISOString())
 
-    const all = store.invoices
+    // Saringan tipe berlaku untuk seluruh angka invoice, seperti di server.
+    const all = params?.type ? store.invoices.filter((i) => i.type === params.type) : store.invoices
     const active = all.filter((i) => i.status !== 'cancelled')
     const issuedThis = active.filter((i) => monthKey(i.dueDate) === thisMonth)
     const issuedPrev = active.filter((i) => monthKey(i.dueDate) === prevMonth)
@@ -83,9 +84,17 @@ export const mockDashboardRepository: DashboardRepository = {
         chapterId: inv.chapterId,
         chapterName: chapter.displayName,
         total: 0, paid: 0, outstanding: 0, overdue: 0, totalAmount: 0,
+        renewal: 0, renewalAmount: 0, registration: 0, registrationAmount: 0,
       }
       existing.total++
       existing.totalAmount += inv.amount
+      if (inv.type === 'renewal') {
+        existing.renewal++
+        existing.renewalAmount += inv.amount
+      } else {
+        existing.registration++
+        existing.registrationAmount += inv.amount
+      }
       if (inv.status === 'paid') existing.paid++
       if (inv.status === 'sent') existing.outstanding++
       if (inv.status === 'overdue') existing.overdue++

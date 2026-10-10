@@ -42,6 +42,27 @@ const CONTACT_OPTIONS: { value: ContactFilter; label: string }[] = [
   { value: 'no-contact', label: 'Tanpa HP & Email' },
 ]
 
+/**
+ * Member versus visitor, sebagai satu saringan kasar.
+ *
+ * Kartu status di atas tabel sudah membedakan empat status, tapi pertanyaan
+ * yang sering diajukan lebih sederhana dari itu: siapa yang sudah anggota,
+ * dan siapa yang masih dalam perjalanan ke sana. Visitor di saringan ini
+ * mencakup tamu (status visitor) dan yang sedang menunggu pendaftarannya
+ * diproses (pending).
+ * Yang keanggotaannya lewat (inactive) tetap member: ia pernah bergabung,
+ * dan yang ditagih darinya adalah perpanjangan, bukan pendaftaran.
+ */
+type Keanggotaan = 'all' | 'member' | 'visitor'
+
+const KEANGGOTAAN_OPTIONS: { value: Keanggotaan; label: string }[] = [
+  { value: 'all', label: 'Member & Visitor' },
+  { value: 'member', label: 'Member' },
+  { value: 'visitor', label: 'Visitor' },
+]
+
+const STATUS_VISITOR: MemberStatus[] = ['pending', 'visitor']
+
 const MEMBER_STATUS_LABEL: Record<string, string> = {
   active: 'Aktif',
   pending: 'Pending',
@@ -73,6 +94,7 @@ export function MemberListPage() {
   const [dueTo, setDueTo] = useState('')
   const [memberStatus, setMemberStatus] = useState<MemberStatus | 'all'>('all')
   const [contact, setContact] = useState<ContactFilter>('all')
+  const [keanggotaan, setKeanggotaan] = useState<Keanggotaan>('all')
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
 
@@ -83,6 +105,7 @@ export function MemberListPage() {
     const q = search.trim().toLowerCase()
     return members.filter((m) => {
       if (chapterId !== 'all' && m.chapterId !== chapterId) return false
+      if (keanggotaan !== 'all' && STATUS_VISITOR.includes(m.status) !== (keanggotaan === 'visitor')) return false
       if (hideNoDueDate && !m.renewalDate) return false
       if (dueFrom && (!m.renewalDate || m.renewalDate < dueFrom)) return false
       if (dueTo && (!m.renewalDate || m.renewalDate > dueTo)) return false
@@ -99,7 +122,7 @@ export function MemberListPage() {
       if (contact === 'no-contact' && (hasPhone || hasEmail)) return false
       return true
     })
-  }, [members, search, chapterId, hideNoDueDate, dueFrom, dueTo, contact])
+  }, [members, search, chapterId, keanggotaan, hideNoDueDate, dueFrom, dueTo, contact])
 
   const statusCounts = useMemo(() => {
     const list = baseFiltered
@@ -248,6 +271,17 @@ export function MemberListPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={keanggotaan}
+              onChange={(e) => setKeanggotaan(e.target.value as Keanggotaan)}
+              className="w-full sm:w-44"
+            >
+              {KEANGGOTAAN_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
             <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-52">
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (

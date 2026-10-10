@@ -1,4 +1,4 @@
-import type { InvoiceStatus } from '@/types'
+import type { InvoiceStatus, InvoiceType, MemberStatus } from '@/types'
 
 /**
  * Single source of truth for how invoice statuses are presented across the app
@@ -34,4 +34,19 @@ export const OUTSTANDING_STATUSES: InvoiceStatus[] = ['sent', 'overdue']
 
 export function isOutstanding(status: InvoiceStatus): boolean {
   return status === 'sent' || status === 'overdue'
+}
+
+/**
+ * Status member yang boleh menerima tiap tipe invoice. Cermin dari
+ * MemberStatus.BolehDitagih di server: pendaftaran untuk yang belum anggota,
+ * renewal untuk yang sudah. Formulir memakainya untuk menyaring pilihan, mock
+ * memakainya untuk menolak, supaya keduanya tidak berbeda dari server.
+ */
+export const STATUS_UNTUK_TIPE: Record<InvoiceType, MemberStatus[]> = {
+  registration: ['visitor', 'pending'],
+  renewal: ['active', 'inactive'],
+}
+
+export function bolehDitagih(status: MemberStatus, tipe: InvoiceType): boolean {
+  return STATUS_UNTUK_TIPE[tipe].includes(status)
 }

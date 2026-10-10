@@ -39,7 +39,22 @@ func TestRingkasanPerTipeMengikutiFilterStatus(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = repo.Delete(nasional, inv.ID) })
 	}
-	in := contohInput(memA, chA, 5_000_000)
+	// Pendaftaran hanya untuk yang belum anggota, jadi ditagihkan ke calon
+	// member di chapter yang sama, bukan ke memA yang aktif.
+	const calon = "mem-uji-ringkas-calon"
+	if _, err := pool.Exec(nasional, `
+		INSERT INTO members (id, chapter_id, name, status, joined_date)
+		VALUES ($1,$2,'Calon Ringkas','pending'::member_status, CURRENT_DATE)
+		ON CONFLICT (id) DO UPDATE SET status = 'pending', chapter_id = $2`, calon, chA); err != nil {
+		t.Fatalf("siapkan calon member: %v", err)
+	}
+	t.Cleanup(func() {
+		c := context.Background()
+		_, _ = pool.Exec(c, "DELETE FROM invoice_audit_log WHERE invoice_id IN (SELECT id FROM invoices WHERE member_id = $1)", calon)
+		_, _ = pool.Exec(c, "DELETE FROM invoices WHERE member_id = $1", calon)
+		_, _ = pool.Exec(c, "DELETE FROM members WHERE id = $1", calon)
+	})
+	in := contohInput(calon, chA, 5_000_000)
 	in.Type = domain.TypeRegistration
 	daftar, err := repo.Create(nasional, in, "", "IDR")
 	if err != nil {

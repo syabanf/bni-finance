@@ -8,6 +8,7 @@ import {
   CardHeader,
   Field,
   Input,
+  MoneyInput,
   LoadingState,
   PageHeader,
   Textarea,
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
+import { rupiahDari } from '@/lib/kurs'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
 import { formatCurrency, formatDateTime } from '@/lib/format'
 import { PaperProdukCard } from './components/PaperProdukCard'
@@ -25,9 +27,15 @@ export function SettingsPage() {
   const { toast } = useToast()
   const { data: fees, loading, reload } = useAsync<FeeSettings>(() => settingsService.getFees())
 
-  const [registrationFee, setRegistrationFee] = useState(0)
-  const [renewalFee, setRenewalFee] = useState(0)
+  const [registrationFeeUsd, setRegistrationFeeUsd] = useState(0)
+  const [renewalFeeUsd, setRenewalFeeUsd] = useState(0)
+  const [usdRate, setUsdRate] = useState(0)
   const [notes, setNotes] = useState('')
+  // Rupiah yang AKAN disimpan, dihitung dengan aturan yang sama seperti server.
+  // Ditampilkan sebelum Simpan ditekan, supaya akibat dari angka yang baru
+  // diketik terlihat lebih dulu.
+  const registrationFee = rupiahDari(registrationFeeUsd, usdRate)
+  const renewalFee = rupiahDari(renewalFeeUsd, usdRate)
   const [saving, setSaving] = useState(false)
 
   // Invoice timing
@@ -56,22 +64,29 @@ export function SettingsPage() {
 
   useEffect(() => {
     if (fees) {
-      setRegistrationFee(fees.registrationFee)
-      setRenewalFee(fees.renewalFee)
+      setRegistrationFeeUsd(fees.registrationFeeUsd)
+      setRenewalFeeUsd(fees.renewalFeeUsd)
+      setUsdRate(fees.usdRate)
       setNotes(fees.notes ?? '')
     }
   }, [fees])
 
   const dirty =
     !!fees &&
-    (registrationFee !== fees.registrationFee ||
-      renewalFee !== fees.renewalFee ||
+    (registrationFeeUsd !== fees.registrationFeeUsd ||
+      renewalFeeUsd !== fees.renewalFeeUsd ||
+      usdRate !== fees.usdRate ||
       notes !== (fees.notes ?? ''))
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      await settingsService.updateFees({ registrationFee, renewalFee, notes: notes.trim() || undefined })
+      await settingsService.updateFees({
+        registrationFeeUsd,
+        renewalFeeUsd,
+        usdRate,
+        notes: notes.trim() || undefined,
+      })
       toast('Pengaturan biaya berhasil disimpan.')
       reload()
     } catch (err) {
@@ -100,17 +115,34 @@ export function SettingsPage() {
                   icon={<UserPlus className="h-5 w-5" />}
                   label="Biaya Pendaftaran"
                   hint="Visitor → Member (berlaku 1 tahun)"
-                  value={registrationFee}
-                  onChange={setRegistrationFee}
+                  usd={registrationFeeUsd}
+                  onChange={setRegistrationFeeUsd}
+                  rupiah={registrationFee}
                 />
                 <FeeInput
                   icon={<RefreshCw className="h-5 w-5" />}
                   label="Biaya Renewal"
                   hint="Perpanjangan tahunan member"
-                  value={renewalFee}
-                  onChange={setRenewalFee}
+                  usd={renewalFeeUsd}
+                  onChange={setRenewalFeeUsd}
+                  rupiah={renewalFee}
                 />
               </div>
+
+              {/* Satu kurs untuk kedua harga. Mengubahnya mengubah kedua
+                  Rupiah sekaligus, dan itu memang maksudnya: BNI menetapkan
+                  harga dalam Dollar, dan Rupiah hanya terjemahannya. */}
+              <Field
+                label="Kurs USD → IDR"
+                hint="Rupiah per satu dolar, diisi manual. Kedua harga Rupiah dihitung ulang dari kurs ini."
+              >
+                <div className="relative sm:w-64">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">
+                    Rp
+                  </span>
+                  <MoneyInput value={usdRate} onChange={setUsdRate} className="pl-9 font-semibold" />
+                </div>
+              </Field>
 
               <Field label="Catatan" hint="Catatan internal mengenai kebijakan biaya.">
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -216,14 +248,16 @@ function FeeInput({
   icon,
   label,
   hint,
-  value,
+  usd,
   onChange,
+  rupiah,
 }: {
   icon: React.ReactNode
   label: string
   hint: string
-  value: number
+  usd: number
   onChange: (v: number) => void
+  rupiah: number
 }) {
   return (
     <div className="rounded-xl border border-ink-200 p-4">
@@ -236,18 +270,26 @@ function FeeInput({
           <div className="text-xs text-ink-400">{hint}</div>
         </div>
       </div>
+      {/* Yang diketik Dollar; Rupiah di bawahnya hanya dibaca. BNI menetapkan
+          harga dalam Dollar, dan Rupiah adalah hasil kurs, bukan angka yang
+          berdiri sendiri. Dua kotak yang sama-sama bisa diketik adalah dua
+          sumber untuk satu angka yang suatu saat tidak sama. */}
       <div className="relative">
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">
-          Rp
+          $
         </span>
         <Input
           type="number"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          inputMode="decimal"
           min={0}
-          step={50000}
-          className="pl-9 text-base font-semibold"
+          step="0.01"
+          value={usd}
+          onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+          className="pl-8 text-base font-semibold"
         />
+      </div>
+      <div className="mt-2 text-sm text-ink-600">
+        = <span className="font-semibold text-ink-900">{formatCurrency(rupiah)}</span>
       </div>
     </div>
   )

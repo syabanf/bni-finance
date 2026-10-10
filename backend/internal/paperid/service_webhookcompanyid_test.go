@@ -5,29 +5,30 @@ import (
 	"testing"
 )
 
-// TOKEN KOSONG TIDAK BOLEH LOLOS, TERMASUK SAAT KONFIGURASINYA JUGA KOSONG.
+// KREDENSIAL KOSONG TIDAK BOLEH LOLOS, TERMASUK SAAT KONFIGURASINYA JUGA KOSONG.
 //
 // Endpoint ini duduk di luar middleware autentikasi, karena Paper.id memanggil
-// tanpa login. Tokennya satu-satunya yang membedakan callback sungguhan dari
-// siapa pun yang tahu alamatnya.
+// tanpa login. Header Paper-Company-Id satu-satunya yang membedakan callback
+// sungguhan dari siapa pun yang tahu alamatnya.
 //
 // Bahayanya ada pada subtle.ConstantTimeCompare: membandingkan dua string
 // kosong menghasilkan 1, yaitu COCOK. Jadi tanpa penjaga eksplisit, instalasi
-// yang PAPER_ID_CALLBACK_TOKEN-nya belum diisi akan menerima callback tanpa
-// token apa pun dan menandai invoice lunas. Dibuktikan dengan menghapus
+// yang PAPER_ID_COMPANY_ID-nya belum diisi akan menerima callback tanpa
+// header apa pun dan menandai invoice lunas. Dibuktikan dengan menghapus
 // penjaganya: settle dipanggil, galat nil.
 //
-// Tes yang sudah ada mengirim token "apa pun", yang tidak pernah menyentuh
+// Tes yang sudah ada mengirim kredensial "apa pun", yang tidak pernah menyentuh
 // kombinasi itu. Menghapus penjaganya membuat seluruh paket tetap hijau.
-func TestWebhookTokenKosongDitolak(t *testing.T) {
+func TestWebhookKredensialKosongDitolak(t *testing.T) {
 	kasus := []struct {
 		nama        string
 		terkonfigur string
 		dikirim     string
 	}{
-		{"konfigurasi kosong, token kosong", "", ""},
-		{"konfigurasi kosong, token diisi", "", "apa pun"},
-		{"konfigurasi diisi, token kosong", "rahasia", ""},
+		{"konfigurasi kosong, header kosong", "", ""},
+		{"konfigurasi kosong, header diisi", "", "apa pun"},
+		{"konfigurasi diisi, header kosong", "rahasia", ""},
+		{"konfigurasi diisi, header salah", "rahasia", "salah"},
 	}
 	for _, k := range kasus {
 		t.Run(k.nama, func(t *testing.T) {
@@ -41,30 +42,30 @@ func TestWebhookTokenKosongDitolak(t *testing.T) {
 			// Yang menentukan bukan kode statusnya, melainkan ini: tidak boleh
 			// ada invoice yang berpindah status.
 			if store.settleRef.called {
-				t.Error("settle dipanggil padahal tokennya tidak sah")
+				t.Error("settle dipanggil padahal kredensialnya tidak sah")
 			}
 		})
 	}
 }
 
-// Jalur acknowledge memeriksa token dengan aturan yang sama.
+// Jalur acknowledge memeriksa kredensial dengan aturan yang sama.
 //
 // Ia tidak menyentuh invoice, jadi godaan untuk membiarkannya terbuka besar.
 // Tapi endpoint terbuka yang menerima apa saja adalah tempat menumpuknya
 // sampah, dan rekaman yang tidak bisa dipercaya asalnya justru tidak berguna
 // saat dipakai menelusuri masalah. Sebelum ini ia tidak punya satu pun tes.
-func TestAcknowledgeMemeriksaToken(t *testing.T) {
+func TestAcknowledgeMemeriksaKredensial(t *testing.T) {
 	kasus := []struct {
 		nama        string
 		terkonfigur string
 		dikirim     string
 		mau401      bool
 	}{
-		{"konfigurasi kosong, token kosong", "", "", true},
-		{"konfigurasi kosong, token diisi", "", "apa pun", true},
-		{"konfigurasi diisi, token kosong", "rahasia", "", true},
-		{"konfigurasi diisi, token salah", "rahasia", "salah", true},
-		{"token benar", "rahasia", "rahasia", false},
+		{"konfigurasi kosong, header kosong", "", "", true},
+		{"konfigurasi kosong, header diisi", "", "apa pun", true},
+		{"konfigurasi diisi, header kosong", "rahasia", "", true},
+		{"konfigurasi diisi, header salah", "rahasia", "salah", true},
+		{"header benar", "rahasia", "rahasia", false},
 	}
 	for _, k := range kasus {
 		t.Run(k.nama, func(t *testing.T) {
@@ -78,7 +79,7 @@ func TestAcknowledgeMemeriksaToken(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Errorf("token benar harus diterima, dapat %v", err)
+				t.Errorf("header benar harus diterima, dapat %v", err)
 			}
 		})
 	}
@@ -88,8 +89,8 @@ func TestAcknowledgeMemeriksaToken(t *testing.T) {
 //
 // Keduanya diuji bersama karena yang berbahaya bukan modenya, melainkan
 // kemungkinan ia menyala tanpa seorang pun meminta. Service yang dibangun
-// tanpa menyentuh sakelar ini harus tetap menolak callback tanpa token.
-func TestCallbackTerbukaMelewatiToken(t *testing.T) {
+// tanpa menyentuh sakelar ini harus tetap menolak callback tanpa kredensial.
+func TestCallbackTerbukaMelewatiKredensial(t *testing.T) {
 	t.Run("bawaan: tertutup", func(t *testing.T) {
 		store := &stubStore{}
 		svc := newService(store, &stubGateway{}, "rahasia") // sakelar tidak disentuh
@@ -102,7 +103,7 @@ func TestCallbackTerbukaMelewatiToken(t *testing.T) {
 		}
 	})
 
-	t.Run("terbuka: token kosong diterima", func(t *testing.T) {
+	t.Run("terbuka: header kosong diterima", func(t *testing.T) {
 		// settleReturns menentukan apakah ADA invoice yang cocok dengan
 		// referensinya. Tanpa itu, settle tetap dipanggil tapi melaporkan nol
 		// baris berubah, dan tesnya memerah pada hal yang bukan intinya.
@@ -118,12 +119,12 @@ func TestCallbackTerbukaMelewatiToken(t *testing.T) {
 		}
 	})
 
-	t.Run("terbuka: tanpa token terkonfigurasi sama sekali", func(t *testing.T) {
+	t.Run("terbuka: tanpa company id terkonfigurasi sama sekali", func(t *testing.T) {
 		store := &stubStore{}
 		svc := newService(store, &stubGateway{}, "").IzinkanCallbackTanpaToken(true)
 		if _, err := svc.HandleWebhook(context.Background(),
 			"/api/v1/webhooks/paperid", "", mustJSONBytes(paidWebhook())); err != nil {
-			t.Fatalf("mode terbuka tidak boleh menuntut token terkonfigurasi, dapat %v", err)
+			t.Fatalf("mode terbuka tidak boleh menuntut company id terkonfigurasi, dapat %v", err)
 		}
 	})
 
