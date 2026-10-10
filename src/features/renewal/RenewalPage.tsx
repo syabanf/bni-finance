@@ -532,7 +532,7 @@ function TombolMinta({
         // menanyakan konfirmasi kepada orang yang keanggotaannya masih lama
         // membuat daftar tugas MC penuh hal yang belum perlu dijawab.
         const semua = await memberService.list()
-        const aktif = semua.filter((m) => m.status === 'active')
+        const aktif = semua.filter((m) => m.status === 'active' || m.status === 'new_member')
         // Disaring per chapter bila dipilih. MOM: "Konfirmasi Renewal ada yang
         // kirim by chapter" — ST yang menangani satu chapter tidak seharusnya
         // membuat tugas untuk seluruh MC di chapter lain hanya karena menekan

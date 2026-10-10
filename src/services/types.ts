@@ -10,6 +10,7 @@
 
 import type {
   ImportHasil,
+  Member,
   MemberStatus,
   ManagedUser,
   RenewalAnswer,
@@ -149,7 +150,19 @@ export interface MemberRepository {
   getById(id: string): Promise<MemberWithChapter | null>
   /** Members eligible for a new registration invoice (no active one yet). */
   eligibleForRegistration(): Promise<MemberWithChapter[]>
+  /** Tambah satu member (admin). */
+  create(input: CreateMemberInput): Promise<Member>
   sync(): Promise<{ count: number; syncedAt: string }>
+}
+
+export interface CreateMemberInput {
+  chapterId: string
+  name: string
+  email?: string
+  phone?: string
+  company?: string
+  businessField?: string
+  status?: MemberStatus
 }
 
 export interface InvoiceRepository {

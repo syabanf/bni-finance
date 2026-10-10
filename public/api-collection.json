@@ -1266,7 +1266,8 @@
             "active",
             "inactive",
             "pending",
-            "visitor"
+            "visitor",
+            "new_member"
           ],
           "description": ""
         },
@@ -1541,9 +1542,10 @@
             "active",
             "inactive",
             "pending",
-            "visitor"
+            "visitor",
+            "new_member"
           ],
-          "description": "visitor adalah tamu yang datang ke pertemuan chapter tapi belum menjadi anggota. Ia dicatat supaya bisa diikuti sampai mendaftar, dan tidak pernah ditagih: dua query yang memanen member untuk renewal menyaring active, dan permintaan renewal yang memakai daftar id pilihan operator melewatinya secara eksplisit.",
+          "description": "Tipe invoice mengikuti status: visitor dan pending hanya ditagih pendaftaran, active dan inactive hanya renewal, new_member keduanya (pendaftaran hanya sekali per member). new_member adalah anggota baru: dibuat lewat \"Tambah Member\", atau visitor/pending yang melunasi pendaftaran. Ia menjadi active saat renewal pertamanya lunas.",
           "complex": false
         },
         {
@@ -2258,7 +2260,8 @@
             "active",
             "inactive",
             "pending",
-            "visitor"
+            "visitor",
+            "new_member"
           ],
           "description": "Status untuk baris yang kolom status-nya KOSONG. Bawaannya active. Diisi visitor oleh tombol impor tamu: daftar hadir pertemuan tidak pernah memuat kolom status, dan tanpa ini setiap tamu masuk sebagai anggota penuh. Status yang DITULIS di berkas tidak pernah ditimpa nilai ini."
         }

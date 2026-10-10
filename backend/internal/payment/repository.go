@@ -165,7 +165,7 @@ func (r *Repository) CreateAndSettle(
 		if err != nil {
 			return nil, fmt.Errorf("tandai invoice lunas: %w", err)
 		}
-		if err := member.AktifkanSetelahPendaftaran(ctx, tx, in.InvoiceID); err != nil {
+		if err := member.NaikkanStatusSetelahLunas(ctx, tx, in.InvoiceID); err != nil {
 			return nil, err
 		}
 

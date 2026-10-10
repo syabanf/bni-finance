@@ -111,16 +111,19 @@ function saring(semua: InvoiceWithRelations[], filters?: InvoiceFilters) {
 }
 
 /**
- * Cermin member.AktifkanSetelahPendaftaran di server: visitor atau pending
- * yang invoice pendaftarannya lunas menjadi aktif, renewal_date-nya akhir
- * periode invoice bila belum ada yang lebih jauh.
+ * Cermin member.NaikkanStatusSetelahLunas di server: pendaftaran lunas
+ * menjadikan visitor atau pending New Member (renewal_date akhir periode bila
+ * belum ada yang lebih jauh), renewal lunas menjadikan New Member Active.
  */
-function aktifkanSetelahPendaftaran(invoice: Invoice) {
-  if (invoice.type !== 'registration') return
+function naikkanStatusSetelahLunas(invoice: Invoice) {
   const member = store.members.find((m) => m.id === invoice.memberId)
-  if (!member || (member.status !== 'visitor' && member.status !== 'pending')) return
-  member.status = 'active'
-  if (!member.renewalDate || member.renewalDate < invoice.periodEnd) member.renewalDate = invoice.periodEnd
+  if (!member) return
+  if (invoice.type === 'registration' && (member.status === 'visitor' || member.status === 'pending')) {
+    member.status = 'new_member'
+    if (!member.renewalDate || member.renewalDate < invoice.periodEnd) member.renewalDate = invoice.periodEnd
+  } else if (invoice.type === 'renewal' && member.status === 'new_member') {
+    member.status = 'active'
+  }
 }
 
 export const mockInvoiceRepository: InvoiceRepository = {
@@ -196,6 +199,14 @@ export const mockInvoiceRepository: InvoiceRepository = {
     if (input.type === 'renewal') {
       const alasan = alasanBelumKonfirmasi(jawabanTerakhir(member.id))
       if (alasan) throw new Error(alasan)
+    }
+    if (
+      input.type === 'registration' &&
+      store.invoices.some(
+        (i) => i.memberId === member.id && i.type === 'registration' && i.status !== 'cancelled' && i.status !== 'terminated',
+      )
+    ) {
+      throw new Error('Member ini sudah punya invoice pendaftaran; batalkan yang lama dulu bila memang perlu diterbitkan ulang.')
     }
 
     const invoice: Invoice = {
@@ -348,7 +359,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
     invoice.paidAt = paidAt
     invoice.paidAmount = invoice.amount
     invoice.updatedAt = paidAt
-    aktifkanSetelahPendaftaran(invoice)
+    naikkanStatusSetelahLunas(invoice)
 
     store.payments.unshift({
       id: nextId('pay'),
@@ -386,7 +397,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
     invoice.paidAt = paidAt
     invoice.paidAmount = input.amount
     invoice.updatedAt = nowISO()
-    aktifkanSetelahPendaftaran(invoice)
+    naikkanStatusSetelahLunas(invoice)
 
     store.payments.unshift({
       id: nextId('pay'),

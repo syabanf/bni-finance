@@ -141,7 +141,7 @@ func (r *Repository) renewalDue(ctx context.Context) (current, previous int, err
 	  count(*) FILTER (WHERE renewal_date >= CURRENT_DATE - $1::int
 	                     AND renewal_date <  CURRENT_DATE)
 	FROM members
-	WHERE status = 'active' AND renewal_date IS NOT NULL AND %s`
+	WHERE status IN ('active', 'new_member') AND renewal_date IS NOT NULL AND %s`
 
 	syarat, arg := syaratChapter(ctx, "chapter_id", 2)
 	if err = r.db.QueryRow(ctx, fmt.Sprintf(q, syarat),

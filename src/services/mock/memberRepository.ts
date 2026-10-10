@@ -1,7 +1,7 @@
 import type { MemberRepository } from '@/services/types'
-import type { MemberWithChapter } from '@/types'
+import type { Member, MemberWithChapter } from '@/types'
 import { bolehDitagih } from '@/lib/status'
-import { delay, nowISO, store } from './store'
+import { delay, nextId, nowISO, store } from './store'
 
 function withChapter(memberId: string): MemberWithChapter | null {
   const member = store.members.find((m) => m.id === memberId)
@@ -47,6 +47,25 @@ export const mockMemberRepository: MemberRepository = {
       .filter((m) => bolehDitagih(m.status, 'registration') && !hasIssuedRegistration.has(m.id))
       .map((m) => withChapter(m.id)!)
     return delay(result.sort((a, b) => a.name.localeCompare(b.name)))
+  },
+
+  async create(input) {
+    if (!store.chapters.some((c) => c.id === input.chapterId)) throw new Error('Chapter tidak ditemukan.')
+    const member: Member = {
+      id: nextId('mem'),
+      chapterId: input.chapterId,
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      company: input.company,
+      businessField: input.businessField,
+      status: input.status ?? 'active',
+      joinedDate: null,
+      renewalDate: null,
+      syncedAt: nowISO(),
+    }
+    store.members.push(member)
+    return delay(member, 300)
   },
 
   async sync() {

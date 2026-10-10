@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Upload, Users } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Upload, UserPlus, Users } from 'lucide-react'
 import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Avatar,
@@ -26,6 +26,7 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
+import { TambahMemberModal } from './components/TambahMemberModal'
 import { useAuth } from '@/features/auth/AuthContext'
 import { can } from '@/lib/rbac'
 import { chapterService, memberService } from '@/services'
@@ -67,6 +68,7 @@ const MEMBER_STATUS_LABEL: Record<string, string> = {
   active: 'Aktif',
   pending: 'Pending',
   inactive: 'Nonaktif',
+  new_member: 'New Member',
 }
 
 export function MemberListPage() {
@@ -96,6 +98,7 @@ export function MemberListPage() {
   const [contact, setContact] = useState<ContactFilter>('all')
   const [keanggotaan, setKeanggotaan] = useState<Keanggotaan>('all')
   const [page, setPage] = useState(1)
+  const [tambahBuka, setTambahBuka] = useState(false)
   const PAGE_SIZE = 25
 
   // Everything except the status filter — drives the summary cards so they
@@ -129,6 +132,7 @@ export function MemberListPage() {
     return {
       all: list.length,
       active: list.filter((m) => m.status === 'active').length,
+      new_member: list.filter((m) => m.status === 'new_member').length,
       pending: list.filter((m) => m.status === 'pending').length,
       inactive: list.filter((m) => m.status === 'inactive').length,
       visitor: list.filter((m) => m.status === 'visitor').length,
@@ -214,6 +218,12 @@ export function MemberListPage() {
                 {memberStatus === 'visitor' ? 'Impor Visitor' : 'Impor Member'}
               </Button>
             )}
+            {bolehImpor && (
+              <Button onClick={() => setTambahBuka(true)}>
+                <UserPlus className="h-4 w-4" />
+                Tambah Member
+              </Button>
+            )}
             <SyncButton jenis="member" onSelesai={reload} />
             <ExportMenu {...exportHandlers} disabled={filtered.length === 0} />
           </div>
@@ -221,7 +231,7 @@ export function MemberListPage() {
       />
 
       {/* Summary cards (also filter by status) */}
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <SummaryCard
           label="Total Member"
           value={statusCounts.all}
@@ -235,6 +245,13 @@ export function MemberListPage() {
           tone="green"
           active={memberStatus === 'active'}
           onClick={() => setMemberStatus('active')}
+        />
+        <SummaryCard
+          label="New Member"
+          value={statusCounts.new_member}
+          tone="purple"
+          active={memberStatus === 'new_member'}
+          onClick={() => setMemberStatus('new_member')}
         />
         <SummaryCard
           label="Pending"
@@ -478,6 +495,13 @@ export function MemberListPage() {
           </>
         )}
       </Card>
+      <TambahMemberModal
+        open={tambahBuka}
+        onClose={() => setTambahBuka(false)}
+        onDibuat={reload}
+        chapters={chapters ?? []}
+        chapterAwal={chapterId !== 'all' ? chapterId : undefined}
+      />
     </div>
   )
 }

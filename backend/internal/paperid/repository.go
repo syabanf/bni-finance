@@ -175,7 +175,7 @@ func (r *Repository) SettleByRef(
 		WHERE id = $1`, invoiceID, paidAt, amount); err != nil {
 		return false, fmt.Errorf("tandai invoice lunas: %w", err)
 	}
-	if err := member.AktifkanSetelahPendaftaran(ctx, tx, invoiceID); err != nil {
+	if err := member.NaikkanStatusSetelahLunas(ctx, tx, invoiceID); err != nil {
 		return false, err
 	}
 
