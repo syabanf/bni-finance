@@ -84,6 +84,7 @@ func TestTipeInvoiceMengikutiStatusMember(t *testing.T) {
 			t.Errorf("pesannya harus menunjuk jalan keluarnya (invoice renewal): %v", err)
 		}
 	}
+	konfirmasiRenewal(t, pool, aktif)
 	if _, err := repo.Create(ctx, contohInput(aktif, ch, 12_700_000), "", "IDR"); err != nil {
 		t.Fatalf("renewal untuk member aktif harus diterima: %v", err)
 	}

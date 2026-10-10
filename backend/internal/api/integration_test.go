@@ -95,6 +95,20 @@ func databaseName(url string) string {
 type liveStack struct {
 	srv   *httptest.Server
 	token string
+	pool  *pgxpool.Pool
+}
+
+// konfirmasiRenewal mencatat jawaban "Diterima" untuk member, karena invoice
+// renewal hanya terbit setelah konfirmasi itu ada. Tidak dibersihkan: setiap
+// stack men-TRUNCATE members, dan CASCADE ikut mengosongkan renewal_requests.
+func konfirmasiRenewal(t *testing.T, pool *pgxpool.Pool, memberID string) {
+	t.Helper()
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO renewal_requests (member_id, chapter_id, period, answer, answered_at)
+		SELECT id, chapter_id, 'uji', 'will_renew', now() FROM members WHERE id = $1
+		ON CONFLICT (member_id, period) DO UPDATE SET answer = 'will_renew'`, memberID); err != nil {
+		t.Fatalf("konfirmasi renewal %s: %v", memberID, err)
+	}
 }
 
 func newLiveServer(t *testing.T) *liveStack {
@@ -115,7 +129,7 @@ func newLiveServer(t *testing.T) *liveStack {
 
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &liveStack{srv: srv, token: tokenFor(t, signer, domain.RoleAdmin)}
+	return &liveStack{srv: srv, token: tokenFor(t, signer, domain.RoleAdmin), pool: pool}
 }
 
 func (s *liveStack) req(t *testing.T, method, path, body string, want int) []byte {
@@ -159,6 +173,7 @@ func TestLiveSQLPaths(t *testing.T) {
 	if err := json.Unmarshal(memberBody, &m); err != nil {
 		t.Fatalf("decode member: %v", err)
 	}
+	konfirmasiRenewal(t, s.pool, m.ID)
 	// The LEFT JOIN must actually hydrate the chapter.
 	if m.Chapter == nil || m.Chapter.DisplayName != "BNI Integrasi" {
 		t.Errorf("chapter harus ikut ter-join, dapat %+v", m.Chapter)
@@ -278,6 +293,7 @@ func TestLiveConcurrentSettle(t *testing.T) {
 		`{"chapterId":"ch-race","name":"Rekan Balap"}`, http.StatusCreated)
 	var m domain.Member
 	json.Unmarshal(memberBody, &m)
+	konfirmasiRenewal(t, s.pool, m.ID)
 
 	invoiceBody := s.req(t, http.MethodPost, "/api/v1/invoices",
 		`{"memberId":"`+m.ID+`","chapterId":"ch-race","type":"renewal","amount":2000000,`+

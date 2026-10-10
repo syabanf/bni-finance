@@ -1,4 +1,4 @@
-import type { InvoiceStatus, InvoiceType, MemberStatus } from '@/types'
+import type { InvoiceStatus, InvoiceType, MemberStatus, RenewalAnswer } from '@/types'
 
 /**
  * Single source of truth for how invoice statuses are presented across the app
@@ -45,6 +45,25 @@ export function isOutstanding(status: InvoiceStatus): boolean {
 export const STATUS_UNTUK_TIPE: Record<InvoiceType, MemberStatus[]> = {
   registration: ['visitor', 'pending'],
   renewal: ['active', 'inactive'],
+}
+
+/**
+ * Alasan invoice renewal belum boleh terbit, dari jawaban konfirmasi terakhir;
+ * null berarti boleh. Cermin periksaKonfirmasiRenewal di server.
+ */
+export function alasanBelumKonfirmasi(jawaban: RenewalAnswer | null): string | null {
+  switch (jawaban) {
+    case 'will_renew':
+      return null
+    case null:
+      return 'Member ini belum dimintai konfirmasi renewal; minta konfirmasi di halaman Konfirmasi Renewal dulu.'
+    case 'pending':
+      return 'Konfirmasi renewal member ini belum dijawab MC.'
+    case 'will_not':
+      return 'MC menjawab member ini tidak memperpanjang; invoice renewal tidak diterbitkan.'
+    default:
+      return 'Jawaban MC atas konfirmasi renewal member ini masih belum pasti.'
+  }
 }
 
 export function bolehDitagih(status: MemberStatus, tipe: InvoiceType): boolean {

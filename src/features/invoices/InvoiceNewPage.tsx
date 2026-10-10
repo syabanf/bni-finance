@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Search, Send, UserRound } from 'lucide-react'
-import type { FeeSettings, InvoiceType, MemberWithChapter } from '@/types'
+import type { FeeSettings, InvoiceType, MemberWithChapter, RenewalRequest } from '@/types'
 import { bolehDitagih } from '@/lib/status'
 import {
   Avatar,
@@ -18,7 +18,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { invoiceService, memberService, settingsService } from '@/services'
+import { invoiceService, memberService, renewalService, settingsService } from '@/services'
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -34,13 +34,23 @@ export function InvoiceNewPage() {
   // untuk visitor dan pending, renewal hanya untuk member aktif dan nonaktif.
   // Server tetap menolak yang lolos, tapi pilihan yang pasti ditolak tidak
   // perlu ditampilkan.
-  const { data: members, loading: membersLoading } = useAsync<MemberWithChapter[]>(
-    () =>
-      (type === 'registration' ? memberService.eligibleForRegistration() : memberService.list()).then(
-        (list) => list.filter((m) => bolehDitagih(m.status, type)),
-      ),
-    [type],
-  )
+  //
+  // Renewal juga menunggu konfirmasi: alurnya Member, lalu Konfirmasi Renewal,
+  // baru Invoice. Yang ditawarkan hanya member yang permintaan konfirmasi
+  // TERAKHIR-nya dijawab MC "Diterima".
+  const { data: members, loading: membersLoading } = useAsync<MemberWithChapter[]>(async () => {
+    if (type === 'registration') {
+      const list = await memberService.eligibleForRegistration()
+      return list.filter((m) => bolehDitagih(m.status, type))
+    }
+    const [list, konfirmasi] = await Promise.all([memberService.list(), renewalService.list()])
+    const terakhir = new Map<string, RenewalRequest>()
+    for (const r of konfirmasi) {
+      const ada = terakhir.get(r.memberId)
+      if (!ada || r.requestedAt > ada.requestedAt) terakhir.set(r.memberId, r)
+    }
+    return list.filter((m) => bolehDitagih(m.status, type) && terakhir.get(m.id)?.answer === 'will_renew')
+  }, [type])
 
   // Pilihan JAMAK. Halaman ini dulu hanya bisa satu member, sehingga
   // menerbitkan renewal untuk satu chapter berarti mengulang seluruh formulir
@@ -307,7 +317,7 @@ export function InvoiceNewPage() {
               subtitle={
                 type === 'registration'
                   ? 'Visitor dan calon yang belum punya invoice pendaftaran aktif.'
-                  : 'Member aktif atau nonaktif yang keanggotaannya diperpanjang.'
+                  : 'Member yang konfirmasi renewal terakhirnya dijawab MC "Diterima".'
               }
             />
             <div className="px-5 pb-3">
@@ -365,7 +375,9 @@ export function InvoiceNewPage() {
                 <LoadingState />
               ) : filteredMembers.length === 0 ? (
                 <p className="px-2 py-8 text-center text-sm text-ink-400">
-                  Tidak ada member yang cocok.
+                  {type === 'renewal' && !search && chapterFilter === 'all'
+                    ? 'Belum ada member yang konfirmasi renewal-nya dijawab "Diterima". Minta konfirmasi di halaman Konfirmasi Renewal dulu.'
+                    : 'Tidak ada member yang cocok.'}
                 </p>
               ) : (
                 <div className="space-y-1">

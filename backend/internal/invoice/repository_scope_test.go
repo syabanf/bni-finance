@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 	"github.com/syabanf/bni-finance/backend/internal/scope"
@@ -70,7 +72,29 @@ func duaChapter(t *testing.T, repo *Repository) (a, b string, memberA, memberB s
 			[]string{memberA, memberB})
 		_, _ = repo.db.Exec(bersih, `DELETE FROM chapters WHERE id = ANY($1)`, []string{a, b})
 	})
+	// Didaftarkan SESUDAH cleanup di atas: t.Cleanup berjalan terbalik, jadi
+	// baris konfirmasi terhapus lebih dulu dan member tidak tertahan foreign key.
+	konfirmasiRenewal(t, repo.db, memberA, memberB)
 	return a, b, memberA, memberB
+}
+
+// konfirmasiRenewal mencatat jawaban "Diterima" untuk setiap member, karena
+// invoice renewal hanya terbit setelah konfirmasi itu ada. Barisnya dihapus
+// di cleanup sebelum membernya.
+func konfirmasiRenewal(t *testing.T, db *pgxpool.Pool, memberIDs ...string) {
+	t.Helper()
+	ctx := context.Background()
+	for _, m := range memberIDs {
+		if _, err := db.Exec(ctx, `
+			INSERT INTO renewal_requests (member_id, chapter_id, period, answer, answered_at)
+			SELECT id, chapter_id, 'uji', 'will_renew', now() FROM members WHERE id = $1
+			ON CONFLICT (member_id, period) DO UPDATE SET answer = 'will_renew'`, m); err != nil {
+			t.Fatalf("konfirmasi renewal %s: %v", m, err)
+		}
+	}
+	t.Cleanup(func() {
+		_, _ = db.Exec(context.Background(), "DELETE FROM renewal_requests WHERE member_id = ANY($1)", memberIDs)
+	})
 }
 
 // ST chapter A tidak boleh melihat invoice chapter B — tidak lewat daftar,

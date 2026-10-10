@@ -1,5 +1,6 @@
 import type { CreateInvoiceInput, InvoiceRepository } from '@/services/types'
-import { bolehDitagih } from '@/lib/status'
+import { alasanBelumKonfirmasi, bolehDitagih } from '@/lib/status'
+import { jawabanTerakhir } from './renewalRepository'
 import type {
   AuditLogEntry,
   Invoice,
@@ -191,6 +192,10 @@ export const mockInvoiceRepository: InvoiceRepository = {
           ? `Member berstatus ${member.status} belum menjadi anggota, jadi tidak bisa ditagih renewal; terbitkan invoice pendaftaran.`
           : `Member berstatus ${member.status} sudah menjadi anggota, jadi tidak bisa ditagih pendaftaran; terbitkan invoice renewal.`,
       )
+    }
+    if (input.type === 'renewal') {
+      const alasan = alasanBelumKonfirmasi(jawabanTerakhir(member.id))
+      if (alasan) throw new Error(alasan)
     }
 
     const invoice: Invoice = {
