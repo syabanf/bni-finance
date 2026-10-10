@@ -52,7 +52,8 @@ func (r *Repository) ChapterRows(ctx context.Context) (map[string]ChapterRow, er
 func (r *Repository) MemberRows(ctx context.Context) (map[string]MemberRow, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, chapter_id, name, coalesce(email,''), coalesce(phone,''),
-		       coalesce(company,''), coalesce(business_field,''), status::text
+		       coalesce(company,''), coalesce(business_field,''), status::text,
+		       coalesce(renewal_date::text,''), coalesce(joined_date::text,'')
 		FROM members`)
 	if err != nil {
 		return nil, fmt.Errorf("baca member: %w", err)
@@ -62,7 +63,7 @@ func (r *Repository) MemberRows(ctx context.Context) (map[string]MemberRow, erro
 	for rows.Next() {
 		var m MemberRow
 		if err := rows.Scan(&m.ID, &m.ChapterID, &m.Name, &m.Email, &m.Phone,
-			&m.Company, &m.BusinessField, &m.Status); err != nil {
+			&m.Company, &m.BusinessField, &m.Status, &m.RenewalDate, &m.JoinedDate); err != nil {
 			return nil, fmt.Errorf("scan member: %w", err)
 		}
 		out[m.ID] = m
@@ -104,8 +105,10 @@ func (r *Repository) UpsertMembers(ctx context.Context, rows []MemberRow) error 
 	return r.dalamTransaksi(ctx, func(tx pgx.Tx) error {
 		for _, m := range rows {
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO members (id, chapter_id, name, email, phone, company, business_field, status)
-				VALUES ($1,$2,$3,nullif($4,''),nullif($5,''),nullif($6,''),nullif($7,''),$8::member_status)
+				INSERT INTO members (id, chapter_id, name, email, phone, company, business_field, status,
+				                     renewal_date, joined_date)
+				VALUES ($1,$2,$3,nullif($4,''),nullif($5,''),nullif($6,''),nullif($7,''),$8::member_status,
+				        nullif($9,'')::date, nullif($10,'')::date)
 				ON CONFLICT (id) DO UPDATE SET
 					chapter_id     = excluded.chapter_id,
 					name           = excluded.name,
@@ -113,8 +116,11 @@ func (r *Repository) UpsertMembers(ctx context.Context, rows []MemberRow) error 
 					phone          = coalesce(excluded.phone,          members.phone),
 					company        = coalesce(excluded.company,        members.company),
 					business_field = coalesce(excluded.business_field, members.business_field),
-					status         = excluded.status`,
-				m.ID, m.ChapterID, m.Name, m.Email, m.Phone, m.Company, m.BusinessField, m.Status); err != nil {
+					status         = excluded.status,
+					renewal_date   = coalesce(excluded.renewal_date,   members.renewal_date),
+					joined_date    = coalesce(excluded.joined_date,    members.joined_date)`,
+				m.ID, m.ChapterID, m.Name, m.Email, m.Phone, m.Company, m.BusinessField, m.Status,
+				m.RenewalDate, m.JoinedDate); err != nil {
 				return fmt.Errorf("tulis member %s: %w", m.ID, err)
 			}
 		}

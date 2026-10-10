@@ -101,6 +101,10 @@ type MemberRow struct {
 	Company       string
 	BusinessField string
 	Status        string
+	// Tanggal sebagai "YYYY-MM-DD" atau kosong. Kosong berarti "jangan
+	// sentuh yang tersimpan", sama seperti kolom teks lainnya.
+	RenewalDate string
+	JoinedDate  string
 }
 
 type Service struct {
@@ -143,16 +147,27 @@ func (s *Service) Jalankan(ctx context.Context, jenis Jenis, data []byte, terapk
 	if err != nil {
 		return nil, err
 	}
-	tabel, err := BuatTabel(rows)
-	if err != nil {
-		return nil, err
-	}
 
 	if opsi.StatusBawaan == "" {
 		opsi.StatusBawaan = string(domain.MemberActive)
 	}
 	if !domain.MemberStatus(opsi.StatusBawaan).Valid() {
 		return nil, fmt.Errorf("status bawaan %q tidak dikenal (%s)", opsi.StatusBawaan, daftarStatus())
+	}
+
+	// Laporan BNI Connect dikenali dari judul kolomnya di baris mana pun,
+	// SEBELUM pemeta judul generik mengambil baris pertama yang berisi sebagai
+	// judul. Pada laporan Dues baris pertama itu adalah judul laporannya, dan
+	// pemeta generik akan menuntut kolom id yang memang tidak pernah ada.
+	if jenis == JenisMember {
+		if lap, ok := deteksiBNIConnect(rows); ok {
+			return s.membersBNIConnect(ctx, rows, lap, format, terapkan, opsi)
+		}
+	}
+
+	tabel, err := BuatTabel(rows)
+	if err != nil {
+		return nil, err
 	}
 
 	switch jenis {
@@ -454,6 +469,8 @@ func bedaMember(lama, baru MemberRow) []string {
 	cek("company", lama.Company, baru.Company)
 	cek("business_field", lama.BusinessField, baru.BusinessField)
 	cek("status", lama.Status, baru.Status)
+	cek("renewal_date", lama.RenewalDate, baru.RenewalDate)
+	cek("joined_date", lama.JoinedDate, baru.JoinedDate)
 	return out
 }
 

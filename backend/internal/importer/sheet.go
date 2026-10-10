@@ -20,8 +20,9 @@ import (
 type Format string
 
 const (
-	FormatCSV  Format = "csv"
-	FormatXLSX Format = "xlsx"
+	FormatCSV           Format = "csv"
+	FormatXLSX          Format = "xlsx"
+	FormatSpreadsheetML Format = "spreadsheetml"
 )
 
 // Baca membaca berkas menjadi baris-baris teks.
@@ -35,6 +36,11 @@ func Baca(data []byte) ([]sheetRow, Format, error) {
 	if len(data) >= 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 3 && data[3] == 4 {
 		rows, err := bacaXLSX(data)
 		return rows, FormatXLSX, err
+	}
+	// Ekspor BNI Connect: berekstensi .xls, berisi XML SpreadsheetML.
+	if adalahSpreadsheetML(data) {
+		rows, err := bacaSpreadsheetML(data)
+		return rows, FormatSpreadsheetML, err
 	}
 	rows, err := bacaCSV(data)
 	return rows, FormatCSV, err

@@ -2143,7 +2143,17 @@ paths:
         dihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.
 
         Format ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang
-        di-rename menjadi `.csv` tetap terbaca benar.
+        di-rename menjadi `.csv` tetap terbaca benar. Ekspor BNI Connect
+        (berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.
+
+        **Laporan BNI Connect** (Membership Dues, Chapter Roster, Membership
+        Length) dikenali dari judul kolomnya di baris mana pun dan dibaca
+        dengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan
+        lewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan
+        yang belum ada dibuat baru dengan id `bc-…`. Dues mengisi jatuh tempo
+        dan status (Active/Dropped), Roster mengisi perusahaan, telepon, dan
+        bidang usaha, Length mengisi tanggal bergabung. Laporan Dues yang
+        menumpuk beberapa tabel di satu lembar dibaca seluruhnya.
 
         Kolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa
         Indonesia maupun Inggris sama-sama diterima (`nama`/`name`,
@@ -2229,7 +2239,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  format: { type: string, enum: [csv, xlsx] }
+                  format: { type: string, enum: [csv, xlsx, spreadsheetml] }
                   jenis: { type: string, enum: [chapters, members] }
                   diterapkan: { type: boolean }
                   total: { type: integer }

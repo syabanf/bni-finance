@@ -280,7 +280,7 @@ export function ImportPage() {
               <input
                 ref={inputRef}
                 type="file"
-                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                 className="hidden"
                 onChange={(e) => pilihBerkas(e.target.files?.[0] ?? null)}
               />
@@ -294,7 +294,7 @@ export function ImportPage() {
                     {file ? file.name : 'Pilih berkas…'}
                   </span>
                   <span className="block text-xs text-ink-500">
-                    {file ? `${(file.size / 1024).toFixed(0)} KB` : 'CSV atau XLSX, maksimal 10 MB'}
+                    {file ? `${(file.size / 1024).toFixed(0)} KB` : 'CSV, XLSX, atau ekspor BNI Connect (.xls), maksimal 10 MB'}
                   </span>
                 </span>
               </button>
