@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Download, FileUp, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, FileUp, Upload, X } from 'lucide-react'
 import type { Chapter, ImportBaris, ImportHasil, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Badge,
@@ -36,6 +36,15 @@ import { downloadXlsx } from '@/lib/xlsx'
  * Angka pratinjau dihitung KODE YANG SAMA dengan yang menulis, di server. Itu
  * yang membuatnya bisa dipercaya: tidak mungkin berbeda dari yang akhirnya
  * terjadi.
+ *
+ * IMPOR MEMBER ADALAH SATU ALUR TIGA BERKAS, bukan tiga impor terpisah.
+ * Data satu chapter datang dari tiga sumber yang masing-masing hanya memuat
+ * sebagian: data master (nama, HP, email), laporan jatuh tempo (urutan
+ * perpanjangan), dan data yang tercatat di BNI (perusahaan, bidang usaha).
+ * Urutannya menentukan: dua berkas terakhir mencocokkan NAMA ke member yang
+ * sudah ada di chapter, jadi data master harus masuk lebih dulu. Halaman ini
+ * menerapkannya berurutan dalam satu tekanan tombol supaya urutan itu tidak
+ * bergantung pada ingatan orang yang mengunggah.
  */
 
 /**
@@ -71,9 +80,56 @@ const TONE: Record<ImportBaris['tindakan'], 'green' | 'amber' | 'gray' | 'red'> 
   ditolak: 'red',
 }
 
+type Langkah = 'master' | 'jatuhTempo' | 'bni' | 'chapter'
+
+interface DefinisiLangkah {
+  key: Langkah
+  judul: string
+  keterangan: string
+  /** Laporan BNI Connect tidak memuat kolom chapter; namanya dicocokkan di dalam chapter tujuan. */
+  butuhChapter: boolean
+}
+
+/**
+ * Urutan mengikuti ketergantungan datanya, bukan selera. Langkah 1 boleh
+ * membuat member baru; langkah 2 dan 3 hanya melengkapi member yang sudah ada
+ * dengan mencocokkan nama di chapter tujuan. Importer mengenali setiap format
+ * dari isinya, jadi slot ini pengarah, bukan pembatas: laporan Membership
+ * Length yang diunggah di langkah 3 tetap terbaca.
+ */
+const LANGKAH_MEMBER: DefinisiLangkah[] = [
+  {
+    key: 'master',
+    judul: 'Data master',
+    keterangan: 'Nama, HP, dan email: template member dari halaman ini (template-member-<chapter>.xlsx).',
+    butuhChapter: false,
+  },
+  {
+    key: 'jatuhTempo',
+    judul: 'Urutan jatuh tempo',
+    keterangan: 'Laporan Membership Dues BNI Connect, atau template jatuh tempo. Mengisi tanggal perpanjangan.',
+    butuhChapter: true,
+  },
+  {
+    key: 'bni',
+    judul: 'Data lama di BNI',
+    keterangan: 'Laporan Chapter Roster BNI Connect: perusahaan, bidang usaha, telepon yang tercatat di BNI. Laporan Membership Length juga diterima.',
+    butuhChapter: true,
+  },
+]
+
+const LANGKAH_CHAPTER: DefinisiLangkah[] = [
+  {
+    key: 'chapter',
+    judul: 'Daftar chapter',
+    keterangan: 'Template chapter dari halaman ini.',
+    butuhChapter: false,
+  },
+]
+
 export function ImportPage() {
   const { toast } = useToast()
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<Partial<Record<Langkah, HTMLInputElement | null>>>({})
   const [params, setParams] = useSearchParams()
 
   /**
@@ -94,9 +150,16 @@ export function ImportPage() {
 
   const [jenis, setJenis] = useState<'members' | 'chapters'>('members')
   const [daftarChapter, setDaftarChapter] = useState<Chapter[]>([])
-  const [file, setFile] = useState<File | null>(null)
-  const [hasil, setHasil] = useState<ImportHasil | null>(null)
+  const [berkas, setBerkas] = useState<Partial<Record<Langkah, File>>>({})
+  const [hasil, setHasil] = useState<Partial<Record<Langkah, ImportHasil>>>({})
   const [sibuk, setSibuk] = useState(false)
+  const [menyiapkan, setMenyiapkan] = useState(false)
+
+  const langkah = jenis === 'members' ? LANGKAH_MEMBER : LANGKAH_CHAPTER
+  const terisi = langkah.filter((l) => berkas[l.key])
+  const sudahDitinjau = terisi.length > 0 && terisi.every((l) => hasil[l.key])
+  const belumDiterapkan = terisi.filter((l) => hasil[l.key] && !hasil[l.key]?.diterapkan)
+  const perubahan = belumDiterapkan.reduce((n, l) => n + (hasil[l.key]!.baru + hasil[l.key]!.diperbarui), 0)
 
   useEffect(() => {
     let aktif = true
@@ -135,41 +198,32 @@ export function ImportPage() {
     if (id) baru.set('chapter', id)
     else baru.delete('chapter')
     setParams(baru, { replace: true })
-    setHasil(null)
+    setHasil({})
     // Impor yang ditujukan ke satu chapter selalu tentang member.
     if (id) setJenis('members')
   }
 
-  const pilihBerkas = (f: File | null) => {
-    setFile(f)
-    // Pratinjau lama DIBUANG saat berkasnya berganti. Membiarkannya membuat
-    // orang menekan "Terapkan" atas laporan yang menggambarkan berkas lain.
-    setHasil(null)
+  const pilihBerkas = (key: Langkah, f: File | null) => {
+    setBerkas((b) => {
+      const baru = { ...b }
+      if (f) baru[key] = f
+      else delete baru[key]
+      return baru
+    })
+    // Pratinjau lama DIBUANG saat satu berkas pun berganti. Langkah-langkah
+    // ini saling bergantung, jadi pratinjau yang tersisa menggambarkan
+    // rangkaian yang sudah tidak ada. Membiarkannya membuat orang menekan
+    // "Terapkan" atas laporan yang menggambarkan berkas lain.
+    setHasil({})
+    const input = inputRef.current[key]
+    if (input) input.value = ''
   }
 
-  const [menyiapkan, setMenyiapkan] = useState(false)
-
-  /**
-   * Template BERISI DATA YANG SUDAH ADA, bukan lembar kosong.
-   *
-   * MOM meminta template "untuk import phone number dan email karena data
-   * import kurang lengkap" — dan itu menentukan bentuknya. Lembar kosong
-   * memaksa orang mengetik ulang id dan nama setiap member hanya untuk
-   * menambahkan satu nomor telepon, dan setiap pengetikan ulang adalah peluang
-   * id-nya salah — yang berarti bukan melengkapi data, melainkan membuat member
-   * baru atau menimpa orang lain.
-   *
-   * Jadi template ini sudah terisi id, nama, dan chapter; kolom email dan
-   * telepon dibiarkan kosong persis di baris yang memang belum punya. Yang
-   * sudah terisi ikut dibawa supaya tidak terhapus saat diimpor kembali.
-   */
   /**
    * Template kedua, untuk tanggal jatuh tempo, mengikuti format BNI Connect.
    *
-   * Impor member jadi dua berkas: data member yang sekarang (template di atas)
-   * dan tanggal jatuh tempo per nama (yang ini). Terikat ke chapter tujuan
-   * karena laporan BNI Connect tidak memuat kolom chapter, dan importer
-   * mencocokkan nama hanya di dalam chapter itu.
+   * Terikat ke chapter tujuan karena laporan BNI Connect tidak memuat kolom
+   * chapter, dan importer mencocokkan nama hanya di dalam chapter itu.
    */
   const unduhTemplateJatuhTempo = async () => {
     setMenyiapkan(true)
@@ -189,7 +243,7 @@ export function ImportPage() {
           (m.joinedDate ?? '').slice(0, 10),
         ]),
       )
-      toast('Template jatuh tempo diunduh. Isi kolom Due Date, lalu unggah kembali di halaman ini.')
+      toast('Template jatuh tempo diunduh. Isi kolom Due Date, lalu unggah kembali di langkah 2.')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyiapkan template.', 'error')
     } finally {
@@ -197,6 +251,20 @@ export function ImportPage() {
     }
   }
 
+  /**
+   * Template BERISI DATA YANG SUDAH ADA, bukan lembar kosong.
+   *
+   * MOM meminta template "untuk import phone number dan email karena data
+   * import kurang lengkap" — dan itu menentukan bentuknya. Lembar kosong
+   * memaksa orang mengetik ulang id dan nama setiap member hanya untuk
+   * menambahkan satu nomor telepon, dan setiap pengetikan ulang adalah peluang
+   * id-nya salah — yang berarti bukan melengkapi data, melainkan membuat member
+   * baru atau menimpa orang lain.
+   *
+   * Jadi template ini sudah terisi id, nama, dan chapter; kolom email dan
+   * telepon dibiarkan kosong persis di baris yang memang belum punya. Yang
+   * sudah terisi ikut dibawa supaya tidak terhapus saat diimpor kembali.
+   */
   const unduhTemplate = async () => {
     setMenyiapkan(true)
     try {
@@ -241,19 +309,32 @@ export function ImportPage() {
     }
   }
 
+  /**
+   * Menjalankan langkah-langkah yang berkasnya ada, BERURUTAN.
+   *
+   * Pratinjau: setiap berkas ditinjau terhadap data yang tersimpan sekarang.
+   * Nama yang baru muncul di data master belum dikenal langkah 2 dan 3 sampai
+   * langkah 1 ditulis; pratinjaunya menyebut mereka "baru", dan itu benar
+   * untuk saat itu. Terapkan: langkah 1 ditulis dulu, baru langkah 2 membaca
+   * basis data yang sudah memuat nama-nama itu. Satu langkah yang gagal
+   * menghentikan sisanya; yang sudah ditulis tetap tertulis dan ditandai.
+   */
   const jalankan = async (terapkan: boolean) => {
-    if (!file) return
+    const antrean = terapkan ? belumDiterapkan : terisi
+    if (antrean.length === 0) return
     setSibuk(true)
     try {
-      const out = terapkan
-        ? await importService.apply(jenis, file, opsi)
-        : await importService.preview(jenis, file, opsi)
-      setHasil(out)
-      if (terapkan) {
-        toast(`Diterapkan: ${out.baru} baru, ${out.diperbarui} diperbarui, ${out.ditolak} ditolak.`)
+      for (const l of antrean) {
+        const f = berkas[l.key]!
+        const out = terapkan
+          ? await importService.apply(jenis, f, opsi)
+          : await importService.preview(jenis, f, opsi)
+        setHasil((h) => ({ ...h, [l.key]: out }))
+        if (terapkan) {
+          toast(`${l.judul}: ${out.baru} baru, ${out.diperbarui} diperbarui, ${out.ditolak} ditolak.`)
+        }
       }
     } catch (err) {
-      setHasil(null)
       toast(err instanceof Error ? err.message : 'Berkas tidak bisa dibaca.', 'error')
     } finally {
       setSibuk(false)
@@ -264,7 +345,7 @@ export function ImportPage() {
     <div>
       <PageHeader
         title="Impor Data"
-        description="Unggah CSV atau XLSX berisi chapter atau member. Selalu ditinjau dulu sebelum ditulis."
+        description="Satu alur tiga berkas untuk member: data master, jatuh tempo, lalu data lama di BNI. Selalu ditinjau dulu sebelum ditulis."
       />
 
       {chapterTujuan && (
@@ -280,7 +361,7 @@ export function ImportPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[400px_1fr]">
         <Card>
           <CardHeader title="Berkas" subtitle="Kolom dicari lewat judulnya, bukan urutannya." />
           <CardBody className="space-y-4">
@@ -294,7 +375,7 @@ export function ImportPage() {
               hint={
                 chapterTujuan
                   ? 'Kolom chapter_id di berkas boleh dikosongkan.'
-                  : 'Nasional: setiap baris wajib menyebut chapter_id sendiri.'
+                  : 'Nasional: setiap baris wajib menyebut chapter_id sendiri. Langkah 2 dan 3 butuh satu chapter.'
               }
             >
               <Select value={chapterTujuan} onChange={(e) => pilihChapter(e.target.value)}>
@@ -316,7 +397,8 @@ export function ImportPage() {
                 disabled={!!chapterTujuan}
                 onChange={(e) => {
                   setJenis(e.target.value as 'members' | 'chapters')
-                  setHasil(null)
+                  setBerkas({})
+                  setHasil({})
                 }}
               >
                 <option value="members">Member</option>
@@ -324,171 +406,241 @@ export function ImportPage() {
               </Select>
             </Field>
 
-            <div>
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                className="hidden"
-                onChange={(e) => pilihBerkas(e.target.files?.[0] ?? null)}
-              />
-              <button
-                onClick={() => inputRef.current?.click()}
-                className="flex w-full items-center gap-3 rounded-xl border border-dashed border-ink-300 p-4 text-left transition-colors hover:border-ink-400 hover:bg-ink-50"
-              >
-                <FileUp className="h-5 w-5 shrink-0 text-ink-400" />
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-ink-800">
-                    {file ? file.name : 'Pilih berkas…'}
-                  </span>
-                  <span className="block text-xs text-ink-500">
-                    {file ? `${(file.size / 1024).toFixed(0)} KB` : 'CSV, XLSX, atau ekspor BNI Connect (.xls), maksimal 10 MB'}
-                  </span>
-                </span>
-              </button>
-            </div>
-
-            {/* Template diletakkan SEBELUM tombol unggah, bukan sesudahnya.
+            {/* Template diletakkan SEBELUM slot berkas, bukan sesudahnya.
                 Urutannya mengikuti urutan pekerjaannya: orang datang ke sini
                 justru karena datanya belum lengkap, jadi mengunduh template
                 adalah langkah pertama, bukan pelengkap di bawah. */}
-            <button
-              onClick={unduhTemplate}
-              disabled={menyiapkan}
-              className="flex w-full items-center gap-3 rounded-xl border border-ink-200 p-3 text-left transition-colors hover:bg-ink-50 disabled:opacity-50"
-            >
-              <Download className="h-4 w-4 shrink-0 text-brand-500" />
-              <span className="min-w-0">
-                <span className="block text-sm font-medium text-ink-800">
-                  {menyiapkan ? 'Menyiapkan…' : 'Unduh template'}
-                </span>
-                <span className="block text-xs leading-snug text-ink-500">
-                  Sudah terisi {jenis === 'members' ? 'id, nama, dan chapter' : 'id dan nama'} yang ada —
-                  {jenis === 'members' ? ' tinggal lengkapi email dan nomor telepon.' : ' tinggal lengkapi kolom kosongnya.'}
-                </span>
-              </span>
-            </button>
-
-            {/* Berkas kedua untuk member: tanggal jatuh tempo, dalam format
-                laporan Membership Dues BNI Connect. Hanya muncul bila chapter
-                tujuan sudah dipilih, karena importer mencocokkan namanya di
-                dalam chapter itu. */}
-            {jenis === 'members' && chapterTujuan && (
-              <button
-                onClick={unduhTemplateJatuhTempo}
+            <div className="space-y-2">
+              <TombolTemplate
+                onClick={unduhTemplate}
                 disabled={menyiapkan}
-                className="flex w-full items-center gap-3 rounded-xl border border-ink-200 p-3 text-left transition-colors hover:bg-ink-50 disabled:opacity-50"
-              >
-                <Download className="h-4 w-4 shrink-0 text-brand-500" />
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium text-ink-800">
-                    {menyiapkan ? 'Menyiapkan…' : 'Unduh template jatuh tempo'}
-                  </span>
-                  <span className="block text-xs leading-snug text-ink-500">
-                    Format laporan Membership Dues BNI Connect: nama member {namaChapter} sudah terisi,
-                    tinggal isi kolom Due Date.
-                  </span>
-                </span>
-              </button>
-            )}
+                judul={menyiapkan ? 'Menyiapkan…' : jenis === 'members' ? 'Unduh template data master' : 'Unduh template chapter'}
+                keterangan={
+                  jenis === 'members'
+                    ? 'Sudah terisi id, nama, dan chapter yang ada; tinggal lengkapi email dan nomor telepon.'
+                    : 'Sudah terisi id dan nama yang ada; tinggal lengkapi kolom kosongnya.'
+                }
+              />
+              {jenis === 'members' && chapterTujuan && (
+                <TombolTemplate
+                  onClick={unduhTemplateJatuhTempo}
+                  disabled={menyiapkan}
+                  judul={menyiapkan ? 'Menyiapkan…' : 'Unduh template jatuh tempo'}
+                  keterangan={`Format laporan Membership Dues BNI Connect: nama member ${namaChapter} sudah terisi, tinggal isi kolom Due Date.`}
+                />
+              )}
+            </div>
+
+            <ol className="space-y-3">
+              {langkah.map((l, i) => {
+                const f = berkas[l.key]
+                const terkunci = l.butuhChapter && !chapterTujuan
+                return (
+                  <li key={l.key} className={terkunci ? 'opacity-60' : undefined}>
+                    <input
+                      ref={(el) => {
+                        inputRef.current[l.key] = el
+                      }}
+                      type="file"
+                      accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                      className="hidden"
+                      onChange={(e) => pilihBerkas(l.key, e.target.files?.[0] ?? null)}
+                    />
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink-900 text-xs font-semibold text-white">
+                        {langkah.length > 1 ? i + 1 : <FileUp className="h-3.5 w-3.5" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-ink-900">{l.judul}</div>
+                        <p className="mt-0.5 text-xs leading-snug text-ink-500">
+                          {terkunci ? 'Pilih chapter tujuan dulu: laporan ini tidak memuat kolom chapter.' : l.keterangan}
+                        </p>
+                        <div className="mt-2 flex items-stretch gap-2">
+                          <button
+                            type="button"
+                            disabled={terkunci || sibuk}
+                            onClick={() => inputRef.current[l.key]?.click()}
+                            className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-dashed border-ink-300 px-3 py-2 text-left transition-colors hover:border-ink-400 hover:bg-ink-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                          >
+                            <FileUp className="h-4 w-4 shrink-0 text-ink-400" />
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm font-medium text-ink-800">
+                                {f ? f.name : 'Pilih berkas…'}
+                              </span>
+                              <span className="block text-xs text-ink-500">
+                                {f ? `${(f.size / 1024).toFixed(0)} KB` : 'CSV, XLSX, atau .xls BNI Connect'}
+                              </span>
+                            </span>
+                          </button>
+                          {f && (
+                            <button
+                              type="button"
+                              onClick={() => pilihBerkas(l.key, null)}
+                              aria-label={`Hapus berkas ${l.judul}`}
+                              className="rounded-xl border border-ink-200 px-2.5 text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-800"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
 
             <div className="space-y-2">
-              <Button className="w-full" disabled={!file} loading={sibuk && !hasil} onClick={() => jalankan(false)}>
+              <Button
+                className="w-full"
+                disabled={terisi.length === 0}
+                loading={sibuk && !sudahDitinjau}
+                onClick={() => jalankan(false)}
+              >
                 <Upload className="h-4 w-4" />
-                Tinjau
+                Tinjau{terisi.length > 1 ? ` ${terisi.length} berkas` : ''}
               </Button>
-              {/* Tombol terapkan baru ADA setelah pratinjau, dan hilang lagi
-                  begitu berkasnya berganti. Menyediakannya lebih awal berarti
-                  menawarkan penulisan atas sesuatu yang belum pernah dilihat. */}
-              {hasil && !hasil.diterapkan && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  loading={sibuk}
-                  onClick={() => jalankan(true)}
-                >
-                  Terapkan {hasil.baru + hasil.diperbarui} perubahan
+              {/* Tombol terapkan baru ADA setelah seluruh pratinjau, dan hilang
+                  lagi begitu satu berkas berganti. Menyediakannya lebih awal
+                  berarti menawarkan penulisan atas sesuatu yang belum pernah
+                  dilihat. */}
+              {sudahDitinjau && belumDiterapkan.length > 0 && (
+                <Button variant="outline" className="w-full" loading={sibuk} onClick={() => jalankan(true)}>
+                  Terapkan {perubahan} perubahan
+                  {belumDiterapkan.length > 1 ? ` (${belumDiterapkan.length} langkah berurutan)` : ''}
                 </Button>
               )}
             </div>
 
             <p className="text-xs leading-relaxed text-ink-500">
-              Kolom yang <strong>tidak ada</strong> di berkas tidak mengosongkan data tersimpan —
-              mengirim daftar nomor telepon saja tidak akan menghapus email siapa pun.
+              Kolom yang <strong>tidak ada</strong> di berkas tidak mengosongkan data tersimpan:
+              mengirim daftar nomor telepon saja tidak akan menghapus email siapa pun. Langkah 2
+              dan 3 mencocokkan nama ke member yang sudah ada; nama yang baru masuk lewat langkah 1
+              baru dikenal setelah langkah 1 ditulis.
             </p>
           </CardBody>
         </Card>
 
-        <Card>
-          <CardHeader
-            title={hasil ? (hasil.diterapkan ? 'Sudah diterapkan' : 'Pratinjau — belum ditulis') : 'Hasil'}
-            subtitle={
-              hasil
-                ? `${hasil.total} baris · ${hasil.baru} baru · ${hasil.diperbarui} diperbarui · ${hasil.sama} sama · ${hasil.ditolak} ditolak`
-                : 'Pilih berkas lalu tekan Tinjau.'
-            }
-          />
-          <CardBody>
-            {!hasil ? (
-              <p className="py-8 text-center text-sm text-ink-500">Belum ada berkas yang ditinjau.</p>
-            ) : (
-              <div className="space-y-3">
-                <div
-                  className={`flex items-start gap-2 rounded-lg p-3 text-xs ${
-                    hasil.diterapkan ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
-                  }`}
-                >
-                  {hasil.diterapkan ? (
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  )}
-                  <span>
-                    {hasil.diterapkan
-                      ? 'Perubahan sudah ditulis ke basis data.'
-                      : 'Belum ada satu baris pun yang ditulis. Tekan "Terapkan" untuk menyimpannya.'}
-                  </span>
-                </div>
-
-                {hasil.peringatan?.map((p) => (
-                  <div key={p} className="rounded-lg bg-ink-50 p-3 text-xs text-ink-700">
-                    {p}
-                  </div>
-                ))}
-
-                <Table>
-                  <THead>
-                    <Tr>
-                      <Th className="w-16">Baris</Th>
-                      <Th>ID</Th>
-                      <Th>Nama</Th>
-                      <Th>Tindakan</Th>
-                      <Th>Keterangan</Th>
-                    </Tr>
-                  </THead>
-                  <TBody>
-                    {hasil.baris.map((b) => (
-                      <Tr key={`${b.nomor}-${b.id}`}>
-                        {/* Nomor mengikuti Excel, supaya barisnya bisa langsung
-                            dicari di berkas aslinya. */}
-                        <Td className="tabular-nums text-ink-500">{b.nomor}</Td>
-                        <Td className="font-mono text-xs text-ink-700">{b.id || '—'}</Td>
-                        <Td className="text-ink-800">{b.nama || '—'}</Td>
-                        <Td>
-                          <Badge tone={TONE[b.tindakan]}>{b.tindakan}</Badge>
-                        </Td>
-                        <Td className="text-xs text-ink-600">
-                          {b.alasan ?? b.perubahan?.join(', ') ?? ''}
-                        </Td>
-                      </Tr>
-                    ))}
-                  </TBody>
-                </Table>
-              </div>
-            )}
-          </CardBody>
-        </Card>
+        <div className="space-y-4">
+          {!terisi.some((l) => hasil[l.key]) ? (
+            <Card>
+              <CardHeader title="Hasil" subtitle="Pilih berkas lalu tekan Tinjau." />
+              <CardBody>
+                <p className="py-8 text-center text-sm text-ink-500">Belum ada berkas yang ditinjau.</p>
+              </CardBody>
+            </Card>
+          ) : (
+            terisi.map((l) => (
+              <HasilLangkah
+                key={l.key}
+                nomor={langkah.length > 1 ? langkah.indexOf(l) + 1 : undefined}
+                judul={l.judul}
+                hasil={hasil[l.key]}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
+  )
+}
+
+function TombolTemplate({
+  onClick,
+  disabled,
+  judul,
+  keterangan,
+}: {
+  onClick: () => void
+  disabled: boolean
+  judul: string
+  keterangan: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-3 rounded-xl border border-ink-200 p-3 text-left transition-colors hover:bg-ink-50 disabled:opacity-50"
+    >
+      <Download className="h-4 w-4 shrink-0 text-brand-500" />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-ink-800">{judul}</span>
+        <span className="block text-xs leading-snug text-ink-500">{keterangan}</span>
+      </span>
+    </button>
+  )
+}
+
+/** Hasil satu langkah: ringkasan, status tulis, peringatan, dan tabel barisnya. */
+function HasilLangkah({ nomor, judul, hasil }: { nomor?: number; judul: string; hasil?: ImportHasil }) {
+  const label = nomor ? `Langkah ${nomor} · ${judul}` : judul
+  if (!hasil) {
+    return (
+      <Card>
+        <CardHeader title={label} subtitle="Menunggu giliran ditinjau." />
+      </Card>
+    )
+  }
+  return (
+    <Card>
+      <CardHeader
+        title={`${label} · ${hasil.diterapkan ? 'sudah diterapkan' : 'pratinjau, belum ditulis'}`}
+        subtitle={`${hasil.total} baris · ${hasil.baru} baru · ${hasil.diperbarui} diperbarui · ${hasil.sama} sama · ${hasil.ditolak} ditolak`}
+      />
+      <CardBody>
+        <div className="space-y-3">
+          <div
+            className={`flex items-start gap-2 rounded-lg p-3 text-xs ${
+              hasil.diterapkan ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
+            }`}
+          >
+            {hasil.diterapkan ? (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+            <span>
+              {hasil.diterapkan
+                ? 'Perubahan sudah ditulis ke basis data.'
+                : 'Belum ada satu baris pun yang ditulis. Tekan "Terapkan" untuk menyimpannya.'}
+            </span>
+          </div>
+
+          {hasil.peringatan?.map((p) => (
+            <div key={p} className="rounded-lg bg-ink-50 p-3 text-xs text-ink-700">
+              {p}
+            </div>
+          ))}
+
+          <Table>
+            <THead>
+              <Tr>
+                <Th className="w-16">Baris</Th>
+                <Th>ID</Th>
+                <Th>Nama</Th>
+                <Th>Tindakan</Th>
+                <Th>Keterangan</Th>
+              </Tr>
+            </THead>
+            <TBody>
+              {hasil.baris.map((b) => (
+                <Tr key={`${b.nomor}-${b.id}`}>
+                  {/* Nomor mengikuti Excel, supaya barisnya bisa langsung
+                      dicari di berkas aslinya. */}
+                  <Td className="tabular-nums text-ink-500">{b.nomor}</Td>
+                  <Td className="font-mono text-xs text-ink-700">{b.id || '—'}</Td>
+                  <Td className="text-ink-800">{b.nama || '—'}</Td>
+                  <Td>
+                    <Badge tone={TONE[b.tindakan]}>{b.tindakan}</Badge>
+                  </Td>
+                  <Td className="text-xs text-ink-600">{b.alasan ?? b.perubahan?.join(', ') ?? ''}</Td>
+                </Tr>
+              ))}
+            </TBody>
+          </Table>
+        </div>
+      </CardBody>
+    </Card>
   )
 }
