@@ -378,10 +378,24 @@ export function InvoiceDetailPage() {
                       {(status === 'sent' || status === 'overdue') && (
                         <Button onClick={kirimPengingat}>
                           <Send className="h-4 w-4" />
-                          Kirim Ulang
+                          Kirim Pengingat
                         </Button>
                       )}
                     </div>
+                    {/* Berapa kali pengingat sudah berangkat. Tanpa angka ini,
+                        orang menekan tombolnya lagi "untuk memastikan", dan tiap
+                        pengiriman memakai satu nomor invoice Paper.id. */}
+                    <p className="text-xs text-ink-500">
+                      {invoice.paperIdReminderCount ? (
+                        <>
+                          Sudah diingatkan{' '}
+                          <span className="font-semibold text-ink-800">{invoice.paperIdReminderCount}×</span> lewat
+                          Paper.id.
+                        </>
+                      ) : (
+                        'Belum pernah diingatkan.'
+                      )}
+                    </p>
                   </>
                 ) : (
                   // Tanpa tautan Paper.id tidak ada yang bisa dibagikan, dan
