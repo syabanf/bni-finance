@@ -69,13 +69,15 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
               <div className="font-medium text-ink-900 text-sm">{s.chapterName}</div>
               <div className="text-sm font-semibold text-ink-900">{formatCurrencyCompact(s.totalAmount)}</div>
             </div>
-            <div className="mt-2 flex items-center gap-3 text-xs">
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="text-ink-500">{s.total} invoice</span>
+              <span className="text-ink-500">{s.renewal} renewal</span>
+              <span className="text-ink-500">{s.registration} pendaftaran</span>
               {s.overdue > 0 && (
-                <span className="font-semibold text-red-600">{s.overdue} overdue</span>
+                <span className="font-semibold text-red-600">{s.overdue} terlambat</span>
               )}
               {s.outstanding > 0 && (
-                <span className="font-semibold text-amber-600">{s.outstanding} outstanding</span>
+                <span className="font-semibold text-amber-600">{s.outstanding} belum dibayar</span>
               )}
               <span className="text-emerald-600">{s.paid} lunas</span>
             </div>
@@ -89,8 +91,10 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
             <tr className="border-b border-ink-100 text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
               <th className="px-5 py-3">Chapter</th>
               <th className="px-3 py-3 text-center">Total</th>
-              <th className="px-3 py-3 text-center">Overdue</th>
-              <th className="px-3 py-3 text-center">Outstanding</th>
+              <th className="px-3 py-3 text-center">Renewal</th>
+              <th className="px-3 py-3 text-center">Pendaftaran</th>
+              <th className="px-3 py-3 text-center">Terlambat</th>
+              <th className="px-3 py-3 text-center">Belum Dibayar</th>
               <th className="px-3 py-3 text-center">Lunas</th>
               <th className="px-5 py-3 text-right">Total Nilai</th>
             </tr>
@@ -104,6 +108,17 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
               >
                 <td className="px-5 py-3 font-medium text-ink-900">{s.chapterName}</td>
                 <td className="px-3 py-3 text-center text-ink-600">{s.total}</td>
+                {/* Jumlah di atas, nominal di bawah. Renewal dan pendaftaran
+                    harganya jauh berbeda, jadi "3 renewal" dan "3 pendaftaran"
+                    bukan jumlah uang yang sama. */}
+                <td className="px-3 py-3 text-center">
+                  <div className="text-ink-700">{s.renewal}</div>
+                  <div className="text-[11px] text-ink-400">{formatCurrencyCompact(s.renewalAmount)}</div>
+                </td>
+                <td className="px-3 py-3 text-center">
+                  <div className="text-ink-700">{s.registration}</div>
+                  <div className="text-[11px] text-ink-400">{formatCurrencyCompact(s.registrationAmount)}</div>
+                </td>
                 <td className="px-3 py-3 text-center">
                   <StatCell value={s.overdue} tone="text-red-600" onSelect={() => drill(s.chapterId, 'overdue')} />
                 </td>

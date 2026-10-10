@@ -194,6 +194,11 @@ export interface ChapterStat {
   outstanding: number
   overdue: number
   totalAmount: number
+  /** Per tipe, tanpa yang dibatalkan. Harganya jauh berbeda, jadi nominalnya ikut dibawa. */
+  renewal: number
+  renewalAmount: number
+  registration: number
+  registrationAmount: number
 }
 
 export interface DashboardSummary {

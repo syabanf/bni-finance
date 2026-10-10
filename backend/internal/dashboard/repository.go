@@ -208,7 +208,11 @@ func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, er
 	  count(i.id) FILTER (WHERE i.status = 'paid'),
 	  count(i.id) FILTER (WHERE i.status IN ('sent','overdue')),
 	  count(i.id) FILTER (WHERE i.status = 'overdue'),
-	  coalesce(sum(i.amount) FILTER (WHERE i.status <> 'cancelled'), 0)
+	  coalesce(sum(i.amount) FILTER (WHERE i.status <> 'cancelled'), 0),
+	  count(i.id) FILTER (WHERE i.type = 'renewal' AND i.status <> 'cancelled'),
+	  coalesce(sum(i.amount) FILTER (WHERE i.type = 'renewal' AND i.status <> 'cancelled'), 0),
+	  count(i.id) FILTER (WHERE i.type = 'registration' AND i.status <> 'cancelled'),
+	  coalesce(sum(i.amount) FILTER (WHERE i.type = 'registration' AND i.status <> 'cancelled'), 0)
 	FROM chapters c
 	LEFT JOIN invoices i ON i.chapter_id = c.id
 	WHERE %s
@@ -229,7 +233,8 @@ func (r *Repository) chapterStats(ctx context.Context) ([]domain.ChapterStat, er
 	for rows.Next() {
 		var s domain.ChapterStat
 		if err := rows.Scan(&s.ChapterID, &s.ChapterName, &s.Total, &s.Paid,
-			&s.Outstanding, &s.Overdue, &s.TotalAmount); err != nil {
+			&s.Outstanding, &s.Overdue, &s.TotalAmount,
+			&s.Renewal, &s.RenewalAmount, &s.Registration, &s.RegistrationAmount); err != nil {
 			return nil, fmt.Errorf("scan statistik chapter: %w", err)
 		}
 		items = append(items, s)

@@ -592,6 +592,10 @@ export async function mockApiFetch(
           outstanding: rows.filter((i) => i.status === 'sent' || i.status === 'overdue').length,
           overdue: rows.filter((i) => i.status === 'overdue').length,
           totalAmount: sum(rows.filter((i) => i.status !== 'cancelled')),
+          renewal: rows.filter((i) => i.type === 'renewal' && i.status !== 'cancelled').length,
+          renewalAmount: sum(rows.filter((i) => i.type === 'renewal' && i.status !== 'cancelled')),
+          registration: rows.filter((i) => i.type === 'registration' && i.status !== 'cancelled').length,
+          registrationAmount: sum(rows.filter((i) => i.type === 'registration' && i.status !== 'cancelled')),
         }
       }),
     })

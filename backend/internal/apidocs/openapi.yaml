@@ -3232,6 +3232,10 @@ components:
               outstanding: { type: integer }
               overdue: { type: integer }
               totalAmount: { type: integer }
+              renewal: { type: integer, description: Jumlah invoice renewal, tanpa yang dibatalkan }
+              renewalAmount: { type: integer }
+              registration: { type: integer, description: Jumlah invoice pendaftaran, tanpa yang dibatalkan }
+              registrationAmount: { type: integer }
 
     # --- Publik --------------------------------------------------------------
     PublicInvoice:

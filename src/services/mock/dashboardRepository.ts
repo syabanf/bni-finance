@@ -83,9 +83,17 @@ export const mockDashboardRepository: DashboardRepository = {
         chapterId: inv.chapterId,
         chapterName: chapter.displayName,
         total: 0, paid: 0, outstanding: 0, overdue: 0, totalAmount: 0,
+        renewal: 0, renewalAmount: 0, registration: 0, registrationAmount: 0,
       }
       existing.total++
       existing.totalAmount += inv.amount
+      if (inv.type === 'renewal') {
+        existing.renewal++
+        existing.renewalAmount += inv.amount
+      } else {
+        existing.registration++
+        existing.registrationAmount += inv.amount
+      }
       if (inv.status === 'paid') existing.paid++
       if (inv.status === 'sent') existing.outstanding++
       if (inv.status === 'overdue') existing.overdue++
