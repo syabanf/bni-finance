@@ -21,6 +21,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/invoices/{id}", h.get)
 	mux.HandleFunc("PATCH /api/v1/invoices/{id}", auth.RequireAdmin(h.update))
 	mux.HandleFunc("DELETE /api/v1/invoices/{id}", auth.RequireAdmin(h.remove))
+	mux.HandleFunc("PUT /api/v1/invoices/{id}/tax-invoice", auth.RequireAdmin(h.taxInvoice))
 }
 
 type listMeta struct {
@@ -107,6 +108,24 @@ func (h *Handler) update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inv, err := h.svc.Update(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, inv)
+}
+
+// taxInvoice melampirkan faktur pajak. Berkasnya diunggah lebih dulu lewat
+// POST /api/v1/uploads; body di sini hanya membawa path yang dikembalikannya.
+func (h *Handler) taxInvoice(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		URL string `json:"url"`
+	}
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	inv, err := h.svc.AttachTaxInvoice(r.Context(), r.PathValue("id"), in.URL)
 	if err != nil {
 		httpx.Fail(w, err)
 		return

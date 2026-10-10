@@ -373,6 +373,27 @@ export const mockInvoiceRepository: InvoiceRepository = {
     return delay(invoice, 600)
   },
 
+  async attachTaxInvoice(id, file) {
+    const invoice = store.invoices.find((i) => i.id === id)
+    if (!invoice) throw new Error('Invoice tidak ditemukan.')
+    if (invoice.status !== 'paid') {
+      throw new Error('Faktur pajak hanya bisa dilampirkan pada invoice yang sudah lunas.')
+    }
+    const diganti = !!invoice.taxInvoiceUrl
+    // Mock tidak punya penyimpanan; object URL cukup untuk dilihat selama sesi.
+    invoice.taxInvoiceUrl = URL.createObjectURL(file)
+    invoice.taxInvoiceAt = nowISO()
+    invoice.updatedAt = invoice.taxInvoiceAt
+    pushAudit({
+      invoiceId: id,
+      action: 'tax_invoice',
+      actorId: 'admin-national',
+      actorName: 'Admin Nasional',
+      notes: diganti ? 'faktur pajak diganti' : 'faktur pajak dilampirkan',
+    })
+    return delay(invoice, 400)
+  },
+
   async recordManualPayment(id, input) {
     const invoice = store.invoices.find((i) => i.id === id)
     if (!invoice) throw new Error('Invoice tidak ditemukan.')

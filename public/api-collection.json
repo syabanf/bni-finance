@@ -999,6 +999,39 @@
       "admin": true
     },
     {
+      "id": "put:/api/v1/invoices/{id}/tax-invoice",
+      "method": "PUT",
+      "path": "/api/v1/invoices/{id}/tax-invoice",
+      "tag": "Invoice",
+      "summary": "Lampirkan faktur pajak",
+      "description": "**Admin.** Melampirkan atau mengganti faktur pajak invoice yang\n**sudah lunas**; invoice berstatus lain ditolak 400. Berkasnya diunggah\nlebih dulu lewat `POST /api/v1/uploads`, dan `url` di sini adalah path\n`/uploads/...` yang dikembalikannya. Tautan luar ditolak. Setiap\nlampiran menulis baris audit `tax_invoice`.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {
+        "url": "/uploads/3f9c2a.pdf"
+      },
+      "bodyFields": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
       "id": "get:/api/v1/payments",
       "method": "GET",
       "path": "/api/v1/payments",

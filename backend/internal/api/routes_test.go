@@ -3,6 +3,7 @@ package api_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -348,6 +349,18 @@ func TestEmptyListIsArray(t *testing.T) {
 		_, body := s.do(t, http.MethodGet, path, "")
 		if !strings.Contains(string(body), `"data":[]`) {
 			t.Errorf("%s: daftar kosong harus [] bukan null — %s", path, body)
+		}
+	}
+}
+
+// Faktur pajak hanya menerima path berkas dari /api/v1/uploads. Tautan luar
+// ditolak sebelum menyentuh invoice mana pun.
+func TestFakturPajakMenolakTautanLuar(t *testing.T) {
+	s := newFullServer(t)
+	for _, url := range []string{"https://contoh.invalid/faktur.pdf", "", "/uploads/../etc/passwd", "uploads/a.pdf"} {
+		body := fmt.Sprintf(`{"url":%q}`, url)
+		if code, raw := s.do(t, http.MethodPut, "/api/v1/invoices/inv-1/tax-invoice", body); code != http.StatusBadRequest {
+			t.Errorf("url %q: status %d, mau 400: %s", url, code, raw)
 		}
 	}
 }

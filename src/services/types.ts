@@ -185,6 +185,8 @@ export interface InvoiceRepository {
   markPaid(id: string): Promise<Invoice>
   /** Manually record an offline payment (e.g. bank transfer) with optional proof. */
   recordManualPayment(id: string, input: ManualPaymentInput): Promise<Invoice>
+  /** Lampirkan atau ganti faktur pajak. Hanya untuk invoice yang sudah lunas. */
+  attachTaxInvoice(id: string, file: File): Promise<Invoice>
   getAuditLog(invoiceId: string): Promise<AuditLogEntry[]>
   /** Members at/near the end of their membership period. */
   renewalDue(withinDays?: number): Promise<RenewalDueMember[]>

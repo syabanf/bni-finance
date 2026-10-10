@@ -1321,6 +1321,40 @@ paths:
   # ===========================================================================
   # Paper.id
   # ===========================================================================
+  /api/v1/invoices/{id}/tax-invoice:
+    put:
+      tags: [Invoice]
+      summary: Lampirkan faktur pajak
+      description: |
+        **Admin.** Melampirkan atau mengganti faktur pajak invoice yang
+        **sudah lunas**; invoice berstatus lain ditolak 400. Berkasnya diunggah
+        lebih dulu lewat `POST /api/v1/uploads`, dan `url` di sini adalah path
+        `/uploads/...` yang dikembalikannya. Tautan luar ditolak. Setiap
+        lampiran menulis baris audit `tax_invoice`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url: { type: string, example: "/uploads/3f9c2a.pdf" }
+      responses:
+        "200":
+          description: Invoice dengan faktur pajak terlampir
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /api/v1/invoices/{id}/remind:
     post:
       tags: [Paper.id]
@@ -2881,6 +2915,8 @@ components:
         paperIdInvoiceUrl: { title: URL Invoice Paper.id, type: string }
         paperIdPaymentUrl: { title: URL Pembayaran Paper.id, type: string }
         paperIdSentAt: { title: Waktu Kirim ke Paper.id, type: string, format: date-time }
+        taxInvoiceUrl: { title: Faktur Pajak, type: string, description: "Path berkas faktur pajak di /uploads/; hanya ada pada invoice lunas." }
+        taxInvoiceAt: { title: Faktur Pajak Dilampirkan, type: string, format: date-time }
         paymentProvider: { type: string, example: xendit }
         xenditExternalId: { type: string }
         xenditPaymentId: { type: string }

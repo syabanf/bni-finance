@@ -14,11 +14,13 @@ const (
 	AuditCancelled AuditAction = "cancelled"
 	AuditOverdue   AuditAction = "overdue"
 	AuditUpdated   AuditAction = "updated"
+	// AuditTaxInvoice: faktur pajak dilampirkan atau diganti.
+	AuditTaxInvoice AuditAction = "tax_invoice"
 )
 
 func (a AuditAction) Valid() bool {
 	switch a {
-	case AuditCreated, AuditSent, AuditPaid, AuditCancelled, AuditOverdue, AuditUpdated:
+	case AuditCreated, AuditSent, AuditPaid, AuditCancelled, AuditOverdue, AuditUpdated, AuditTaxInvoice:
 		return true
 	}
 	return false

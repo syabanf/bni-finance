@@ -107,6 +107,10 @@ export interface Invoice {
   /** Berapa kali invoice ini dikirim ulang sebagai pengingat lewat Paper.id. */
   paperIdReminderCount?: number
 
+  /** Faktur pajak, dilampirkan setelah invoice lunas. */
+  taxInvoiceUrl?: string
+  taxInvoiceAt?: string
+
   /**
    * Selalu 'paper_id' sejak pembayaran mandiri dihapus.
    *
@@ -174,6 +178,7 @@ export type AuditAction =
   | 'updated'
   | 'reminded'
   | 'terminated'
+  | 'tax_invoice'
 
 export interface AuditLogEntry {
   id: string
