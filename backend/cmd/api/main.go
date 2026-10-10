@@ -23,6 +23,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/database"
 	"github.com/syabanf/bni-finance/backend/internal/importer"
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
+	"github.com/syabanf/bni-finance/backend/internal/kurs"
 	"github.com/syabanf/bni-finance/backend/internal/mailer"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
@@ -150,13 +151,15 @@ func run(log *slog.Logger) error {
 			"endpoint", "/api/v1/webhooks/paperid/*")
 	}
 
+	settingsSvc := settings.NewService(settings.NewRepository(pool))
+
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
 		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
 		Payment:   payment.NewService(payment.NewRepository(pool)),
 		Member:    member.NewService(member.NewRepository(pool)),
 		Chapter:   chapter.NewService(chapter.NewRepository(pool)),
-		Settings:  settings.NewService(settings.NewRepository(pool)),
+		Settings:  settingsSvc,
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
 		Upload:    uploads,
@@ -190,6 +193,11 @@ func run(log *slog.Logger) error {
 		reminder.NewPaperPengirim(paperSvc),
 		log,
 	).Jalankan(workerCtx)
+
+	// Kurs pajak KMK diperiksa saat start lalu sekali sehari; kurs USD di
+	// fee_settings mengikutinya kecuali app_settings.kurs_kmk_otomatis = false.
+	// Melewati settings.Service supaya Rupiah ikut diturunkan ulang dari USD.
+	go kurs.NewWorker(settingsSvc, log).Jalankan(workerCtx)
 
 	errCh := make(chan error, 1)
 	go func() {
