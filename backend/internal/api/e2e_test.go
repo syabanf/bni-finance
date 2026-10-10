@@ -327,6 +327,7 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		`{"id":"mem-e2e","chapterId":"ch-e2e","name":"Peserta E2E",`+
 			`"email":"fahmi@wit.id","phone":"082240274833","status":"active"}`,
 		http.StatusCreated, nil)
+	konfirmasiRenewal(t, s.pool, "mem-e2e")
 
 	// --- tagihan ------------------------------------------------------------
 

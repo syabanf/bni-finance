@@ -62,6 +62,7 @@ func concurrentStack(t *testing.T) *e2eStack {
 		`{"id":"mem-conc","chapterId":"ch-conc","name":"Peserta Concurrency",`+
 			`"email":"fahmi@wit.id","phone":"082240274833","status":"active"}`,
 		http.StatusCreated, nil)
+	konfirmasiRenewal(t, s.pool, "mem-conc")
 	return s
 }
 

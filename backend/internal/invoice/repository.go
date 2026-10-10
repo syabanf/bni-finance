@@ -311,6 +311,11 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 	case !statusMember.BolehDitagih(in.Type):
 		return nil, httpx.BadRequest(pesanTipeSalah(statusMember, in.Type))
 	}
+	if in.Type == domain.TypeRenewal {
+		if err := periksaKonfirmasiRenewal(ctx, tx, in.MemberID); err != nil {
+			return nil, err
+		}
+	}
 
 	const q = `
 		INSERT INTO invoices (number, member_id, chapter_id, type, amount, currency,
@@ -709,4 +714,37 @@ func pesanTipeSalah(status domain.MemberStatus, tipe domain.InvoiceType) string 
 		return fmt.Sprintf("member berstatus %s belum menjadi anggota, jadi tidak bisa ditagih renewal; terbitkan invoice pendaftaran", status)
 	}
 	return fmt.Sprintf("member berstatus %s sudah menjadi anggota, jadi tidak bisa ditagih pendaftaran; terbitkan invoice renewal", status)
+}
+
+// periksaKonfirmasiRenewal menahan invoice renewal sampai MC menjawab
+// "Diterima" pada permintaan konfirmasi renewal terakhir member itu.
+//
+// Alurnya Member, lalu Konfirmasi Renewal, baru Invoice. Tagihan yang
+// terbit sebelum MC memastikan member akan memperpanjang adalah tagihan yang
+// mungkin harus dibatalkan, dan nomor Paper.id yang sudah terpakai tidak bisa
+// dikembalikan. Yang dibaca permintaan TERAKHIR, supaya jawaban "Diterima"
+// tahun lalu tidak membuka tagihan tahun ini.
+func periksaKonfirmasiRenewal(ctx context.Context, tx pgx.Tx, memberID string) error {
+	var jawaban domain.RenewalAnswer
+	err := tx.QueryRow(ctx, `
+		SELECT answer FROM renewal_requests
+		 WHERE member_id = $1
+		 ORDER BY requested_at DESC
+		 LIMIT 1`, memberID).Scan(&jawaban)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return httpx.BadRequest("member ini belum dimintai konfirmasi renewal; minta konfirmasi di halaman Konfirmasi Renewal dulu")
+	case err != nil:
+		return fmt.Errorf("periksa konfirmasi renewal: %w", err)
+	}
+	switch jawaban {
+	case domain.RenewalWillRenew:
+		return nil
+	case domain.RenewalPending:
+		return httpx.BadRequest("konfirmasi renewal member ini belum dijawab MC")
+	case domain.RenewalWillNot:
+		return httpx.BadRequest("MC menjawab member ini tidak memperpanjang; invoice renewal tidak diterbitkan")
+	default:
+		return httpx.BadRequest("jawaban MC atas konfirmasi renewal member ini masih belum pasti")
+	}
 }
