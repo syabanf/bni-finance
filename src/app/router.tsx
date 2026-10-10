@@ -11,6 +11,7 @@ import { RenewalDuePage } from '@/features/invoices/RenewalDuePage'
 import { InvoiceDetailPage } from '@/features/invoices/InvoiceDetailPage'
 import { MemberListPage } from '@/features/members/MemberListPage'
 import { MemberDetailPage } from '@/features/members/MemberDetailPage'
+import { MembershipLengthPage } from '@/features/members/MembershipLengthPage'
 import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentDetailPage } from '@/features/payments/PaymentDetailPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { path: '/invoices/:id', element: <InvoiceDetailPage /> },
 
           { path: '/members', element: <MemberListPage /> },
+          { path: '/members/lama-keanggotaan', element: <MembershipLengthPage /> },
           { path: '/members/:id', element: <MemberDetailPage /> },
 
           { path: '/chapters', element: <ChapterListPage /> },
