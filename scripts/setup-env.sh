@@ -117,7 +117,6 @@ fi
 warn "Belum diisi — hanya Anda yang punya nilainya:"
 cat <<'TODO'
     PAPER_ID_CLIENT_ID / PAPER_ID_CLIENT_SECRET   penerbitan invoice
-    XENDIT_SECRET_KEY / XENDIT_CALLBACK_TOKEN     pembayaran mandiri
     BNI_VM_TOKEN                                  sinkronisasi member
 
 Semuanya opsional: fitur yang bersangkutan menjawab 503 dengan pesan yang

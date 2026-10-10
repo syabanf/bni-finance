@@ -61,8 +61,8 @@ npm run dev        # http://localhost:5173
 
 Masuk dengan kredensial apa pun, atau tekan tombol **Masuk Cepat**.
 
-`npm run setup` menyalin kedua `.env.example` lalu membangkitkan `JWT_SECRET`,
-token callback Paper.id, dan kata sandi admin awal. Kredensial pihak ketiga
+`npm run setup` menyalin kedua `.env.example` lalu membangkitkan `JWT_SECRET`
+dan kata sandi admin awal. Kredensial pihak ketiga
 dibiarkan kosong — fitur terkait menjawab 503 dengan pesan jelas sampai diisi.
 Berkas yang sudah ada tidak pernah ditimpa.
 

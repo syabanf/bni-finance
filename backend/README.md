@@ -254,7 +254,6 @@ chapter diturunkan dari daftar member. Token diambil dari
 |---|---|---|
 | `GET` | `/public/invoices/{id}` | Proyeksi sempit untuk halaman bayar |
 | `POST` | `/public/invoices/{id}/payment` | Buat pembayaran Xendit (VA/QRIS) |
-| `POST` | `/webhooks/xendit` | Callback Xendit — butuh `x-callback-token` |
 
 ### Paper.id
 
