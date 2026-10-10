@@ -36,28 +36,28 @@ func (s MemberStatus) Valid() bool {
 	return false
 }
 
-// BolehDitagih melaporkan orang berstatus ini boleh menerima tagihan
-// keanggotaan.
+// BolehDitagih melaporkan orang berstatus ini boleh menerima tagihan bertipe t.
+//
+// Pendaftaran hanya untuk yang belum menjadi anggota (visitor dan pending);
+// renewal hanya untuk yang sudah (active dan inactive). Member yang
+// keanggotaannya lewat tetap diperpanjang, bukan didaftarkan ulang, karena ia
+// pernah bergabung dan riwayat periodenya menyambung dari sana.
 //
 // DITULIS SEBAGAI SWITCH YANG MENYEBUT SETIAP STATUS, bukan sebagai
 // `!= MemberVisitor`. Bentuk negatif membuat status yang ditambahkan nanti
-// otomatis ikut tertagih — diam-diam, tanpa seorang pun memutuskannya. Di sini
+// otomatis ikut tertagih, diam-diam, tanpa seorang pun memutuskannya. Di sini
 // yang tidak disebut jatuh ke `false`, dan tes memaksa setiap status punya
-// keputusan tertulis.
+// keputusan tertulis untuk kedua tipe.
 //
 // Arah gagalnya dipilih sengaja: tagihan yang tidak terbit hanya perlu
-// diperbaiki; tagihan yang terlanjur terkirim ke orang yang tidak pernah
-// menjadi anggota tidak bisa ditarik kembali dari kotak masuknya.
-//
-// `inactive` dan `pending` tetap boleh, seperti sebelumnya — member yang
-// keanggotaannya lewat masih ditagih perpanjangan, dan yang pending memang
-// sedang menunggu tagihan pendaftarannya.
-func (s MemberStatus) BolehDitagih() bool {
+// diperbaiki; tagihan yang terlanjur terkirim dengan tipe yang salah tidak bisa
+// ditarik kembali dari kotak masuk penerimanya.
+func (s MemberStatus) BolehDitagih(t InvoiceType) bool {
 	switch s {
-	case MemberActive, MemberInactive, MemberPending:
-		return true
-	case MemberVisitor:
-		return false
+	case MemberActive, MemberInactive:
+		return t == TypeRenewal
+	case MemberVisitor, MemberPending:
+		return t == TypeRegistration
 	}
 	return false
 }

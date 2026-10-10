@@ -1,4 +1,5 @@
 import type { CreateInvoiceInput, InvoiceRepository } from '@/services/types'
+import { bolehDitagih } from '@/lib/status'
 import type {
   AuditLogEntry,
   Invoice,
@@ -170,6 +171,14 @@ export const mockInvoiceRepository: InvoiceRepository = {
   async create(input: CreateInvoiceInput) {
     const member = store.members.find((m) => m.id === input.memberId)
     if (!member) throw new Error('Member tidak ditemukan.')
+    // Meniru penolakan server: tipe harus cocok dengan status member.
+    if (!bolehDitagih(member.status, input.type)) {
+      throw new Error(
+        input.type === 'renewal'
+          ? `Member berstatus ${member.status} belum menjadi anggota, jadi tidak bisa ditagih renewal; terbitkan invoice pendaftaran.`
+          : `Member berstatus ${member.status} sudah menjadi anggota, jadi tidak bisa ditagih pendaftaran; terbitkan invoice renewal.`,
+      )
+    }
 
     const invoice: Invoice = {
       id: nextId('inv'),

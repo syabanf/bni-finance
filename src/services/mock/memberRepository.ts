@@ -1,5 +1,6 @@
 import type { MemberRepository } from '@/services/types'
 import type { MemberWithChapter } from '@/types'
+import { bolehDitagih } from '@/lib/status'
 import { delay, nowISO, store } from './store'
 
 function withChapter(memberId: string): MemberWithChapter | null {
@@ -35,16 +36,15 @@ export const mockMemberRepository: MemberRepository = {
   },
 
   async eligibleForRegistration() {
-    // Members who have no registration invoice yet that is still active
-    // (sent/paid). In the seed every member has one, so we surface those whose
-    // registration invoice is still a draft — i.e. not yet issued.
+    // Visitor dan pending yang belum punya invoice pendaftaran terbit
+    // (sent/paid). Member aktif tidak termasuk: mereka ditagih renewal.
     const hasIssuedRegistration = new Set(
       store.invoices
         .filter((i) => i.type === 'registration' && i.status !== 'draft' && i.status !== 'cancelled')
         .map((i) => i.memberId),
     )
     const result = store.members
-      .filter((m) => !hasIssuedRegistration.has(m.id))
+      .filter((m) => bolehDitagih(m.status, 'registration') && !hasIssuedRegistration.has(m.id))
       .map((m) => withChapter(m.id)!)
     return delay(result.sort((a, b) => a.name.localeCompare(b.name)))
   },

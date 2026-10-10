@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Search, Send, UserRound } from 'lucide-react'
 import type { FeeSettings, InvoiceType, MemberWithChapter } from '@/types'
+import { bolehDitagih } from '@/lib/status'
 import {
   Avatar,
   Button,
@@ -29,8 +30,15 @@ export function InvoiceNewPage() {
   const { data: fees } = useAsync<FeeSettings>(() => settingsService.getFees())
 
   const [type, setType] = useState<InvoiceType>('registration')
+  // Daftar yang ditawarkan sudah mengikuti aturan server: pendaftaran hanya
+  // untuk visitor dan pending, renewal hanya untuk member aktif dan nonaktif.
+  // Server tetap menolak yang lolos, tapi pilihan yang pasti ditolak tidak
+  // perlu ditampilkan.
   const { data: members, loading: membersLoading } = useAsync<MemberWithChapter[]>(
-    () => (type === 'registration' ? memberService.eligibleForRegistration() : memberService.list()),
+    () =>
+      (type === 'registration' ? memberService.eligibleForRegistration() : memberService.list()).then(
+        (list) => list.filter((m) => bolehDitagih(m.status, type)),
+      ),
     [type],
   )
 
@@ -91,7 +99,7 @@ export function InvoiceNewPage() {
   //
   // Menawarkan seluruh chapter berarti sebagian pilihan menghasilkan daftar
   // kosong — dan pada tipe Pendaftaran itu sering terjadi, karena daftarnya
-  // sudah disaring ke member yang belum punya invoice pendaftaran aktif.
+  // sudah disaring ke visitor yang belum punya invoice pendaftaran aktif.
   // Pilihan yang pasti kosong hanya membuat orang mengira datanya hilang.
   const chapterOptions = useMemo(() => {
     const map = new Map<string, string>()
@@ -298,8 +306,8 @@ export function InvoiceNewPage() {
               title="2. Pilih Member"
               subtitle={
                 type === 'registration'
-                  ? 'Member yang belum punya invoice pendaftaran aktif.'
-                  : 'Pilih member untuk diperpanjang.'
+                  ? 'Visitor dan calon yang belum punya invoice pendaftaran aktif.'
+                  : 'Member aktif atau nonaktif yang keanggotaannya diperpanjang.'
               }
             />
             <div className="px-5 pb-3">
