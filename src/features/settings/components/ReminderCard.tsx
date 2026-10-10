@@ -6,23 +6,18 @@ import { getAppSetting, setAppSetting } from '@/services/appSettings'
 /**
  * Pengaturan pengingat dan denda.
  *
- * DUA SAKELAR YANG SENGAJA TERPISAH, dan bedanya nyata:
- *
- *   notifications_enabled    mematikan SELURUH notifikasi, termasuk pengiriman
- *                            manual — dipakai saat memindahkan lingkungan atau
- *                            menguji, ketika pesan yang telanjur keluar tidak
- *                            bisa ditarik kembali
- *   reminder_worker_enabled  hanya menghentikan yang otomatis; orang tetap bisa
- *                            mengirim sendiri
+ * Satu sakelar: reminder_worker_enabled, yang menghentikan pengingat otomatis
+ * saja; orang tetap bisa mengirim sendiri. Sakelar notifikasi global dan kode
+ * masuk lewat email pernah ada di kartu ini dan dicabut atas permintaan: dua
+ * sakelar yang tidak dipakai hanya menambah hal yang bisa salah disentuh.
+ * Server masih membaca kuncinya dari app_settings dengan nilai bawaannya.
  *
  * Worker bawaannya MATI. Ia mengirim pesan sungguhan ke member dan membakar
  * nomor invoice Paper.id secara permanen, jadi menyalakannya harus keputusan
- * sadar — bukan efek samping sebuah deploy.
+ * sadar, bukan efek samping sebuah deploy.
  */
 
 const KUNCI = [
-  'login_otp_enabled',
-  'notifications_enabled',
   'reminder_worker_enabled',
   'reminder_offsets',
   'denda_aktif',
@@ -38,8 +33,6 @@ type Kunci = (typeof KUNCI)[number]
 export function ReminderCard() {
   const { toast } = useToast()
   const [nilai, setNilai] = useState<Record<Kunci, string>>({
-    login_otp_enabled: 'false',
-    notifications_enabled: 'true',
     reminder_worker_enabled: 'false',
     reminder_offsets: '7,3,1',
     denda_aktif: 'false',
@@ -86,7 +79,6 @@ export function ReminderCard() {
   }
 
   const workerNyala = nilai.reminder_worker_enabled === 'true'
-  const notifNyala = nilai.notifications_enabled === 'true'
   const dendaNyala = nilai.denda_aktif === 'true'
 
   /** Contoh perhitungan, memakai aturan yang sama dengan server. */
@@ -123,36 +115,17 @@ export function ReminderCard() {
         }
       />
       <CardBody className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Sakelar
-            label="Kode masuk lewat email (OTP)"
-            nyala={nilai.login_otp_enabled === 'true'}
-            onChange={(v) => ubah('login_otp_enabled', String(v))}
-            deskripsi="Setelah kata sandi benar, sistem mengirim kode 6 digit ke email dan meminta kode itu sebelum bisa masuk."
-            peringatan={
-              nilai.login_otp_enabled === 'true'
-                ? 'Menyala: kalau pengiriman email bermasalah, tidak ada yang bisa masuk — termasuk Anda. Sistem otomatis melewati OTP bila email belum dikonfigurasi.'
-                : undefined
-            }
-          />
-          <Sakelar
-            label="Notifikasi"
-            nyala={notifNyala}
-            onChange={(v) => ubah('notifications_enabled', String(v))}
-            deskripsi="Kalau dimatikan, tidak ada pesan apa pun yang sampai ke member — termasuk yang Anda kirim sendiri."
-          />
-          <Sakelar
-            label="Pengingat otomatis"
-            nyala={workerNyala}
-            onChange={(v) => ubah('reminder_worker_enabled', String(v))}
-            deskripsi="Sistem mengirim pengingat sendiri sesuai jadwal. Kalau dimatikan, Anda tetap bisa mengirim satu per satu."
-            peringatan={
-              workerNyala
-                ? 'Sedang menyala — pengingat dikirim otomatis ke member. Tiap pengiriman memakai satu nomor invoice Paper.id yang tidak bisa dipakai lagi.'
-                : undefined
-            }
-          />
-        </div>
+        <Sakelar
+          label="Pengingat otomatis"
+          nyala={workerNyala}
+          onChange={(v) => ubah('reminder_worker_enabled', String(v))}
+          deskripsi="Sistem mengirim pengingat sendiri sesuai jadwal. Kalau dimatikan, Anda tetap bisa mengirim satu per satu."
+          peringatan={
+            workerNyala
+              ? 'Sedang menyala — pengingat dikirim otomatis ke member. Tiap pengiriman memakai satu nomor invoice Paper.id yang tidak bisa dipakai lagi.'
+              : undefined
+          }
+        />
 
         <Field
           label="Jadwal pengingat"

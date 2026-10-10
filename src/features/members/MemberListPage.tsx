@@ -43,24 +43,25 @@ const CONTACT_OPTIONS: { value: ContactFilter; label: string }[] = [
 ]
 
 /**
- * Member versus calon member, sebagai satu saringan kasar.
+ * Member versus visitor, sebagai satu saringan kasar.
  *
  * Kartu status di atas tabel sudah membedakan empat status, tapi pertanyaan
  * yang sering diajukan lebih sederhana dari itu: siapa yang sudah anggota,
- * dan siapa yang masih dalam perjalanan ke sana. Calon member adalah tamu
- * (visitor) dan yang sedang menunggu pendaftarannya diproses (pending).
+ * dan siapa yang masih dalam perjalanan ke sana. Visitor di saringan ini
+ * mencakup tamu (status visitor) dan yang sedang menunggu pendaftarannya
+ * diproses (pending).
  * Yang keanggotaannya lewat (inactive) tetap member: ia pernah bergabung,
  * dan yang ditagih darinya adalah perpanjangan, bukan pendaftaran.
  */
-type Keanggotaan = 'all' | 'member' | 'calon'
+type Keanggotaan = 'all' | 'member' | 'visitor'
 
 const KEANGGOTAAN_OPTIONS: { value: Keanggotaan; label: string }[] = [
-  { value: 'all', label: 'Member & Calon' },
+  { value: 'all', label: 'Member & Visitor' },
   { value: 'member', label: 'Member' },
-  { value: 'calon', label: 'Calon Member' },
+  { value: 'visitor', label: 'Visitor' },
 ]
 
-const STATUS_CALON: MemberStatus[] = ['pending', 'visitor']
+const STATUS_VISITOR: MemberStatus[] = ['pending', 'visitor']
 
 const MEMBER_STATUS_LABEL: Record<string, string> = {
   active: 'Aktif',
@@ -104,7 +105,7 @@ export function MemberListPage() {
     const q = search.trim().toLowerCase()
     return members.filter((m) => {
       if (chapterId !== 'all' && m.chapterId !== chapterId) return false
-      if (keanggotaan !== 'all' && STATUS_CALON.includes(m.status) !== (keanggotaan === 'calon')) return false
+      if (keanggotaan !== 'all' && STATUS_VISITOR.includes(m.status) !== (keanggotaan === 'visitor')) return false
       if (hideNoDueDate && !m.renewalDate) return false
       if (dueFrom && (!m.renewalDate || m.renewalDate < dueFrom)) return false
       if (dueTo && (!m.renewalDate || m.renewalDate > dueTo)) return false
