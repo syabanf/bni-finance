@@ -5350,16 +5350,35 @@
           },
           "registrationFee": {
             "title": "Biaya Pendaftaran",
-            "type": "integer"
+            "type": "integer",
+            "description": "Rupiah yang ditagihkan. Diturunkan server dari `registrationFeeUsd` × `usdRate`."
           },
           "renewalFee": {
             "title": "Biaya Perpanjangan",
-            "type": "integer"
+            "type": "integer",
+            "description": "Rupiah yang ditagihkan. Diturunkan server dari `renewalFeeUsd` × `usdRate`."
           },
           "currency": {
             "title": "Mata Uang",
             "type": "string",
             "default": "IDR"
+          },
+          "registrationFeeUsd": {
+            "title": "Biaya Pendaftaran (USD)",
+            "type": "number",
+            "example": 1125
+          },
+          "renewalFeeUsd": {
+            "title": "Biaya Perpanjangan (USD)",
+            "type": "number",
+            "example": 793.75
+          },
+          "usdRate": {
+            "title": "Kurs USD ke IDR",
+            "type": "integer",
+            "example": 16000,
+            "description": "Rupiah per satu dolar",
+            "diisi manual.": null
           },
           "notes": {
             "title": "Catatan",
@@ -5381,7 +5400,7 @@
       },
       "UpdateFeeSettingsInput": {
         "type": "object",
-        "description": "Minimal satu field harus dikirim.",
+        "description": "Minimal satu field harus dikirim.\n\nMengirim salah satu dari `registrationFeeUsd`, `renewalFeeUsd`, atau\n`usdRate` membuat server menghitung ulang **kedua** harga Rupiah dari\nnilai efektifnya (yang dikirim, atau yang tersimpan bila tidak\ndikirim). `registrationFee`/`renewalFee` yang ikut dikirim dalam\npermintaan yang sama ditimpa; satu angka yang tercetak di invoice\nhanya boleh punya satu sumber.\n",
         "properties": {
           "registrationFee": {
             "title": "Biaya Pendaftaran",
@@ -5392,6 +5411,21 @@
             "title": "Biaya Perpanjangan",
             "type": "integer",
             "minimum": 0
+          },
+          "registrationFeeUsd": {
+            "title": "Biaya Pendaftaran (USD)",
+            "type": "number",
+            "minimum": 0
+          },
+          "renewalFeeUsd": {
+            "title": "Biaya Perpanjangan (USD)",
+            "type": "number",
+            "minimum": 0
+          },
+          "usdRate": {
+            "title": "Kurs USD ke IDR",
+            "type": "integer",
+            "minimum": 1
           },
           "currency": {
             "title": "Mata Uang",

@@ -2093,6 +2093,30 @@
           "complex": false
         },
         {
+          "name": "registrationFeeUsd",
+          "label": "Biaya Pendaftaran (USD)",
+          "type": "number",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "renewalFeeUsd",
+          "label": "Biaya Perpanjangan (USD)",
+          "type": "number",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "usdRate",
+          "label": "Kurs USD ke IDR",
+          "type": "integer",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
           "name": "currency",
           "label": "Mata Uang",
           "type": "string",
