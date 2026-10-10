@@ -162,41 +162,81 @@ function sheetXml(headers: string[], rows: (string | number)[][]): string {
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${cols}</cols><sheetData>${headerRow}${bodyRows}</sheetData></worksheet>`
 }
 
-const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`
+function contentTypes(n: number): string {
+  const sheets = Array.from({ length: n }, (_, i) =>
+    `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+  ).join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheets}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`
+}
 
 const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`
 
-const WORKBOOK_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`
+// rId1..rIdN untuk lembar, styles menyusul di rId(N+1).
+function workbookRels(n: number): string {
+  const sheets = Array.from({ length: n }, (_, i) =>
+    `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+  ).join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets}<Relationship Id="rId${n + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`
+}
 
 // Two cell formats: 0 = default, 1 = bold (used for the header row).
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>`
 
-function workbookXml(sheetName: string): string {
+function workbookXml(names: string[]): string {
   // Excel sheet names: max 31 chars, and : \ / ? * [ ] are illegal.
-  const safe = escXml(sheetName.replace(/[:\\/?*[\]]/g, '-').slice(0, 31) || 'Sheet1')
+  const sheets = names
+    .map((name, i) => {
+      const safe = escXml(name.replace(/[:\\/?*[\]]/g, '-').slice(0, 31) || `Sheet${i + 1}`)
+      return `<sheet name="${safe}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`
+    })
+    .join('')
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${safe}" sheetId="1" r:id="rId1"/></sheets></workbook>`
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets}</sheets></workbook>`
+}
+
+export interface XlsxSheet {
+  name: string
+  headers: string[]
+  rows: (string | number)[][]
+}
+
+/** Build an .xlsx Blob with one worksheet per entry. */
+export function buildXlsxSheets(sheets: XlsxSheet[]): Blob {
+  const enc = new TextEncoder()
+  return zip([
+    { name: '[Content_Types].xml', data: enc.encode(contentTypes(sheets.length)) },
+    { name: '_rels/.rels', data: enc.encode(ROOT_RELS) },
+    { name: 'xl/workbook.xml', data: enc.encode(workbookXml(sheets.map((s) => s.name))) },
+    { name: 'xl/_rels/workbook.xml.rels', data: enc.encode(workbookRels(sheets.length)) },
+    { name: 'xl/styles.xml', data: enc.encode(STYLES) },
+    ...sheets.map((s, i) => ({
+      name: `xl/worksheets/sheet${i + 1}.xml`,
+      data: enc.encode(sheetXml(s.headers, s.rows)),
+    })),
+  ])
 }
 
 /** Build an .xlsx Blob from a header row + data rows. */
-export function buildXlsx(
-  sheetName: string,
-  headers: string[],
-  rows: (string | number)[][],
-): Blob {
-  const enc = new TextEncoder()
-  return zip([
-    { name: '[Content_Types].xml', data: enc.encode(CONTENT_TYPES) },
-    { name: '_rels/.rels', data: enc.encode(ROOT_RELS) },
-    { name: 'xl/workbook.xml', data: enc.encode(workbookXml(sheetName)) },
-    { name: 'xl/_rels/workbook.xml.rels', data: enc.encode(WORKBOOK_RELS) },
-    { name: 'xl/styles.xml', data: enc.encode(STYLES) },
-    { name: 'xl/worksheets/sheet1.xml', data: enc.encode(sheetXml(headers, rows)) },
-  ])
+export function buildXlsx(sheetName: string, headers: string[], rows: (string | number)[][]): Blob {
+  return buildXlsxSheets([{ name: sheetName, headers, rows }])
+}
+
+function unduh(filename: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Trigger a client-side .xlsx download with several worksheets. */
+export function downloadXlsxSheets(filename: string, sheets: XlsxSheet[]): void {
+  unduh(filename, buildXlsxSheets(sheets))
 }
 
 /** Trigger a client-side .xlsx download. */
@@ -206,10 +246,5 @@ export function downloadXlsx(
   headers: string[],
   rows: (string | number)[][],
 ): void {
-  const url = URL.createObjectURL(buildXlsx(sheetName, headers, rows))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`
-  a.click()
-  URL.revokeObjectURL(url)
+  unduh(filename, buildXlsx(sheetName, headers, rows))
 }
