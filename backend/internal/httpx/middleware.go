@@ -154,3 +154,40 @@ func contains(list []string, v string) bool {
 	}
 	return false
 }
+
+// RapikanPath meratakan garis miring ganda di path SEBELUM mux melihatnya.
+//
+// http.ServeMux membersihkan path sendiri dengan redirect: 301 untuk GET, 307
+// untuk method lain. 307 memang menjaga method dan body bila kliennya patuh,
+// tapi tidak semua klien webhook mengikuti redirect untuk POST, dan yang
+// tidak mengikutinya menganggap callback-nya gagal lalu mengulang. Lapisan di
+// depan server (reverse proxy, ingress) bisa pula menjawab 301 sendiri untuk
+// path yang sama, dan 301 membuat klien mengubah POST menjadi GET sambil
+// membuang body.
+//
+// Terjadi sungguhan: URL callback di dashboard Paper.id terdaftar dengan "//"
+// dan setiap uji dari sana mendarat sebagai body kosong. Meratakan path di
+// sini menghilangkan redirect dari sisi Go sama sekali, jadi permintaan yang
+// sampai ke proses ini dilayani utuh apa pun perilaku kliennya. Yang terjadi
+// di proxy di depan tidak bisa diperbaiki dari sini; URL di dashboard tetap
+// harus satu garis miring.
+func RapikanPath(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "//") {
+			r2 := r.Clone(r.Context())
+			r2.URL.Path = rapikan(r.URL.Path)
+			if r2.URL.RawPath != "" {
+				r2.URL.RawPath = rapikan(r.URL.RawPath)
+			}
+			r = r2
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func rapikan(p string) string {
+	for strings.Contains(p, "//") {
+		p = strings.ReplaceAll(p, "//", "/")
+	}
+	return p
+}
