@@ -348,6 +348,19 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 		return false, e
 	}
 
+	// Uang KELUAR tidak pernah melunasi apa pun, di URL mana pun ia mendarat.
+	//
+	// Disbursement dan pembayaran ke supplier punya endpoint acknowledge
+	// sendiri, tapi dashboard Paper.id membiarkan satu URL didaftarkan untuk
+	// beberapa jenis, dan di produksi keluarga ini memang sampai ke endpoint
+	// pembayaran masuk. Status "SUCCESS" pada pembayaran ke vendor yang
+	// kebetulan menyebut nomor invoice kita tidak boleh menandai tagihan
+	// member lunas. Dikenali dari bentuknya, bukan dari alamatnya.
+	if Pencairan(raw) {
+		s.recordInboundAt(path, raw, http.StatusOK, true, nil)
+		return false, nil
+	}
+
 	// Only a completed payment settles; other events are acknowledged (200) but
 	// change nothing.
 	//
