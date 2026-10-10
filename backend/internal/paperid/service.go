@@ -19,7 +19,7 @@ import (
 
 // dueDaysSettingKey mirrors the frontend: the due date is issue date + N days.
 const dueDaysSettingKey = "invoice_due_days_after"
-const defaultDueDays = 30
+const defaultDueDays = 3
 
 type Store interface {
 	GetSendable(ctx context.Context, invoiceID string) (*Sendable, error)
