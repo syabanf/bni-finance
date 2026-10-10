@@ -135,14 +135,21 @@ func (r *Repository) SettleByRef(
 	defer tx.Rollback(ctx)
 
 	// Match on the Paper.id id first (exact), then fall back to our number.
+	//
+	// Nomornya dicocokkan dua kali: apa adanya, dan setelah sufiks pengingat
+	// dilepas. Dokumen pengingat di Paper.id bernomor INV-2026-023-R1 sementara
+	// baris di tabel ini bernomor INV-2026-023, dan callback atas pengingat
+	// membawa nomor dokumennya. Satu bentuk saja berarti setiap pembayaran
+	// lewat pengingat jatuh ke "tidak ditemukan".
 	var invoiceID string
 	var current domain.InvoiceStatus
 	err = tx.QueryRow(ctx, `
 		SELECT id, status FROM invoices
-		WHERE ($1 <> '' AND paper_id_invoice_id = $1) OR ($2 <> '' AND number = $2)
+		WHERE ($1 <> '' AND paper_id_invoice_id = $1)
+		   OR ($2 <> '' AND number IN ($2, $3))
 		ORDER BY (paper_id_invoice_id = $1) DESC
 		LIMIT 1
-		FOR UPDATE`, paperInvoiceID, number).Scan(&invoiceID, &current)
+		FOR UPDATE`, paperInvoiceID, number, nomorKanonik(number)).Scan(&invoiceID, &current)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return false, httpx.NotFound("invoice untuk callback tersebut tidak ditemukan")

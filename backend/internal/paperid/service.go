@@ -648,6 +648,27 @@ func reminderNumber(base string, n int) string {
 	return fmt.Sprintf("%s-R%d", base, n)
 }
 
+// nomorKanonik membalikkan reminderNumber: INV-2026-023-R1 kembali menjadi
+// INV-2026-023. Nomor tanpa sufiks pengingat dikembalikan apa adanya.
+//
+// Dipakai saat callback datang. Pembayaran atas dokumen pengingat membawa
+// nomor turunannya, sedangkan tabel invoices hanya menyimpan nomor kanonik.
+// Tanpa pembalikan ini, pelunasan dari pengingat jatuh ke "invoice tidak
+// ditemukan" dan member yang sudah membayar tetap tercatat menunggak.
+// Terjadi sungguhan pada INV-2026-023-R1.
+func nomorKanonik(number string) string {
+	i := strings.LastIndex(number, "-R")
+	if i < 0 || i+2 >= len(number) {
+		return number
+	}
+	for _, c := range number[i+2:] {
+		if c < '0' || c > '9' {
+			return number
+		}
+	}
+	return number[:i]
+}
+
 // recordRemind mencerminkan recordSend: setiap hasil, berhasil maupun gagal,
 // meninggalkan satu entri di blackbox lengkap dengan request dan response.
 func (s *Service) recordRemind(invoiceID string, opts SendOptions, started time.Time, err error) {
