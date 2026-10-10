@@ -18,10 +18,20 @@ import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
 import { rupiahDari } from '@/lib/kurs'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
-import { formatCurrency, formatDateTime } from '@/lib/format'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { PaperProdukCard } from './components/PaperProdukCard'
 import { ReminderCard } from './components/ReminderCard'
 
+
+/** Isi app_settings.kurs_kmk_terakhir, ditulis worker kurs di server. */
+interface KursKMK {
+  usd: number
+  nomor: string
+  berlakuDari: string
+  berlakuSampai: string
+  diperiksa: string
+  diterapkan: boolean
+}
 
 export function SettingsPage() {
   const { toast } = useToast()
@@ -40,14 +50,40 @@ export function SettingsPage() {
 
   // Invoice timing
   const [draftDaysBefore, setDraftDaysBefore] = useState(30)
-  const [dueDaysAfter, setDueDaysAfter] = useState(30)
+  const [dueDaysAfter, setDueDaysAfter] = useState(3)
   const [savingTiming, setSavingTiming] = useState(false)
+
+  // Kurs pajak KMK. Server memeriksanya harian dan menulis kurs ke biaya
+  // selama sakelarnya tidak dimatikan; halaman ini hanya menampilkan sumbernya
+  // dan menyediakan sakelar untuk kembali ke kurs manual.
+  const [kursOtomatis, setKursOtomatis] = useState(true)
+  const [kmk, setKmk] = useState<KursKMK | null>(null)
 
   useEffect(() => {
     // Berlaku di kedua mode: mock membaca dari localStorage, API dari server.
     getAppSetting('invoice_draft_days_before').then(v => { if (v) setDraftDaysBefore(Number(v)) })
     getAppSetting('invoice_due_days_after').then(v => { if (v) setDueDaysAfter(Number(v)) })
+    getAppSetting('kurs_kmk_otomatis').then(v => setKursOtomatis(v !== 'false'))
+    getAppSetting('kurs_kmk_terakhir').then(v => {
+      if (!v) return
+      try {
+        setKmk(JSON.parse(v) as KursKMK)
+      } catch {
+        // Catatan rusak tidak boleh menjatuhkan halaman; sumbernya cukup tidak tampil.
+      }
+    })
   }, [])
+
+  const ubahKursOtomatis = async (nyala: boolean) => {
+    setKursOtomatis(nyala)
+    try {
+      await setAppSetting('kurs_kmk_otomatis', String(nyala))
+      toast(nyala ? 'Kurs akan mengikuti KMK, diperiksa setiap hari.' : 'Kurs kembali diisi manual.')
+    } catch {
+      setKursOtomatis(!nyala)
+      toast('Gagal menyimpan sakelar kurs.', 'error')
+    }
+  }
 
   const saveTiming = async () => {
     setSavingTiming(true)
@@ -134,13 +170,44 @@ export function SettingsPage() {
                   harga dalam Dollar, dan Rupiah hanya terjemahannya. */}
               <Field
                 label="Kurs USD → IDR"
-                hint="Rupiah per satu dolar, diisi manual. Kedua harga Rupiah dihitung ulang dari kurs ini."
+                hint={
+                  kursOtomatis
+                    ? 'Mengikuti kurs pajak KMK Kementerian Keuangan, diperiksa server setiap hari. Kedua harga Rupiah dihitung ulang setiap kurs berganti.'
+                    : 'Rupiah per satu dolar, diisi manual. Kedua harga Rupiah dihitung ulang dari kurs ini.'
+                }
               >
-                <div className="relative sm:w-64">
-                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">
-                    Rp
-                  </span>
-                  <MoneyInput value={usdRate} onChange={setUsdRate} className="pl-9 font-semibold" />
+                <div className="space-y-2">
+                  <div className="relative sm:w-64">
+                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">
+                      Rp
+                    </span>
+                    <MoneyInput
+                      value={usdRate}
+                      onChange={setUsdRate}
+                      disabled={kursOtomatis}
+                      className="pl-9 font-semibold"
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-ink-700">
+                    <input
+                      type="checkbox"
+                      checked={kursOtomatis}
+                      onChange={(e) => ubahKursOtomatis(e.target.checked)}
+                      className="h-4 w-4 accent-bni-red"
+                    />
+                    Perbarui otomatis dari kurs pajak KMK
+                  </label>
+                  {kursOtomatis && (
+                    <p className="text-xs text-ink-500">
+                      {kmk
+                        ? `KMK Nomor ${kmk.nomor} · Rp ${kmk.usd.toLocaleString('id-ID')} per USD` +
+                          (kmk.berlakuDari && !kmk.berlakuDari.startsWith('0001')
+                            ? ` · berlaku ${formatDate(kmk.berlakuDari)} – ${formatDate(kmk.berlakuSampai)}`
+                            : '') +
+                          ` · diperiksa ${formatDateTime(kmk.diperiksa)}`
+                        : 'Belum pernah diperiksa. Server memeriksa saat start lalu setiap hari.'}
+                    </p>
+                  )}
                 </div>
               </Field>
 

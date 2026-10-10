@@ -226,10 +226,16 @@ create table if not exists app_settings (
 insert into app_settings (key, value) values
   ('self_payment_mode',        'false'),
   ('invoice_draft_days_before','30'),
-  ('invoice_due_days_after',   '30'),
+  ('invoice_due_days_after',   '3'),
   ('paperid_send_email',       'true'),
   ('paperid_send_whatsapp',    'true')
 on conflict (key) do nothing;
+
+-- Jatuh tempo invoice yang diterbitkan menjadi 3 hari (masukan Oktober 2026).
+-- Hanya menimpa nilai bawaan lama yang belum pernah diubah siapa pun; angka
+-- lain berarti seseorang sudah memilihnya.
+update app_settings set value = '3'
+ where key = 'invoice_due_days_after' and value = '30';
 
 -- ---------------------------------------------------------------------------
 -- invoices

@@ -12,7 +12,7 @@ const PREFIX = 'mock.app_settings.'
 /** Nilai awal, mencerminkan default di db/schema.sql. */
 const DEFAULTS: Record<string, string> = {
   invoice_draft_days_before: '30',
-  invoice_due_days_after: '30',
+  invoice_due_days_after: '3',
   // Kanal pengiriman Paper.id NYALA secara bawaan — mengantar invoice adalah
   // tujuan menerbitkannya. Hanya nilai 'false' yang mematikan.
   paperid_send_email: 'true',
