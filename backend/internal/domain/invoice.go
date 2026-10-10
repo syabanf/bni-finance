@@ -99,6 +99,11 @@ type Invoice struct {
 	// nomor secara permanen dan menolak pengiriman kedua dengan nomor sama.
 	PaperIDReminderCount int `json:"paperIdReminderCount"`
 
+	// Faktur pajak yang dilampirkan setelah invoice lunas: path berkas di
+	// /uploads/ dan kapan terakhir dilampirkan.
+	TaxInvoiceURL *string    `json:"taxInvoiceUrl,omitempty"`
+	TaxInvoiceAt  *time.Time `json:"taxInvoiceAt,omitempty"`
+
 	// Xendit (self-payment)
 	PaymentProvider     *string    `json:"paymentProvider,omitempty"`
 	XenditExternalID    *string    `json:"xenditExternalId,omitempty"`

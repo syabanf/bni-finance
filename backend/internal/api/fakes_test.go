@@ -146,6 +146,18 @@ func (s *fakeInvoiceStore) LateFeeRule(context.Context) (domain.LateFeeRule, err
 	return domain.LateFeeRule{}, nil
 }
 
+func (s *fakeInvoiceStore) AttachTaxInvoice(_ context.Context, id, url string, _, _ *string) (*domain.Invoice, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	inv, ok := s.items[id]
+	if !ok {
+		return nil, httpx.ErrNotFound
+	}
+	inv.TaxInvoiceURL = &url
+	s.items[id] = inv
+	return &inv, nil
+}
+
 // Ringkasan dihitung dari isi stub, bukan dikembalikan kosong: tes rute yang
 // memeriksa bentuk jawabannya harus melihat angka yang benar-benar berasal dari
 // data, kalau tidak ia lulus meski agregatnya rusak.

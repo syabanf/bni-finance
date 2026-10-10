@@ -2,10 +2,13 @@ package invoice
 
 import (
 	"context"
+	"strings"
 	"time"
 
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/upload"
 )
 
 // Store is the persistence contract the service depends on. Keeping it an
@@ -21,6 +24,7 @@ type Store interface {
 	NextNumber(ctx context.Context, year int) (string, error)
 	LateFeeRule(ctx context.Context) (domain.LateFeeRule, error)
 	Summary(ctx context.Context, f domain.InvoiceFilter) (*domain.InvoiceSummary, error)
+	AttachTaxInvoice(ctx context.Context, id, url string, actorID, actorName *string) (*domain.Invoice, error)
 }
 
 // compile-time check that the Postgres repository satisfies the contract.
@@ -142,4 +146,20 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 // due date becomes overdue.
 func (s *Service) NextNumberFor(ctx context.Context, t time.Time) (string, error) {
 	return s.repo.NextNumber(ctx, t.Year())
+}
+
+// AttachTaxInvoice menerima path berkas hasil POST /api/v1/uploads saja.
+//
+// Tautan luar ditolak: faktur pajak memuat NPWP dan nominal, dan tautan yang
+// menunjuk ke luar sistem bisa berubah isinya atau hilang tanpa jejak di sini.
+func (s *Service) AttachTaxInvoice(ctx context.Context, id, url string) (*domain.Invoice, error) {
+	url = strings.TrimSpace(url)
+	if !strings.HasPrefix(url, upload.URLPrefix) || strings.Contains(url, "..") {
+		return nil, httpx.BadRequest("url faktur pajak harus berkas yang diunggah lewat /api/v1/uploads")
+	}
+	var actorID, actorName *string
+	if u, ok := auth.UserFrom(ctx); ok {
+		actorID, actorName = &u.ID, &u.Name
+	}
+	return s.repo.AttachTaxInvoice(ctx, id, url, actorID, actorName)
 }

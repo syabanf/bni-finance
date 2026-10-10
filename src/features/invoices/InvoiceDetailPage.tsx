@@ -10,6 +10,7 @@ import { BellRing,
   Download,
   Eye,
   FilePlus2,
+  FileText,
   Link2,
   Pencil,
   Send,
@@ -57,6 +58,7 @@ const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> 
   updated: { icon: Pencil, tone: 'bg-blue-50 text-blue-500' },
   reminded: { icon: BellRing, tone: 'bg-brand-50 text-brand-500' },
   terminated: { icon: Ban, tone: 'bg-violet-50 text-violet-500' },
+  tax_invoice: { icon: FileText, tone: 'bg-emerald-50 text-emerald-600' },
 }
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
@@ -68,6 +70,7 @@ const AUDIT_LABEL: Record<AuditAction, string> = {
   updated: 'Invoice diperbarui',
   reminded: 'Pengingat dikirim',
   terminated: 'Keanggotaan diputus',
+  tax_invoice: 'Faktur pajak dilampirkan',
 }
 
 type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | 'terminate' | null
@@ -225,6 +228,15 @@ export function InvoiceDetailPage() {
   // tagihan yang sudah ditarik kembali tetap bisa berakhir sebagai keanggotaan
   // yang diputus.
   const canTerminate = canManage && status !== 'paid' && status !== 'terminated'
+  const canAttachTax = canManage && status === 'paid'
+
+  const lampirkanFaktur = (file: File | null) => {
+    if (!file) return
+    runAction(
+      () => invoiceService.attachTaxInvoice(invoice.id, file),
+      invoice.taxInvoiceUrl ? 'Faktur pajak diganti.' : 'Faktur pajak dilampirkan.',
+    )
+  }
 
   return (
     <div>
@@ -455,6 +467,56 @@ export function InvoiceDetailPage() {
               </div>
             </CardBody>
           </Card>
+
+          {/* Faktur pajak terbit atas pembayaran yang sudah diterima, jadi
+              kartunya baru ada setelah invoice lunas. */}
+          {status === 'paid' && (invoice.taxInvoiceUrl || canAttachTax) && (
+            <Card>
+              <CardHeader title="Faktur Pajak" subtitle="Dilampirkan setelah pembayaran diterima." />
+              <CardBody className="space-y-3">
+                {invoice.taxInvoiceUrl ? (
+                  <a
+                    href={invoice.taxInvoiceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50/50 px-4 py-3 transition-colors hover:bg-emerald-50"
+                  >
+                    <FileText className="h-5 w-5 shrink-0 text-emerald-600" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-emerald-700">Lihat faktur pajak</span>
+                      {invoice.taxInvoiceAt && (
+                        <span className="block text-xs text-ink-500">
+                          Dilampirkan {formatDateTime(invoice.taxInvoiceAt)}
+                        </span>
+                      )}
+                    </span>
+                  </a>
+                ) : (
+                  <p className="text-sm text-ink-500">Belum ada faktur pajak untuk invoice ini.</p>
+                )}
+                {canAttachTax && (
+                  <label
+                    className={cn(
+                      'flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-medium text-ink-700 transition-colors hover:bg-ink-50',
+                      busy && 'pointer-events-none opacity-50',
+                    )}
+                  >
+                    <Upload className="h-4 w-4" />
+                    {invoice.taxInvoiceUrl ? 'Ganti faktur pajak' : 'Lampirkan faktur pajak'}
+                    <input
+                      type="file"
+                      accept="application/pdf,image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        lampirkanFaktur(e.target.files?.[0] ?? null)
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                )}
+              </CardBody>
+            </Card>
+          )}
 
           {payments && payments.length > 0 && (
             <Card>

@@ -366,6 +366,22 @@ begin
   end if;
 end $$;
 
+-- Faktur pajak: satu berkas per invoice, hanya untuk invoice yang lunas.
+-- URL-nya path berkas dari /api/v1/uploads, bukan tautan luar.
+alter table invoices
+  add column if not exists tax_invoice_url text,
+  add column if not exists tax_invoice_at  timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'audit_action' and e.enumlabel = 'tax_invoice'
+  ) then
+    alter type audit_action add value 'tax_invoice';
+  end if;
+end $$;
+
 alter table invoices
   add column if not exists paper_id_reminder_count integer not null default 0;
 

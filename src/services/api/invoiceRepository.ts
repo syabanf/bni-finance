@@ -340,6 +340,13 @@ export const apiInvoiceRepository: InvoiceRepository = {
     return api.get<Invoice>(`/invoices/${encodeURIComponent(id)}`)
   },
 
+  async attachTaxInvoice(id, file) {
+    // Dua langkah: berkasnya disimpan dulu, lalu path-nya ditempel ke invoice.
+    // Server menolak path yang bukan hasil /uploads dan invoice yang belum lunas.
+    const { url } = await api.upload('/uploads', file)
+    return api.put<Invoice>(`/invoices/${encodeURIComponent(id)}/tax-invoice`, { url })
+  },
+
   async getAuditLog(invoiceId) {
     const res = await api.get<ListResponse<AuditLogEntry>>(
       `/invoices/${encodeURIComponent(invoiceId)}/audit${query({ limit: 200 })}`,

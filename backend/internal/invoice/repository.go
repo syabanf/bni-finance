@@ -20,7 +20,7 @@ const columns = `
 	id, number, member_id, chapter_id, type, amount, currency,
 	due_date, period_start, period_end, status,
 	paper_id_invoice_id, paper_id_invoice_url, paper_id_payment_url, paper_id_sent_at,
-	paper_id_reminder_count,
+	paper_id_reminder_count, tax_invoice_url, tax_invoice_at,
 	payment_provider, xendit_external_id, xendit_payment_id, xendit_payment_method,
 	xendit_va_bank, xendit_va_number, xendit_qris_string, xendit_payment_status, xendit_expires_at,
 	paid_at, paid_amount, notes, created_by, cancelled_by, cancelled_at, cancel_reason,
@@ -80,7 +80,7 @@ func scan(row scannable) (*domain.Invoice, error) {
 		&inv.ID, &inv.Number, &inv.MemberID, &inv.ChapterID, &inv.Type, &inv.Amount, &inv.Currency,
 		&due, &periodStart, &periodEnd, &inv.Status,
 		&inv.PaperIDInvoiceID, &inv.PaperIDInvoiceURL, &inv.PaperIDPaymentURL, &inv.PaperIDSentAt,
-		&inv.PaperIDReminderCount,
+		&inv.PaperIDReminderCount, &inv.TaxInvoiceURL, &inv.TaxInvoiceAt,
 		&inv.PaymentProvider, &inv.XenditExternalID, &inv.XenditPaymentID, &inv.XenditPaymentMethod,
 		&inv.XenditVaBank, &inv.XenditVaNumber, &inv.XenditQrisString, &inv.XenditPaymentStatus, &inv.XenditExpiresAt,
 		&inv.PaidAt, &inv.PaidAmount, &inv.Notes, &inv.CreatedBy, &inv.CancelledBy, &inv.CancelledAt, &inv.CancelReason,
@@ -452,6 +452,62 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvo
 }
 
 // auditRow is the payload of one invoice_audit_log insert.
+// AttachTaxInvoice melampirkan (atau mengganti) faktur pajak invoice lunas.
+//
+// Faktur pajak terbit atas pembayaran yang sudah diterima, jadi invoice yang
+// belum lunas ditolak. Baris dikunci lebih dulu supaya pelunasan dan
+// pembatalan yang berjalan bersamaan tidak lolos di antara pemeriksaan dan
+// penulisan. Setiap lampiran meninggalkan baris audit.
+func (r *Repository) AttachTaxInvoice(ctx context.Context, id, url string, actorID, actorName *string) (*domain.Invoice, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	q := "SELECT status, tax_invoice_url FROM invoices WHERE id = $1"
+	args := []any{id}
+	if klausa, arg, pakai := scope.Chapter(ctx).SQL("chapter_id", 2); klausa != "" {
+		q += " AND " + klausa
+		if pakai {
+			args = append(args, arg)
+		}
+	}
+	var status domain.InvoiceStatus
+	var lama *string
+	if err := tx.QueryRow(ctx, q+" FOR UPDATE", args...).Scan(&status, &lama); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, httpx.ErrNotFound
+		}
+		return nil, fmt.Errorf("kunci invoice: %w", err)
+	}
+	if status != domain.StatusPaid {
+		return nil, httpx.BadRequest("faktur pajak hanya bisa dilampirkan pada invoice yang sudah lunas")
+	}
+
+	inv, err := scan(tx.QueryRow(ctx, `
+		UPDATE invoices SET tax_invoice_url = $2, tax_invoice_at = now(), updated_at = now()
+		WHERE id = $1 RETURNING `+columns, id, url))
+	if err != nil {
+		return nil, err
+	}
+
+	catatan := "faktur pajak dilampirkan"
+	if lama != nil && *lama != "" {
+		catatan = "faktur pajak diganti"
+	}
+	if err := recordAudit(ctx, tx, auditRow{
+		InvoiceID: id, Action: domain.AuditTaxInvoice,
+		ActorID: actorID, ActorName: actorName, Notes: &catatan,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("simpan faktur pajak: %w", err)
+	}
+	return inv, nil
+}
+
 type auditRow struct {
 	InvoiceID string
 	Action    domain.AuditAction
