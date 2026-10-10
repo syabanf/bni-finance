@@ -22,7 +22,7 @@ export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' 
  * dan supaya ia tidak ikut tertagih. Penjaganya ada di backend
  * (domain.MemberStatus.BolehDitagih); di sini ia hanya perlu terlihat.
  */
-export type MemberStatus = 'active' | 'inactive' | 'pending' | 'visitor'
+export type MemberStatus = 'active' | 'inactive' | 'pending' | 'visitor' | 'new_member'
 
 // ---------------------------------------------------------------------------
 // Synced entities (read-only mirrors from BNI Visitor Management)

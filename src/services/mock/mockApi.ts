@@ -402,7 +402,7 @@ export async function mockApiFetch(
       const days = num('days', 30)
       const today = new Date()
       const rows = store.members
-        .filter((x) => x.status === 'active' && x.renewalDate)
+        .filter((x) => (x.status === 'active' || x.status === 'new_member') && x.renewalDate)
         .map((x) => ({ ...x, chapter: chapterOf(x.chapterId), daysUntilDue: daysBetween(today, new Date(x.renewalDate!)) }))
         .filter((x) => x.daysUntilDue >= 0 && x.daysUntilDue <= days)
         .sort((a, b) => a.daysUntilDue - b.daysUntilDue)

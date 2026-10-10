@@ -316,6 +316,21 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 			return nil, err
 		}
 	}
+	// Pendaftaran hanya sekali. New member boleh ditagih pendaftaran (yang
+	// dibuat lewat Tambah Member belum membayar biaya bergabung), dan aturan
+	// itu yang membuat pendaftaran kedua harus dicegah di sini: visitor yang
+	// sudah melunasi pendaftaran juga berstatus new_member.
+	if in.Type == domain.TypeRegistration {
+		var ada bool
+		if err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM invoices WHERE member_id = $1 AND type = 'registration'
+			                AND status NOT IN ('cancelled', 'terminated'))`, in.MemberID).Scan(&ada); err != nil {
+			return nil, fmt.Errorf("periksa pendaftaran ganda: %w", err)
+		}
+		if ada {
+			return nil, httpx.BadRequest("member ini sudah punya invoice pendaftaran; batalkan yang lama dulu bila memang perlu diterbitkan ulang")
+		}
+	}
 
 	const q = `
 		INSERT INTO invoices (number, member_id, chapter_id, type, amount, currency,

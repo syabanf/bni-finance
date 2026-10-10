@@ -26,6 +26,9 @@ func TestSetiapStatusPunyaKeputusanPenagihan(t *testing.T) {
 		MemberInactive: {pendaftaran: false, renewal: true}, // keanggotaannya lewat, perpanjangannya tetap ditagih
 		MemberPending:  {pendaftaran: true, renewal: false}, // sedang menunggu tagihan pendaftarannya
 		MemberVisitor:  {pendaftaran: true, renewal: false},
+		// Belum bayar biaya bergabung bila dibuat lewat Tambah Member; renewal
+		// saat tahun pertamanya habis.
+		MemberNewMember: {pendaftaran: true, renewal: true},
 	}
 
 	for _, s := range SemuaStatusMember {

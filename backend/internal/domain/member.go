@@ -16,6 +16,10 @@ const (
 	// Ia dicatat supaya bisa diundang lagi dan diikuti sampai menjadi anggota.
 	// Yang tidak boleh terjadi: ia ikut tertagih. Lihat BolehDitagih.
 	MemberVisitor MemberStatus = "visitor"
+	// MemberNewMember adalah anggota baru: dibuat lewat "Tambah Member", atau
+	// visitor yang sudah melunasi pendaftaran. Menjadi active saat renewal
+	// pertamanya lunas. Lihat member.NaikkanStatusSetelahLunas.
+	MemberNewMember MemberStatus = "new_member"
 )
 
 // SemuaStatusMember adalah daftar lengkapnya, dan satu-satunya sumbernya.
@@ -24,7 +28,7 @@ const (
 // ditambahkan tanpa memutuskan perlakuannya akan memerahkan tes — bukan
 // diam-diam ikut aturan yang kebetulan berlaku.
 var SemuaStatusMember = []MemberStatus{
-	MemberActive, MemberInactive, MemberPending, MemberVisitor,
+	MemberActive, MemberInactive, MemberPending, MemberVisitor, MemberNewMember,
 }
 
 func (s MemberStatus) Valid() bool {
@@ -58,6 +62,11 @@ func (s MemberStatus) BolehDitagih(t InvoiceType) bool {
 		return t == TypeRenewal
 	case MemberVisitor, MemberPending:
 		return t == TypeRegistration
+	case MemberNewMember:
+		// Keduanya: pendaftaran bagi yang dibuat lewat "Tambah Member" dan
+		// belum membayar biaya bergabung, renewal saat tahun pertamanya habis.
+		// Pendaftaran kedua dicegah di invoice.Repository.Create.
+		return t == TypeRegistration || t == TypeRenewal
 	}
 	return false
 }

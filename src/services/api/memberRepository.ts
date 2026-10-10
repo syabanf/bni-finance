@@ -1,7 +1,7 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
 import { bolehDitagih } from '@/lib/status'
 import type { MemberRepository } from '@/services/types'
-import type { Invoice, MemberWithChapter } from '@/types'
+import type { Invoice, Member, MemberWithChapter } from '@/types'
 import { isNotFound } from './chapterRepository'
 import { runSync } from './syncService'
 
@@ -41,6 +41,10 @@ export const apiMemberRepository: MemberRepository = {
       invoices.data.filter((i) => i.status !== 'cancelled').map((i) => i.memberId),
     )
     return members.data.filter((m) => !alreadyInvoiced.has(m.id))
+  },
+
+  async create(input) {
+    return api.post<Member>('/members', input)
   },
 
   async sync() {

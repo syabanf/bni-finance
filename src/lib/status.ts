@@ -43,8 +43,8 @@ export function isOutstanding(status: InvoiceStatus): boolean {
  * memakainya untuk menolak, supaya keduanya tidak berbeda dari server.
  */
 export const STATUS_UNTUK_TIPE: Record<InvoiceType, MemberStatus[]> = {
-  registration: ['visitor', 'pending'],
-  renewal: ['active', 'inactive'],
+  registration: ['visitor', 'pending', 'new_member'],
+  renewal: ['active', 'inactive', 'new_member'],
 }
 
 /**

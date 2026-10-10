@@ -71,6 +71,10 @@ func TestTipeInvoiceMengikutiStatusMember(t *testing.T) {
 	if inv.Type != domain.TypeRegistration {
 		t.Errorf("tipe tersimpan %q", inv.Type)
 	}
+	// Pendaftaran hanya sekali: yang kedua ditolak selama yang pertama belum dibatalkan.
+	if _, err := repo.Create(ctx, pendaftaran, "", "IDR"); httpx.StatusOf(err) != 400 || !strings.Contains(err.Error(), "sudah punya invoice pendaftaran") {
+		t.Errorf("pendaftaran kedua harus ditolak 400, dapat %v", err)
+	}
 
 	daftarUlang := contohInput(aktif, ch, 18_000_000)
 	daftarUlang.Type = domain.TypeRegistration

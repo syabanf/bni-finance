@@ -162,13 +162,13 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*domain.Member, er
 	return scan(r.db.QueryRow(ctx, "SELECT "+columns+" "+from+" WHERE m.id = $1", id))
 }
 
-// RenewalDue lists active members whose membership lapses within the next
+// RenewalDue lists active and new members whose membership lapses within the next
 // `days` days, soonest first — the input for renewal invoices and reminders.
 func (r *Repository) RenewalDue(ctx context.Context, days, limit int) ([]domain.RenewalDueMember, error) {
 	query := fmt.Sprintf(`
 		SELECT %s, (m.renewal_date - CURRENT_DATE)::int
 		%s
-		WHERE m.status = 'active'
+		WHERE m.status IN ('active', 'new_member')
 		  AND m.renewal_date IS NOT NULL
 		  AND m.renewal_date >= CURRENT_DATE
 		  -- date + int stays typed. Building the interval by concatenating
@@ -303,30 +303,34 @@ func (r *Repository) CountInvoices(ctx context.Context, id string) (int, error) 
 	return n, err
 }
 
-// AktifkanSetelahPendaftaran menjadikan visitor atau pending yang invoice
-// pendaftarannya lunas sebagai member aktif, dalam transaksi pelunasan itu.
+// NaikkanStatusSetelahLunas memajukan status member saat invoicenya lunas,
+// dalam transaksi pelunasan itu.
 //
-// Tipe invoice mengikuti status: pendaftaran hanya untuk yang belum anggota,
-// renewal hanya untuk yang sudah. Tanpa langkah ini, visitor yang sudah
-// membayar pendaftaran tetap visitor selamanya, dan tahun depan tidak ada
-// jalan untuk menagihnya renewal. renewal_date diisi akhir periode invoice,
-// dan tidak dimundurkan bila yang tersimpan sudah lebih jauh (sinkron BNI VM
-// atau impor bisa lebih dulu mengisinya). Invoice renewal tidak disentuh:
-// keanggotaannya sudah ada, dan sumber tanggalnya BNI.
+//	pendaftaran lunas  visitor, pending  ->  new_member
+//	renewal lunas      new_member        ->  active
+//
+// Tanpa langkah ini, visitor yang sudah membayar tetap visitor dan tahun depan
+// tidak ada jalan menagihnya renewal. renewal_date diisi akhir periode invoice
+// pendaftaran, dan tidak dimundurkan bila yang tersimpan sudah lebih jauh
+// (sinkron BNI VM atau impor bisa lebih dulu mengisinya). Renewal tidak
+// menyentuh renewal_date: sumber tanggalnya BNI.
 //
 // Dijalankan oleh kedua jalur pelunasan (callback Paper.id dan pencatatan
 // manual) supaya status member tidak bergantung pada dari mana uangnya datang.
-func AktifkanSetelahPendaftaran(ctx context.Context, tx pgx.Tx, invoiceID string) error {
+func NaikkanStatusSetelahLunas(ctx context.Context, tx pgx.Tx, invoiceID string) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE members m
-		   SET status = 'active',
-		       renewal_date = GREATEST(COALESCE(m.renewal_date, i.period_end), i.period_end)
+		   SET status = CASE i.type WHEN 'registration' THEN 'new_member'::member_status
+		                            ELSE 'active'::member_status END,
+		       renewal_date = CASE i.type
+		         WHEN 'registration' THEN GREATEST(COALESCE(m.renewal_date, i.period_end), i.period_end)
+		         ELSE m.renewal_date END
 		  FROM invoices i
 		 WHERE i.id = $1 AND m.id = i.member_id
-		   AND i.type = 'registration'
-		   AND m.status IN ('visitor', 'pending')`, invoiceID)
+		   AND ((i.type = 'registration' AND m.status IN ('visitor', 'pending'))
+		     OR (i.type = 'renewal' AND m.status = 'new_member'))`, invoiceID)
 	if err != nil {
-		return fmt.Errorf("aktifkan member setelah pendaftaran: %w", err)
+		return fmt.Errorf("naikkan status member setelah lunas: %w", err)
 	}
 	return nil
 }

@@ -1,6 +1,6 @@
 import { cn } from '@/lib/cn'
 
-type Tone = 'default' | 'brand' | 'amber' | 'red' | 'green' | 'blue'
+type Tone = 'default' | 'brand' | 'amber' | 'red' | 'green' | 'blue' | 'purple'
 
 const toneText: Record<Tone, string> = {
   default: 'text-ink-900',
@@ -9,6 +9,7 @@ const toneText: Record<Tone, string> = {
   red: 'text-red-600',
   green: 'text-emerald-600',
   blue: 'text-blue-600',
+  purple: 'text-violet-600',
 }
 
 interface SummaryCardProps {

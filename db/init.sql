@@ -589,6 +589,18 @@ begin
   end if;
 end $$;
 
+-- new_member: sudah membayar (atau baru dibuat sebagai) anggota baru, belum
+-- pernah memperpanjang. Menjadi active saat invoice renewal pertamanya lunas.
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'member_status' and e.enumlabel = 'new_member'
+  ) then
+    alter type member_status add value 'new_member';
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------------------
 -- Harga pendaftaran dan renewal
 --
