@@ -34,10 +34,23 @@ import { printTableReport } from '@/lib/pdfReport'
 
 type StatusFilter = InvoiceStatus | 'all' | 'outstanding'
 
-const STATUS_TABS: { value: StatusFilter; label: string; dot?: string }[] = [
+/**
+ * Satu tab per status, tidak ada yang saling memuat.
+ *
+ * Sebelumnya ada tab "Outstanding" yang berarti sent+overdue, bersebelahan
+ * dengan tab "Overdue". Yang kedua adalah bagian dari yang pertama, jadi
+ * angka di kedua tab tidak bisa dijumlahkan dan orang tidak tahu invoice
+ * terlambat itu harus dicari di tab yang mana. Sekarang setiap invoice
+ * hanya masuk satu tab, dan jumlah semua tab sama dengan "Semua".
+ *
+ * Nilai `outstanding` tetap diterima dari alamat (?status=outstanding),
+ * karena dashboard dan kartu chapter masih menautkannya. Ia menyaring sent
+ * dan overdue sekaligus, dan menyalakan kedua tabnya.
+ */
+const STATUS_TABS: { value: InvoiceStatus | 'all'; label: string; dot?: string }[] = [
   { value: 'all', label: 'Semua' },
-  { value: 'outstanding', label: 'Outstanding', dot: 'bg-amber-400' },
-  { value: 'overdue', label: 'Overdue', dot: 'bg-red-500' },
+  { value: 'sent', label: 'Belum Dibayar', dot: 'bg-amber-400' },
+  { value: 'overdue', label: 'Terlambat', dot: 'bg-red-500' },
   { value: 'paid', label: 'Lunas', dot: 'bg-emerald-500' },
   { value: 'draft', label: 'Draft', dot: 'bg-ink-300' },
   { value: 'cancelled', label: 'Dibatalkan' },
@@ -46,6 +59,18 @@ const STATUS_TABS: { value: StatusFilter; label: string; dot?: string }[] = [
   // tagihan yang ditarik kembali versus keanggotaan yang berakhir.
   { value: 'terminated', label: 'Diputus', dot: 'bg-violet-500' },
 ]
+
+/** Label status untuk judul ekspor, termasuk nilai gabungan dari alamat. */
+function labelStatus(status: StatusFilter): string {
+  if (status === 'outstanding') return 'Belum Dibayar & Terlambat'
+  return STATUS_TABS.find((t) => t.value === status)?.label ?? 'Semua'
+}
+
+/** Tab dianggap aktif juga saat alamat membawa nilai gabungan yang memuatnya. */
+function tabAktif(status: StatusFilter, tab: InvoiceStatus | 'all'): boolean {
+  if (status === tab) return true
+  return status === 'outstanding' && (tab === 'sent' || tab === 'overdue')
+}
 
 const TYPE_OPTIONS: { value: InvoiceType | 'all'; label: string }[] = [
   { value: 'all', label: 'Semua Tipe' },
@@ -362,7 +387,7 @@ export function InvoiceListPage() {
     jalankanEkspor((b) =>
       printTableReport({
         title: 'Daftar Invoice',
-        subtitle: `Status: ${STATUS_TABS.find((t) => t.value === status)?.label ?? 'Semua'}`,
+        subtitle: `Status: ${labelStatus(status)}`,
         meta: [`${b.length} invoice`, `Dibuat ${formatDateTime(new Date())}`],
         columns: [
           { label: 'No. Invoice' },
@@ -417,43 +442,36 @@ export function InvoiceListPage() {
         }
       />
 
-      {/* Kartu ringkasan.
-          Tab di bawah menyaring STATUS; kartu ini menyaring TIPE, dan angkanya
-          mengikuti tab yang sedang aktif. Dua sumbu yang berbeda pada dua
-          kendali yang berbeda — kalau keduanya menyaring status, kartu dan tab
-          akan saling membatalkan dan tidak jelas mana yang sedang berlaku. */}
+      {/* Kartu ringkasan hanya menampilkan angka, tidak menyaring.
+          Dulu dua kartu menyaring status dan dua lainnya menyaring tipe,
+          sementara tab di bawah juga menyaring status. Menekan "Lunas" di
+          kartu lalu "Terlambat" di tab menghasilkan daftar kosong tanpa ada
+          yang menjelaskan kenapa. Satu tempat untuk menyaring: tab dan
+          dropdown di bawah. Angka di kartu mengikuti saringan itu. */}
       <div data-tour="invoice-filters" className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <SummaryCard
           label="Total Invoice"
           value={summary.total.count}
           sub={formatCurrencyCompact(summary.total.amount)}
           tone="brand"
-          active={status === 'all'}
-          onClick={() => setStatus('all')}
         />
         <SummaryCard
           label="Renewal"
           value={summary.renewal.count}
           sub={formatCurrencyCompact(summary.renewal.amount)}
           tone="amber"
-          active={type === 'renewal'}
-          onClick={() => setType(type === 'renewal' ? 'all' : 'renewal')}
         />
         <SummaryCard
           label="Pendaftaran"
           value={summary.pendaftaran.count}
           sub={formatCurrencyCompact(summary.pendaftaran.amount)}
           tone="blue"
-          active={type === 'registration'}
-          onClick={() => setType(type === 'registration' ? 'all' : 'registration')}
         />
         <SummaryCard
           label="Lunas"
           value={summary.paid.count}
           sub={formatCurrencyCompact(summary.paid.amount)}
           tone="green"
-          active={status === 'paid'}
-          onClick={() => setStatus('paid')}
         />
       </div>
 
@@ -464,16 +482,14 @@ export function InvoiceListPage() {
             const count =
               tab.value === 'all'
                 ? Object.values(byStatus).reduce((a, b) => a + b.count, 0)
-                : tab.value === 'outstanding'
-                  ? (countByStatus.sent ?? 0) + (countByStatus.overdue ?? 0)
-                  : countByStatus[tab.value]
+                : countByStatus[tab.value]
             return (
               <button
                 key={tab.value}
                 onClick={() => setStatus(tab.value)}
                 className={cn(
                   'flex shrink-0 items-center gap-1.5 rounded-t-lg border-b-2 px-3 pb-2.5 pt-2 text-[13px] font-medium transition-colors',
-                  status === tab.value
+                  tabAktif(status, tab.value)
                     ? 'border-brand-500 text-brand-600'
                     : 'border-transparent text-ink-500 hover:text-ink-800',
                 )}
