@@ -294,9 +294,10 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 	}
 
 	var chapterMember string
+	var statusMember domain.MemberStatus
 	switch err := tx.QueryRow(ctx,
-		"SELECT chapter_id FROM members WHERE id = $1", in.MemberID,
-	).Scan(&chapterMember); {
+		"SELECT chapter_id, status FROM members WHERE id = $1", in.MemberID,
+	).Scan(&chapterMember, &statusMember); {
 	case errors.Is(err, pgx.ErrNoRows):
 		return nil, httpx.BadRequest("memberId tidak ditemukan")
 	case err != nil:
@@ -304,6 +305,13 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 	case chapterMember != in.ChapterID:
 		return nil, httpx.BadRequest(fmt.Sprintf(
 			"chapterId %q bukan chapter member tersebut (%q)", in.ChapterID, chapterMember))
+	// Renewal hanya untuk yang SUDAH anggota. Visitor belum punya keanggotaan
+	// yang bisa diperpanjang; jalannya ke dalam adalah invoice pendaftaran.
+	// Pendaftaran sendiri sengaja tidak dibatasi: visitor dan pending memang
+	// sasarannya, dan member aktif yang mendaftar ulang punya alasannya sendiri.
+	case in.Type == domain.TypeRenewal && !statusMember.BolehDitagih():
+		return nil, httpx.BadRequest(fmt.Sprintf(
+			"member berstatus %s belum menjadi anggota, jadi tidak bisa ditagih renewal; terbitkan invoice pendaftaran", statusMember))
 	}
 
 	const q = `
