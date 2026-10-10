@@ -45,6 +45,11 @@ var known = map[string]map[string]bool{
 	"payment_info": {
 		"channel": true, "method": true, "status": true, "message": true,
 		"source": true, "event": true, "payment_type": true, "additional_info": true,
+		// Terlihat pada callback e-wallet sungguhan (OVO lewat payper):
+		// ewallet_type menyebut dompetnya dalam huruf kecil, grand_amount
+		// adalah nominal berikut biaya yang dibayar pembeli. Nominal invoice
+		// tetap dibaca dari ewallet.paid_amount.
+		"ewallet_type": true, "grand_amount": true,
 	},
 	"additional_info": {"invoices": true},
 	"data": {
