@@ -509,7 +509,16 @@ export async function mockApiFetch(
       if (typeof b.renewalFee === 'number' && b.renewalFee < 0) {
         return fail(400, 'renewalFee tidak boleh negatif')
       }
-      return ok({ ...store.feeSettings, ...b, updatedAt: nowISO() })
+      if (typeof b.usdRate === 'number' && b.usdRate <= 0) {
+        return fail(400, 'usdRate harus lebih dari nol')
+      }
+      const next = { ...store.feeSettings, ...b, updatedAt: nowISO() } as typeof store.feeSettings
+      // Meniru server: USD atau kurs yang berubah menurunkan ulang Rupiah.
+      if ('registrationFeeUsd' in b || 'renewalFeeUsd' in b || 'usdRate' in b) {
+        next.registrationFee = Math.round(next.registrationFeeUsd * next.usdRate)
+        next.renewalFee = Math.round(next.renewalFeeUsd * next.usdRate)
+      }
+      return ok(next)
     }
   }
 

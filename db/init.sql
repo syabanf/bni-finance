@@ -627,6 +627,22 @@ alter table payments      alter column amount           type bigint;
 alter table fee_settings  alter column registration_fee type bigint;
 alter table fee_settings  alter column renewal_fee      type bigint;
 
+-- ---------------------------------------------------------------------------
+-- Harga dasar dalam Dollar
+--
+-- BNI menetapkan harganya dalam USD; yang ditagihkan ke member tetap Rupiah.
+-- Kolom Rupiah di atas TETAP menjadi angka yang ditagihkan, dan server yang
+-- menghitungnya: Rupiah = bulat(USD × kurs) setiap kali USD atau kurs
+-- berubah. Dengan begitu pembuatan invoice, denda, dan laporan tidak perlu
+-- tahu Dollar sama sekali.
+--
+-- Nilai bawaan dipilih supaya cocok persis dengan Rupiah bawaan di atas:
+-- 1.125,00 × 16.000 = 18.000.000 dan 793,75 × 16.000 = 12.700.000.
+-- ---------------------------------------------------------------------------
+alter table fee_settings add column if not exists registration_fee_usd numeric(12,2) not null default 1125.00;
+alter table fee_settings add column if not exists renewal_fee_usd      numeric(12,2) not null default 793.75;
+alter table fee_settings add column if not exists usd_rate             bigint        not null default 16000;
+
 
 create table if not exists integration_calls (
   id          bigserial   primary key,

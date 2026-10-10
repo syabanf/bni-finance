@@ -3135,9 +3135,18 @@ components:
       required: [id, registrationFee, renewalFee, currency, updatedAt, createdAt]
       properties:
         id: { title: ID, type: string, default: "default" }
-        registrationFee: { title: Biaya Pendaftaran, type: integer }
-        renewalFee: { title: Biaya Perpanjangan, type: integer }
+        registrationFee:
+          title: Biaya Pendaftaran
+          type: integer
+          description: Rupiah yang ditagihkan. Diturunkan server dari `registrationFeeUsd` × `usdRate`.
+        renewalFee:
+          title: Biaya Perpanjangan
+          type: integer
+          description: Rupiah yang ditagihkan. Diturunkan server dari `renewalFeeUsd` × `usdRate`.
         currency: { title: Mata Uang, type: string, default: IDR }
+        registrationFeeUsd: { title: Biaya Pendaftaran (USD), type: number, example: 1125 }
+        renewalFeeUsd: { title: Biaya Perpanjangan (USD), type: number, example: 793.75 }
+        usdRate: { title: Kurs USD ke IDR, type: integer, example: 16000, description: Rupiah per satu dolar, diisi manual. }
         notes: { title: Catatan, type: string }
         updatedBy: { title: Diubah Oleh, type: string }
         updatedAt: { type: string, format: date-time }
@@ -3145,10 +3154,21 @@ components:
 
     UpdateFeeSettingsInput:
       type: object
-      description: Minimal satu field harus dikirim.
+      description: |
+        Minimal satu field harus dikirim.
+
+        Mengirim salah satu dari `registrationFeeUsd`, `renewalFeeUsd`, atau
+        `usdRate` membuat server menghitung ulang **kedua** harga Rupiah dari
+        nilai efektifnya (yang dikirim, atau yang tersimpan bila tidak
+        dikirim). `registrationFee`/`renewalFee` yang ikut dikirim dalam
+        permintaan yang sama ditimpa; satu angka yang tercetak di invoice
+        hanya boleh punya satu sumber.
       properties:
         registrationFee: { title: Biaya Pendaftaran, type: integer, minimum: 0 }
         renewalFee: { title: Biaya Perpanjangan, type: integer, minimum: 0 }
+        registrationFeeUsd: { title: Biaya Pendaftaran (USD), type: number, minimum: 0 }
+        renewalFeeUsd: { title: Biaya Perpanjangan (USD), type: number, minimum: 0 }
+        usdRate: { title: Kurs USD ke IDR, type: integer, minimum: 1 }
         currency: { title: Mata Uang, type: string, minLength: 1 }
         notes: { title: Catatan, type: string }
         updatedBy: { title: Diubah Oleh, type: string }

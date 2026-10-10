@@ -40,8 +40,34 @@ func (s *Service) UpdateFees(ctx context.Context, in domain.UpdateFeeSettingsInp
 	// dengan body kosong akan lolos lalu menulis baris audit tanpa satu pun
 	// perubahan nyata.
 	if in.RegistrationFee == nil && in.RenewalFee == nil &&
-		in.Currency == nil && in.Notes == nil {
+		!in.MenyentuhDollar() && in.Currency == nil && in.Notes == nil {
 		return nil, httpx.BadRequest("tidak ada field yang diubah")
+	}
+
+	// Rupiah DITURUNKAN DI SINI, bukan dipercayakan ke klien.
+	//
+	// Begitu USD atau kurs berubah, kedua harga Rupiah dihitung ulang dari
+	// nilai efektifnya: yang dikirim di permintaan ini, atau yang tersimpan
+	// bila tidak dikirim. Klien yang mengirim Rupiah sendiri bersama USD akan
+	// ditimpa, dan itu disengaja: dua sumber untuk satu angka yang tercetak di
+	// invoice adalah dua angka yang suatu saat tidak sama.
+	if in.MenyentuhDollar() {
+		cur, err := s.repo.GetFees(ctx)
+		if err != nil {
+			return nil, err
+		}
+		usdReg, usdRen, rate := cur.RegistrationFeeUSD, cur.RenewalFeeUSD, cur.UsdRate
+		if in.RegistrationFeeUSD != nil {
+			usdReg = *in.RegistrationFeeUSD
+		}
+		if in.RenewalFeeUSD != nil {
+			usdRen = *in.RenewalFeeUSD
+		}
+		if in.UsdRate != nil {
+			rate = *in.UsdRate
+		}
+		reg, ren := domain.TurunkanRupiah(usdReg, rate), domain.TurunkanRupiah(usdRen, rate)
+		in.RegistrationFee, in.RenewalFee = &reg, &ren
 	}
 	return s.repo.UpdateFees(ctx, in)
 }

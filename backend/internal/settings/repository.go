@@ -18,7 +18,9 @@ import (
 // FeeSettingsID is the singleton primary key used by the schema.
 const FeeSettingsID = "default"
 
-const feeColumns = `id, registration_fee, renewal_fee, currency, notes, updated_by, updated_at, created_at`
+const feeColumns = `id, registration_fee, renewal_fee, currency,
+	registration_fee_usd, renewal_fee_usd, usd_rate,
+	notes, updated_by, updated_at, created_at`
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -33,6 +35,7 @@ type scannable interface {
 func scanFees(row scannable) (*domain.FeeSettings, error) {
 	var f domain.FeeSettings
 	err := row.Scan(&f.ID, &f.RegistrationFee, &f.RenewalFee, &f.Currency,
+		&f.RegistrationFeeUSD, &f.RenewalFeeUSD, &f.UsdRate,
 		&f.Notes, &f.UpdatedBy, &f.UpdatedAt, &f.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -61,6 +64,15 @@ func (r *Repository) UpdateFees(ctx context.Context, in domain.UpdateFeeSettings
 	}
 	if in.RenewalFee != nil {
 		set("renewal_fee", *in.RenewalFee)
+	}
+	if in.RegistrationFeeUSD != nil {
+		set("registration_fee_usd", *in.RegistrationFeeUSD)
+	}
+	if in.RenewalFeeUSD != nil {
+		set("renewal_fee_usd", *in.RenewalFeeUSD)
+	}
+	if in.UsdRate != nil {
+		set("usd_rate", *in.UsdRate)
 	}
 	if in.Currency != nil {
 		set("currency", *in.Currency)

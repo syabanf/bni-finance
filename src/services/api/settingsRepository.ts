@@ -41,9 +41,12 @@ export const apiSettingsRepository: SettingsRepository = {
   },
 
   updateFees(input) {
+    // Rupiah TIDAK dikirim. Server yang menurunkannya dari USD × kurs, supaya
+    // angka yang tercetak di invoice hanya punya satu sumber.
     return api.patch<FeeSettings>('/fee-settings', {
-      registrationFee: input.registrationFee,
-      renewalFee: input.renewalFee,
+      registrationFeeUsd: input.registrationFeeUsd,
+      renewalFeeUsd: input.renewalFeeUsd,
+      usdRate: input.usdRate,
       notes: input.notes,
     })
   },

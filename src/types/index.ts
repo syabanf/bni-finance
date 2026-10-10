@@ -62,9 +62,14 @@ export interface MemberWithChapter extends Member {
 
 export interface FeeSettings {
   id: string
+  /** Rupiah yang ditagihkan. Diturunkan server dari USD × kurs. */
   registrationFee: number
   renewalFee: number
   currency: string
+  /** Harga dasar dalam Dollar seperti yang ditetapkan BNI, dan kurs manualnya. */
+  registrationFeeUsd: number
+  renewalFeeUsd: number
+  usdRate: number
   notes?: string
   updatedBy?: string
   updatedAt: string
