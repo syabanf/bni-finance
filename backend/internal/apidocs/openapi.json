@@ -2404,13 +2404,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2445,7 +2445,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2469,13 +2469,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2510,7 +2510,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2534,13 +2534,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2575,7 +2575,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2599,13 +2599,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2640,7 +2640,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2664,13 +2664,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2705,7 +2705,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2729,13 +2729,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2770,7 +2770,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2794,13 +2794,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2835,7 +2835,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2859,13 +2859,13 @@
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
+            "name": "Paper-Company-Id",
+            "in": "header",
+            "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Token callback bersama. Bisa juga dikirim lewat header\n`x-paper-callback-token` — Paper.id tidak menandatangani callback,\njadi token inilah satu-satunya pembuktian asalnya.\n"
+            "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper\ncompany id\" dicentang. Paper.id tidak menandatangani callback, jadi\nheader ini satu-satunya pembuktian asalnya; dibandingkan dengan\nPAPER_ID_COMPANY_ID.\n"
           }
         ],
         "requestBody": {
@@ -2900,7 +2900,7 @@
             }
           },
           "401": {
-            "description": "Token callback salah atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id salah atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -2918,24 +2918,16 @@
           "Paper.id"
         ],
         "summary": "Callback pembayaran dari Paper.id",
-        "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
+        "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan. Yang dikirim dashboard adalah id perusahaan di header\n`Paper-Company-Id` (centang \"Kirim paper company id\"), dibandingkan\n**constant-time** dengan `PAPER_ID_COMPANY_ID`. Id yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
         "security": [
 
         ],
         "parameters": [
           {
-            "name": "token",
-            "in": "query",
-            "required": false,
-            "description": "Secret bersama, alternatif dari header.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "x-paper-callback-token",
+            "name": "Paper-Company-Id",
             "in": "header",
-            "required": false,
+            "required": true,
+            "description": "Id perusahaan Paper.id, lihat keterangan di atas.",
             "schema": {
               "type": "string"
             }
@@ -2972,7 +2964,7 @@
             "$ref": "#/components/responses/BadRequest"
           },
           "401": {
-            "description": "Token callback tidak valid atau belum dikonfigurasi",
+            "description": "Header Paper-Company-Id tidak valid atau belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {

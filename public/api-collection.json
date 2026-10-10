@@ -2588,21 +2588,14 @@
       "path": "/api/v1/webhooks/paperid",
       "tag": "Paper.id",
       "summary": "Callback pembayaran dari Paper.id",
-      "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan, jadi URL callback yang didaftarkan di dashboard Paper.id membawa\nsecret bersama (lewat `?token=…` atau header `x-paper-callback-token`)\nyang dibandingkan **constant-time** di sini. Secret yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
+      "description": "**Tanpa token login.** Dokumentasi Paper.id tidak mendefinisikan tanda\ntangan. Yang dikirim dashboard adalah id perusahaan di header\n`Paper-Company-Id` (centang \"Kirim paper company id\"), dibandingkan\n**constant-time** dengan `PAPER_ID_COMPANY_ID`. Id yang belum\ndikonfigurasi menolak **setiap** callback, bukan menerima semuanya.\n\n**Idempoten**: Paper.id mengulang pengiriman, jadi callback untuk invoice\nyang sudah lunas dijawab `settled: false` tanpa baris pembayaran kedua.\n\nEvent yang bukan `PAID` dijawab **200** dengan `settled: false`.\n\nInvoice dicocokkan lewat `additional_info.invoices[].uuid` (id Paper.id\nyang kita simpan), lalu fallback ke `number`.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
-          "type": "string",
-          "description": "Secret bersama, alternatif dari header."
-        },
-        {
-          "name": "x-paper-callback-token",
+          "name": "Paper-Company-Id",
           "in": "header",
-          "required": false,
+          "required": true,
           "type": "string",
-          "description": ""
+          "description": "Id perusahaan Paper.id, lihat keterangan di atas."
         }
       ],
       "body": {},
@@ -2662,11 +2655,11 @@
       "description": "Diterima, direkam, diakui. Tidak menyentuh invoice.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2684,11 +2677,11 @@
       "description": "Dipicu saat jumlah tagihan berubah, misalnya setelah pembayaran sebagian.\n\nSaat ini direkam dan diakui saja: melunasi sebagian belum didukung, dan menebak\nakan lebih berbahaya daripada tidak berbuat apa-apa. Rekamannya tersimpan\nlengkap sehingga bisa ditindaklanjuti begitu perilakunya diputuskan.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2706,11 +2699,11 @@
       "description": "Hanya dipicu saat status invoice di Paper.id berubah menjadi `paid`.\n\nBentuknya BERBEDA dari callback pembayaran: tidak ada `payment_info` sama\nsekali, dan identitas invoicenya ada di `data.invoice.id` serta\n`data.invoice.number`.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2728,11 +2721,11 @@
       "description": "Diterima, direkam, diakui. Tidak menyentuh invoice.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2750,11 +2743,11 @@
       "description": "Dipanggil Paper.id saat pembayaran masuk mendapat respons balik.\n\nPayloadnya IDENTIK dengan pembayaran keluar — dokumentasi Paper.id menyebutnya\neksplisit — dan hanya URL pendaftarannya yang membedakan. Itulah sebabnya\nkeduanya punya alamat sendiri meski penanganannya sama.\n\nStatus dibaca dari `payment_info.status`, dan bila tidak ada di sana, dari objek\nyang dinamai menurut metode pembayaran: `payment_info.bank_transfer.status`,\n`payment_info.qris.status`, `payment_info.credit_card.status`,\n`payment_info.ewallet.status`. Contoh di dashboard Paper.id hanya memuat yang\nbersarang, jadi membaca satu tempat saja membuat separuh payload sah terbaca\nkosong.\n\nHanya PAID, SETTLED, SUCCESS, SUCCEEDED, dan FULLY_RECONCILED yang melunasi.\nSelainnya diakui dengan 200 tanpa mengubah apa pun.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2772,11 +2765,11 @@
       "description": "Direkam dan diakui 200. TIDAK melunasi invoice, dan itu keputusan.\n\nPembayaran keluar adalah uang yang kita bayarkan, bukan yang kita\nterima — sistem ini hanya menagih iuran keanggotaan dan tidak pernah\nmembayar siapa pun. Payload masuk dan keluar IDENTIK menurut\ndokumentasi Paper.id, sehingga URL-nya adalah satu-satunya penanda\narah. Merutekannya ke penangan yang melunasi berarti membuang penanda\nitu, dan satu callback pembayaran keluar yang kebetulan menyebut nomor\ninvoice kita akan menandainya lunas tanpa uang pernah masuk.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2794,11 +2787,11 @@
       "description": "Pembayaran lewat virtual account statis, DAN callback rekonsiliasi —\nkeduanya datang lewat bagian ini di dashboard Paper.id.\n\nNominal dan statusnya dibaca dari `payment_info.static_va`.\n`FULLY_RECONCILED` melunasi; `PARTIALLY_RECONCILED` sengaja TIDAK —\ntagihannya belum lunas, dan menandainya lunas akan menghentikan\npenagihan atas sisa yang masih terutang.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},
@@ -2816,11 +2809,11 @@
       "description": "Kejadian Paper.id yang tidak menyentuh penagihan keanggotaan. Direkam ke\nblackbox lalu diakui dengan 200.\n\nMenolaknya akan membuat Paper.id mengulang-ulang pengiriman untuk kejadian yang\nmemang bukan urusan sistem ini, dan rekamannya tetap berguna bila suatu saat\ndipakai.\n",
       "params": [
         {
-          "name": "token",
-          "in": "query",
-          "required": false,
+          "name": "Paper-Company-Id",
+          "in": "header",
+          "required": true,
           "type": "string",
-          "description": "Token callback bersama. Bisa juga dikirim lewat header"
+          "description": "Id perusahaan Paper.id, dikirim dashboard bila opsi \"Kirim paper"
         }
       ],
       "body": {},

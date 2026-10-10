@@ -150,10 +150,15 @@ func (h *Handler) remind(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, inv)
 }
 
+// headerCompanyID dikirim dashboard Paper.id pada setiap callback bila opsi
+// "Kirim paper company id" dicentang. Satu-satunya kredensial yang dibawa
+// callback; lihat Service.periksaKredensial.
+const headerCompanyID = "Paper-Company-Id"
+
 // acknowledge merekam callback lalu menjawab 200 tanpa menyentuh invoice.
 //
 // Dipakai untuk kejadian Paper.id yang bukan urusan penagihan keanggotaan.
-// Tetap diverifikasi tokennya: endpoint terbuka yang menerima apa saja adalah
+// Tetap diverifikasi kredensialnya: endpoint terbuka yang menerima apa saja adalah
 // tempat menumpuknya sampah, dan rekaman yang tidak bisa dipercaya asalnya
 // tidak berguna saat dipakai menelusuri masalah.
 func (h *Handler) acknowledge(w http.ResponseWriter, r *http.Request) {
@@ -162,11 +167,7 @@ func (h *Handler) acknowledge(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, httpx.BadRequest("gagal membaca body callback"))
 		return
 	}
-	token := r.Header.Get("x-paper-callback-token")
-	if token == "" {
-		token = httpx.Query(r, "token")
-	}
-	if err := h.svc.AcknowledgeWebhook(r.Context(), r.URL.Path, token, raw); err != nil {
+	if err := h.svc.AcknowledgeWebhook(r.Context(), r.URL.Path, r.Header.Get(headerCompanyID), raw); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
@@ -187,14 +188,7 @@ func (h *Handler) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The secret arrives via header or ?token= — whichever the callback URL
-	// registered in the Paper.id dashboard uses.
-	token := r.Header.Get("x-paper-callback-token")
-	if token == "" {
-		token = httpx.Query(r, "token")
-	}
-
-	settled, err := h.svc.HandleWebhook(r.Context(), r.URL.Path, token, raw)
+	settled, err := h.svc.HandleWebhook(r.Context(), r.URL.Path, r.Header.Get(headerCompanyID), raw)
 	if err != nil {
 		httpx.Fail(w, err)
 		return

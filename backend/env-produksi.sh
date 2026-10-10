@@ -17,10 +17,10 @@ env_file="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.env"
 
 echo "# --- tempel ke konfigurasi env backend produksi, lalu RESTART prosesnya ---"
 echo "# Tanpa restart, tidak ada yang berubah: kredensial dibaca sekali saat start."
-grep -E '^PAPER_ID_(CLIENT_ID|CLIENT_SECRET|CALLBACK_TOKEN)=' "$env_file"
+grep -E '^PAPER_ID_(CLIENT_ID|CLIENT_SECRET|COMPANY_ID)=' "$env_file"
 echo
-echo "# URL webhook yang didaftarkan di dashboard Paper.id:"
-token="$(grep -E '^PAPER_ID_CALLBACK_TOKEN=' "$env_file" | cut -d= -f2-)"
+echo "# URL webhook yang didaftarkan di dashboard Paper.id, dengan centang"
+echo "# \"Kirim paper company id\" menyala (itulah kredensialnya):"
 for p in payment-in invoice-paid static-va payment-out supplier-payment paylater disbursement invoice-amount-due; do
-  echo "#   https://bni-finance.reddie.id/api/v1/webhooks/paperid/${p}?token=${token}"
+  echo "#   https://bnisystem.id/api/v1/webhooks/paperid/${p}"
 done

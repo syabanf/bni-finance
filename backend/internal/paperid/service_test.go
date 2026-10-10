@@ -90,8 +90,8 @@ func (g *stubGateway) CreateInvoice(_ context.Context, in CreateInput) (*CreateR
 	return g.res, nil
 }
 
-func newService(store Store, gw Gateway, token string) *Service {
-	return &Service{repo: store, gateway: gw, baseURL: DefaultBaseURL, callbackToken: token,
+func newService(store Store, gw Gateway, companyID string) *Service {
+	return &Service{repo: store, gateway: gw, baseURL: DefaultBaseURL, companyID: companyID,
 		now: func() time.Time {
 			return time.Date(2026, 7, 27, 12, 0, 0, 0, time.UTC)
 		}}

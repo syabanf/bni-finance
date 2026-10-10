@@ -261,7 +261,7 @@ chapter diturunkan dari daftar member. Token diambil dari
 | Method | Path | Akses |
 |---|---|---|
 | `POST` | `/invoices/{id}/send` | admin — dorong invoice draft ke Paper.id, simpan link & PDF, status → `sent` |
-| `POST` | `/webhooks/paperid` | **publik** — callback pembayaran (secret di URL callback) |
+| `POST` | `/webhooks/paperid` | **publik** — callback pembayaran; kredensial di header `Paper-Company-Id`, dibandingkan dengan `PAPER_ID_COMPANY_ID` |
 
 Dipakai saat Self Payment Mode **OFF**. `client_id`/`client_secret` hanya di
 server. Callback dicocokkan ke invoice lewat `uuid` Paper.id lalu `number`, dan

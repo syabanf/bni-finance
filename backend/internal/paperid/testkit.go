@@ -38,7 +38,7 @@ func (s *Service) Status(context.Context) (*ConfigStatus, error) {
 	return &ConfigStatus{
 		Configured:         s.gateway != nil,
 		BaseURL:            s.baseURL,
-		CallbackConfigured: s.callbackToken != "",
+		CallbackConfigured: s.companyID != "",
 	}, nil
 }
 
@@ -310,7 +310,7 @@ func (s *Service) TestCallback(ctx context.Context, in TestCallbackInput) (*Test
 	// menempuh jalur parsing yang sama dengan callback sungguhan. Menyuntikkan
 	// struct langsung akan melewati satu-satunya langkah yang bisa gagal karena
 	// perbedaan format.
-	settled, err := s.HandleWebhook(ctx, "/api/v1/webhooks/paperid", s.callbackToken, body)
+	settled, err := s.HandleWebhook(ctx, "/api/v1/webhooks/paperid", s.companyID, body)
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()

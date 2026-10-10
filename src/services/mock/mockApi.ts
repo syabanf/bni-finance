@@ -733,9 +733,9 @@ export async function mockApiFetch(
       durationMs: 2,
       success: false,
       request: body ?? {},
-      error: 'token callback tidak valid',
+      error: 'kredensial callback tidak valid',
     })
-    return fail(401, 'token callback tidak valid')
+    return fail(401, 'kredensial callback tidak valid')
   }
 
   // --- routes outside /api/v1 ---------------------------------------------
