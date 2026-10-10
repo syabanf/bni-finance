@@ -372,9 +372,22 @@ func (s *Service) HandleWebhook(ctx context.Context, path, token string, raw []b
 			s.recordInboundAt(path, raw, http.StatusOK, true, nil)
 			return false, nil
 		}
-		err := httpx.BadRequest("callback tidak memuat invoice yang bisa dicocokkan")
-		s.recordInboundAt(path, raw, http.StatusBadRequest, false, err)
-		return false, err
+		// Tanpa identitas apa pun: diakui 200, direkam, tidak melunasi apa-apa.
+		//
+		// Sebelumnya dijawab 400. Setiap bentuk callback yang didokumentasikan
+		// Paper.id (Payment In/Out, Invoice, Reconciliation) membawa identitas
+		// invoice, jadi payload tanpa satu pun identitas bukan pembayaran yang
+		// bisa dicocokkan, dan mengulanginya tidak akan pernah berhasil. 400
+		// hanya membuat Paper.id mengirim ulang tanpa henti dan menandai URL
+		// callback kita gagal saat diuji dari dashboard mereka. Terjadi
+		// sungguhan di produksi: satu callback tanpa payment_info maupun
+		// identitas tercatat sebagai galat, padahal tidak ada yang bisa
+		// dilakukan atasnya selain menyimpannya untuk dibaca.
+		//
+		// Yang tidak hilang: catatan formatnya tetap tersimpan di blackbox,
+		// jadi bentuk payload yang belum kita kenal tetap terlihat di sana.
+		s.recordInboundAt(path, raw, http.StatusOK, true, nil)
+		return false, nil
 	}
 
 	pay := summarizePayment(in.paymentInfo())
