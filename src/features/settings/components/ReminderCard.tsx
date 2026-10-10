@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BellRing, Save } from 'lucide-react'
-import { Button, Card, CardBody, CardHeader, Field, Input, Select, useToast } from '@/components/ui'
+import { Button, Card, CardBody, CardHeader, Field, Input, MoneyInput, Select, useToast } from '@/components/ui'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
 
 /**
@@ -217,11 +217,9 @@ export function ReminderCard() {
                   </Field>
                 ) : (
                   <Field label={`Denda per ${nilai.denda_satuan} (Rp)`}>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={nilai.denda_per_hari}
-                      onChange={(e) => ubah('denda_per_hari', e.target.value)}
+                    <MoneyInput
+                      value={Number(nilai.denda_per_hari) || 0}
+                      onChange={(n) => ubah('denda_per_hari', String(n))}
                     />
                   </Field>
                 )}

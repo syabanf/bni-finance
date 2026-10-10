@@ -9,6 +9,7 @@ import {
   CardHeader,
   Field,
   Input,
+  MoneyInput,
   LoadingState,
   PageHeader,
   Select,
@@ -428,13 +429,7 @@ export function InvoiceNewPage() {
               )}
 
               <Field label="Nominal (Rp)">
-                <Input
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
-                  min={0}
-                  step={50000}
-                />
+                <MoneyInput value={amount} onChange={setAmount} />
               </Field>
 
               <div className="space-y-2.5 rounded-xl bg-ink-50 p-4 text-sm">

@@ -8,6 +8,7 @@ import {
   CardHeader,
   Field,
   Input,
+  MoneyInput,
   LoadingState,
   PageHeader,
   Textarea,
@@ -240,14 +241,7 @@ function FeeInput({
         <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-400">
           Rp
         </span>
-        <Input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          min={0}
-          step={50000}
-          className="pl-9 text-base font-semibold"
-        />
+        <MoneyInput value={value} onChange={onChange} className="pl-9 text-base font-semibold" />
       </div>
     </div>
   )
