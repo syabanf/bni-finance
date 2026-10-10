@@ -12,6 +12,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/scope"
 )
 
@@ -163,6 +164,9 @@ func (r *Repository) CreateAndSettle(
 			 WHERE id = $1`, in.InvoiceID, paidAt, in.Amount)
 		if err != nil {
 			return nil, fmt.Errorf("tandai invoice lunas: %w", err)
+		}
+		if err := member.AktifkanSetelahPendaftaran(ctx, tx, in.InvoiceID); err != nil {
+			return nil, err
 		}
 
 		// Settling here bypasses invoice.Repository.Update, so the timeline

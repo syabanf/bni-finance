@@ -302,3 +302,31 @@ func (r *Repository) CountInvoices(ctx context.Context, id string) (int, error) 
 	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM invoices WHERE member_id = $1", id).Scan(&n)
 	return n, err
 }
+
+// AktifkanSetelahPendaftaran menjadikan visitor atau pending yang invoice
+// pendaftarannya lunas sebagai member aktif, dalam transaksi pelunasan itu.
+//
+// Tipe invoice mengikuti status: pendaftaran hanya untuk yang belum anggota,
+// renewal hanya untuk yang sudah. Tanpa langkah ini, visitor yang sudah
+// membayar pendaftaran tetap visitor selamanya, dan tahun depan tidak ada
+// jalan untuk menagihnya renewal. renewal_date diisi akhir periode invoice,
+// dan tidak dimundurkan bila yang tersimpan sudah lebih jauh (sinkron BNI VM
+// atau impor bisa lebih dulu mengisinya). Invoice renewal tidak disentuh:
+// keanggotaannya sudah ada, dan sumber tanggalnya BNI.
+//
+// Dijalankan oleh kedua jalur pelunasan (callback Paper.id dan pencatatan
+// manual) supaya status member tidak bergantung pada dari mana uangnya datang.
+func AktifkanSetelahPendaftaran(ctx context.Context, tx pgx.Tx, invoiceID string) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE members m
+		   SET status = 'active',
+		       renewal_date = GREATEST(COALESCE(m.renewal_date, i.period_end), i.period_end)
+		  FROM invoices i
+		 WHERE i.id = $1 AND m.id = i.member_id
+		   AND i.type = 'registration'
+		   AND m.status IN ('visitor', 'pending')`, invoiceID)
+	if err != nil {
+		return fmt.Errorf("aktifkan member setelah pendaftaran: %w", err)
+	}
+	return nil
+}

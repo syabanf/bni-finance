@@ -11,6 +11,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
+	"github.com/syabanf/bni-finance/backend/internal/member"
 )
 
 type Repository struct {
@@ -173,6 +174,9 @@ func (r *Repository) SettleByRef(
 		  paid_amount = COALESCE(paid_amount, $3), updated_at = now()
 		WHERE id = $1`, invoiceID, paidAt, amount); err != nil {
 		return false, fmt.Errorf("tandai invoice lunas: %w", err)
+	}
+	if err := member.AktifkanSetelahPendaftaran(ctx, tx, invoiceID); err != nil {
+		return false, err
 	}
 
 	paid := domain.StatusPaid
