@@ -30,8 +30,12 @@ func TestBNIConnectSampleAsli(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			st := &stub{chapters: map[string]ChapterRow{"ch-rise": {ID: "ch-rise"}}, members: map[string]MemberRow{}}
-			h, err := NewService(st).Jalankan(context.Background(), JenisMember, data, false, Opsi{Chapter: "ch-rise"})
+			// Chapter tujuan mengikuti yang tertulis di laporan, karena laporan
+			// chapter lain ditolak. Lihat TestBNIConnectMenolakLaporanChapterLain.
+			nama := chapterLaporan(mustRows(t, data))
+			st := &stub{chapters: map[string]ChapterRow{"ch-uji": {ID: "ch-uji", Name: nama, DisplayName: "BNI " + nama}},
+				members: map[string]MemberRow{}}
+			h, err := NewService(st).Jalankan(context.Background(), JenisMember, data, false, Opsi{Chapter: "ch-uji"})
 			if err != nil {
 				t.Fatalf("jalankan: %v", err)
 			}

@@ -17,6 +17,10 @@ export const apiChapterRepository: ChapterRepository = {
     return res.data
   },
 
+  async create(input) {
+    return api.post<Chapter>('/chapters', input)
+  },
+
   async getById(id) {
     try {
       return await api.get<Chapter>(`/chapters/${encodeURIComponent(id)}`)
