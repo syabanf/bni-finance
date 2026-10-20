@@ -11,9 +11,27 @@ export type DataSource = 'mock' | 'api'
 
 const STORAGE_KEY = 'bni.dataSource'
 
-/** Nilai awal dari env, dipakai hanya saat pengguna belum pernah memilih. */
+/**
+ * Host yang punya backend di origin yang sama (reverse proxy meneruskan /api ke
+ * Go). Di host ini Backend API menjadi nilai awal; di host lain, misalnya
+ * pratinjau Vercel yang tidak punya /api, nilai awalnya tetap Data Contoh.
+ */
+const hostBackend = (import.meta.env.VITE_API_HOSTS ?? '')
+  .split(',')
+  .map((h: string) => h.trim().toLowerCase())
+  .filter(Boolean)
+
+function diHostBackend(): boolean {
+  try {
+    return hostBackend.includes(window.location.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
+/** Nilai awal, dipakai hanya saat pengguna belum pernah memilih. */
 const envDefault: DataSource =
-  import.meta.env.VITE_USE_MOCK === 'false' ? 'api' : 'mock'
+  import.meta.env.VITE_USE_MOCK === 'false' || diHostBackend() ? 'api' : 'mock'
 
 function read(): DataSource {
   try {

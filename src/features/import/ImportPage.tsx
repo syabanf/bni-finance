@@ -22,6 +22,7 @@ import {
 import { chapterService, importService, memberService } from '@/services'
 import type { ImportOpsi } from '@/services/types'
 import { downloadXlsx } from '@/lib/xlsx'
+import { isMockMode, setDataSource } from '@/services/dataSource'
 import { cn } from '@/lib/cn'
 
 /**
@@ -275,6 +276,21 @@ export function ImportPage() {
 
   return (
     <div>
+      {/* Mode Data Contoh tidak membaca laporan BNI Connect (.xls) dan tidak
+          menyimpan apa pun ke server. Dinyatakan di atas, sebelum orang
+          mengunggah berkas lalu menerima galat yang tidak menjelaskan jalannya. */}
+      {isMockMode() && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>
+            <span className="font-semibold">Anda di mode Data Contoh.</span> Impor laporan BNI Connect
+            (.xls) dan penyimpanan ke server butuh mode Backend API.
+          </span>
+          <Button size="sm" onClick={() => setDataSource('api')}>
+            Beralih ke Backend API
+          </Button>
+        </div>
+      )}
+
       <PageHeader
         title="Impor Data"
         description={
