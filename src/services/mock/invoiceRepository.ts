@@ -126,6 +126,14 @@ function naikkanStatusSetelahLunas(invoice: Invoice) {
   }
 }
 
+/** Cermin kanalKirim di server: ke mana invoice diminta dikirim, untuk riwayat. */
+function kanalKirim(memberId: string): string {
+  const m = store.members.find((x) => x.id === memberId)
+  const kanal = [m?.phone && `WhatsApp ${m.phone}`, m?.email && `email ${m.email}`].filter(Boolean)
+  const dasar = kanal.length ? `lewat ${kanal.join(' dan ')}` : 'tanpa notifikasi'
+  return m?.email ? dasar : `${dasar}; email dilewati karena member belum punya alamat email`
+}
+
 export const mockInvoiceRepository: InvoiceRepository = {
   async list(filters) {
     syncOverdueStatus()
@@ -260,7 +268,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
       newStatus: 'sent',
       actorId: 'admin-national',
       actorName: 'Admin Nasional',
-      notes: 'Dikirim ke Paper.id — link pembayaran dibuat',
+      notes: `Dikirim ke Paper.id ${kanalKirim(invoice.memberId)}`,
     })
     return delay(invoice, 800)
   },
@@ -286,7 +294,7 @@ export const mockInvoiceRepository: InvoiceRepository = {
       newStatus: invoice.status,
       actorId: 'admin-national',
       actorName: 'Admin Nasional',
-      notes: 'Dikirim ulang ke Paper.id — link pembayaran diperbarui',
+      notes: `Dikirim ulang ke Paper.id ${kanalKirim(invoice.memberId)}`,
     })
     return delay(invoice, 600)
   },

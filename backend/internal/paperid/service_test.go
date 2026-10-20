@@ -38,7 +38,7 @@ func (s *stubStore) GetSendable(context.Context, string) (*Sendable, error) {
 	return s.sendable, nil
 }
 
-func (s *stubStore) MarkSent(_ context.Context, id string, res CreateResult, _, _ time.Time, _ string) (*domain.Invoice, error) {
+func (s *stubStore) MarkSent(_ context.Context, id string, res CreateResult, _, _ time.Time, _, _ string) (*domain.Invoice, error) {
 	s.sentWith = &res
 	return &domain.Invoice{ID: id, Status: domain.StatusSent}, nil
 }
@@ -48,7 +48,7 @@ func (s *stubStore) ReserveReminder(context.Context, string) (int, error) {
 	return s.reserved, nil
 }
 
-func (s *stubStore) MarkReminded(_ context.Context, id string, res CreateResult, _ time.Time, _ string) (*domain.Invoice, error) {
+func (s *stubStore) MarkReminded(_ context.Context, id string, res CreateResult, _ time.Time, _, _ string) (*domain.Invoice, error) {
 	s.remindedWith = &res
 	return &domain.Invoice{ID: id, Status: domain.StatusSent, PaperIDReminderCount: 1}, nil
 }
