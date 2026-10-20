@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Pencil, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
-import type { ManagedUser, UserRole } from '@/types'
+import { Copy, KeyRound, Pencil, RefreshCw, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import type { ManagedUser, MemberWithChapter, UserRole } from '@/types'
 import {
   Badge,
   Button,
@@ -24,7 +24,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { chapterService, userService } from '@/services'
+import { authService, chapterService, memberService, userService } from '@/services'
 import { ROLE_LABEL } from '@/lib/rbac'
 
 /**
@@ -70,6 +70,15 @@ export function UsersPage() {
     () => (chapters.data ?? []).map((c) => ({ id: c.id, nama: c.displayName })),
     [chapters.data],
   )
+
+  const kirimReset = async (u: ManagedUser) => {
+    try {
+      await authService.mintaResetSandi(u.email)
+      toast(`Tautan atur kata sandi dikirim ke ${u.email}.`)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengirim tautan.', 'error')
+    }
+  }
 
   const hapus = async (u: ManagedUser) => {
     // Konfirmasi dulu: menghapus akun tidak bisa dibatalkan, dan orang yang
@@ -147,6 +156,13 @@ export function UsersPage() {
                           Ubah Peran
                         </button>
                         <button
+                          onClick={() => kirimReset(u)}
+                          className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                          Kirim Reset Sandi
+                        </button>
+                        <button
                           onClick={() => hapus(u)}
                           className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-red-600"
                         >
@@ -186,6 +202,16 @@ export function UsersPage() {
   )
 }
 
+/**
+ * Kata sandi awal acak, 12 karakter tanpa huruf yang mudah tertukar (0/O, 1/l/I).
+ * Dibuat dengan crypto.getRandomValues, bukan Math.random, karena ini kredensial.
+ */
+function buatSandi(panjang = 12): string {
+  const huruf = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+  const acak = crypto.getRandomValues(new Uint32Array(panjang))
+  return Array.from(acak, (n) => huruf[n % huruf.length]).join('')
+}
+
 function FormTambah({
   open,
   chapters,
@@ -203,7 +229,47 @@ function FormTambah({
   const [sandi, setSandi] = useState('')
   const [role, setRole] = useState<UserRole>('st')
   const [chapterId, setChapterId] = useState('')
+  const [kirimReset, setKirimReset] = useState(false)
   const [menyimpan, setMenyimpan] = useState(false)
+  const [anggota, setAnggota] = useState<MemberWithChapter[]>([])
+
+  // Setiap kali dibuka: kata sandi awal baru, dan daftar member terbaru dari
+  // data BNI Connect untuk mengambil email.
+  useEffect(() => {
+    if (!open) return
+    setSandi(buatSandi())
+    memberService.list().then(setAnggota).catch(() => setAnggota([]))
+  }, [open])
+
+  /**
+   * Member aktif yang punya email, dari data BNI Connect (impor atau sinkron),
+   * disaring ke chapter lingkupnya bila dipilih. Memilih satu mengisi nama dan
+   * email; keduanya tetap bisa diubah.
+   */
+  const calon = useMemo(
+    () =>
+      anggota
+        .filter((m) => m.email && (m.status === 'active' || m.status === 'new_member'))
+        .filter((m) => !chapterId || m.chapterId === chapterId)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [anggota, chapterId],
+  )
+
+  const pilihMember = (id: string) => {
+    const m = calon.find((x) => x.id === id)
+    if (!m) return
+    setNama(m.name)
+    setEmail(m.email ?? '')
+  }
+
+  const salinSandi = async () => {
+    try {
+      await navigator.clipboard.writeText(sandi)
+      toast('Kata sandi disalin.')
+    } catch {
+      toast('Gagal menyalin; salin manual dari kolomnya.', 'error')
+    }
+  }
 
   const simpan = async (e: FormEvent) => {
     e.preventDefault()
@@ -216,10 +282,21 @@ function FormTambah({
         role,
         chapterId: bolehBerchapter(role) ? chapterId || null : null,
       })
-      toast(`Akun ${email.trim()} dibuat.`)
+      let pesan = `Akun ${email.trim()} dibuat.`
+      if (kirimReset) {
+        // Akunnya sudah jadi; gagal kirim email tidak membatalkannya, cukup
+        // dilaporkan supaya bisa dikirim ulang dari daftar akun.
+        try {
+          await authService.mintaResetSandi(email.trim())
+          pesan += ' Tautan atur kata sandi dikirim ke emailnya.'
+        } catch {
+          pesan += ' Tautan atur kata sandi gagal dikirim; kirim ulang dari daftar akun.'
+        }
+      }
+      toast(pesan)
       setEmail('')
       setNama('')
-      setSandi('')
+      setKirimReset(false)
       onSaved()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membuat akun.', 'error')
@@ -231,6 +308,33 @@ function FormTambah({
   return (
     <Modal open={open} onClose={onClose} title="Tambah Pengguna">
       <form onSubmit={simpan} className="space-y-4">
+        <PilihPeranLingkup
+          role={role}
+          chapterId={chapterId}
+          chapters={chapters}
+          onRole={setRole}
+          onChapter={setChapterId}
+        />
+
+        <Field
+          label="Ambil dari member BNI Connect"
+          hint={
+            calon.length
+              ? 'Mengisi nama dan email dari member aktif; keduanya tetap bisa diubah.'
+              : 'Belum ada member aktif dengan email di lingkup ini. Isi manual di bawah.'
+          }
+        >
+          <Select value="" onChange={(e) => pilihMember(e.target.value)} disabled={calon.length === 0}>
+            <option value="">Pilih member…</option>
+            {calon.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} · {m.email}
+                {chapterId ? '' : ` · ${m.chapter?.displayName ?? m.chapterId}`}
+              </option>
+            ))}
+          </Select>
+        </Field>
+
         <Field label="Nama">
           <Input value={nama} onChange={(e) => setNama(e.target.value)} required placeholder="Nama lengkap" />
         </Field>
@@ -243,24 +347,37 @@ function FormTambah({
             placeholder="nama@bni-finance.com"
           />
         </Field>
-        <Field label="Kata sandi" hint="Minimal 6 karakter.">
-          <Input
-            type="password"
-            value={sandi}
-            onChange={(e) => setSandi(e.target.value)}
-            required
-            minLength={6}
-            placeholder="••••••••"
-          />
+        <Field label="Kata sandi awal" hint="Dibuat otomatis, boleh diubah. Minimal 6 karakter; salin sebelum menyimpan.">
+          <div className="flex gap-2">
+            <Input
+              value={sandi}
+              onChange={(e) => setSandi(e.target.value)}
+              required
+              minLength={6}
+              autoComplete="new-password"
+              className="font-mono"
+            />
+            <Button type="button" variant="outline" onClick={() => setSandi(buatSandi())} title="Buat ulang">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button type="button" variant="outline" onClick={salinSandi} title="Salin">
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
         </Field>
 
-        <PilihPeranLingkup
-          role={role}
-          chapterId={chapterId}
-          chapters={chapters}
-          onRole={setRole}
-          onChapter={setChapterId}
-        />
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-ink-700">
+          <input
+            type="checkbox"
+            checked={kirimReset}
+            onChange={(e) => setKirimReset(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-bni-red"
+          />
+          <span>
+            Kirim email "atur kata sandi" ke pengguna setelah akun dibuat, supaya ia memilih kata
+            sandinya sendiri.
+          </span>
+        </label>
 
         <div className="flex items-start gap-2 rounded-lg bg-ink-50 p-3 text-xs text-ink-600">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
