@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, FileUp, HelpCircle, Send, XCircle } from 'lucide-react'
-import type { RenewalAnswer, RenewalRequest } from '@/types'
+import type { MemberWithChapter, RenewalAnswer, RenewalRequest } from '@/types'
 import {
   Badge,
   Button,
@@ -26,6 +26,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { chapterService, importService, memberService, renewalService, userService } from '@/services'
 import { useAuth } from '@/features/auth/AuthContext'
 import { formatDate } from '@/lib/format'
+import { bolehDitagih } from '@/lib/status'
+import { cn } from '@/lib/cn'
 
 /**
  * Konfirmasi renewal — ST menanyakan, MC menjawab.
@@ -229,11 +231,12 @@ export function RenewalPage() {
     <div>
       <PageHeader
         title="Konfirmasi Renewal"
-        description="ST menanyakan siapa yang akan memperpanjang; MC menjawab per member."
+        description="Sistem menyusun daftar member yang jatuh tempo; ST menyetujui dan menanyakannya; MC menjawab per member."
         action={
           bolehMeminta ? (
             <TombolMinta
               period={period}
+              sudahDiminta={new Set((permintaan.data ?? []).map((r) => r.memberId))}
               lintasChapter={lintasChapter}
               chapterOptions={(chapters.data ?? []).map((c) => ({ id: c.id, displayName: c.displayName }))}
               daftarMc={daftarMc.map((u) => ({
@@ -473,14 +476,32 @@ function TombolJawab({
   )
 }
 
+/** Rentang tanggal sebuah periode: "2027-S1" Jan–Jun, "2027-S2" Jul–Des, "2027" setahun. */
+function rentangPeriode(p: string): { dari: string; sampai: string } | null {
+  const sem = /^(\d{4})-S([12])$/.exec(p)
+  if (sem) return sem[2] === '1' ? { dari: `${sem[1]}-01-01`, sampai: `${sem[1]}-06-30` } : { dari: `${sem[1]}-07-01`, sampai: `${sem[1]}-12-31` }
+  if (/^\d{4}$/.test(p)) return { dari: `${p}-01-01`, sampai: `${p}-12-31` }
+  return null
+}
+
+type Kelompok = 'jatuhTempo' | 'terlewat' | 'tanpaTanggal'
+
+const LABEL_KELOMPOK: Record<Kelompok, string> = {
+  jatuhTempo: 'Jatuh tempo di periode ini',
+  terlewat: 'Sudah lewat jatuh tempo',
+  tanpaTanggal: 'Tanpa tanggal jatuh tempo',
+}
+
 function TombolMinta({
   period,
+  sudahDiminta,
   daftarMc,
   lintasChapter,
   chapterOptions,
   onDone,
 }: {
   period: string
+  sudahDiminta: Set<string>
   daftarMc: { id: string; nama: string; chapterId: string | null; namaChapter: string | null }[]
   lintasChapter: boolean
   chapterOptions: { id: string; displayName: string }[]
@@ -492,6 +513,57 @@ function TombolMinta({
   const [chapterId, setChapterId] = useState('all')
   const [berkas, setBerkas] = useState<File | null>(null)
   const [mengirim, setMengirim] = useState(false)
+  const [anggota, setAnggota] = useState<MemberWithChapter[] | null>(null)
+  const [terpilih, setTerpilih] = useState<Set<string>>(new Set())
+
+  // Daftar member dimuat setiap kali modal dibuka, supaya jatuh tempo yang
+  // baru saja diimpor atau dilunasi langsung terbaca.
+  useEffect(() => {
+    if (!buka) return
+    setAnggota(null)
+    memberService.list().then(setAnggota).catch(() => setAnggota([]))
+  }, [buka])
+
+  /**
+   * Daftar jatuh tempo disusun sistem; ST yang menyetujui.
+   *
+   * Calon: member yang boleh ditagih renewal (active, inactive, new_member) di
+   * chapter terpilih. Yang jatuh temponya masuk periode ini dicentang otomatis.
+   * Yang sudah lewat jatuh tempo dan yang belum punya tanggal ikut ditampilkan
+   * tanpa centang, karena keduanya butuh keputusan orang: bisa jadi sudah
+   * keluar, bisa jadi tanggalnya belum diimpor. Member yang jatuh temponya
+   * sesudah periode ini tidak ditampilkan; belum waktunya ditanyakan.
+   */
+  const kandidat = useMemo(() => {
+    const rentang = rentangPeriode(period)
+    const out: Record<Kelompok, MemberWithChapter[]> = { jatuhTempo: [], terlewat: [], tanpaTanggal: [] }
+    for (const m of anggota ?? []) {
+      if (!bolehDitagih(m.status, 'renewal')) continue
+      if (chapterId !== 'all' && m.chapterId !== chapterId) continue
+      const tgl = m.renewalDate?.slice(0, 10)
+      if (!tgl) out.tanpaTanggal.push(m)
+      else if (!rentang || (tgl >= rentang.dari && tgl <= rentang.sampai)) out.jatuhTempo.push(m)
+      else if (tgl < rentang.dari) out.terlewat.push(m)
+    }
+    for (const k of Object.keys(out) as Kelompok[]) {
+      out[k].sort((a, b) => (a.renewalDate ?? '').localeCompare(b.renewalDate ?? '') || a.name.localeCompare(b.name))
+    }
+    return out
+  }, [anggota, chapterId, period])
+
+  useEffect(() => {
+    setTerpilih(new Set(kandidat.jatuhTempo.filter((m) => !sudahDiminta.has(m.id)).map((m) => m.id)))
+    // Bergantung pada kandidat saja: sudahDiminta dibangun ulang tiap render
+    // induk, dan memasukkannya akan menimpa centang ST di setiap render.
+  }, [kandidat])
+
+  const alihkan = (id: string) =>
+    setTerpilih((lama) => {
+      const baru = new Set(lama)
+      if (baru.has(id)) baru.delete(id)
+      else baru.add(id)
+      return baru
+    })
 
   /**
    * Member yang ditanyakan datang dari salah satu dua sumber.
@@ -528,25 +600,14 @@ function TombolMinta({
       if (berkas) {
         ;({ ids, takDikenal } = await idDariBerkas(berkas))
       } else {
-        // Diambil dari daftar member yang jatuh tempo, bukan seluruh member:
-        // menanyakan konfirmasi kepada orang yang keanggotaannya masih lama
-        // membuat daftar tugas MC penuh hal yang belum perlu dijawab.
-        const semua = await memberService.list()
-        const aktif = semua.filter((m) => m.status === 'active' || m.status === 'new_member')
-        // Disaring per chapter bila dipilih. MOM: "Konfirmasi Renewal ada yang
-        // kirim by chapter" — ST yang menangani satu chapter tidak seharusnya
-        // membuat tugas untuk seluruh MC di chapter lain hanya karena menekan
-        // satu tombol.
-        const relevan = chapterId === 'all' ? aktif : aktif.filter((m) => m.chapterId === chapterId)
-        ids = relevan.map((m) => m.id)
+        // Hanya yang dicentang ST dari daftar jatuh tempo.
+        ids = [...terpilih]
       }
       if (ids.length === 0) {
         toast(
           berkas
             ? 'Tidak ada nama di laporan yang cocok dengan member chapter itu.'
-            : chapterId === 'all'
-              ? 'Tidak ada member aktif yang perlu dikonfirmasi.'
-              : 'Tidak ada member aktif di chapter itu.',
+            : 'Belum ada member yang dicentang.',
           'error',
         )
         return
@@ -606,7 +667,7 @@ function TombolMinta({
 
           <Field
             label="Dari laporan BNI Connect (opsional)"
-            hint="Laporan Membership Dues (.xls) atau template jatuh tempo dari halaman Impor. Hanya nama di laporan yang ditanyakan; tanpa berkas, seluruh member aktif di chapter."
+            hint="Laporan Membership Dues (.xls) atau template jatuh tempo dari halaman Impor. Bila diisi, nama di laporan yang ditanyakan, menggantikan daftar di bawah."
           >
             <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-300 px-4 py-3 text-sm transition-colors hover:bg-ink-50">
               <FileUp className="h-4 w-4 shrink-0 text-brand-500" />
@@ -633,6 +694,61 @@ function TombolMinta({
               />
             </label>
           </Field>
+
+          {!berkas && (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-ink-800">Member yang ditanyakan</span>
+                <span className="text-xs text-ink-500">{terpilih.size} dicentang</span>
+              </div>
+              {anggota === null ? (
+                <p className="rounded-xl border border-ink-200 p-4 text-sm text-ink-500">Menyusun daftar jatuh tempo…</p>
+              ) : kandidat.jatuhTempo.length + kandidat.terlewat.length + kandidat.tanpaTanggal.length === 0 ? (
+                <p className="rounded-xl border border-ink-200 p-4 text-sm text-ink-500">
+                  Tidak ada member yang jatuh tempo di {labelPeriode(period)} untuk chapter ini.
+                </p>
+              ) : (
+                <div className="max-h-72 space-y-3 overflow-y-auto rounded-xl border border-ink-200 p-3">
+                  {(Object.keys(LABEL_KELOMPOK) as Kelompok[])
+                    .filter((k) => kandidat[k].length > 0)
+                    .map((k) => (
+                      <div key={k}>
+                        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400">
+                          {LABEL_KELOMPOK[k]} ({kandidat[k].length})
+                        </div>
+                        {kandidat[k].map((m) => {
+                          const sudah = sudahDiminta.has(m.id)
+                          return (
+                            <label
+                              key={m.id}
+                              className={cn(
+                                'flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm',
+                                sudah ? 'text-ink-400' : 'cursor-pointer hover:bg-ink-50',
+                              )}
+                            >
+                              <input
+                                type="checkbox"
+                                disabled={sudah}
+                                checked={!sudah && terpilih.has(m.id)}
+                                onChange={() => alihkan(m.id)}
+                                className="h-4 w-4 accent-bni-red"
+                              />
+                              <span className="min-w-0 flex-1 truncate">
+                                {m.name}
+                                <span className="text-ink-400"> · {m.chapter?.displayName ?? m.chapterId}</span>
+                              </span>
+                              <span className="shrink-0 text-xs text-ink-500">
+                                {sudah ? 'sudah diminta' : m.renewalDate ? formatDate(m.renewalDate) : '—'}
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <Field
             label="Tugaskan ke MC"
