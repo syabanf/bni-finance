@@ -6,10 +6,13 @@ import (
 	"time"
 )
 
-// STATUS MEMBER MAJU SAAT INVOICENYA LUNAS, DI TRANSAKSI YANG SAMA.
+// STATUS DAN MASA KEANGGOTAAN MAJU SAAT INVOICENYA LUNAS, DI TRANSAKSI YANG SAMA.
 //
-//	pendaftaran lunas  visitor, pending  ->  new_member
-//	renewal lunas      new_member        ->  active
+//	pendaftaran lunas  visitor, pending      ->  new_member
+//	renewal lunas      new_member, inactive  ->  active
+//
+// Kedua tipe memajukan renewal_date ke akhir periode invoice (+365 hari di
+// seed ini), tanpa memundurkan tanggal yang sudah lebih jauh.
 //
 // Tipe invoice mengikuti status: pendaftaran hanya untuk yang belum anggota,
 // renewal hanya untuk yang sudah. Tanpa aktivasi ini, visitor yang sudah
@@ -29,7 +32,9 @@ func TestLiveSettleMemajukanStatusMember(t *testing.T) {
 		VALUES ('mem-tamu','ch-1','Tamu','visitor', NULL),
 		       ('mem-calon','ch-1','Calon','pending', CURRENT_DATE + 900),
 		       ('mem-aktif','ch-1','Aktif','active', CURRENT_DATE + 30),
-		       ('mem-baru','ch-1','Baru','new_member', CURRENT_DATE + 10);`); err != nil {
+		       ('mem-baru','ch-1','Baru','new_member', CURRENT_DATE + 10),
+		       ('mem-lewat','ch-1','Lewat','inactive', CURRENT_DATE - 20),
+		       ('mem-jauh','ch-1','Jauh','active', CURRENT_DATE + 700);`); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	seed := func(nomor, member, tipe, paperID string) string {
@@ -49,8 +54,10 @@ func TestLiveSettleMemajukanStatusMember(t *testing.T) {
 	seed("INV-T-2", "mem-calon", "registration", "pp-calon")
 	seed("INV-T-3", "mem-aktif", "renewal", "pp-aktif")
 	seed("INV-T-4", "mem-baru", "renewal", "pp-baru")
+	seed("INV-T-5", "mem-lewat", "renewal", "pp-lewat")
+	seed("INV-T-6", "mem-jauh", "renewal", "pp-jauh")
 
-	for _, pp := range []string{"pp-tamu", "pp-calon", "pp-aktif", "pp-baru"} {
+	for _, pp := range []string{"pp-tamu", "pp-calon", "pp-aktif", "pp-baru", "pp-lewat", "pp-jauh"} {
 		if settled, err := repo.SettleByRef(ctx, pp, "", "bank_transfer:bni", "PAID", 1_000_000, time.Now()); err != nil || !settled {
 			t.Fatalf("%s: settled=%v err=%v", pp, settled, err)
 		}
@@ -74,11 +81,18 @@ func TestLiveSettleMemajukanStatusMember(t *testing.T) {
 		t.Errorf("pending: status=%s renewal_date=+%d hari, mau new_member dan +900 (tidak mundur)", s, h)
 	}
 	// Renewal tidak menyentuh member: tanggalnya milik BNI.
-	if s, h := baca("mem-aktif"); s != "active" || h != 30 {
-		t.Errorf("renewal: status=%s renewal_date=+%d hari, mau tetap active dan +30", s, h)
+	// Renewal lunas memajukan jatuh tempo, supaya tahun depan ia muncul lagi
+	// di daftar jatuh tempo pada waktunya.
+	if s, h := baca("mem-aktif"); s != "active" || h != 365 {
+		t.Errorf("renewal: status=%s renewal_date=+%d hari, mau active dan +365", s, h)
 	}
-	// Renewal pertama new member menjadikannya active; tanggalnya tetap milik BNI.
-	if s, h := baca("mem-baru"); s != "active" || h != 10 {
-		t.Errorf("new member renewal: status=%s renewal_date=+%d hari, mau active dan +10", s, h)
+	if s, h := baca("mem-baru"); s != "active" || h != 365 {
+		t.Errorf("new member renewal: status=%s renewal_date=+%d hari, mau active dan +365", s, h)
+	}
+	if s, h := baca("mem-lewat"); s != "active" || h != 365 {
+		t.Errorf("inactive renewal: status=%s renewal_date=+%d hari, mau active dan +365", s, h)
+	}
+	if s, h := baca("mem-jauh"); s != "active" || h != 700 {
+		t.Errorf("tanggal lebih jauh tidak boleh mundur: status=%s renewal_date=+%d hari, mau +700", s, h)
 	}
 }

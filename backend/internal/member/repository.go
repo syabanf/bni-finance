@@ -303,32 +303,32 @@ func (r *Repository) CountInvoices(ctx context.Context, id string) (int, error) 
 	return n, err
 }
 
-// NaikkanStatusSetelahLunas memajukan status member saat invoicenya lunas,
-// dalam transaksi pelunasan itu.
+// NaikkanStatusSetelahLunas memajukan status dan masa keanggotaan member saat
+// invoicenya lunas, dalam transaksi pelunasan itu.
 //
-//	pendaftaran lunas  visitor, pending  ->  new_member
-//	renewal lunas      new_member        ->  active
+//	pendaftaran lunas  visitor, pending       ->  new_member
+//	renewal lunas      new_member, inactive   ->  active
 //
-// Tanpa langkah ini, visitor yang sudah membayar tetap visitor dan tahun depan
-// tidak ada jalan menagihnya renewal. renewal_date diisi akhir periode invoice
-// pendaftaran, dan tidak dimundurkan bila yang tersimpan sudah lebih jauh
-// (sinkron BNI VM atau impor bisa lebih dulu mengisinya). Renewal tidak
-// menyentuh renewal_date: sumber tanggalnya BNI.
+// Kedua tipe memajukan renewal_date ke akhir periode invoice, tanpa pernah
+// memundurkannya (sinkron BNI VM atau impor laporan Dues bisa lebih dulu
+// mengisi tanggal yang lebih jauh). Tanpa itu, member yang sudah membayar
+// renewal tetap tercatat jatuh tempo di tanggal lama: tahun berikutnya ia
+// tidak muncul di daftar jatuh tempo pada waktunya, sementara daftar tahun
+// ini terus menyebutnya terlambat.
 //
 // Dijalankan oleh kedua jalur pelunasan (callback Paper.id dan pencatatan
 // manual) supaya status member tidak bergantung pada dari mana uangnya datang.
 func NaikkanStatusSetelahLunas(ctx context.Context, tx pgx.Tx, invoiceID string) error {
 	_, err := tx.Exec(ctx, `
 		UPDATE members m
-		   SET status = CASE i.type WHEN 'registration' THEN 'new_member'::member_status
-		                            ELSE 'active'::member_status END,
-		       renewal_date = CASE i.type
-		         WHEN 'registration' THEN GREATEST(COALESCE(m.renewal_date, i.period_end), i.period_end)
-		         ELSE m.renewal_date END
+		   SET status = CASE
+		         WHEN i.type = 'registration' AND m.status IN ('visitor', 'pending') THEN 'new_member'::member_status
+		         WHEN i.type = 'renewal' AND m.status IN ('new_member', 'inactive') THEN 'active'::member_status
+		         ELSE m.status END,
+		       renewal_date = GREATEST(COALESCE(m.renewal_date, i.period_end), i.period_end)
 		  FROM invoices i
 		 WHERE i.id = $1 AND m.id = i.member_id
-		   AND ((i.type = 'registration' AND m.status IN ('visitor', 'pending'))
-		     OR (i.type = 'renewal' AND m.status = 'new_member'))`, invoiceID)
+		   AND (i.type = 'renewal' OR m.status IN ('visitor', 'pending', 'new_member'))`, invoiceID)
 	if err != nil {
 		return fmt.Errorf("naikkan status member setelah lunas: %w", err)
 	}

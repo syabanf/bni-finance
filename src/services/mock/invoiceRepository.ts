@@ -112,18 +112,20 @@ function saring(semua: InvoiceWithRelations[], filters?: InvoiceFilters) {
 
 /**
  * Cermin member.NaikkanStatusSetelahLunas di server: pendaftaran lunas
- * menjadikan visitor atau pending New Member (renewal_date akhir periode bila
- * belum ada yang lebih jauh), renewal lunas menjadikan New Member Active.
+ * menjadikan visitor atau pending New Member, renewal lunas menjadikan New
+ * Member atau Inactive Active. Keduanya memajukan renewal_date ke akhir
+ * periode invoice tanpa memundurkan tanggal yang lebih jauh.
  */
 function naikkanStatusSetelahLunas(invoice: Invoice) {
   const member = store.members.find((m) => m.id === invoice.memberId)
   if (!member) return
-  if (invoice.type === 'registration' && (member.status === 'visitor' || member.status === 'pending')) {
-    member.status = 'new_member'
-    if (!member.renewalDate || member.renewalDate < invoice.periodEnd) member.renewalDate = invoice.periodEnd
-  } else if (invoice.type === 'renewal' && member.status === 'new_member') {
+  if (invoice.type === 'registration') {
+    if (!['visitor', 'pending', 'new_member'].includes(member.status)) return
+    if (member.status !== 'new_member') member.status = 'new_member'
+  } else if (member.status === 'new_member' || member.status === 'inactive') {
     member.status = 'active'
   }
+  if (!member.renewalDate || member.renewalDate < invoice.periodEnd) member.renewalDate = invoice.periodEnd
 }
 
 /** Cermin kanalKirim di server: ke mana invoice diminta dikirim, untuk riwayat. */
