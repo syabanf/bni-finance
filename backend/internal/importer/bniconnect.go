@@ -1,6 +1,7 @@
 package importer
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"regexp"
@@ -203,12 +204,22 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 	if opsi.Chapter == "" {
 		return nil, fmt.Errorf("laporan BNI Connect tidak memuat kolom chapter — pilih chapter tujuan dulu, lalu unggah lagi")
 	}
-	chapterAda, err := s.repo.ChapterIDs(ctx)
+	chapters, err := s.repo.ChapterRows(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !chapterAda[opsi.Chapter] {
+	tujuan, ada := chapters[opsi.Chapter]
+	if !ada {
 		return nil, fmt.Errorf("chapter %q tidak ada", opsi.Chapter)
+	}
+	// Laporan menyebut chapternya di baris parameter ("Chapter: Supreme").
+	// Karena barisnya sendiri tidak membawa chapter, berkas chapter A yang
+	// diunggah ke tujuan B akan menempelkan seluruh namanya ke B tanpa satu
+	// pun penolakan. Ditolak di sini, sebelum pratinjau sempat terlihat wajar.
+	if nama := chapterLaporan(rows); nama != "" && !samaChapter(nama, tujuan) {
+		return nil, fmt.Errorf("laporan ini milik chapter %q, sedangkan chapter tujuan %q; "+
+			"pilih chapter %s sebagai tujuan, atau tambahkan dulu di halaman Chapter bila belum ada",
+			nama, cmp.Or(tujuan.DisplayName, tujuan.Name, tujuan.ID), nama)
 	}
 	tersimpan, err := s.repo.MemberRows(ctx)
 	if err != nil {
@@ -296,4 +307,37 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 		hasil.Diterapkan = true
 	}
 	return hasil, nil
+}
+
+// chapterLaporan mengambil nama chapter dari baris parameter laporan BNI
+// Connect ("Chapter:" lalu namanya di sel berikutnya yang berisi). Kosong bila
+// laporan tidak memuatnya.
+func chapterLaporan(rows []sheetRow) string {
+	for _, r := range rows {
+		for i, v := range r {
+			if !strings.EqualFold(strings.TrimSpace(v), "Chapter:") {
+				continue
+			}
+			for _, w := range r[i+1:] {
+				if w = strings.TrimSpace(w); w != "" {
+					return w
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// samaChapter mencocokkan nama chapter di laporan dengan chapter tujuan lewat
+// id, nama, atau nama tampilnya, mengabaikan huruf besar, spasi, tanda baca,
+// awalan "BNI" dan "ch-". "Supreme" cocok dengan "BNI Supreme" dan "ch-supreme".
+func samaChapter(laporan string, c ChapterRow) bool {
+	inti := func(s string) string {
+		s = strings.ToLower(strings.TrimSpace(s))
+		s = strings.TrimPrefix(s, "ch-")
+		s = strings.TrimPrefix(s, "bni ")
+		return bukanAlnum.ReplaceAllString(s, "")
+	}
+	n := inti(laporan)
+	return n != "" && (n == inti(c.ID) || n == inti(c.Name) || n == inti(c.DisplayName))
 }

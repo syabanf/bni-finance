@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Building2, MapPin, Search, Upload, Users, X } from 'lucide-react'
+import { Building2, MapPin, Plus, Search, Upload, Users, X } from 'lucide-react'
 import type { Chapter, ChapterCounts } from '@/types'
 import {
+  Button,
   Card,
   EmptyState,
   ExportMenu,
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
+import { TambahChapterModal } from './components/TambahChapterModal'
 import { useAuth } from '@/features/auth/AuthContext'
 import { can } from '@/lib/rbac'
 import { chapterService } from '@/services'
@@ -30,6 +32,7 @@ export function ChapterListPage() {
   const bolehImpor = can(user?.role, 'settings:manage')
   const { toast } = useToast()
   const { data: chapters, loading, reload } = useAsync<Chapter[]>(() => chapterService.list())
+  const [tambahBuka, setTambahBuka] = useState(false)
 
   /**
    * Angka per chapter dari server — satu permintaan, bukan dua tarikan penuh.
@@ -122,6 +125,12 @@ export function ChapterListPage() {
         description="Daftar chapter hasil sinkronisasi dari BNI Visitor Management."
         action={
           <div className="flex flex-wrap items-center gap-2">
+            {bolehImpor && (
+              <Button onClick={() => setTambahBuka(true)}>
+                <Plus className="h-4 w-4" />
+                Tambah Chapter
+              </Button>
+            )}
             <SyncButton jenis="chapter" onSelesai={reload} />
             <ExportMenu {...exportHandlers} disabled={filteredChapters.length === 0} />
           </div>
@@ -240,6 +249,7 @@ export function ChapterListPage() {
           )}
         </>
       )}
+      <TambahChapterModal open={tambahBuka} onClose={() => setTambahBuka(false)} onDibuat={reload} />
     </div>
   )
 }

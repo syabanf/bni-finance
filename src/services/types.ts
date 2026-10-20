@@ -141,8 +141,18 @@ export interface ChapterRepository {
   /** Jumlah member dan nominal tunggakan tiap chapter, dihitung server. */
   counts(): Promise<ChapterCounts[]>
   getById(id: string): Promise<Chapter | null>
+  /** Tambah satu chapter (admin). */
+  create(input: CreateChapterInput): Promise<Chapter>
   /** Pull fresh data from BNI VM and refresh the local mirror. */
   sync(): Promise<{ count: number; syncedAt: string }>
+}
+
+export interface CreateChapterInput {
+  id: string
+  name: string
+  displayName: string
+  areaName?: string
+  cityName?: string
 }
 
 export interface MemberRepository {

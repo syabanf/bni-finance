@@ -53,7 +53,7 @@ async function jalankan(
 ): Promise<ImportHasil> {
   if (!file.name.toLowerCase().endsWith('.csv')) {
     throw new Error(
-      'Mode Data Contoh hanya membaca CSV. Untuk menguji XLSX, beralih ke Backend API.',
+      'Mode Data Contoh hanya membaca CSV. Laporan BNI Connect (.xls) dan XLSX butuh mode Backend API: tekan "Beralih ke Backend API" di atas.',
     )
   }
 

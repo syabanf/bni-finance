@@ -13,6 +13,8 @@ interface ImportMetaEnv {
    * halaman Pengaturan / Login yang menentukan — lihat services/dataSource.ts.
    */
   readonly VITE_USE_MOCK: string
+  /** Host berbackend di origin yang sama, dipisah koma; lihat services/dataSource. */
+  readonly VITE_API_HOSTS?: string
 }
 
 interface ImportMeta {

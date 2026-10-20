@@ -20,6 +20,13 @@ export const mockChapterRepository: ChapterRepository = {
     )
   },
 
+  async create(input) {
+    if (store.chapters.some((c) => c.id === input.id)) throw new Error('Chapter dengan id tersebut sudah ada.')
+    const chapter = { ...input, syncedAt: nowISO() }
+    store.chapters.push(chapter)
+    return delay(chapter, 250)
+  },
+
   async getById(id) {
     return delay(store.chapters.find((c) => c.id === id) ?? null)
   },
