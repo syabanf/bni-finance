@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AuthUser } from '@/types'
 import { authService } from '@/services'
-import { clearSession, getToken, setUnauthorizedHandler } from '@/lib/apiClient'
+import { ApiError, clearSession, getToken, setUnauthorizedHandler } from '@/lib/apiClient'
 import { fetchCurrentUser, PASSWORD_SEPARATOR, setCurrentUser } from '@/services/api/authRepository'
 import { quickLogin as apiQuickLogin } from '@/services/api/quickLoginService'
 import { isMockMode } from '@/services/dataSource'
@@ -53,8 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then((u) => {
         if (!cancelled) setUser(u)
       })
-      .catch(() => {
-        // Token no longer valid — start clean.
+      .catch((err) => {
+        // Hanya 401 yang berarti sesinya berakhir. Galat lain (jaringan putus,
+        // backend sedang dideploy ulang, permintaan yang terpotong karena
+        // halaman dimuat ulang beruntun) tidak mengatakan apa pun tentang
+        // tokennya; menghapus sesi di sana mengeluarkan pengguna setiap kali
+        // sinyalnya goyah. Profil tersimpan tetap dipakai, dan permintaan
+        // berikutnya yang dijawab 401 akan mengeluarkannya lewat apiClient.
+        if (!(err instanceof ApiError) || err.status !== 401) return
         clearSession()
         setCurrentUser(null)
         if (!cancelled) setUser(null)

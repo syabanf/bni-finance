@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,5 +45,19 @@ func TestStatusOfSepakatDenganFail(t *testing.T) {
 func TestStatusOfNilAdalah200(t *testing.T) {
 	if got := StatusOf(nil); got != http.StatusOK {
 		t.Errorf("StatusOf(nil) = %d, mau 200", got)
+	}
+}
+
+// Permintaan yang dibatalkan klien bukan kesalahan server: 499, dan Fail
+// tidak menulis body galat.
+func TestStatusOfKlienMembatalkan(t *testing.T) {
+	err := fmt.Errorf("scan invoice: %w", context.Canceled)
+	if got := StatusOf(err); got != StatusClientClosed {
+		t.Fatalf("StatusOf = %d, mau %d", got, StatusClientClosed)
+	}
+	rec := httptest.NewRecorder()
+	Fail(rec, err)
+	if rec.Code != StatusClientClosed || rec.Body.Len() != 0 {
+		t.Errorf("Fail: status %d body %q", rec.Code, rec.Body.String())
 	}
 }
