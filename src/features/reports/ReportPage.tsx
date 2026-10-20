@@ -26,6 +26,7 @@ import { downloadXlsxSheets } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
 import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
+import { KonfirmasiPembayaranCard } from './components/KonfirmasiPembayaranCard'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 
 type Preset = 'this-month' | 'last-month' | 'this-year' | 'all' | 'custom'
@@ -487,6 +488,8 @@ export function ReportPage() {
           />
         </div>
       )}
+
+      <KonfirmasiPembayaranCard />
 
       {/* Monthly trend */}
       <Card className="mt-5">

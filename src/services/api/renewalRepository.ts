@@ -11,10 +11,17 @@ import type { RenewalRequest } from '@/types'
  */
 export const apiRenewalRepository: RenewalRepository = {
   async list(params) {
-    const res = await api.get<ListResponse<RenewalRequest>>(
-      `/renewal-requests${query({ answer: params?.answer, period: params?.period, limit: 200 })}`,
-    )
-    return res.data
+    // Server membatasi 200 baris per halaman. Satu periode nasional bisa
+    // melebihinya, jadi halamannya dibaca sampai habis; daftar yang terpotong
+    // diam-diam membuat member hilang dari laporan dan dari daftar tugas MC.
+    const semua: RenewalRequest[] = []
+    for (;;) {
+      const res = await api.get<ListResponse<RenewalRequest>>(
+        `/renewal-requests${query({ answer: params?.answer, period: params?.period, limit: 200, offset: semua.length })}`,
+      )
+      semua.push(...res.data)
+      if (res.data.length === 0 || semua.length >= res.meta.total) return semua
+    }
   },
 
   async request(memberIds, period, assignedMc) {
