@@ -275,8 +275,11 @@ func TestLiveSQLPaths(t *testing.T) {
 	if sum.Total.Count != 1 || sum.Total.Amount != 1_500_000 {
 		t.Errorf("bucket total salah: %+v", sum.Total)
 	}
-	if sum.RenewalDue.Count != 1 {
-		t.Errorf("renewalDue harusnya 1, dapat %d", sum.RenewalDue.Count)
+	// Satu-satunya member yang tadi jatuh tempo dalam 14 hari sudah melunasi
+	// renewal berperiode sampai 2027-08-01. Pelunasan memajukan renewal_date,
+	// jadi ia tidak lagi jatuh tempo dalam jendela 30 hari.
+	if sum.RenewalDue.Count != 0 {
+		t.Errorf("renewalDue harusnya 0 setelah renewal lunas, dapat %d", sum.RenewalDue.Count)
 	}
 	if len(sum.ChapterStats) != 1 || sum.ChapterStats[0].TotalAmount != 1_500_000 {
 		t.Errorf("statistik chapter salah: %+v", sum.ChapterStats)
