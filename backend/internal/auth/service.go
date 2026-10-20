@@ -22,10 +22,9 @@ type Store interface {
 	List(ctx context.Context) ([]domain.User, error)
 	Create(ctx context.Context, email, passwordHash, name string, role domain.UserRole, chapterID *string) (*domain.User, error)
 	UpdateName(ctx context.Context, id, name string) (*domain.User, error)
-	UpdateRole(ctx context.Context, id string, role domain.UserRole) (*domain.User, error)
 	// Guarded: pemeriksaan admin-terakhir dan penulisannya terjadi dalam satu
 	// transaksi. Memisahkannya adalah balapan yang pernah menyisakan nol admin.
-	UpdateRoleGuarded(ctx context.Context, id string, role domain.UserRole) (*domain.User, error)
+	UpdateRoleGuarded(ctx context.Context, id string, role domain.UserRole, chapterID *string) (*domain.User, error)
 	DeleteGuarded(ctx context.Context, id string) error
 	UpdatePasswordHash(ctx context.Context, id, hash string) error
 	Delete(ctx context.Context, id string) error
@@ -300,7 +299,7 @@ func (s *Service) Create(ctx context.Context, in domain.CreateUserInput) (*domai
 	if err != nil {
 		return nil, err
 	}
-	user, err := s.repo.Create(ctx, in.Email, hash, strings.TrimSpace(in.Name), role, in.ChapterID)
+	user, err := s.repo.Create(ctx, in.Email, hash, strings.TrimSpace(in.Name), role, domain.RapikanChapter(in.ChapterID))
 	if err != nil {
 		return nil, err
 	}
@@ -308,11 +307,19 @@ func (s *Service) Create(ctx context.Context, in domain.CreateUserInput) (*domai
 	return &out, nil
 }
 
-func (s *Service) SetRole(ctx context.Context, id string, role domain.UserRole) (*domain.AuthUser, error) {
+// SetRole menyimpan peran dan lingkup chapter pengguna sekaligus.
+//
+// Perubahan berlaku pada login berikutnya: lingkup dibawa di dalam token, dan
+// token yang sudah terbit tetap memuat lingkup lamanya sampai kedaluwarsa.
+func (s *Service) SetRole(ctx context.Context, id string, role domain.UserRole, chapterID *string) (*domain.AuthUser, error) {
 	if !role.Valid() {
-		return nil, httpx.BadRequest("role harus 'admin' atau 'user'")
+		return nil, httpx.BadRequest("role harus 'admin', 'st', 'mc', atau 'user'")
 	}
-	user, err := s.repo.UpdateRoleGuarded(ctx, id, role)
+	chapterID = domain.RapikanChapter(chapterID)
+	if err := (domain.User{Role: role, ChapterID: chapterID}).ValidateScope(); err != nil {
+		return nil, httpx.BadRequest(err.Error())
+	}
+	user, err := s.repo.UpdateRoleGuarded(ctx, id, role, chapterID)
 	if err != nil {
 		return nil, lastAdminAsConflict(err)
 	}

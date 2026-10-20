@@ -11,11 +11,11 @@ type UserRole string
 const (
 	RoleAdmin UserRole = "admin"
 	RoleUser  UserRole = "user"
-	// RoleST — Secretary/Treasurer sebuah chapter. Menulis, tapi hanya di
-	// chapternya sendiri.
+	// RoleST: Secretary/Treasurer. Menulis invoice dan pembayaran, nasional
+	// atau di satu chapter, mengikuti ChapterID.
 	RoleST UserRole = "st"
-	// RoleMC — Membership Committee sebuah chapter. Membaca, dan menjawab
-	// permintaan konfirmasi renewal.
+	// RoleMC: Membership Committee. Membaca, dan menjawab permintaan
+	// konfirmasi renewal, nasional atau di satu chapter.
 	RoleMC UserRole = "mc"
 )
 
@@ -33,15 +33,18 @@ func (r UserRole) Valid() bool {
 //	kemampuan — boleh menulis, atau hanya membaca
 //	lingkup   — melihat seluruh chapter, atau hanya satu
 //
-// Peran `user` misalnya punya jangkauan nasional tapi tidak boleh menulis,
-// sedangkan `st` boleh menulis tapi hanya di satu chapter. Satu pemeriksaan
-// gabungan tidak bisa menyatakan keduanya tanpa salah pada salah satu.
+// Peran menentukan kemampuan; ChapterID menentukan lingkup. Keduanya diatur
+// terpisah: ST, MC, dan User masing-masing bisa nasional atau satu chapter.
+// Hanya admin yang selalu nasional, karena rute khusus admin (pengaturan,
+// pengguna, sinkron, impor) bekerja lintas chapter.
 
 // CanWrite melaporkan peran ini boleh mengubah data.
 func (r UserRole) CanWrite() bool { return r == RoleAdmin || r == RoleST }
 
-// ChapterScoped melaporkan peran ini terikat pada satu chapter saja.
-func (r UserRole) ChapterScoped() bool { return r == RoleST || r == RoleMC }
+// BolehBerlingkupChapter melaporkan peran ini boleh dibatasi ke satu chapter.
+// Admin tidak: rute khusus admin bekerja lintas chapter dan tidak membaca
+// lingkup, jadi admin berchapter adalah lingkup yang tidak ditegakkan.
+func (r UserRole) BolehBerlingkupChapter() bool { return r != RoleAdmin }
 
 // User mirrors the `users` table. PasswordHash is never serialised — it has no
 // JSON tag pair that would let it escape.
@@ -50,8 +53,8 @@ type User struct {
 	Email string   `json:"email"`
 	Name  string   `json:"name"`
 	Role  UserRole `json:"role"`
-	// ChapterID mengikat pengguna ke satu chapter. Null berarti nasional —
-	// itulah yang dipakai admin dan user.
+	// ChapterID mengikat pengguna ke satu chapter. Null berarti nasional;
+	// admin selalu null.
 	ChapterID *string   `json:"chapterId"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -59,25 +62,30 @@ type User struct {
 	PasswordHash string `json:"-"`
 }
 
-// Validate menolak kombinasi peran dan lingkup yang tidak masuk akal.
+// ValidateScope menolak admin yang berchapter.
 //
-// Keduanya diperiksa bersama karena kesalahannya berlawanan arah, dan keduanya
-// berbahaya dengan cara yang berbeda:
-//
-//	ST/MC tanpa chapter   -> lingkupnya kosong; kalau kode di hilir membaca ini
-//	                         sebagai "tanpa batas", ia melihat SELURUH chapter
-//	admin dengan chapter  -> lingkup yang menyesatkan pada peran yang memang
-//	                         nasional
+// Peran lain bebas: tanpa chapter berarti nasional, dengan chapter berarti
+// hanya chapter itu. Admin ditolak karena rute khusus admin tidak membaca
+// lingkup; chapter pada admin akan tampil di layar tanpa membatasi apa pun.
 func (u User) ValidateScope() error {
-	scoped := u.Role.ChapterScoped()
-	punya := u.ChapterID != nil && strings.TrimSpace(*u.ChapterID) != ""
-	switch {
-	case scoped && !punya:
-		return fmt.Errorf("peran %s wajib punya chapterId", u.Role)
-	case !scoped && punya:
-		return fmt.Errorf("peran %s tidak boleh punya chapterId", u.Role)
+	if !u.Role.BolehBerlingkupChapter() && u.ChapterID != nil && strings.TrimSpace(*u.ChapterID) != "" {
+		return fmt.Errorf("peran %s selalu nasional; kosongkan chapterId", u.Role)
 	}
 	return nil
+}
+
+// RapikanChapter mengubah chapterId kosong atau berisi spasi menjadi nil.
+// Nilai kosong berarti nasional, dan menyimpannya sebagai "" akan ditolak
+// foreign key sebagai chapter yang tidak ada.
+func RapikanChapter(id *string) *string {
+	if id == nil {
+		return nil
+	}
+	v := strings.TrimSpace(*id)
+	if v == "" {
+		return nil
+	}
+	return &v
 }
 
 // AuthUser is the shape the frontend's AuthUser type expects.
@@ -100,7 +108,7 @@ func (u User) AsAuthUser() AuthUser {
 // Role dan ChapterID sendiri-sendiri — supaya penambahan peran berlingkup
 // berikutnya tidak perlu menyentuh setiap query.
 func (u AuthUser) ChapterScope() (string, bool) {
-	if !u.Role.ChapterScoped() || u.ChapterID == nil {
+	if !u.Role.BolehBerlingkupChapter() || u.ChapterID == nil {
 		return "", false
 	}
 	id := strings.TrimSpace(*u.ChapterID)

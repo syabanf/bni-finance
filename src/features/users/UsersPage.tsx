@@ -1,5 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react'
-import { ShieldCheck, Trash2, UserPlus } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Pencil, ShieldCheck, Trash2, UserPlus } from 'lucide-react'
 import type { ManagedUser, UserRole } from '@/types'
 import {
   Badge,
@@ -28,24 +28,23 @@ import { chapterService, userService } from '@/services'
 import { ROLE_LABEL } from '@/lib/rbac'
 
 /**
- * Pengelolaan akun — satu-satunya cara membuat peran ST dan MC dari aplikasi.
+ * Pengelolaan akun: peran menentukan APA yang boleh dilakukan, lingkup
+ * menentukan DI MANA.
  *
- * Halaman ini ada karena tanpanya alur berlingkup chapter tidak bisa dipakai
- * siapa pun: backend sudah membatasi ST ke chapternya dan sudah menolak ST
- * tanpa chapter, tapi akun yang memakai aturan itu hanya bisa dibuat lewat
- * curl.
+ * ST, MC, dan User masing-masing bisa Nasional (seluruh chapter) atau satu
+ * chapter. Admin selalu nasional, karena rute khusus admin (pengaturan,
+ * pengguna, sinkron, impor) bekerja lintas chapter. Lingkup ditegakkan server
+ * pada setiap query; perubahan berlaku pada login berikutnya.
  */
 
-const PERAN: { value: UserRole; deskripsi: string; berlingkup: boolean }[] = [
-  { value: 'admin', deskripsi: 'Akses penuh, seluruh chapter', berlingkup: false },
-  { value: 'st', deskripsi: 'Kelola invoice & pembayaran, HANYA chapternya', berlingkup: true },
-  { value: 'mc', deskripsi: 'Lihat & jawab konfirmasi renewal, HANYA chapternya', berlingkup: true },
-  { value: 'user', deskripsi: 'Hanya melihat & mengekspor, seluruh chapter', berlingkup: false },
+const PERAN: { value: UserRole; deskripsi: string }[] = [
+  { value: 'admin', deskripsi: 'Akses penuh, selalu nasional' },
+  { value: 'st', deskripsi: 'Kelola invoice & pembayaran' },
+  { value: 'mc', deskripsi: 'Lihat & jawab konfirmasi renewal' },
+  { value: 'user', deskripsi: 'Hanya melihat & mengekspor' },
 ]
 
-function berlingkupChapter(role: UserRole) {
-  return role === 'st' || role === 'mc'
-}
+const bolehBerchapter = (role: UserRole) => role !== 'admin'
 
 const WARNA_PERAN: Record<UserRole, 'red' | 'amber' | 'green' | 'gray'> = {
   admin: 'red',
@@ -59,12 +58,18 @@ export function UsersPage() {
   const users = useAsync(() => userService.list(), [])
   const chapters = useAsync(() => chapterService.list(), [])
   const [bukaForm, setBukaForm] = useState(false)
+  const [diubah, setDiubah] = useState<ManagedUser | null>(null)
 
   const namaChapter = useMemo(() => {
     const map = new Map<string, string>()
     for (const c of chapters.data ?? []) map.set(c.id, c.displayName)
     return map
   }, [chapters.data])
+
+  const daftarChapter = useMemo(
+    () => (chapters.data ?? []).map((c) => ({ id: c.id, nama: c.displayName })),
+    [chapters.data],
+  )
 
   const hapus = async (u: ManagedUser) => {
     // Konfirmasi dulu: menghapus akun tidak bisa dibatalkan, dan orang yang
@@ -83,7 +88,7 @@ export function UsersPage() {
     <div>
       <PageHeader
         title="Pengguna"
-        description="Kelola akun dan perannya. ST dan MC terikat pada satu chapter."
+        description="Kelola akun, perannya, dan lingkupnya: nasional atau satu chapter."
         action={
           <Button onClick={() => setBukaForm(true)}>
             <UserPlus className="h-4 w-4" />
@@ -111,7 +116,7 @@ export function UsersPage() {
                   <Th>Nama</Th>
                   <Th>Email</Th>
                   <Th>Peran</Th>
-                  <Th>Chapter</Th>
+                  <Th>Lingkup</Th>
                   <Th className="text-right">Aksi</Th>
                 </Tr>
               </THead>
@@ -128,19 +133,27 @@ export function UsersPage() {
                         namaChapter.get(u.chapterId) ?? u.chapterId
                       ) : (
                         // Bukan sel kosong: kosong terbaca sebagai data yang
-                        // hilang, padahal "nasional" adalah keadaan yang benar
-                        // untuk admin dan user.
+                        // hilang, padahal "nasional" adalah keadaan yang sah.
                         <span className="text-ink-400">Nasional</span>
                       )}
                     </Td>
                     <Td className="text-right">
-                      <button
-                        onClick={() => hapus(u)}
-                        className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Hapus
-                      </button>
+                      <div className="inline-flex items-center gap-3">
+                        <button
+                          onClick={() => setDiubah(u)}
+                          className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Ubah Peran
+                        </button>
+                        <button
+                          onClick={() => hapus(u)}
+                          className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Hapus
+                        </button>
+                      </div>
                     </Td>
                   </Tr>
                 ))}
@@ -152,10 +165,20 @@ export function UsersPage() {
 
       <FormTambah
         open={bukaForm}
-        chapters={(chapters.data ?? []).map((c) => ({ id: c.id, nama: c.displayName }))}
+        chapters={daftarChapter}
         onClose={() => setBukaForm(false)}
         onSaved={() => {
           setBukaForm(false)
+          users.reload()
+        }}
+      />
+
+      <FormUbahPeran
+        user={diubah}
+        chapters={daftarChapter}
+        onClose={() => setDiubah(null)}
+        onSaved={() => {
+          setDiubah(null)
           users.reload()
         }}
       />
@@ -182,17 +205,8 @@ function FormTambah({
   const [chapterId, setChapterId] = useState('')
   const [menyimpan, setMenyimpan] = useState(false)
 
-  const perluChapter = berlingkupChapter(role)
-
   const simpan = async (e: FormEvent) => {
     e.preventDefault()
-    // Diperiksa di sini juga, meski backend menolaknya: pesan yang muncul
-    // sebelum permintaan dikirim jauh lebih jelas daripada 400 yang datang
-    // beberapa detik kemudian.
-    if (perluChapter && !chapterId) {
-      toast(`Peran ${ROLE_LABEL[role]} wajib punya chapter.`, 'error')
-      return
-    }
     setMenyimpan(true)
     try {
       await userService.create({
@@ -200,7 +214,7 @@ function FormTambah({
         name: nama.trim(),
         password: sandi,
         role,
-        chapterId: perluChapter ? chapterId : null,
+        chapterId: bolehBerchapter(role) ? chapterId || null : null,
       })
       toast(`Akun ${email.trim()} dibuat.`)
       setEmail('')
@@ -240,48 +254,146 @@ function FormTambah({
           />
         </Field>
 
-        <Field label="Peran">
-          <Select
-            value={role}
-            onChange={(e) => {
-              const baru = e.target.value as UserRole
-              setRole(baru)
-              // Chapter dikosongkan saat berpindah ke peran nasional. Kalau
-              // dibiarkan, nilai lamanya ikut terkirim dan backend menolaknya
-              // dengan "peran admin tidak boleh punya chapterId" — pesan yang
-              // membingungkan karena kolomnya bahkan tidak terlihat lagi.
-              if (!berlingkupChapter(baru)) setChapterId('')
-            }}
-          >
-            {PERAN.map((p) => (
-              <option key={p.value} value={p.value}>
-                {ROLE_LABEL[p.value]} — {p.deskripsi}
-              </option>
-            ))}
-          </Select>
-        </Field>
-
-        {perluChapter && (
-          <Field label="Chapter" hint={`${ROLE_LABEL[role]} hanya melihat dan mengelola chapter ini.`}>
-            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} required>
-              <option value="">Pilih chapter…</option>
-              {chapters.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nama}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        )}
+        <PilihPeranLingkup
+          role={role}
+          chapterId={chapterId}
+          chapters={chapters}
+          onRole={setRole}
+          onChapter={setChapterId}
+        />
 
         <div className="flex items-start gap-2 rounded-lg bg-ink-50 p-3 text-xs text-ink-600">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
           <span>
-            Batas chapter ditegakkan di server, pada setiap query — bukan hanya dengan
-            menyembunyikan tombol. ST chapter lain tidak akan melihat data chapter ini sama sekali.
+            Batas chapter ditegakkan di server pada setiap query, bukan hanya dengan
+            menyembunyikan tombol. Akun berchapter tidak melihat data chapter lain sama sekali.
           </span>
         </div>
 
+        <div className="flex justify-end gap-2 pt-1">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Batal
+          </Button>
+          <Button type="submit" loading={menyimpan}>
+            Simpan
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+/**
+ * Peran dan lingkup, dipakai formulir tambah dan ubah. Lingkup hanya muncul
+ * untuk peran yang boleh berchapter, dan dikosongkan saat berpindah ke admin:
+ * nilai lama yang tersembunyi tetap terkirim dan ditolak server.
+ */
+function PilihPeranLingkup({
+  role,
+  chapterId,
+  chapters,
+  onRole,
+  onChapter,
+}: {
+  role: UserRole
+  chapterId: string
+  chapters: { id: string; nama: string }[]
+  onRole: (r: UserRole) => void
+  onChapter: (id: string) => void
+}) {
+  return (
+    <>
+      <Field label="Peran">
+        <Select
+          value={role}
+          onChange={(e) => {
+            const baru = e.target.value as UserRole
+            onRole(baru)
+            if (!bolehBerchapter(baru)) onChapter('')
+          }}
+        >
+          {PERAN.map((p) => (
+            <option key={p.value} value={p.value}>
+              {ROLE_LABEL[p.value]}: {p.deskripsi}
+            </option>
+          ))}
+        </Select>
+      </Field>
+
+      {bolehBerchapter(role) && (
+        <Field
+          label="Lingkup"
+          hint={
+            chapterId
+              ? `${ROLE_LABEL[role]} hanya melihat dan mengelola chapter ini.`
+              : `${ROLE_LABEL[role]} melihat dan mengelola seluruh chapter.`
+          }
+        >
+          <Select value={chapterId} onChange={(e) => onChapter(e.target.value)}>
+            <option value="">Nasional (seluruh chapter)</option>
+            {chapters.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nama}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+    </>
+  )
+}
+
+function FormUbahPeran({
+  user,
+  chapters,
+  onClose,
+  onSaved,
+}: {
+  user: ManagedUser | null
+  chapters: { id: string; nama: string }[]
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const { toast } = useToast()
+  const [role, setRole] = useState<UserRole>('user')
+  const [chapterId, setChapterId] = useState('')
+  const [menyimpan, setMenyimpan] = useState(false)
+
+  // Diisi ulang dari akun yang dipilih setiap kali formulir dibuka.
+  useEffect(() => {
+    if (!user) return
+    setRole(user.role)
+    setChapterId(user.chapterId ?? '')
+  }, [user])
+
+  const simpan = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    setMenyimpan(true)
+    try {
+      await userService.changeRole(user.id, role, bolehBerchapter(role) ? chapterId || null : null)
+      toast(`Peran ${user.email} diperbarui. Berlaku saat ia masuk lagi.`)
+      onSaved()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengubah peran.', 'error')
+    } finally {
+      setMenyimpan(false)
+    }
+  }
+
+  return (
+    <Modal open={!!user} onClose={onClose} title={user ? `Ubah Peran: ${user.name}` : 'Ubah Peran'}>
+      <form onSubmit={simpan} className="space-y-4">
+        <PilihPeranLingkup
+          role={role}
+          chapterId={chapterId}
+          chapters={chapters}
+          onRole={setRole}
+          onChapter={setChapterId}
+        />
+        <p className="text-xs leading-relaxed text-ink-500">
+          Peran dan lingkup dibawa di dalam sesi, jadi perubahan berlaku saat pengguna ini masuk lagi.
+        </p>
         <div className="flex justify-end gap-2 pt-1">
           <Button type="button" variant="outline" onClick={onClose}>
             Batal

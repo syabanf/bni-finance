@@ -431,8 +431,8 @@
       "method": "PATCH",
       "path": "/api/v1/users/{id}/role",
       "tag": "Auth",
-      "summary": "Ubah peran pengguna",
-      "description": "**Admin saja.** Menurunkan admin **terakhir** ditolak dengan 409 —\nitu keadaan yang tidak bisa dipulihkan lewat API.\n",
+      "summary": "Ubah peran dan lingkup pengguna",
+      "description": "**Admin saja.** Peran dan lingkup disimpan bersama. `chapterId` null\natau kosong berarti nasional; ST, MC, dan User boleh nasional atau satu\nchapter, admin selalu nasional (admin dengan `chapterId` ditolak 400).\nPerubahan lingkup berlaku pada login berikutnya, karena lingkup dibawa\ndi dalam token. Menurunkan admin **terakhir** ditolak dengan 409.\n",
       "params": [
         {
           "name": "id",
@@ -456,6 +456,14 @@
             "user"
           ],
           "description": "",
+          "complex": false
+        },
+        {
+          "name": "chapterId",
+          "label": "Lingkup chapter",
+          "type": "string",
+          "required": false,
+          "description": "Kosong atau null = nasional.",
           "complex": false
         }
       ],

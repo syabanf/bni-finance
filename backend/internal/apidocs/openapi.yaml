@@ -420,10 +420,13 @@ paths:
   /api/v1/users/{id}/role:
     patch:
       tags: [Auth]
-      summary: Ubah peran pengguna
+      summary: Ubah peran dan lingkup pengguna
       description: |
-        **Admin saja.** Menurunkan admin **terakhir** ditolak dengan 409 —
-        itu keadaan yang tidak bisa dipulihkan lewat API.
+        **Admin saja.** Peran dan lingkup disimpan bersama. `chapterId` null
+        atau kosong berarti nasional; ST, MC, dan User boleh nasional atau satu
+        chapter, admin selalu nasional (admin dengan `chapterId` ditolak 400).
+        Perubahan lingkup berlaku pada login berikutnya, karena lingkup dibawa
+        di dalam token. Menurunkan admin **terakhir** ditolak dengan 409.
       parameters:
         - $ref: "#/components/parameters/UserId"
       requestBody:
@@ -435,6 +438,11 @@ paths:
               required: [role]
               properties:
                 role: { title: Peran, $ref: "#/components/schemas/UserRole" }
+                chapterId:
+                  title: Lingkup chapter
+                  type: string
+                  nullable: true
+                  description: Kosong atau null = nasional.
       responses:
         "200":
           description: Pengguna setelah diubah

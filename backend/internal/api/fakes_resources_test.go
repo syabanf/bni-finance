@@ -470,18 +470,6 @@ func (s *fakeUserStore) UpdateName(_ context.Context, id, name string) (*domain.
 	return &u, nil
 }
 
-func (s *fakeUserStore) UpdateRole(_ context.Context, id string, role domain.UserRole) (*domain.User, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	u, ok := s.items[id]
-	if !ok {
-		return nil, httpx.ErrNotFound
-	}
-	u.Role = role
-	s.items[id] = u
-	return &u, nil
-}
-
 func (s *fakeUserStore) UpdatePasswordHash(_ context.Context, id, hash string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -520,7 +508,7 @@ func (s *fakeUserStore) CountAdmins(context.Context) (int, error) {
 // admin-terakhir dan penulisannya terjadi di bawah SATU lock, tidak terpisah.
 // Kalau fake memisahkannya, tes in-memory akan menguji perilaku yang berbeda
 // dari produksi — persis celah yang membuat balapan ini lolos selama ini.
-func (s *fakeUserStore) UpdateRoleGuarded(_ context.Context, id string, role domain.UserRole) (*domain.User, error) {
+func (s *fakeUserStore) UpdateRoleGuarded(_ context.Context, id string, role domain.UserRole, chapterID *string) (*domain.User, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	u, ok := s.items[id]
@@ -531,6 +519,7 @@ func (s *fakeUserStore) UpdateRoleGuarded(_ context.Context, id string, role dom
 		return nil, auth.ErrLastAdmin
 	}
 	u.Role = role
+	u.ChapterID = chapterID
 	s.items[id] = u
 	out := u
 	return &out, nil
