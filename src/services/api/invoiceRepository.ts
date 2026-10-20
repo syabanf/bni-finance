@@ -1,4 +1,4 @@
-import { ApiError, api, query, type ListResponse } from '@/lib/apiClient'
+import { ApiError, api, fileUrl, query, type ListResponse } from '@/lib/apiClient'
 import { todayISO } from '@/lib/date'
 import type { CreateInvoiceInput, InvoiceRepository, ManualPaymentInput } from '@/services/types'
 import type {
@@ -91,6 +91,9 @@ function attach(
 ): InvoiceWithRelations {
   return {
     ...invoice,
+    // Path /uploads/... milik backend; diberi alamatnya supaya tautan faktur
+    // tetap benar saat backend berada di origin lain (sama seperti bukti bayar).
+    taxInvoiceUrl: fileUrl(invoice.taxInvoiceUrl),
     member: members.get(invoice.memberId) ?? null,
     chapter: chapters.get(invoice.chapterId) ?? null,
   }
@@ -344,7 +347,8 @@ export const apiInvoiceRepository: InvoiceRepository = {
     // Dua langkah: berkasnya disimpan dulu, lalu path-nya ditempel ke invoice.
     // Server menolak path yang bukan hasil /uploads dan invoice yang belum lunas.
     const { url } = await api.upload('/uploads', file)
-    return api.put<Invoice>(`/invoices/${encodeURIComponent(id)}/tax-invoice`, { url })
+    const inv = await api.put<Invoice>(`/invoices/${encodeURIComponent(id)}/tax-invoice`, { url })
+    return { ...inv, taxInvoiceUrl: fileUrl(inv.taxInvoiceUrl) }
   },
 
   async getAuditLog(invoiceId) {
