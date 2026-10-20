@@ -90,11 +90,6 @@ func (r *Repository) UpdateName(ctx context.Context, id, name string) (*domain.U
 		"UPDATE users SET name = $2, updated_at = now() WHERE id = $1 RETURNING "+columns, id, name))
 }
 
-func (r *Repository) UpdateRole(ctx context.Context, id string, role domain.UserRole) (*domain.User, error) {
-	return scan(r.db.QueryRow(ctx,
-		"UPDATE users SET role = $2, updated_at = now() WHERE id = $1 RETURNING "+columns, id, role))
-}
-
 // lockAdmins mengunci SELURUH baris admin dan mengembalikan jumlahnya.
 //
 // Menghitung admin lalu menurunkan peran lewat dua pernyataan terpisah adalah
@@ -124,7 +119,7 @@ var ErrLastAdmin = errors.New("admin terakhir tidak boleh diturunkan atau dihapu
 
 // UpdateRoleGuarded menurunkan peran dengan penjaga admin terakhir DI DALAM
 // transaksi yang sama, sehingga pemeriksaan dan penulisannya tak terpisahkan.
-func (r *Repository) UpdateRoleGuarded(ctx context.Context, id string, role domain.UserRole) (*domain.User, error) {
+func (r *Repository) UpdateRoleGuarded(ctx context.Context, id string, role domain.UserRole, chapterID *string) (*domain.User, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("mulai transaksi: %w", err)
@@ -146,8 +141,12 @@ func (r *Repository) UpdateRoleGuarded(ctx context.Context, id string, role doma
 	}
 
 	user, err := scan(tx.QueryRow(ctx,
-		"UPDATE users SET role = $2, updated_at = now() WHERE id = $1 RETURNING "+columns, id, role))
+		"UPDATE users SET role = $2, chapter_id = $3, updated_at = now() WHERE id = $1 RETURNING "+columns,
+		id, role, chapterID))
 	if err != nil {
+		if strings.Contains(err.Error(), "23503") {
+			return nil, httpx.BadRequest("chapterId tidak ditemukan")
+		}
 		return nil, err
 	}
 	return user, tx.Commit(ctx)

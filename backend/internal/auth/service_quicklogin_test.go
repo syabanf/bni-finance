@@ -39,11 +39,8 @@ func (f *fakeUsers) Create(context.Context, string, string, string, domain.UserR
 func (f *fakeUsers) UpdateName(context.Context, string, string) (*domain.User, error) {
 	return nil, nil
 }
-func (f *fakeUsers) UpdateRole(context.Context, string, domain.UserRole) (*domain.User, error) {
-	return nil, nil
-}
 func (f *fakeUsers) UpdatePasswordHash(context.Context, string, string) error { return nil }
-func (f *fakeUsers) UpdateRoleGuarded(context.Context, string, domain.UserRole) (*domain.User, error) {
+func (f *fakeUsers) UpdateRoleGuarded(context.Context, string, domain.UserRole, *string) (*domain.User, error) {
 	return nil, nil
 }
 func (f *fakeUsers) DeleteGuarded(context.Context, string) error { return nil }

@@ -364,3 +364,40 @@ func TestFakturPajakMenolakTautanLuar(t *testing.T) {
 		}
 	}
 }
+
+// Peran dan lingkup diubah bersama lewat PATCH /users/{id}/role. ST bisa
+// dijadikan nasional (chapterId null) atau satu chapter; admin berchapter
+// ditolak karena rute khusus admin tidak membaca lingkup.
+func TestUbahPeranMenyimpanLingkup(t *testing.T) {
+	s := newFullServer(t)
+	code, raw := s.do(t, http.MethodPost, "/api/v1/users",
+		`{"email":"st@contoh.invalid","password":"rahasia","name":"ST Uji","role":"st","chapterId":"ch-a"}`)
+	if code != http.StatusCreated {
+		t.Fatalf("buat pengguna: %d %s", code, raw)
+	}
+	var u domain.AuthUser
+	if err := json.Unmarshal(raw, &u); err != nil {
+		t.Fatal(err)
+	}
+
+	ubah := func(body string) (int, domain.AuthUser) {
+		t.Helper()
+		code, raw := s.do(t, http.MethodPatch, "/api/v1/users/"+u.ID+"/role", body)
+		var out domain.AuthUser
+		_ = json.Unmarshal(raw, &out)
+		return code, out
+	}
+
+	if code, out := ubah(`{"role":"st","chapterId":null}`); code != http.StatusOK || out.ChapterID != nil {
+		t.Errorf("ST nasional: status %d, chapter %v", code, out.ChapterID)
+	}
+	if code, out := ubah(`{"role":"user","chapterId":"ch-b"}`); code != http.StatusOK || out.ChapterID == nil || *out.ChapterID != "ch-b" {
+		t.Errorf("User berchapter: status %d, chapter %v", code, out.ChapterID)
+	}
+	if code, _ := ubah(`{"role":"admin","chapterId":"ch-b"}`); code != http.StatusBadRequest {
+		t.Errorf("admin berchapter harus 400, dapat %d", code)
+	}
+	if code, out := ubah(`{"role":"admin","chapterId":""}`); code != http.StatusOK || out.ChapterID != nil {
+		t.Errorf("admin dengan chapter kosong harus nasional: status %d, chapter %v", code, out.ChapterID)
+	}
+}

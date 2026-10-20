@@ -22,9 +22,7 @@ const store: ManagedUser[] = [
 
 /** Aturan yang sama dengan backend; lihat domain.User.ValidateScope. */
 function periksaLingkup(role: UserRole, chapterId: string | null) {
-  const berlingkup = role === 'st' || role === 'mc'
-  if (berlingkup && !chapterId) throw new Error(`Peran ${role} wajib punya chapter.`)
-  if (!berlingkup && chapterId) throw new Error(`Peran ${role} tidak boleh punya chapter.`)
+  if (role === 'admin' && chapterId) throw new Error('Peran admin selalu nasional; kosongkan chapter.')
 }
 
 export const mockUserRepository: UserRepository = {
@@ -42,7 +40,7 @@ export const mockUserRepository: UserRepository = {
       email: input.email.toLowerCase(),
       name: input.name,
       role: input.role,
-      chapterId: input.chapterId,
+      chapterId: input.chapterId || null,
       createdAt: nowISO(),
       updatedAt: nowISO(),
     }
@@ -62,7 +60,7 @@ export const mockUserRepository: UserRepository = {
       throw new Error('Ini admin terakhir — sistem harus selalu punya satu admin.')
     }
     user.role = role
-    user.chapterId = chapterId
+    user.chapterId = chapterId || null
     user.updatedAt = nowISO()
     return delay({ ...user }, 250)
   },

@@ -387,15 +387,12 @@ alter table invoices
 
 
 -- ---------------------------------------------------------------------------
--- Peran berlingkup chapter — ST dan MC
+-- Peran ST dan MC, dan lingkup chapter
 --
--- ST (Secretary/Treasurer) dan MC (Membership Committee) adalah pengurus SATU
--- chapter, bukan nasional. Keduanya login, dan keduanya hanya boleh melihat
--- chapternya sendiri.
---
--- Lingkupnya disimpan di users.chapter_id, dan null berarti nasional — itulah
--- yang dipakai admin dan user. Kolomnya nullable dengan sengaja: memaksanya
--- not null akan menuntut chapter untuk admin, yang tidak punya satu pun.
+-- ST (Secretary/Treasurer) dan MC (Membership Committee) adalah pengurus.
+-- Lingkupnya disimpan di users.chapter_id terpisah dari peran: null berarti
+-- nasional, terisi berarti hanya chapter itu. ST, MC, dan User masing-masing
+-- boleh keduanya; admin selalu nasional (lihat domain.User.ValidateScope).
 --
 -- Perlu diketahui: TIDAK ADA row-level security yang menegakkan lingkup ini.
 -- Backend menyambung sebagai satu peran tepercaya, jadi database melihat satu

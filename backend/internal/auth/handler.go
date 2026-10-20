@@ -285,14 +285,18 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) setRole(w http.ResponseWriter, r *http.Request) {
+	// Peran dan lingkup dikirim bersama dan disimpan bersama: chapterId null
+	// atau kosong berarti nasional. Mengubah salah satunya saja bisa
+	// meninggalkan kombinasi yang tidak pernah diputuskan siapa pun.
 	var in struct {
-		Role domain.UserRole `json:"role"`
+		Role      domain.UserRole `json:"role"`
+		ChapterID *string         `json:"chapterId"`
 	}
 	if err := httpx.Decode(r, &in); err != nil {
 		httpx.Fail(w, err)
 		return
 	}
-	user, err := h.svc.SetRole(r.Context(), r.PathValue("id"), in.Role)
+	user, err := h.svc.SetRole(r.Context(), r.PathValue("id"), in.Role, in.ChapterID)
 	if err != nil {
 		httpx.Fail(w, err)
 		return
