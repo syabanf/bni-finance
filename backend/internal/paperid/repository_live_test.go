@@ -84,7 +84,7 @@ func TestLiveMarkSent(t *testing.T) {
 		InvoicePDFURL:  "https://x/INV.pdf",
 	}
 	due := time.Now().AddDate(0, 0, 30)
-	inv, err := repo.MarkSent(ctx, id, res, due, time.Now(), "Admin")
+	inv, err := repo.MarkSent(ctx, id, res, due, time.Now(), "Admin", "")
 	if err != nil {
 		t.Fatalf("MarkSent: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestLiveMarkSent(t *testing.T) {
 	}
 
 	// Sending again must be refused — it's no longer a draft.
-	if _, err := repo.MarkSent(ctx, id, res, due, time.Now(), "Admin"); err == nil {
+	if _, err := repo.MarkSent(ctx, id, res, due, time.Now(), "Admin", ""); err == nil {
 		t.Error("mengirim invoice yang sudah sent seharusnya gagal")
 	}
 }
@@ -124,7 +124,7 @@ func TestLiveSettleByRefNomorPengingat(t *testing.T) {
 	id := seedDraft(t, pool)
 
 	if _, err := repo.MarkSent(ctx, id, CreateResult{PaperInvoiceID: "pp-uuid-asli"},
-		time.Now().AddDate(0, 0, 30), time.Now(), "Admin"); err != nil {
+		time.Now().AddDate(0, 0, 30), time.Now(), "Admin", ""); err != nil {
 		t.Fatalf("MarkSent: %v", err)
 	}
 
@@ -151,7 +151,7 @@ func TestLiveSettleByRefIdempotent(t *testing.T) {
 
 	// Move it to sent first (as the send path would).
 	if _, err := repo.MarkSent(ctx, id, CreateResult{PaperInvoiceID: "pp-uuid-1"},
-		time.Now().AddDate(0, 0, 30), time.Now(), "Admin"); err != nil {
+		time.Now().AddDate(0, 0, 30), time.Now(), "Admin", ""); err != nil {
 		t.Fatalf("MarkSent: %v", err)
 	}
 
@@ -257,7 +257,7 @@ func TestLiveMarkReminded(t *testing.T) {
 	// Invoice harus sudah terkirim sebelum bisa diingatkan.
 	if _, err := repo.MarkSent(ctx, id, CreateResult{
 		PaperInvoiceID: "pp-1", PaymentURL: "https://bayar/1", InvoicePDFURL: "https://pdf/1",
-	}, time.Now().AddDate(0, 0, 30), time.Now(), "Admin"); err != nil {
+	}, time.Now().AddDate(0, 0, 30), time.Now(), "Admin", ""); err != nil {
 		t.Fatalf("MarkSent: %v", err)
 	}
 
@@ -274,7 +274,7 @@ func TestLiveMarkReminded(t *testing.T) {
 		PaperInvoiceID: "pp-r1", Number: "INV-UJI-R1",
 		PaymentURL: "https://bayar/r1", InvoicePDFURL: "https://pdf/r1",
 	}
-	inv, err := repo.MarkReminded(ctx, id, res, time.Now(), "Admin")
+	inv, err := repo.MarkReminded(ctx, id, res, time.Now(), "Admin", "")
 	if err != nil {
 		t.Fatalf("MarkReminded: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestLiveMarkReminded(t *testing.T) {
 	}
 	inv2, err := repo.MarkReminded(ctx, id, CreateResult{
 		PaperInvoiceID: "pp-r2", Number: "INV-UJI-R2", PaymentURL: "https://bayar/r2",
-	}, time.Now(), "Admin")
+	}, time.Now(), "Admin", "")
 	if err != nil {
 		t.Fatalf("MarkReminded kedua: %v", err)
 	}

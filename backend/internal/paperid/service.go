@@ -23,8 +23,8 @@ const defaultDueDays = 3
 
 type Store interface {
 	GetSendable(ctx context.Context, invoiceID string) (*Sendable, error)
-	MarkSent(ctx context.Context, invoiceID string, res CreateResult, dueDate, sentAt time.Time, actor string) (*domain.Invoice, error)
-	MarkReminded(ctx context.Context, invoiceID string, res CreateResult, at time.Time, actor string) (*domain.Invoice, error)
+	MarkSent(ctx context.Context, invoiceID string, res CreateResult, dueDate, sentAt time.Time, actor, kanal string) (*domain.Invoice, error)
+	MarkReminded(ctx context.Context, invoiceID string, res CreateResult, at time.Time, actor, kanal string) (*domain.Invoice, error)
 	ReserveReminder(ctx context.Context, invoiceID string) (int, error)
 	SettleByRef(ctx context.Context, paperInvoiceID, number, method, status string, amount int64, paidAt time.Time) (bool, error)
 	GetSetting(ctx context.Context, key string) (string, error)
@@ -303,7 +303,8 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 		return nil, gatewayError(fmt.Errorf("Paper.id tidak mengembalikan hasil"))
 	}
 
-	return s.repo.MarkSent(ctx, invoiceID, *res, dueDate, now, "Admin")
+	return s.repo.MarkSent(ctx, invoiceID, *res, dueDate, now, "Admin",
+		kanalKirim(sendEmail, sendWhatsApp, inv.Email, inv.Phone))
 }
 
 func (s *Service) dueDays(ctx context.Context) int {
@@ -660,7 +661,34 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 	if err != nil {
 		return nil, gatewayError(err)
 	}
-	return s.repo.MarkReminded(ctx, invoiceID, *res, now, "sistem")
+	return s.repo.MarkReminded(ctx, invoiceID, *res, now, "sistem",
+		kanalKirim(sendEmail, sendWhatsApp, inv.Email, inv.Phone))
+}
+
+// kanalKirim menyusun keterangan ke mana Paper.id diminta mengirim invoice,
+// untuk dicatat di riwayat.
+//
+// Paper.id tidak melaporkan apakah invoice sudah dibaca: callback-nya hanya
+// soal pembayaran, dan respons pembuatan invoice tidak memuat status kirim per
+// kanal. Yang bisa dipastikan dari sisi kita adalah kanal dan tujuan yang
+// diminta. Mencatatnya membuat "member tidak menerima invoice" bisa ditelusuri:
+// nomor yang salah, atau email yang kosong sehingga kanal itu dilewati.
+func kanalKirim(sendEmail, sendWhatsApp bool, email, phone string) string {
+	var kanal []string
+	if sendWhatsApp {
+		kanal = append(kanal, "WhatsApp "+normalizePhone(phone))
+	}
+	if sendEmail {
+		kanal = append(kanal, "email "+strings.TrimSpace(email))
+	}
+	out := "tanpa notifikasi (email dan WhatsApp dimatikan di pengaturan)"
+	if len(kanal) > 0 {
+		out = "lewat " + strings.Join(kanal, " dan ")
+	}
+	if strings.TrimSpace(email) == "" {
+		out += "; email dilewati karena member belum punya alamat email"
+	}
+	return out
 }
 
 // reminderNumber menurunkan nomor dokumen pengingat dari nomor kanonik.

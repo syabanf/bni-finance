@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -66,7 +67,7 @@ func (r *Repository) GetSendable(ctx context.Context, invoiceID string) (*Sendab
 // never drift apart. It re-checks the transition under the lock: only a draft
 // can be sent.
 func (r *Repository) MarkSent(
-	ctx context.Context, invoiceID string, res CreateResult, dueDate, sentAt time.Time, actor string,
+	ctx context.Context, invoiceID string, res CreateResult, dueDate, sentAt time.Time, actor, kanal string,
 ) (*domain.Invoice, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -109,8 +110,8 @@ func (r *Repository) MarkSent(
 	draft, sent := domain.StatusDraft, domain.StatusSent
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO invoice_audit_log (invoice_id, action, old_status, new_status, actor_name, notes)
-		VALUES ($1, 'sent', $2, $3, $4, 'Dikirim ke Paper.id')`,
-		invoiceID, draft, sent, actor); err != nil {
+		VALUES ($1, 'sent', $2, $3, $4, $5)`,
+		invoiceID, draft, sent, actor, strings.TrimSpace("Dikirim ke Paper.id "+kanal)); err != nil {
 		return nil, fmt.Errorf("catat audit log: %w", err)
 	}
 
@@ -270,7 +271,7 @@ func scanInvoice(row scannable) (*domain.Invoice, error) {
 // Paper.id, tetapi yang harus dibagikan adalah yang paling akhir dikirim ke
 // member, supaya admin dan member melihat halaman yang sama.
 func (r *Repository) MarkReminded(ctx context.Context, invoiceID string,
-	res CreateResult, at time.Time, actor string) (*domain.Invoice, error) {
+	res CreateResult, at time.Time, actor, kanal string) (*domain.Invoice, error) {
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -301,8 +302,8 @@ func (r *Repository) MarkReminded(ctx context.Context, invoiceID string,
 		INSERT INTO invoice_audit_log (invoice_id, action, old_status, new_status, actor_name, notes)
 		VALUES ($1, 'reminded', $2, $2, $3, $4)`,
 		invoiceID, inv.Status, actor,
-		fmt.Sprintf("pengingat ke-%d dikirim ulang ke Paper.id sebagai %s",
-			inv.PaperIDReminderCount, res.Number)); err != nil {
+		strings.TrimSpace(fmt.Sprintf("pengingat ke-%d dikirim ulang ke Paper.id sebagai %s %s",
+			inv.PaperIDReminderCount, res.Number, kanal))); err != nil {
 		return nil, fmt.Errorf("catat audit pengingat: %w", err)
 	}
 
