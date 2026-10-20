@@ -242,24 +242,32 @@ function FormTambah({
   }, [open])
 
   /**
-   * Member aktif yang punya email, dari data BNI Connect (impor atau sinkron),
-   * disaring ke chapter lingkupnya bila dipilih. Memilih satu mengisi nama dan
-   * email; keduanya tetap bisa diubah.
+   * Member aktif dari data BNI Connect (impor atau sinkron), disaring ke
+   * chapter lingkupnya bila dipilih. Memilih satu mengisi nama, dan email bila
+   * ada; keduanya tetap bisa diubah.
+   *
+   * Member tanpa email tetap ditawarkan. Laporan Chapter Roster dan Dues dari
+   * BNI Connect tidak memuat kolom email, jadi member hasil impor memang belum
+   * punya email; menyembunyikan mereka membuat daftar ini kosong untuk
+   * chapter yang datanya baru diimpor.
    */
   const calon = useMemo(
     () =>
       anggota
-        .filter((m) => m.email && (m.status === 'active' || m.status === 'new_member'))
+        .filter((m) => m.status === 'active' || m.status === 'new_member')
         .filter((m) => !chapterId || m.chapterId === chapterId)
         .sort((a, b) => a.name.localeCompare(b.name)),
     [anggota, chapterId],
   )
+
+  const [tanpaEmail, setTanpaEmail] = useState(false)
 
   const pilihMember = (id: string) => {
     const m = calon.find((x) => x.id === id)
     if (!m) return
     setNama(m.name)
     setEmail(m.email ?? '')
+    setTanpaEmail(!m.email)
   }
 
   const salinSandi = async () => {
@@ -296,6 +304,7 @@ function FormTambah({
       toast(pesan)
       setEmail('')
       setNama('')
+      setTanpaEmail(false)
       setKirimReset(false)
       onSaved()
     } catch (err) {
@@ -320,15 +329,15 @@ function FormTambah({
           label="Ambil dari member BNI Connect"
           hint={
             calon.length
-              ? 'Mengisi nama dan email dari member aktif; keduanya tetap bisa diubah.'
-              : 'Belum ada member aktif dengan email di lingkup ini. Isi manual di bawah.'
+              ? 'Mengisi nama, dan email bila tercatat; keduanya tetap bisa diubah.'
+              : 'Belum ada member aktif di lingkup ini. Isi manual di bawah.'
           }
         >
           <Select value="" onChange={(e) => pilihMember(e.target.value)} disabled={calon.length === 0}>
             <option value="">Pilih member…</option>
             {calon.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name} · {m.email}
+                {m.name} · {m.email ?? 'belum ada email'}
                 {chapterId ? '' : ` · ${m.chapter?.displayName ?? m.chapterId}`}
               </option>
             ))}
@@ -338,7 +347,14 @@ function FormTambah({
         <Field label="Nama">
           <Input value={nama} onChange={(e) => setNama(e.target.value)} required placeholder="Nama lengkap" />
         </Field>
-        <Field label="Email">
+        <Field
+          label="Email"
+          hint={
+            tanpaEmail && !email
+              ? 'Member ini belum punya email di sistem (laporan BNI Connect tidak memuatnya). Isi email login-nya di sini.'
+              : undefined
+          }
+        >
           <Input
             type="email"
             value={email}

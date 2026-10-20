@@ -3,6 +3,7 @@
 package httpx
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -97,10 +98,19 @@ func StatusOf(err error) int {
 		return he.Status
 	case errors.Is(err, ErrNotFound), isBadIdentifier(err):
 		return http.StatusNotFound
+	case errors.Is(err, context.Canceled):
+		return StatusClientClosed
 	default:
 		return http.StatusInternalServerError
 	}
 }
+
+// StatusClientClosed (499, konvensi nginx) menandai permintaan yang klien
+// batalkan sebelum selesai: halaman dimuat ulang, tab ditutup, sinyal putus.
+// Itu bukan kesalahan server, jadi tidak dicatat sebagai ERROR; mencatatnya
+// membuat log produksi penuh "kesalahan tak tertangani" setiap kali pengguna
+// berpindah halaman dengan cepat.
+const StatusClientClosed = 499
 
 // Fail maps an error to a status code + JSON body.
 func Fail(w http.ResponseWriter, err error) {
@@ -111,6 +121,9 @@ func Fail(w http.ResponseWriter, err error) {
 		JSON(w, status, errorBody{Error: he.Message})
 	case status == http.StatusNotFound:
 		JSON(w, status, errorBody{Error: ErrNotFound.Error()})
+	case status == StatusClientClosed:
+		// Kliennya sudah pergi; jawaban ini tidak akan dibaca siapa pun.
+		w.WriteHeader(status)
 	default:
 		// The cause never reaches the client, so log it here or it is lost
 		// entirely — a 500 with no trail is close to undebuggable.

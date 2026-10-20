@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, Search, Send, UserRound } from 'lucide-react'
-import type { FeeSettings, InvoiceType, MemberWithChapter, RenewalRequest } from '@/types'
+import type { FeeSettings, Invoice, InvoiceType, MemberWithChapter, RenewalRequest } from '@/types'
 import { bolehDitagih } from '@/lib/status'
 import {
   Avatar,
@@ -22,6 +22,21 @@ import { invoiceService, memberService, renewalService, settingsService } from '
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
+
+/**
+ * Awal periode invoice renewal: melanjutkan invoice terakhir member itu, atau,
+ * bila belum pernah ada invoice (member hasil impor BNI Connect), mulai dari
+ * tanggal jatuh temponya. Hari ini hanya dipakai bila keduanya tidak ada.
+ * Memulai dari hari ini membuat keanggotaan yang jatuh tempo 1 November
+ * tercatat habis lebih awal setelah renewal-nya lunas.
+ */
+function mulaiRenewal(riwayat: Invoice[], renewalDate: string | null | undefined): string {
+  const terakhir = riwayat
+    .filter((inv) => inv.status !== 'cancelled' && inv.status !== 'terminated')
+    .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0]
+  if (terakhir) return addDays(terakhir.periodEnd, 1)
+  return renewalDate ? renewalDate.slice(0, 10) : todayISO()
+}
 
 export function InvoiceNewPage() {
   const navigate = useNavigate()
@@ -93,17 +108,14 @@ export function InvoiceNewPage() {
       setPeriodStart(todayISO())
       return
     }
+    const member = (members ?? []).find((m) => m.id === satu)
     invoiceService.listByMember(satu).then((list) => {
-      if (!active) return
-      const last = list
-        .filter((i) => i.status !== 'cancelled')
-        .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0]
-      setPeriodStart(last ? addDays(last.periodEnd, 1) : todayISO())
+      if (active) setPeriodStart(mulaiRenewal(list, member?.renewalDate))
     })
     return () => {
       active = false
     }
-  }, [type, selectedIds])
+  }, [type, selectedIds, members])
 
   // Hanya chapter yang PUNYA member di daftar ini yang ditawarkan.
   //
@@ -181,14 +193,8 @@ export function InvoiceNewPage() {
       try {
         // Periode dihitung PER MEMBER: renewal melanjutkan periode invoice
         // terakhir orang itu sendiri, bukan tanggal yang sama untuk semua.
-        let mulai = todayISO()
-        if (type === 'renewal') {
-          const riwayat = await invoiceService.listByMember(m.id)
-          const terakhir = riwayat
-            .filter((inv) => inv.status !== 'cancelled' && inv.status !== 'terminated')
-            .sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0]
-          if (terakhir) mulai = addDays(terakhir.periodEnd, 1)
-        }
+        const mulai =
+          type === 'renewal' ? mulaiRenewal(await invoiceService.listByMember(m.id), m.renewalDate) : todayISO()
 
         const inv = await invoiceService.create({
           memberId: m.id,
