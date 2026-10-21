@@ -72,11 +72,16 @@ export function Topbar() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/90 backdrop-blur-md safe-top">
-      <div className="flex h-16 items-center gap-3 px-4 lg:px-6">
-        {/* Mobile brand (sidebar logo is hidden on mobile) */}
-        <Link to="/dashboard" className="flex items-center gap-2.5 lg:hidden">
+      <div className="flex h-16 items-center gap-2 px-4 sm:gap-3 lg:px-6">
+        {/* Mobile brand (sidebar logo is hidden on mobile). Di bawah sm hanya
+            logo: lebar 375px tidak cukup untuk logo, nama, lencana Data Contoh,
+            dan empat tombol sekaligus, dan header yang meluap membuat seluruh
+            halaman bisa digeser ke samping. */}
+        <Link to="/dashboard" aria-label="Finance Hub" className="flex shrink-0 items-center gap-2.5 lg:hidden">
           <BniLogo className="h-7 w-auto" />
-          <span className="border-l border-ink-100 pl-2.5 text-[15px] font-bold text-ink-900">Finance Hub</span>
+          <span className="hidden whitespace-nowrap border-l border-ink-100 pl-2.5 text-[15px] font-bold text-ink-900 sm:inline">
+            Finance Hub
+          </span>
         </Link>
 
         <DemoBadge />
@@ -101,7 +106,7 @@ export function Topbar() {
             const tujuan = TUJUAN.find((t) => t.nilai === entitas) ?? TUJUAN[0]
             navigate(q ? `${tujuan.rute}?q=${encodeURIComponent(q)}` : tujuan.rute)
           }}
-          className="relative ml-auto hidden w-full max-w-sm sm:block"
+          className="relative ml-auto hidden w-full min-w-0 max-w-sm sm:block"
           data-tour="topbar-search"
         >
           <div className="flex h-9 items-center rounded-xl border border-ink-200 bg-ink-50 transition-colors focus-within:border-brand-400 focus-within:bg-white">
@@ -172,16 +177,20 @@ export function Topbar() {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen((o) => !o)}
-            className="flex items-center gap-2.5 rounded-xl py-1.5 pl-2 pr-2.5 transition-colors hover:bg-ink-100"
+            aria-label="Menu akun"
+            aria-expanded={menuOpen}
+            className="flex items-center gap-2.5 rounded-xl p-1 transition-colors hover:bg-ink-100 sm:py-1.5 sm:pl-2 sm:pr-2.5"
           >
-            <div className="hidden text-right leading-tight sm:block">
+            <div className="hidden whitespace-nowrap text-right leading-tight lg:block">
               <div className="text-sm font-semibold text-ink-900">{user?.name ?? 'Admin'}</div>
               <div className="text-xs text-ink-400">
                 {user?.role ? ROLE_LABEL[user.role] : '—'}
               </div>
             </div>
             <Avatar name={user?.name ?? 'Admin'} size="sm" />
-            <ChevronDown className={cn('h-4 w-4 text-ink-400 transition-transform', menuOpen && 'rotate-180')} />
+            <ChevronDown
+              className={cn('hidden h-4 w-4 text-ink-400 transition-transform sm:block', menuOpen && 'rotate-180')}
+            />
           </button>
 
           {menuOpen && (

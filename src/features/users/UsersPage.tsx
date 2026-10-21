@@ -123,7 +123,6 @@ export function UsersPage() {
               <THead>
                 <Tr>
                   <Th>Nama</Th>
-                  <Th>Email</Th>
                   <Th>Peran</Th>
                   <Th>Lingkup</Th>
                   <Th className="text-right">Aksi</Th>
@@ -132,8 +131,10 @@ export function UsersPage() {
               <TBody>
                 {users.data.map((u) => (
                   <Tr key={u.id}>
-                    <Td className="font-medium text-ink-900">{u.name}</Td>
-                    <Td className="text-ink-600">{u.email}</Td>
+                    <Td className="whitespace-nowrap">
+                      <div className="font-medium text-ink-900">{u.name}</div>
+                      <div className="text-xs text-ink-400">{u.email}</div>
+                    </Td>
                     <Td>
                       <Badge tone={WARNA_PERAN[u.role]}>{ROLE_LABEL[u.role]}</Badge>
                     </Td>
@@ -147,7 +148,7 @@ export function UsersPage() {
                       )}
                     </Td>
                     <Td className="text-right">
-                      <div className="inline-flex items-center gap-3">
+                      <div className="inline-flex items-center gap-3 whitespace-nowrap">
                         <button
                           onClick={() => setDiubah(u)}
                           className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
@@ -157,10 +158,11 @@ export function UsersPage() {
                         </button>
                         <button
                           onClick={() => kirimReset(u)}
+                          title="Kirim email tautan reset sandi"
                           className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
                         >
                           <KeyRound className="h-4 w-4" />
-                          Kirim Reset Sandi
+                          Reset Sandi
                         </button>
                         <button
                           onClick={() => hapus(u)}

@@ -138,7 +138,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate font-medium text-ink-900 text-sm">{inv.member?.name ?? '—'}</div>
-                      <div className="text-xs text-ink-400">{inv.chapter?.displayName ?? '—'} · {inv.number}</div>
+                      <div className="text-xs text-ink-400">{inv.chapter?.displayName ?? '—'} · <span className="whitespace-nowrap">{inv.number}</span></div>
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="font-semibold text-ink-900 text-sm">{formatCurrency(inv.amount)}</div>

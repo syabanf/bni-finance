@@ -265,7 +265,7 @@ export function ReportPage() {
 
   const periodLabel = PRESETS.find((p) => p.value === preset)?.label ?? 'Semua'
   const tipeLabel = tipe === 'all' ? '' : tipe === 'renewal' ? ' · Renewal' : ' · Pendaftaran'
-  const periodRange = `${range.from || 'awal'} – ${range.to || todayISO()}`
+  const periodRange = `${range.from ? formatDate(range.from) : 'awal'} – ${formatDate(range.to || todayISO())}`
 
   const EXPORT_HEADERS = [
     'Chapter',
@@ -441,7 +441,7 @@ export function ReportPage() {
             />
           )}
           <span className="ml-auto text-xs text-ink-400">
-            {range.from || 'awal'} – {range.to || todayISO()}
+            {periodRange}
           </span>
         </div>
         <div className="border-t border-ink-100 px-4 py-3">
@@ -451,13 +451,13 @@ export function ReportPage() {
 
       {/* KPIs */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="surface h-[148px] animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
           <StatCard
             icon={CreditCard}
             iconTone="brand"
