@@ -28,7 +28,7 @@ export function StatCard({ icon: Icon, iconTone = 'brand', value, label, hint, o
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        'surface group flex flex-col p-5 text-left transition-shadow',
+        'surface group flex min-w-0 flex-col p-4 text-left transition-shadow sm:p-5',
         onClick ? 'hover:shadow-card-hover cursor-pointer' : 'cursor-default',
       )}
     >
@@ -37,7 +37,7 @@ export function StatCard({ icon: Icon, iconTone = 'brand', value, label, hint, o
           <Icon className="h-[22px] w-[22px]" strokeWidth={2} />
         </div>
       </div>
-      <div className="mt-4 text-[28px] font-bold leading-none tracking-tight text-ink-900">{value}</div>
+      <div className="mt-4 text-[22px] font-bold leading-none tracking-tight text-ink-900 sm:text-[28px]">{value}</div>
       <div className="mt-2 flex items-center gap-1 text-sm font-medium text-ink-500">
         {label}
         {onClick && (

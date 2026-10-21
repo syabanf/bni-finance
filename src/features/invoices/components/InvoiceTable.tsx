@@ -183,30 +183,34 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
         )}
         {sorted.map((inv) => {
           return (
+            // Kartu selalu membuka detail. Di tabel desktop klik baris mencentang
+            // karena ada tombol mata untuk detail; kartu ponsel tidak punya
+            // tombol itu, jadi kartu yang mencentang membuat detail tak terjangkau.
             <div
               key={inv.id}
-              onClick={() => (selectable ? toggleOne(inv.id) : navigate(`/invoices/${inv.id}`))}
+              onClick={() => navigate(`/invoices/${inv.id}`)}
               className={cn(
                 'flex items-start gap-3 px-4 py-3.5 active:bg-ink-50',
                 selectable && selected?.has(inv.id) ? 'bg-brand-50/50' : '',
               )}
             >
               {selectable && (
-                <input
-                  type="checkbox"
-                  aria-label={`Pilih ${inv.number}`}
-                  checked={selected?.has(inv.id) ?? false}
-                  onChange={() => toggleOne(inv.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-0.5 h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
-                />
+                <label className="-m-3 shrink-0 cursor-pointer p-3" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Pilih ${inv.number}`}
+                    checked={selected?.has(inv.id) ?? false}
+                    onChange={() => toggleOne(inv.id)}
+                    className="mt-0.5 h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                  />
+                </label>
               )}
               <Avatar name={inv.member?.name ?? '?'} size="sm" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate font-medium text-ink-900 text-sm">{inv.member?.name ?? '—'}</div>
-                    <div className="text-xs text-ink-400">{inv.chapter?.displayName ?? '—'} · {inv.number}</div>
+                    <div className="text-xs text-ink-400">{inv.chapter?.displayName ?? '—'} · <span className="whitespace-nowrap">{inv.number}</span></div>
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-semibold text-ink-900 text-sm">{formatCurrency(inv.amount)}</div>
