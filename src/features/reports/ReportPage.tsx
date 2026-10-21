@@ -138,9 +138,11 @@ export function ReportPage() {
     // Saringan tipe berlaku untuk dua dasar sekaligus: invoice yang terbit
     // dan pembayaran yang diterima (lewat tipe invoice induknya), supaya
     // "Diterima" tetap bisa dibandingkan dengan "Ditagih" pada tipe yang sama.
+    // Draft dikeluarkan: belum pernah dikirim ke member, jadi belum ditagih,
+    // dan menghitungnya menurunkan Collection Rate tanpa ada yang terlambat bayar.
     const cocokTipe = (t: string | undefined) => tipe === 'all' || t === tipe
     const invs = (invoices ?? []).filter(
-      (i) => i.status !== 'cancelled' && inRange(i.createdAt) && cocokTipe(i.type),
+      (i) => i.status !== 'cancelled' && i.status !== 'draft' && inRange(i.createdAt) && cocokTipe(i.type),
     )
     const outstandingInvs = invs.filter((i) => i.status === 'sent' || i.status === 'overdue')
     // Cash basis: payments RECEIVED in the period (by paidAt). "Diterima", the
