@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -19,6 +19,12 @@ function NavGroup({ label, icon: Icon, children }: Extract<(typeof NAV)[number],
   const { pathname } = useLocation()
   const groupActive = children.some((c) => leafIsActive(pathname, c))
   const [open, setOpen] = useState(groupActive)
+  // Membuka grup juga saat orang TIBA di halamannya lewat tombol di halaman
+  // lain (Impor dari Member atau Chapter), bukan hanya saat halaman dimuat.
+  // Grup yang tetap terlipat menyembunyikan di mana ia berada.
+  useEffect(() => {
+    if (groupActive) setOpen(true)
+  }, [groupActive])
 
   return (
     <div>

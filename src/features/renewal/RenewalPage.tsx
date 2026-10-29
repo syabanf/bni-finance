@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, FileUp, HelpCircle, Send, XCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CheckCircle2, FileText, FileUp, HelpCircle, Send, XCircle } from 'lucide-react'
 import type { MemberWithChapter, RenewalAnswer, RenewalRequest } from '@/types'
 import {
   Badge,
@@ -25,6 +26,8 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, importService, memberService, renewalService, userService } from '@/services'
 import { useAuth } from '@/features/auth/AuthContext'
+import { useCan } from '@/features/auth/usePermission'
+import { muatStatusRenewal } from './statusRenewal'
 import { formatDate } from '@/lib/format'
 import { bolehDitagih } from '@/lib/status'
 import { cn } from '@/lib/cn'
@@ -97,6 +100,9 @@ export function RenewalPage() {
   const [period, setPeriod] = useState(periodeAwal)
   const [chapterFilter, setChapterFilter] = useState('all')
   const permintaan = useAsync(() => renewalService.list({ period }), [period])
+  const navigate = useNavigate()
+  const bolehTagih = useCan('invoice:create')
+  const statusRenewal = useAsync(muatStatusRenewal, [permintaan.data])
 
   /**
    * Periode yang BENAR-BENAR ADA datanya, ditemukan sekali di awal.
@@ -166,6 +172,14 @@ export function RenewalPage() {
       akan: d.filter((r) => r.answer === 'will_renew').length,
     }
   }, [tersaring])
+
+  // Langkah berikutnya setelah MC menjawab: yang Diterima dan belum ditagih
+  // dibawa ke Buat Invoice dalam keadaan terpilih. Tanpa ini orangnya harus
+  // pindah halaman dan mencari ulang nama yang baru saja ia lihat di sini.
+  const siapDitagih = useMemo(
+    () => tersaring.filter((r) => statusRenewal.data?.get(r.memberId) === 'will_renew').map((r) => r.memberId),
+    [tersaring, statusRenewal.data],
+  )
 
   const [terpilih, setTerpilih] = useState<Set<string>>(new Set())
   const [massalSibuk, setMassalSibuk] = useState(false)
@@ -261,6 +275,15 @@ export function RenewalPage() {
           }
           action={
             <div className="flex flex-wrap items-center gap-2">
+              {bolehTagih && siapDitagih.length > 0 && (
+                <Button
+                  size="sm"
+                  onClick={() => navigate(`/invoices/new?type=renewal&member=${siapDitagih.join(',')}`)}
+                >
+                  <FileText className="h-4 w-4" />
+                  Buat Invoice ({siapDitagih.length})
+                </Button>
+              )}
               {/* Dropdown, bukan ketik bebas: bentuk periodenya kini "2027-S1",
                   dan kolom bebas mengundang orang mengetik "2027" lalu melihat
                   daftar kosong tanpa tahu kenapa. */}
@@ -364,9 +387,8 @@ export function RenewalPage() {
                     </Th>
                   )}
                   <Th>Member</Th>
-                  <Th>Chapter</Th>
                   <Th>Jatuh tempo</Th>
-                  <Th>Ditugaskan ke</Th>
+                  <Th>Ditugaskan</Th>
                   <Th>Jawaban</Th>
                   {bolehMenjawab && <Th className="text-right">Tindakan</Th>}
                 </Tr>
@@ -393,9 +415,11 @@ export function RenewalPage() {
                         />
                       </Td>
                     )}
-                    <Td className="font-medium text-ink-900">{r.memberName ?? r.memberId}</Td>
-                    <Td className="text-ink-600">{r.chapterName ?? r.chapterId}</Td>
-                    <Td className="text-ink-600">
+                    <Td className="whitespace-nowrap">
+                      <div className="font-medium text-ink-900">{r.memberName ?? r.memberId}</div>
+                      <div className="text-xs text-ink-400">{r.chapterName ?? r.chapterId}</div>
+                    </Td>
+                    <Td className="whitespace-nowrap text-ink-600">
                       {r.renewalDate ? formatDate(r.renewalDate) : <span className="text-ink-400">—</span>}
                     </Td>
                     <Td className="text-ink-600">
@@ -408,7 +432,7 @@ export function RenewalPage() {
                         <span className="text-ink-400">Semua MC</span>
                       )}
                     </Td>
-                    <Td>
+                    <Td className="whitespace-nowrap">
                       <Badge tone={TONE[r.answer]}>{LABEL[r.answer]}</Badge>
                       {r.note && <div className="mt-1 text-xs text-ink-500">{r.note}</div>}
                     </Td>
@@ -468,7 +492,7 @@ function TombolJawab({
       onClick={onClick}
       disabled={disabled}
       title={label}
-      className={`inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2 py-1 text-xs text-ink-600 transition-colors disabled:opacity-40 ${tone}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-ink-200 px-1.5 py-1 text-xs text-ink-600 transition-colors disabled:opacity-40 ${tone}`}
     >
       <Icon className="h-3.5 w-3.5" />
       {label}

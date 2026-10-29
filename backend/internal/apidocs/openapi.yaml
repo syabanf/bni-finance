@@ -1213,7 +1213,7 @@ paths:
         |---|---|---|
         | `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |
         | `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |
-        | `invoice_due_days_after` | Jatuh tempo = tanggal terbit + N hari | `30` |
+        | `invoice_due_days_after` | Jatuh tempo = tanggal kirim ke Paper.id + N hari | `3` |
         | `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |
         | `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |
         | `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |

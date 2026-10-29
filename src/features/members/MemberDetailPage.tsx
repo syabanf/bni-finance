@@ -23,6 +23,7 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, memberService } from '@/services'
 import { formatCurrency, formatDate } from '@/lib/format'
+import { bolehDitagih } from '@/lib/status'
 
 export function MemberDetailPage() {
   const { id = '' } = useParams()
@@ -67,7 +68,15 @@ export function MemberDetailPage() {
         }
         description={<MemberStatusBadge status={member.status} />}
         action={
-          <Button onClick={() => navigate('/invoices/new')}>
+          // Tipe mengikuti status: yang belum anggota (termasuk New Member yang
+          // baru ditambahkan) ditagih pendaftaran, member aktif ditagih renewal.
+          <Button
+            onClick={() =>
+              navigate(
+                `/invoices/new?type=${bolehDitagih(member.status, 'registration') ? 'registration' : 'renewal'}&member=${member.id}`,
+              )
+            }
+          >
             <Plus className="h-4 w-4" />
             Buat Invoice
           </Button>

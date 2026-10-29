@@ -9,7 +9,8 @@ import type {
   InvoiceWithRelations,
   RenewalDueMember,
 } from '@/types'
-import { daysUntil, todayISO } from '@/lib/date'
+import { addDays, daysUntil, todayISO } from '@/lib/date'
+import { getMockAppSetting } from './appSettings'
 import { delay, nextId, nowISO, store } from './store'
 
 /** Mark sent invoices past their due date as overdue. Called lazily before reads. */
@@ -255,6 +256,8 @@ export const mockInvoiceRepository: InvoiceRepository = {
 
     const old = invoice.status
     invoice.status = 'sent'
+    // Seperti server: jatuh tempo dihitung saat dikirim, bukan saat dibuat.
+    invoice.dueDate = addDays(todayISO(), Number(await getMockAppSetting('invoice_due_days_after')) || 3)
     // Simulate Paper.id response
     const ref = nextId('PPR').toUpperCase()
     invoice.paperIdInvoiceId = ref

@@ -27,6 +27,9 @@ import { invoiceService, settingsService } from '@/services'
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
+import { muatStatusRenewal } from '@/features/renewal/statusRenewal'
+import { buatMassal, pesanMassal } from './lib/buatMassal'
+import { KonfirmasiBadge } from '@/features/renewal/components/KonfirmasiBadge'
 
 type Urgency = 'all' | 'overdue' | 'week' | 'later'
 
@@ -50,6 +53,10 @@ export function RenewalDuePage() {
     invoiceService.renewalDue(30),
   )
   const { data: fees } = useAsync<FeeSettings>(() => settingsService.getFees())
+  const { data: jawaban, reload: reloadJawaban } = useAsync(muatStatusRenewal)
+  // Hanya yang dikonfirmasi MC "Diterima" yang bisa ditagih; server menolak
+  // sisanya, jadi kotak centangnya dimatikan dengan alasan di sebelahnya.
+  const boleh = (id: string) => jawaban?.get(id) === 'will_renew'
 
   const canCreate = useCan('invoice:create')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -74,18 +81,21 @@ export function RenewalDuePage() {
     })
   }, [members, search, urgency])
 
-  const allSelected = filtered.length > 0 && filtered.every((m) => selected.has(m.id))
+  const bisaDipilih = filtered.filter((m) => boleh(m.id))
+  const allSelected = bisaDipilih.length > 0 && bisaDipilih.every((m) => selected.has(m.id))
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    if (!boleh(id)) return
     setSelected((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
 
   // Select-all applies to the CURRENTLY FILTERED rows only.
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(filtered.map((m) => m.id)))
+    setSelected(allSelected ? new Set() : new Set(bisaDipilih.map((m) => m.id)))
   }
 
   const selectedTotal = useMemo(
@@ -96,12 +106,12 @@ export function RenewalDuePage() {
   const handleGenerate = async () => {
     if (!fees || selected.size === 0) return
     setGenerating(true)
-    try {
-      // Only act on rows still visible under the active filter.
-      const targets = filtered.filter((m) => selected.has(m.id))
-      for (const m of targets) {
+    // Only act on rows still visible under the active filter.
+    const hasil = await buatMassal(
+      filtered.filter((m) => selected.has(m.id)),
+      (m) => {
         const periodStart = addDays(m.lastInvoice.periodEnd, 1)
-        await invoiceService.create({
+        return invoiceService.create({
           memberId: m.id,
           type: 'renewal',
           amount: fees.renewalFee,
@@ -109,15 +119,16 @@ export function RenewalDuePage() {
           periodStart,
           periodEnd: addYear(periodStart),
         })
-      }
-      toast(`${targets.length} invoice renewal berhasil dibuat (draft).`)
-      setSelected(new Set())
+      },
+    )
+    const { pesan, tone } = pesanMassal(hasil, 'renewal')
+    toast(pesan, tone)
+    setSelected((prev) => new Set([...prev].filter((id) => !hasil.dibuat.includes(id))))
+    if (hasil.dibuat.length) {
       reload()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal membuat invoice.', 'error')
-    } finally {
-      setGenerating(false)
+      reloadJawaban()
     }
+    setGenerating(false)
   }
 
   const exportHandlers = makeExportHandlers({
@@ -146,7 +157,7 @@ export function RenewalDuePage() {
     <div>
       <PageHeader
         title="Renewal Due"
-        description="Member yang masa keanggotaannya berakhir dalam 30 hari ke depan."
+        description="Member yang masa keanggotaannya berakhir dalam 30 hari ke depan. Hanya yang sudah dikonfirmasi MC bisa dibuatkan invoice."
         action={<span data-tour="renewal-range"><ExportMenu {...exportHandlers} disabled={filtered.length === 0} /></span>}
         breadcrumb={
           <button
@@ -244,10 +255,12 @@ export function RenewalDuePage() {
                 >
                   <input
                     type="checkbox"
+                    aria-label={`Pilih ${m.name}`}
                     checked={selected.has(m.id)}
+                    disabled={!boleh(m.id)}
                     onChange={() => toggle(m.id)}
                     onClick={(e) => e.stopPropagation()}
-                    className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                    className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                   />
                   <Avatar name={m.name} size="sm" />
                   <div className="min-w-0 flex-1">
@@ -255,6 +268,9 @@ export function RenewalDuePage() {
                       <div className="min-w-0">
                         <div className="truncate font-medium text-ink-900 text-sm">{m.name}</div>
                         <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}</div>
+                        <div className="mt-1">
+                          <KonfirmasiBadge jawaban={jawaban?.get(m.id)} />
+                        </div>
                       </div>
                       <div className="shrink-0 text-right">
                         <DueBadge days={m.daysUntilDue} />
@@ -273,15 +289,18 @@ export function RenewalDuePage() {
                     <Th className="w-10">
                       <input
                         type="checkbox"
+                        aria-label="Pilih semua yang sudah dikonfirmasi"
                         checked={allSelected}
+                        disabled={bisaDipilih.length === 0}
                         onChange={toggleAll}
-                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                       />
                     </Th>
                     <Th>Member</Th>
                     <Th>Chapter</Th>
                     <Th>Berakhir</Th>
                     <Th>Status</Th>
+                    <Th>Konfirmasi MC</Th>
                     <Th>Invoice Terakhir</Th>
                   </Tr>
                 </THead>
@@ -291,10 +310,12 @@ export function RenewalDuePage() {
                       <Td>
                         <input
                           type="checkbox"
+                          aria-label={`Pilih ${m.name}`}
                           checked={selected.has(m.id)}
+                          disabled={!boleh(m.id)}
                           onChange={() => toggle(m.id)}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                          className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </Td>
                       <Td>
@@ -310,6 +331,9 @@ export function RenewalDuePage() {
                       <Td className="whitespace-nowrap text-ink-600">{formatDate(m.lastInvoice.periodEnd)}</Td>
                       <Td>
                         <DueBadge days={m.daysUntilDue} />
+                      </Td>
+                      <Td>
+                        <KonfirmasiBadge jawaban={jawaban?.get(m.id)} />
                       </Td>
                       <Td>
                         <span className="font-mono text-[13px] text-ink-500">{m.lastInvoice.number}</span>
