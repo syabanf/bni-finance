@@ -39,6 +39,10 @@ import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
 import { cn } from '@/lib/cn'
 import { downloadInvoice } from '@/features/invoices/lib/invoiceDocument'
+import { buatMassal, pesanMassal } from '@/features/invoices/lib/buatMassal'
+import { KonfirmasiBadge } from '@/features/renewal/components/KonfirmasiBadge'
+import { bolehDitagih, type StatusRenewal } from '@/lib/status'
+import { muatStatusRenewal } from '@/features/renewal/statusRenewal'
 
 function DaysOverdueBadge({ dueDate }: { dueDate: string }) {
   const days = Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
@@ -175,7 +179,6 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
               <THead>
                 <Tr>
                   <Th>Member</Th>
-                  <Th>Chapter</Th>
                   <Th>Nominal</Th>
                   <Th>Jatuh Tempo</Th>
                   <Th>Keterlambatan</Th>
@@ -188,16 +191,17 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                     <Td>
                       <div className="flex items-center gap-3">
                         <Avatar name={inv.member?.name ?? '?'} size="sm" />
-                        <div className="leading-tight">
+                        <div className="whitespace-nowrap leading-tight">
                           <div className="font-medium text-ink-900">{inv.member?.name ?? '—'}</div>
-                          <div className="text-xs text-ink-400">{inv.number}</div>
+                          <div className="text-xs text-ink-400">
+                            {inv.chapter?.displayName ?? '—'} · {inv.number}
+                          </div>
                         </div>
                       </div>
                     </Td>
-                    <Td className="text-ink-600">{inv.chapter?.displayName ?? '—'}</Td>
-                    <Td className="font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
+                    <Td className="whitespace-nowrap font-medium text-ink-900">{formatCurrency(inv.amount)}</Td>
                     <Td className="whitespace-nowrap text-ink-600">{formatDate(inv.dueDate)}</Td>
-                    <Td>
+                    <Td className="whitespace-nowrap">
                       <DaysOverdueBadge dueDate={inv.dueDate} />
                     </Td>
                     <Td className="text-right">
@@ -240,11 +244,14 @@ function RenewalSection({
   members,
   loading,
   fees,
+  jawaban,
   onGenerated,
 }: {
   members: RenewalDueMember[] | null
   loading: boolean
   fees: FeeSettings | null
+  /** Jawaban MC terakhir per member; hanya yang "Diterima" boleh dicentang. */
+  jawaban: Map<string, StatusRenewal> | null
   onGenerated: () => void
 }) {
   const navigate = useNavigate()
@@ -255,24 +262,30 @@ function RenewalSection({
 
   const urgent = useMemo(() => members?.filter((m) => m.daysUntilDue <= 7) ?? [], [members])
   const upcoming = useMemo(() => members?.filter((m) => m.daysUntilDue > 7) ?? [], [members])
-  const allIds = useMemo(() => members?.map((m) => m.id) ?? [], [members])
+  const boleh = (id: string) => jawaban?.get(id) === 'will_renew'
+  const allIds = useMemo(
+    () => members?.filter((m) => jawaban?.get(m.id) === 'will_renew').map((m) => m.id) ?? [],
+    [members, jawaban],
+  )
   const allSelected = allIds.length > 0 && selected.size === allIds.length
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    if (!boleh(id)) return
     setSelected((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
 
   const handleGenerate = async () => {
     if (!members || !fees || selected.size === 0) return
     setGenerating(true)
-    try {
-      const targets = members.filter((m) => selected.has(m.id))
-      for (const m of targets) {
+    const hasil = await buatMassal(
+      members.filter((m) => selected.has(m.id)),
+      (m) => {
         const periodStart = addDays(m.lastInvoice.periodEnd, 1)
-        await invoiceService.create({
+        return invoiceService.create({
           memberId: m.id,
           type: 'renewal',
           amount: fees.renewalFee,
@@ -280,15 +293,15 @@ function RenewalSection({
           periodStart,
           periodEnd: addYear(periodStart),
         })
-      }
-      toast(`${targets.length} invoice renewal berhasil dibuat (draft).`)
-      setSelected(new Set())
-      onGenerated()
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal membuat invoice.', 'error')
-    } finally {
-      setGenerating(false)
-    }
+      },
+    )
+    const { pesan, tone } = pesanMassal(hasil, 'renewal')
+    toast(pesan, tone)
+    // Yang gagal tetap tercentang supaya bisa dicoba lagi tanpa ikut
+    // mengulang yang sudah terbuat.
+    setSelected((prev) => new Set([...prev].filter((id) => !hasil.dibuat.includes(id))))
+    if (hasil.dibuat.length) onGenerated()
+    setGenerating(false)
   }
 
   const selectedTotal = fees ? selected.size * fees.renewalFee : 0
@@ -304,9 +317,18 @@ function RenewalSection({
             Renewal Jatuh Tempo
           </span>
         }
-        subtitle="Member yang masa keanggotaannya berakhir dalam 30 hari ke depan."
+        subtitle={
+          <>
+            Member yang masa keanggotaannya berakhir dalam 30 hari ke depan. Hanya yang sudah dikonfirmasi MC
+            bisa dibuatkan invoice;{' '}
+            <button onClick={() => navigate('/renewal')} className="font-medium text-brand-500 hover:text-brand-600">
+              minta konfirmasi
+            </button>
+            .
+          </>
+        }
         action={
-          !loading && members && members.length > 0 ? (
+          !loading && allIds.length > 0 ? (
             <button
               onClick={() =>
                 setSelected(allSelected ? new Set() : new Set(allIds))
@@ -370,10 +392,12 @@ function RenewalSection({
                     >
                       <input
                         type="checkbox"
+                        aria-label={`Pilih ${m.name}`}
                         checked={selected.has(m.id)}
+                        disabled={!boleh(m.id)}
                         onChange={() => toggle(m.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                        className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                       />
                       <Avatar name={m.name} size="sm" />
                       <div className="min-w-0 flex-1">
@@ -381,6 +405,9 @@ function RenewalSection({
                           <div className="min-w-0">
                             <div className="truncate font-medium text-ink-900 text-sm">{m.name}</div>
                             <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}</div>
+                            <div className="mt-1">
+                              <KonfirmasiBadge jawaban={jawaban?.get(m.id)} />
+                            </div>
                           </div>
                           <div className="shrink-0 text-right">
                             <DaysUntilBadge days={m.daysUntilDue} />
@@ -408,15 +435,17 @@ function RenewalSection({
                   <Th className="w-10">
                     <input
                       type="checkbox"
+                      aria-label="Pilih semua yang sudah dikonfirmasi"
                       checked={allSelected}
+                      disabled={allIds.length === 0}
                       onChange={() => setSelected(allSelected ? new Set() : new Set(allIds))}
-                      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                      className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                     />
                   </Th>
                   <Th>Member</Th>
-                  <Th>Chapter</Th>
                   <Th>Berakhir</Th>
                   <Th>Sisa Waktu</Th>
+                  <Th>Konfirmasi MC</Th>
                   <Th className="text-right">Aksi</Th>
                 </Tr>
               </THead>
@@ -436,25 +465,29 @@ function RenewalSection({
                         <Td>
                           <input
                             type="checkbox"
+                            aria-label={`Pilih ${m.name}`}
                             checked={selected.has(m.id)}
+                            disabled={!boleh(m.id)}
                             onChange={() => toggle(m.id)}
                             onClick={(e) => e.stopPropagation()}
-                            className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400"
+                            className="h-4 w-4 cursor-pointer rounded border-ink-300 text-brand-500 focus:ring-brand-400 disabled:cursor-not-allowed disabled:opacity-40"
                           />
                         </Td>
                         <Td>
                           <div className="flex items-center gap-3">
                             <Avatar name={m.name} size="sm" />
-                            <div className="leading-tight">
+                            <div className="whitespace-nowrap leading-tight">
                               <div className="font-medium text-ink-900">{m.name}</div>
-                              <div className="text-xs text-ink-400">{m.id}</div>
+                              <div className="text-xs text-ink-400">{m.chapter?.displayName ?? '—'}</div>
                             </div>
                           </div>
                         </Td>
-                        <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
                         <Td className="whitespace-nowrap text-ink-600">{formatDate(m.lastInvoice.periodEnd)}</Td>
-                        <Td>
+                        <Td className="whitespace-nowrap">
                           <DaysUntilBadge days={m.daysUntilDue} />
+                        </Td>
+                        <Td className="whitespace-nowrap">
+                          <KonfirmasiBadge jawaban={jawaban?.get(m.id)} />
                         </Td>
                         <Td className="text-right">
                           <button
@@ -508,26 +541,23 @@ function RegistrationSection({
   const handleGenerate = async () => {
     if (!members || !fees || selected.size === 0) return
     setGenerating(true)
-    try {
-      const targets = members.filter((m) => selected.has(m.id))
-      const today = todayISO()
-      for (const m of targets) {
-        await invoiceService.create({
+    const today = todayISO()
+    const hasil = await buatMassal(
+      members.filter((m) => selected.has(m.id)),
+      (m) =>
+        invoiceService.create({
           memberId: m.id,
           type: 'registration',
           amount: fees.registrationFee,
           dueDate: today,
           periodStart: today,
           periodEnd: addYear(today),
-        })
-      }
-      toast(`${targets.length} invoice pendaftaran berhasil dibuat (draft).`)
-      setSelected(new Set())
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Gagal membuat invoice.', 'error')
-    } finally {
-      setGenerating(false)
-    }
+        }),
+    )
+    const { pesan, tone } = pesanMassal(hasil, 'pendaftaran')
+    toast(pesan, tone)
+    setSelected((prev) => new Set([...prev].filter((id) => !hasil.dibuat.includes(id))))
+    setGenerating(false)
   }
 
   const selectedTotal = fees ? selected.size * fees.registrationFee : 0
@@ -698,7 +728,12 @@ export function UrgentPage() {
   const {
     data: eligible,
     loading: loadingEligible,
-  } = useAsync<MemberWithChapter[]>(() => memberService.eligibleForRegistration())
+  } = useAsync<MemberWithChapter[]>(async () =>
+    // Disaring dengan aturan yang sama seperti formulir Buat Invoice; server
+    // menolak status lain, jadi menawarkannya hanya menghasilkan kegagalan.
+    (await memberService.eligibleForRegistration()).filter((m) => bolehDitagih(m.status, 'registration')),
+  )
+  const { data: jawaban, reload: reloadJawaban } = useAsync(muatStatusRenewal)
 
   const { data: fees } = useAsync<FeeSettings>(() => settingsService.getFees())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
@@ -829,7 +864,11 @@ export function UrgentPage() {
           members={filteredRenewal}
           loading={loadingRenewal}
           fees={fees}
-          onGenerated={reloadRenewal}
+          jawaban={jawaban}
+          onGenerated={() => {
+            reloadRenewal()
+            reloadJawaban()
+          }}
         />
         <RegistrationSection members={filteredEligible} loading={loadingEligible} fees={fees} />
       </div>

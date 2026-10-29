@@ -628,7 +628,7 @@ export function InvoiceDetailPage() {
         open={dialog === 'paid'}
         onClose={() => setDialog(null)}
         title="Tandai sebagai lunas?"
-        description="Pembayaran akan dicatat dan status invoice berubah menjadi Lunas."
+        description="Pakai ini bila member sudah membayar lewat Paper.id tapi status invoice belum berubah. Untuk transfer bank atau tunai, pakai Catat Pembayaran Manual supaya metode dan buktinya tercatat."
         footer={
           <>
             <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>

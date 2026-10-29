@@ -181,7 +181,7 @@ export function MemberListPage() {
     <div>
       <PageHeader
         title="Member"
-        description="Data member hasil sinkronisasi dari BNI Visitor Management."
+        description="Data member dari impor laporan BNI Connect, Tambah Member, dan sinkronisasi BNI Visitor Management."
         action={
           <div className="flex flex-wrap items-center gap-2">
             {/*

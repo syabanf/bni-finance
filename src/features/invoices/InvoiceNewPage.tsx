@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Check, Search, Send, UserRound } from 'lucide-react'
-import type { FeeSettings, Invoice, InvoiceType, MemberWithChapter, RenewalRequest } from '@/types'
+import type { FeeSettings, Invoice, InvoiceType, MemberWithChapter } from '@/types'
 import { bolehDitagih } from '@/lib/status'
+import { muatStatusRenewal } from '@/features/renewal/statusRenewal'
 import {
   Avatar,
   Button,
@@ -18,7 +19,8 @@ import {
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { invoiceService, memberService, renewalService, settingsService } from '@/services'
+import { invoiceService, memberService, settingsService } from '@/services'
+import { getAppSetting } from '@/services/appSettings'
 import { addDays, addYear, todayISO } from '@/lib/date'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { cn } from '@/lib/cn'
@@ -43,8 +45,14 @@ export function InvoiceNewPage() {
   const { toast } = useToast()
 
   const { data: fees } = useAsync<FeeSettings>(() => settingsService.getFees())
+  const { data: hariJatuhTempo } = useAsync(async () => Number(await getAppSetting('invoice_due_days_after')) || 3)
 
-  const [type, setType] = useState<InvoiceType>('registration')
+  // Datang dari detail member atau dari Konfirmasi Renewal: ?type=renewal&member=id1,id2
+  // memilihkan tipe dan membernya, supaya orang tidak mencari nama yang baru
+  // saja ia lihat di halaman sebelumnya.
+  const [params] = useSearchParams()
+  const [titipan, setTitipan] = useState(() => params.get('member')?.split(',').filter(Boolean) ?? [])
+  const [type, setType] = useState<InvoiceType>(params.get('type') === 'renewal' ? 'renewal' : 'registration')
   // Daftar yang ditawarkan sudah mengikuti aturan server: pendaftaran hanya
   // untuk visitor dan pending, renewal hanya untuk member aktif dan nonaktif.
   // Server tetap menolak yang lolos, tapi pilihan yang pasti ditolak tidak
@@ -52,19 +60,14 @@ export function InvoiceNewPage() {
   //
   // Renewal juga menunggu konfirmasi: alurnya Member, lalu Konfirmasi Renewal,
   // baru Invoice. Yang ditawarkan hanya member yang permintaan konfirmasi
-  // TERAKHIR-nya dijawab MC "Diterima".
+  // TERAKHIR-nya dijawab MC "Diterima" dan belum ditagih sejak itu.
   const { data: members, loading: membersLoading } = useAsync<MemberWithChapter[]>(async () => {
     if (type === 'registration') {
       const list = await memberService.eligibleForRegistration()
       return list.filter((m) => bolehDitagih(m.status, type))
     }
-    const [list, konfirmasi] = await Promise.all([memberService.list(), renewalService.list()])
-    const terakhir = new Map<string, RenewalRequest>()
-    for (const r of konfirmasi) {
-      const ada = terakhir.get(r.memberId)
-      if (!ada || r.requestedAt > ada.requestedAt) terakhir.set(r.memberId, r)
-    }
-    return list.filter((m) => bolehDitagih(m.status, type) && terakhir.get(m.id)?.answer === 'will_renew')
+    const [list, status] = await Promise.all([memberService.list(), muatStatusRenewal()])
+    return list.filter((m) => bolehDitagih(m.status, type) && status.get(m.id) === 'will_renew')
   }, [type])
 
   // Pilihan JAMAK. Halaman ini dulu hanya bisa satu member, sehingga
@@ -72,6 +75,23 @@ export function InvoiceNewPage() {
   // puluhan kali — dan tiap pengulangan adalah kesempatan salah pilih tipe atau
   // nominal.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Titipan dari URL dipasang sekali, setelah daftar termuat, dan hanya yang
+  // memang ada di daftar. Member yang tidak boleh ditagih tipe ini tidak ikut
+  // diam-diam terpilih; ia disebut supaya orangnya tahu kenapa tidak muncul.
+  useEffect(() => {
+    if (!members || titipan.length === 0) return
+    const ada = titipan.filter((id) => members.some((m) => m.id === id))
+    setSelectedIds(new Set(ada))
+    if (ada.length < titipan.length) {
+      toast(
+        `${titipan.length - ada.length} member belum bisa ditagih ${type === 'renewal' ? 'renewal' : 'pendaftaran'}. ` +
+          (type === 'renewal' ? 'Renewal menunggu konfirmasi MC "Diterima".' : 'Cek status membernya.'),
+        'info',
+      )
+    }
+    setTitipan([])
+  }, [members, titipan, type, toast])
   const [search, setSearch] = useState('')
   const [chapterFilter, setChapterFilter] = useState('all')
   const [amount, setAmount] = useState<number>(0)
@@ -460,6 +480,10 @@ export function InvoiceNewPage() {
 
               <div className="space-y-2.5 rounded-xl bg-ink-50 p-4 text-sm">
                 <Row label="Tanggal terbit" value={formatDate(dueDate)} />
+                {/* Server mengisi jatuh tempo saat invoice dikirim ke Paper.id,
+                    bukan saat dibuat; draft yang dikirim minggu depan tetap
+                    mendapat tenggat penuh. */}
+                {hariJatuhTempo && <Row label="Jatuh tempo" value={`${hariJatuhTempo} hari setelah dikirim`} />}
                 {jumlah === 1 ? (
                   <Row label="Masa berlaku" value={`${formatDate(periodStart)} → ${formatDate(periodEnd)}`} />
                 ) : (
@@ -474,7 +498,7 @@ export function InvoiceNewPage() {
                 )}
                 <Row
                   label={jumlah > 1 ? 'Total seluruhnya' : 'Total'}
-                  value={formatCurrency(amount * Math.max(jumlah, 1))}
+                  value={formatCurrency(amount * jumlah)}
                   bold
                 />
               </div>
