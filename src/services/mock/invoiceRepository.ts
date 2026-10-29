@@ -1,6 +1,6 @@
 import type { CreateInvoiceInput, InvoiceRepository } from '@/services/types'
 import { alasanBelumKonfirmasi, bolehDitagih } from '@/lib/status'
-import { jawabanTerakhir } from './renewalRepository'
+import { konfirmasiTerakhir } from './renewalRepository'
 import type {
   AuditLogEntry,
   Invoice,
@@ -207,8 +207,25 @@ export const mockInvoiceRepository: InvoiceRepository = {
       )
     }
     if (input.type === 'renewal') {
-      const alasan = alasanBelumKonfirmasi(jawabanTerakhir(member.id))
+      const konfirmasi = konfirmasiTerakhir(member.id)
+      const alasan = alasanBelumKonfirmasi(konfirmasi?.answer ?? null)
       if (alasan) throw new Error(alasan)
+      // Satu jawaban "Diterima" membuka satu invoice renewal, sama seperti server.
+      if (
+        konfirmasi &&
+        store.invoices.some(
+          (i) =>
+            i.memberId === member.id &&
+            i.type === 'renewal' &&
+            i.status !== 'cancelled' &&
+            i.status !== 'terminated' &&
+            i.createdAt >= konfirmasi.requestedAt,
+        )
+      ) {
+        throw new Error(
+          'Member ini sudah punya invoice renewal untuk konfirmasi terakhirnya; batalkan invoice itu dulu bila perlu diterbitkan ulang.',
+        )
+      }
     }
     if (
       input.type === 'registration' &&

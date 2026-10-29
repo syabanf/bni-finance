@@ -29,8 +29,13 @@ func TestRingkasanPerTipeMengikutiFilterStatus(t *testing.T) {
 	chA, _, memA, _ := duaChapter(t, repo)
 	nasional := scope.WithoutLimit(context.Background())
 
-	// Dua renewal dan satu pendaftaran, semuanya draft.
+	// Dua renewal dan satu pendaftaran, semuanya draft. Satu konfirmasi hanya
+	// membuka satu invoice renewal, jadi renewal kedua menunggu konfirmasi
+	// periode berikutnya.
 	for i := 0; i < 2; i++ {
+		if i > 0 {
+			konfirmasiRenewal(t, pool, memA)
+		}
 		in := contohInput(memA, chA, 1_000_000)
 		in.Type = domain.TypeRenewal
 		inv, err := repo.Create(nasional, in, "", "IDR")

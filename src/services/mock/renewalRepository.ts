@@ -26,11 +26,11 @@ function isiRelasi(r: RenewalRequest): RenewalRequest {
   }
 }
 
-/** Jawaban atas permintaan konfirmasi TERAKHIR member ini; null bila belum pernah diminta. */
-export function jawabanTerakhir(memberId: string): RenewalAnswer | null {
+/** Permintaan konfirmasi TERAKHIR member ini; null bila belum pernah diminta. */
+export function konfirmasiTerakhir(memberId: string): RenewalRequest | null {
   const milik = requests.filter((r) => r.memberId === memberId)
   if (milik.length === 0) return null
-  return milik.reduce((a, b) => (b.requestedAt > a.requestedAt ? b : a)).answer
+  return milik.reduce((a, b) => (b.requestedAt > a.requestedAt ? b : a))
 }
 
 export const mockRenewalRepository: RenewalRepository = {

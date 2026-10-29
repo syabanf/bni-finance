@@ -98,15 +98,18 @@ type liveStack struct {
 	pool  *pgxpool.Pool
 }
 
-// konfirmasiRenewal mencatat jawaban "Diterima" untuk member, karena invoice
-// renewal hanya terbit setelah konfirmasi itu ada. Tidak dibersihkan: setiap
-// stack men-TRUNCATE members, dan CASCADE ikut mengosongkan renewal_requests.
+// konfirmasiRenewal mencatat permintaan konfirmasi BARU yang dijawab
+// "Diterima", karena invoice renewal hanya terbit setelah konfirmasi itu ada.
+// Satu konfirmasi membuka satu invoice renewal, jadi tiap panggilan memakai
+// periode sendiri dan membuka tepat satu invoice berikutnya. Tidak dibersihkan:
+// setiap stack men-TRUNCATE members, dan CASCADE ikut mengosongkan
+// renewal_requests.
 func konfirmasiRenewal(t *testing.T, pool *pgxpool.Pool, memberID string) {
 	t.Helper()
 	if _, err := pool.Exec(context.Background(), `
 		INSERT INTO renewal_requests (member_id, chapter_id, period, answer, answered_at)
-		SELECT id, chapter_id, 'uji', 'will_renew', now() FROM members WHERE id = $1
-		ON CONFLICT (member_id, period) DO UPDATE SET answer = 'will_renew'`, memberID); err != nil {
+		SELECT id, chapter_id, $2, 'will_renew', now() FROM members WHERE id = $1`,
+		memberID, fmt.Sprintf("uji-%d", time.Now().UnixNano())); err != nil {
 		t.Fatalf("konfirmasi renewal %s: %v", memberID, err)
 	}
 }
