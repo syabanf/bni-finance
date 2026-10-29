@@ -66,16 +66,39 @@ func concurrentStack(t *testing.T) *e2eStack {
 	return s
 }
 
+// memberTertagih menyiapkan n member aktif di ch-conc, masing-masing dengan
+// konfirmasi "Diterima" sendiri. Satu konfirmasi hanya membuka satu invoice
+// renewal, jadi tes yang menerbitkan banyak invoice butuh satu member per
+// invoice. Disiapkan sebelum beban dimulai, supaya yang diukur tetap pembuatan
+// invoicenya.
+func memberTertagih(t *testing.T, s *e2eStack, n int) []string {
+	t.Helper()
+	ids := make([]string, n)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("mem-conc-%d", i)
+	}
+	if _, err := s.pool.Exec(context.Background(), `
+		INSERT INTO members (id, chapter_id, name, status)
+		SELECT id, 'ch-conc', 'Peserta Concurrency', 'active' FROM unnest($1::text[]) AS id`,
+		ids); err != nil {
+		t.Fatalf("siapkan member: %v", err)
+	}
+	for _, id := range ids {
+		konfirmasiRenewal(t, s.pool, id)
+	}
+	return ids
+}
+
 // invoiceBody builds a create payload. Passing number="" lets the server
 // generate one, which is the case under test.
-func invoiceBody(number string, amount int) string {
+func invoiceBody(memberID, number string, amount int) string {
 	num := ""
 	if number != "" {
 		num = fmt.Sprintf(`"number":%q,`, number)
 	}
-	return fmt.Sprintf(`{%s"memberId":"mem-conc","chapterId":"ch-conc","type":"renewal",`+
+	return fmt.Sprintf(`{%s"memberId":%q,"chapterId":"ch-conc","type":"renewal",`+
 		`"amount":%d,"dueDate":"2026-12-31","periodStart":"2026-07-28","periodEnd":"2027-07-28"}`,
-		num, amount)
+		num, memberID, amount)
 }
 
 // post fires one request and returns status + body, without the assertion that
@@ -113,6 +136,7 @@ func TestConcurrentInvoiceCreationProducesUniqueNumbers(t *testing.T) {
 	s := concurrentStack(t)
 
 	n := scale(t, 24)
+	members := memberTertagih(t, s, n)
 	var (
 		mu      sync.Mutex
 		numbers = map[string]int{}
@@ -128,7 +152,7 @@ func TestConcurrentInvoiceCreationProducesUniqueNumbers(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-gate
-			status, body := s.post("/api/v1/invoices", s.adminToken, invoiceBody("", 100_000+i))
+			status, body := s.post("/api/v1/invoices", s.adminToken, invoiceBody(members[i], "", 100_000+i))
 			mu.Lock()
 			defer mu.Unlock()
 			if status != http.StatusCreated {
@@ -169,7 +193,7 @@ func TestConcurrentWebhooksSettleExactlyOnce(t *testing.T) {
 
 	number := fmt.Sprintf("CONC-%d", time.Now().UnixNano())
 	var inv e2eInvoice
-	s.do(t, "POST", "/api/v1/invoices", s.adminToken, invoiceBody(number, 500_000),
+	s.do(t, "POST", "/api/v1/invoices", s.adminToken, invoiceBody("mem-conc", number, 500_000),
 		http.StatusCreated, &inv)
 	// Mark it sent so the settle path accepts it, without needing Paper.id.
 	s.do(t, "PATCH", "/api/v1/invoices/"+inv.ID, s.adminToken,
@@ -235,7 +259,7 @@ func TestConcurrentManualPaymentsOnSameInvoice(t *testing.T) {
 
 	number := fmt.Sprintf("CONC-%d-M", time.Now().UnixNano())
 	var inv e2eInvoice
-	s.do(t, "POST", "/api/v1/invoices", s.adminToken, invoiceBody(number, 750_000),
+	s.do(t, "POST", "/api/v1/invoices", s.adminToken, invoiceBody("mem-conc", number, 750_000),
 		http.StatusCreated, &inv)
 	s.do(t, "PATCH", "/api/v1/invoices/"+inv.ID, s.adminToken, `{"status":"sent"}`, http.StatusOK, nil)
 
@@ -286,14 +310,19 @@ func TestMixedLoadAgainstPostgres(t *testing.T) {
 	}
 	s := concurrentStack(t)
 
+	workers, perWorker := scale(t, 24), 40
+	// Sepuluh invoice benih ditambah satu tulisan per lima permintaan tiap worker.
+	members := memberTertagih(t, s, 10+workers*((perWorker+4)/5))
+	var dipakai atomic.Int64
+	member := func() string { return members[dipakai.Add(1)-1] }
+
 	// Seed a little data so reads have something to page through.
 	for i := 0; i < 10; i++ {
 		s.do(t, "POST", "/api/v1/invoices", s.adminToken,
-			invoiceBody(fmt.Sprintf("SEED-%d-%d", time.Now().UnixNano(), i), 250_000),
+			invoiceBody(member(), fmt.Sprintf("SEED-%d-%d", time.Now().UnixNano(), i), 250_000),
 			http.StatusCreated, nil)
 	}
 
-	workers, perWorker := scale(t, 24), 40
 	var ok, clientErr, serverErr atomic.Int64
 	var wg sync.WaitGroup
 
@@ -317,7 +346,7 @@ func TestMixedLoadAgainstPostgres(t *testing.T) {
 					// One write in five, each with its own number so the
 					// numbering race is not what this test measures.
 					status, _ = s.post("/api/v1/invoices", s.adminToken,
-						invoiceBody(fmt.Sprintf("LOAD-%d-%d-%d", time.Now().UnixNano(), w, i), 300_000))
+						invoiceBody(member(), fmt.Sprintf("LOAD-%d-%d-%d", time.Now().UnixNano(), w, i), 300_000))
 				} else {
 					req, _ := http.NewRequest("GET", s.srv.URL+reads[(w+i)%len(reads)], nil)
 					req.Header.Set("Authorization", "Bearer "+s.adminToken)
@@ -496,12 +525,13 @@ func TestConflictingStatusTransitionsResolveToOne(t *testing.T) {
 	s := concurrentStack(t)
 
 	rounds := scale(t, 12)
+	members := memberTertagih(t, s, rounds)
 	var bothWon, neitherWon int
 
 	for i := 0; i < rounds; i++ {
 		var inv e2eInvoice
 		s.do(t, "POST", "/api/v1/invoices", s.adminToken,
-			invoiceBody(fmt.Sprintf("TRANS-%d-%d", time.Now().UnixNano(), i), 400_000),
+			invoiceBody(members[i], fmt.Sprintf("TRANS-%d-%d", time.Now().UnixNano(), i), 400_000),
 			http.StatusCreated, &inv)
 		s.do(t, "PATCH", "/api/v1/invoices/"+inv.ID, s.adminToken,
 			`{"status":"sent"}`, http.StatusOK, nil)

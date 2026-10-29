@@ -218,9 +218,12 @@ func (s *e2eStack) callback(t *testing.T, companyID, body string, wantStatus int
 	}
 }
 
-// freshDraft membuat satu invoice draft bernomor segar dan mencatatnya.
+// freshDraft membuat satu invoice draft bernomor segar dan mencatatnya. Draft
+// yang gagal terkirim tetap terhitung milik konfirmasi sebelumnya, jadi
+// penggantinya butuh konfirmasi baru.
 func (s *e2eStack) freshDraft(t *testing.T) e2eInvoice {
 	t.Helper()
+	konfirmasiRenewal(t, s.pool, "mem-e2e")
 	var inv e2eInvoice
 	s.do(t, "POST", "/api/v1/invoices", s.adminToken,
 		fmt.Sprintf(`{"number":"E2E-%d","memberId":"mem-e2e","chapterId":"ch-e2e","type":"renewal",`+
@@ -408,6 +411,9 @@ func TestEndToEndInvoiceJourney(t *testing.T) {
 		// kali dengan kontak yang sama tidak membuktikan apa pun.
 		s.do(t, "PATCH", "/api/v1/members/mem-e2e", s.adminToken,
 			`{"phone":"081199887766"}`, http.StatusOK, nil)
+		// Invoice kedua untuk periode berikutnya, jadi MC menjawab konfirmasi
+		// periode itu dulu.
+		konfirmasiRenewal(t, s.pool, "mem-e2e")
 
 		var second e2eInvoice
 		s.do(t, "POST", "/api/v1/invoices", s.adminToken,

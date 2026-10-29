@@ -62,6 +62,13 @@ func TestRenewalMenungguKonfirmasi(t *testing.T) {
 	coba("belum pasti", "belum pasti")
 	jawab("uji-1", "will_renew")
 	coba("diterima", "")
+	// Satu jawaban "Diterima" membuka satu invoice, bukan dua.
+	coba("invoice kedua", "sudah punya invoice renewal")
+	// Invoice yang dibatalkan tidak dihitung, jadi penggantinya boleh terbit.
+	if _, err := pool.Exec(ctx, "UPDATE invoices SET status = 'cancelled' WHERE member_id = $1", memA); err != nil {
+		t.Fatalf("batalkan invoice: %v", err)
+	}
+	coba("setelah dibatalkan", "")
 	// Permintaan baru untuk periode berikutnya menutup lagi jalannya.
 	jawab("uji-2", "pending")
 	coba("periode baru belum dijawab", "belum dijawab")

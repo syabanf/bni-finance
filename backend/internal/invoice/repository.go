@@ -795,13 +795,24 @@ func pesanTipeSalah(status domain.MemberStatus, tipe domain.InvoiceType) string 
 // mungkin harus dibatalkan, dan nomor Paper.id yang sudah terpakai tidak bisa
 // dikembalikan. Yang dibaca permintaan TERAKHIR, supaya jawaban "Diterima"
 // tahun lalu tidak membuka tagihan tahun ini.
+//
+// Satu jawaban "Diterima" membuka SATU invoice renewal. Tanpa batas ini
+// invoice yang sama bisa terbit dua kali, dari Buat Invoice lalu dari Perlu
+// Tindakan, dan member tertagih ganda. Invoice yang dibatalkan atau
+// diterminasi tidak dihitung, jadi tagihan yang salah tetap bisa diganti.
 func periksaKonfirmasiRenewal(ctx context.Context, tx pgx.Tx, memberID string) error {
 	var jawaban domain.RenewalAnswer
+	var sudahAda bool
 	err := tx.QueryRow(ctx, `
-		SELECT answer FROM renewal_requests
-		 WHERE member_id = $1
-		 ORDER BY requested_at DESC
-		 LIMIT 1`, memberID).Scan(&jawaban)
+		SELECT r.answer,
+		       EXISTS (SELECT 1 FROM invoices i
+		                WHERE i.member_id = r.member_id AND i.type = 'renewal'
+		                  AND i.status NOT IN ('cancelled', 'terminated')
+		                  AND i.created_at >= r.requested_at)
+		  FROM renewal_requests r
+		 WHERE r.member_id = $1
+		 ORDER BY r.requested_at DESC
+		 LIMIT 1`, memberID).Scan(&jawaban, &sudahAda)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		return httpx.BadRequest("member ini belum dimintai konfirmasi renewal; minta konfirmasi di halaman Konfirmasi Renewal dulu")
@@ -810,6 +821,9 @@ func periksaKonfirmasiRenewal(ctx context.Context, tx pgx.Tx, memberID string) e
 	}
 	switch jawaban {
 	case domain.RenewalWillRenew:
+		if sudahAda {
+			return httpx.BadRequest("member ini sudah punya invoice renewal untuk konfirmasi terakhirnya; batalkan invoice itu dulu bila perlu diterbitkan ulang")
+		}
 		return nil
 	case domain.RenewalPending:
 		return httpx.BadRequest("konfirmasi renewal member ini belum dijawab MC")

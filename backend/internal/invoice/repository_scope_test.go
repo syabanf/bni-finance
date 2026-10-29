@@ -2,7 +2,9 @@ package invoice
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -78,17 +80,19 @@ func duaChapter(t *testing.T, repo *Repository) (a, b string, memberA, memberB s
 	return a, b, memberA, memberB
 }
 
-// konfirmasiRenewal mencatat jawaban "Diterima" untuk setiap member, karena
-// invoice renewal hanya terbit setelah konfirmasi itu ada. Barisnya dihapus
-// di cleanup sebelum membernya.
+// konfirmasiRenewal mencatat permintaan konfirmasi BARU yang dijawab
+// "Diterima" untuk setiap member, karena invoice renewal hanya terbit setelah
+// konfirmasi itu ada. Satu konfirmasi membuka satu invoice renewal, jadi tiap
+// panggilan memakai periode sendiri. Barisnya dihapus di cleanup sebelum
+// membernya.
 func konfirmasiRenewal(t *testing.T, db *pgxpool.Pool, memberIDs ...string) {
 	t.Helper()
 	ctx := context.Background()
 	for _, m := range memberIDs {
 		if _, err := db.Exec(ctx, `
 			INSERT INTO renewal_requests (member_id, chapter_id, period, answer, answered_at)
-			SELECT id, chapter_id, 'uji', 'will_renew', now() FROM members WHERE id = $1
-			ON CONFLICT (member_id, period) DO UPDATE SET answer = 'will_renew'`, m); err != nil {
+			SELECT id, chapter_id, $2, 'will_renew', now() FROM members WHERE id = $1`,
+			m, fmt.Sprintf("uji-%d", time.Now().UnixNano())); err != nil {
 			t.Fatalf("konfirmasi renewal %s: %v", m, err)
 		}
 	}
