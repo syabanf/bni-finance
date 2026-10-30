@@ -163,7 +163,7 @@ export function MemberListPage() {
       { label: 'Email' },
       { label: 'Telepon' },
       { label: 'Status' },
-      { label: 'Due Date' },
+      { label: 'Jatuh Tempo' },
     ],
     rows: filtered.map((m) => [
       m.name,
@@ -319,9 +319,9 @@ export function MemberListPage() {
                 </option>
               ))}
             </Select>
-            {/* Filter due date (rentang tanggal renewal) */}
+            {/* Filter jatuh tempo (rentang tanggal renewal) */}
             <DateRangeFilter
-              label="Due date"
+              label="Jatuh tempo"
               from={dueFrom}
               to={dueTo}
               onFrom={setDueFrom}
@@ -338,7 +338,7 @@ export function MemberListPage() {
                 onChange={(e) => setHideNoDueDate(e.target.checked)}
                 className="h-4 w-4 rounded border-ink-300 accent-brand-500"
               />
-              Ada due date
+              Ada jatuh tempo
             </label>
           </div>
         </div>
@@ -395,7 +395,7 @@ export function MemberListPage() {
                     <Th>Chapter</Th>
                     <Th>Email</Th>
                     <Th>Status</Th>
-                    <Th>Due Date</Th>
+                    <Th>Jatuh Tempo</Th>
                     <Th className="text-right">Aksi</Th>
                   </Tr>
                 </THead>

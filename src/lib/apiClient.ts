@@ -85,16 +85,20 @@ export function setUnauthorizedHandler(fn: UnauthorizedHandler | null): void {
 
 // --- requests ---------------------------------------------------------------
 
+const PESAN_PUTUS = 'Tidak bisa menghubungi server. Periksa koneksi Anda.'
+
 interface RequestOptions {
   method?: string
   body?: unknown
   /** Skip the Authorization header — for login and the public payment page. */
   anonymous?: boolean
   signal?: AbortSignal
+  /** Multipart body; the browser sets its own Content-Type boundary. */
+  form?: FormData
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, anonymous = false, signal } = options
+  const { method = 'GET', body, anonymous = false, signal, form } = options
 
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -109,17 +113,22 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     response = await fetch(`${BASE_URL}/api/v1${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: form ?? (body === undefined ? undefined : JSON.stringify(body)),
       signal,
     })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
-    throw new ApiError('Tidak bisa menghubungi server. Periksa koneksi Anda.', 0)
+    throw new ApiError(PESAN_PUTUS, 0)
   }
 
   if (response.status === 204) return undefined as T
 
-  const text = await response.text()
+  // Proxy yang menolak unggahan besar bisa memutus koneksi saat jawabannya
+  // masih dibaca. Status gagalnya tetap cukup untuk menyusun pesan.
+  const text = await response.text().catch(() => {
+    if (response.ok) throw new ApiError(PESAN_PUTUS, 0)
+    return ''
+  })
   let payload: unknown = null
   if (text) {
     try {
@@ -130,9 +139,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   }
 
   if (!response.ok) {
+    // 413 tanpa badan JSON datang dari proxy di depan server, yang menolak
+    // berkas sebelum batas server sendiri sempat menjawab.
     const message =
       (payload as { error?: string } | null)?.error ??
-      `Permintaan gagal (HTTP ${response.status})`
+      (response.status === 413 ? 'Berkas terlalu besar untuk diunggah.' : `Permintaan gagal (HTTP ${response.status})`)
 
     // A rejected token means the session is over; drop it here so every caller
     // doesn't have to remember to.
@@ -158,52 +169,20 @@ export const api = {
   publicPost: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'POST', body, anonymous: true }),
 
-  /** Multipart upload — the browser sets its own Content-Type boundary. */
-  async upload(path: string, file: File): Promise<{ url: string }> {
-    const form = new FormData()
-    form.append('file', file)
-
-    const token = getToken()
-    const response = await fetch(`${BASE_URL}/api/v1${path}`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    })
-
-    const text = await response.text()
-    const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {}
-    if (!response.ok) {
-      throw new ApiError((payload.error as string) ?? 'Unggah gagal', response.status)
-    }
-    return payload as { url: string }
-  },
+  /** Unggah bukti pembayaran atau faktur; server menjawab `{ url }`. */
+  upload: (path: string, file: File) => request<{ url: string }>(path, { method: 'POST', form: berkasForm(file) }),
 
   /**
-   * Unggah multipart yang mengembalikan bentuk apa pun.
-   *
-   * Terpisah dari `upload` karena kembaliannya berbeda: `upload` menjanjikan
-   * `{ url }` untuk bukti pembayaran, sedangkan impor mengembalikan laporan
-   * berisi hitungan dan daftar baris. Melonggarkan tipe `upload` akan membuat
-   * setiap pemanggilnya kehilangan jaminan yang selama ini dipegang.
+   * Unggah multipart yang mengembalikan bentuk apa pun, untuk impor yang
+   * menjawab laporan berisi hitungan dan daftar baris.
    */
-  async uploadFor<T>(path: string, file: File): Promise<T> {
-    const form = new FormData()
-    form.append('file', file)
+  uploadFor: <T>(path: string, file: File) => request<T>(path, { method: 'POST', form: berkasForm(file) }),
+}
 
-    const token = getToken()
-    const response = await fetch(`${BASE_URL}/api/v1${path}`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    })
-
-    const text = await response.text()
-    const payload = text ? (JSON.parse(text) as Record<string, unknown>) : {}
-    if (!response.ok) {
-      throw new ApiError((payload.error as string) ?? 'Unggah gagal', response.status)
-    }
-    return payload as T
-  },
+function berkasForm(file: File): FormData {
+  const form = new FormData()
+  form.append('file', file)
+  return form
 }
 
 /** Turns a stored path like `/uploads/x.jpg` into a URL the browser can load. */

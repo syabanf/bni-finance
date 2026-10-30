@@ -55,6 +55,13 @@ const KOLOM_CHAPTER = ['id', 'name', 'display_name', 'area_name', 'city_name']
  * supaya template yang diisi tangan dan laporan asli menempuh jalur baca yang
  * satu.
  */
+/**
+ * Cermin importer.MaksUnggah. Server memutus unggahan yang melewati batas di
+ * tengah jalan, dan peramban melaporkannya sebagai koneksi gagal; memeriksa
+ * di sini memberi alasan yang benar sebelum berkasnya terkirim.
+ */
+const MAKS_UNGGAH = 10 << 20
+
 const KOLOM_JATUH_TEMPO = ['Member Name', 'Industry', 'Type', 'Membership Status', 'Due Date', 'Start Date']
 
 /** Nilai "Membership Status" yang dipahami importer; status lain dibiarkan kosong. */
@@ -196,6 +203,10 @@ export function ImportPage() {
   }
 
   const pilihBerkas = (f: File | null) => {
+    if (f && f.size > MAKS_UNGGAH) {
+      toast(`${f.name} berukuran ${(f.size / 1048576).toLocaleString('id-ID', { maximumFractionDigits: 1 })} MB; batasnya 10 MB.`, 'error')
+      f = null
+    }
     setBerkas(f)
     // Pratinjau lama dibuang saat berkasnya berganti, supaya tidak ada yang
     // menekan "Terapkan" atas laporan yang menggambarkan berkas lain.
