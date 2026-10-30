@@ -198,18 +198,25 @@ func idBNI(chapter, nama string) string {
 func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis laporanBNI,
 	format Format, terapkan bool, opsi Opsi) (*Hasil, error) {
 
-	// Laporan BNI Connect tidak memuat chapter yang bisa dicocokkan ke id kita
-	// (Dues menyebutnya hanya di baris parameter, Roster tidak sama sekali),
-	// jadi chapter tujuan harus datang dari tombolnya.
-	if opsi.Chapter == "" {
-		return nil, fmt.Errorf("laporan BNI Connect tidak memuat kolom chapter — pilih chapter tujuan dulu, lalu unggah lagi")
-	}
 	chapters, err := s.repo.ChapterRows(ctx)
 	if err != nil {
 		return nil, err
 	}
+	// Tanpa chapter tujuan, chapternya dibaca dari baris parameter laporan.
+	// Chapter yang belum ada disiapkan di sini dan baru ditulis saat Terapkan.
+	var chapterBaru *ChapterRow
 	tujuan, ada := chapters[opsi.Chapter]
-	if !ada {
+	switch {
+	case opsi.Chapter == "":
+		c, baru, err := chapterDariLaporan(rows, chapters)
+		if err != nil {
+			return nil, err
+		}
+		tujuan, opsi.Chapter = c, c.ID
+		if baru {
+			chapterBaru = &c
+		}
+	case !ada:
 		return nil, fmt.Errorf("chapter %q tidak ada", opsi.Chapter)
 	}
 	// Laporan menyebut chapternya di baris parameter ("Chapter: Supreme").
@@ -234,10 +241,14 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 		}
 	}
 
-	hasil := &Hasil{Format: format, Jenis: JenisMember}
+	hasil := &Hasil{Format: format, Jenis: JenisMember, Chapter: &ChapterHasil{
+		ID:   tujuan.ID,
+		Nama: cmp.Or(tujuan.DisplayName, tujuan.Name, tujuan.ID),
+		Baru: chapterBaru != nil,
+	}}
 	hasil.Peringatan = append(hasil.Peringatan, fmt.Sprintf(
 		"Laporan BNI Connect (%s). Member dicocokkan lewat NAMA di chapter %s; yang belum ada dibuat baru dengan id bc-…",
-		jenis, opsi.Chapter))
+		jenis, hasil.Chapter.Nama))
 	if jenis == laporanLength {
 		hasil.Peringatan = append(hasil.Peringatan,
 			"Kolom Recent Length dan Recent Start date tidak disimpan — sistem ini hanya mencatat satu tanggal bergabung")
@@ -301,6 +312,13 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 
 	hasil.Total = len(hasil.Baris)
 	if terapkan && len(tulis) > 0 {
+		// Chapter lebih dulu: member merujuknya. Bila penulisan member gagal,
+		// chapternya tetap ada, dan unggahan ulang akan mencocokkannya.
+		if chapterBaru != nil {
+			if err := s.repo.UpsertChapters(ctx, []ChapterRow{*chapterBaru}); err != nil {
+				return nil, err
+			}
+		}
 		if err := s.repo.UpsertMembers(ctx, tulis); err != nil {
 			return nil, err
 		}
@@ -322,6 +340,49 @@ func chapterLaporan(rows []sheetRow) string {
 				if w = strings.TrimSpace(w); w != "" {
 					return w
 				}
+			}
+		}
+	}
+	return ""
+}
+
+// chapterDariLaporan mencari chapter yang disebut laporan di antara chapter
+// tersimpan. Bila belum ada, ia menyiapkan baris baru dengan aturan yang sama
+// dengan Tambah Chapter (id "ch-…", nama tampil "BNI …") dan wilayah dari
+// kolom Region laporan.
+func chapterDariLaporan(rows []sheetRow, chapters map[string]ChapterRow) (ChapterRow, bool, error) {
+	nama := chapterLaporan(rows)
+	if nama == "" {
+		return ChapterRow{}, false, fmt.Errorf("laporan ini tidak menyebut chapternya; pilih chapter tujuan dulu, lalu unggah lagi")
+	}
+	for _, c := range chapters {
+		if samaChapter(nama, c) {
+			return c, false, nil
+		}
+	}
+	inti := strings.TrimSpace(awalanBNI.ReplaceAllString(nama, ""))
+	slug := strings.Trim(bukanAlnum.ReplaceAllString(strings.ToLower(inti), "-"), "-")
+	if slug == "" {
+		return ChapterRow{}, false, fmt.Errorf("nama chapter %q di laporan tidak bisa dipakai; pilih chapter tujuan dulu", nama)
+	}
+	return ChapterRow{
+		ID:          "ch-" + slug,
+		Name:        inti,
+		DisplayName: "BNI " + inti,
+		AreaName:    nilaiParameter(rows, "Region"),
+	}, true, nil
+}
+
+var awalanBNI = regexp.MustCompile(`(?i)^bni\s+`)
+
+// nilaiParameter membaca blok "Running User | Run At | Country | Region |
+// Chapter" di kepala laporan: nilai kolom itu ada di baris tepat di bawah
+// judulnya, pada posisi yang sama.
+func nilaiParameter(rows []sheetRow, judul string) string {
+	for i, r := range rows[:max(len(rows)-1, 0)] {
+		for j, v := range r {
+			if strings.EqualFold(strings.TrimSpace(v), judul) && j < len(rows[i+1]) {
+				return strings.TrimSpace(rows[i+1][j])
 			}
 		}
 	}

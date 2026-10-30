@@ -2254,6 +2254,9 @@ paths:
             baris yang menyebut chapter lain **ditolak**. Tidak berlaku untuk
             `jenis=chapters` — berkasnyalah yang mendefinisikan chapter, jadi
             kombinasi itu dijawab 400 alih-alih diabaikan diam-diam.
+            Untuk laporan BNI Connect parameter ini boleh dikosongkan: chapter
+            dibaca dari baris "Chapter:" laporan, dan chapter yang belum ada
+            dibuat saat `terapkan=true` (id `ch-…`, wilayah dari kolom Region).
           schema: { type: string }
         - name: status_bawaan
           in: query
@@ -2302,6 +2305,16 @@ paths:
                   peringatan:
                     type: array
                     items: { type: string }
+                  chapter:
+                    type: object
+                    description: >
+                      Hanya untuk laporan BNI Connect: chapter tempat member
+                      ditulis. `baru` berarti chapter itu dibaca dari laporan,
+                      belum ada, dan dibuat saat diterapkan.
+                    properties:
+                      id: { type: string }
+                      nama: { type: string }
+                      baru: { type: boolean }
                   baris:
                     type: array
                     items:

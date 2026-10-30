@@ -2290,7 +2290,7 @@
           "in": "query",
           "required": false,
           "type": "string",
-          "description": "Batasi impor ke satu chapter. Membuat kolom chapter_id opsional; baris yang menyebut chapter lain ditolak. Tidak berlaku untuk jenis=chapters — berkasnyalah yang mendefinisikan chapter, jadi kombinasi itu dijawab 400 alih-alih diabaikan diam-diam."
+          "description": "Batasi impor ke satu chapter. Membuat kolom chapter_id opsional; baris yang menyebut chapter lain ditolak. Tidak berlaku untuk jenis=chapters — berkasnyalah yang mendefinisikan chapter, jadi kombinasi itu dijawab 400 alih-alih diabaikan diam-diam. Untuk laporan BNI Connect parameter ini boleh dikosongkan: chapter dibaca dari baris \"Chapter:\" laporan, dan chapter yang belum ada dibuat saat terapkan=true (id ch-…, wilayah dari kolom Region)."
         },
         {
           "name": "status_bawaan",

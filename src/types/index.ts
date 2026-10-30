@@ -340,6 +340,8 @@ export interface ImportHasil {
   ditolak: number
   baris: ImportBaris[]
   peringatan?: string[]
+  /** Hanya untuk laporan BNI Connect; baru = chapter dibuat dari laporannya. */
+  chapter?: { id: string; nama: string; baru: boolean }
 }
 
 /** Jawaban MC atas permintaan konfirmasi renewal. */

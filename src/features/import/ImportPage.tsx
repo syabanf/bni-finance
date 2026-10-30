@@ -35,6 +35,11 @@ import { cn } from '@/lib/cn'
  *   2. Membership Dues  urutan jatuh tempo: mengisi tanggal perpanjangan
  *                       member yang sudah ada.
  *
+ * Chapter tujuan boleh dikosongkan: server membaca chapternya dari baris
+ * "Chapter:" di laporan, dan membuat chapter itu saat Terapkan bila belum ada.
+ * Setelah langkah 1 diterapkan, chapter itu menjadi tujuan langkah 2, sehingga
+ * template jatuh tempo bisa diunduh untuk chapter yang baru dibuat.
+ *
  * Urutannya menentukan. Laporan Dues mencocokkan NAMA ke member di chapter
  * tujuan, jadi Roster harus sudah ditulis sebelum Dues ditinjau; wizard
  * menahan langkah 2 sampai langkah 1 diterapkan atau dilewati. Dengan begitu
@@ -133,10 +138,10 @@ export function ImportPage() {
   /**
    * Chapter tujuan dan status bawaan dibaca dari URL.
    *
-   * Datang dari KONTEKS tombolnya (kartu chapter, tombol "Impor Visitor"),
-   * bukan dari isi berkasnya. Laporan BNI Connect tidak memuat kolom chapter,
-   * dan menuntut orang menambahkannya hanya menambah satu tempat untuk salah
-   * ketik yang memindahkan member beserta tagihannya.
+   * Datang dari KONTEKS tombolnya (kartu chapter, tombol "Impor Visitor"), atau
+   * dari laporan BNI Connect yang diterapkan di langkah 1. Berkas yang disusun
+   * tangan tidak dimintai kolom chapter: menuntutnya hanya menambah satu tempat
+   * untuk salah ketik yang memindahkan member beserta tagihannya.
    */
   const chapterTujuan = params.get('chapter') ?? ''
   const statusBawaan = params.get('status') === 'visitor' ? 'visitor' : undefined
@@ -155,7 +160,9 @@ export function ImportPage() {
   const langkah = jenis === 'chapters' ? LANGKAH_CHAPTER : statusBawaan ? LANGKAH_VISITOR : LANGKAH_MEMBER
   const selesai = indeks >= langkah.length
   const aktif = langkah[indeks] as Langkah | undefined
-  const butuhChapter = jenis === 'members' && !chapterTujuan
+  // Laporan BNI Connect menyebut chapternya sendiri; daftar visitor tidak.
+  const butuhChapter = jenis === 'members' && !chapterTujuan && !!statusBawaan
+  const butuhTemplateChapter = aktif?.template === 'jatuhTempo' && !chapterTujuan
 
   useEffect(() => {
     let hidup = true
@@ -238,6 +245,15 @@ export function ImportPage() {
         ? await importService.apply(jenis, berkas, opsi)
         : await importService.preview(jenis, berkas, opsi)
       setHasil(out)
+      // Chapter yang dibaca dari laporan menjadi tujuan langkah berikutnya.
+      // Ditulis ke URL tanpa memulai ulang wizard, karena langkah ini sudah
+      // diterapkan ke chapter itu.
+      if (terapkan && out.chapter && out.chapter.id !== chapterTujuan) {
+        if (out.chapter.baru) chapterService.list().then(setDaftarChapter).catch(() => undefined)
+        const baru = new URLSearchParams(params)
+        baru.set('chapter', out.chapter.id)
+        setParams(baru, { replace: true })
+      }
       if (terapkan) toast(`${aktif.judul}: ${out.baru} baru, ${out.diperbarui} diperbarui, ${out.ditolak} ditolak.`)
     } catch (err) {
       setHasil(null)
@@ -320,12 +336,16 @@ export function ImportPage() {
             label="Chapter tujuan"
             hint={
               jenis === 'members'
-                ? 'Laporan BNI Connect tidak memuat kolom chapter; namanya dicocokkan di chapter ini.'
+                ? statusBawaan
+                  ? 'Daftar visitor tidak memuat chapter; semua baris masuk ke chapter ini.'
+                  : 'Kosongkan untuk memakai chapter yang tertulis di laporan BNI Connect. Chapter yang belum ada dibuat saat Terapkan.'
                 : 'Impor chapter berlaku nasional.'
             }
           >
             <Select value={chapterTujuan} onChange={(e) => pilihChapter(e.target.value)} disabled={sibuk}>
-              <option value="">{jenis === 'members' ? 'Pilih chapter…' : 'Semua chapter (nasional)'}</option>
+              <option value="">
+                {jenis === 'chapters' ? 'Semua chapter (nasional)' : statusBawaan ? 'Pilih chapter…' : 'Dari laporan BNI Connect'}
+              </option>
               {daftarChapter.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.displayName}
@@ -378,7 +398,7 @@ export function ImportPage() {
               {aktif.template && !butuhChapter && (
                 <TombolTemplate
                   onClick={() => unduhTemplate(aktif.template!)}
-                  disabled={menyiapkan}
+                  disabled={menyiapkan || butuhTemplateChapter}
                   judul={
                     menyiapkan
                       ? 'Menyiapkan…'
@@ -388,7 +408,9 @@ export function ImportPage() {
                   }
                   keterangan={
                     aktif.template === 'jatuhTempo'
-                      ? `Format Membership Dues, terisi nama member ${namaChapter}. Pakai bila tidak memegang laporan aslinya.`
+                      ? butuhTemplateChapter
+                        ? 'Pilih chapter tujuan di atas dulu, atau terapkan laporan Roster di langkah 1.'
+                        : `Format Membership Dues, terisi nama member ${namaChapter}. Pakai bila tidak memegang laporan aslinya.`
                       : 'Sudah terisi id dan nama chapter yang ada.'
                   }
                 />
@@ -633,6 +655,14 @@ function HasilImpor({ hasil }: { hasil: ImportHasil }) {
                 : 'Belum ada satu baris pun yang ditulis. Tekan "Terapkan" untuk menyimpannya.'}
             </span>
           </div>
+
+          {hasil.chapter && (
+            <div className="rounded-lg bg-ink-50 p-3 text-xs text-ink-700">
+              Chapter: <span className="font-semibold">{hasil.chapter.nama}</span>
+              {hasil.chapter.baru &&
+                (hasil.diterapkan ? ' (baru dibuat dari laporan)' : ' (belum ada, dibuat saat Terapkan)')}
+            </div>
+          )}
 
           {hasil.peringatan?.map((p) => (
             <div key={p} className="rounded-lg bg-ink-50 p-3 text-xs text-ink-700">

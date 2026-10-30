@@ -64,3 +64,59 @@ func TestSamaChapter(t *testing.T) {
 		}
 	}
 }
+
+// TANPA CHAPTER TUJUAN, CHAPTERNYA DIBACA DARI LAPORAN.
+//
+// Langkah pertama impor cukup mengunggah Roster: chapter yang disebut baris
+// parameternya dipakai bila sudah ada, dan dibuat saat Terapkan bila belum.
+func TestBNIConnectMembacaChapterDariLaporan(t *testing.T) {
+	laporan := func(chapter string) string {
+		return sml(
+			baris(sel(0, "Chapter ► Chapter Roster Report")),
+			baris(sel(0, "Running User"), sel(4, "Region"), sel(6, "Chapter")),
+			baris(sel(0, "Penguji"), sel(4, "Jakarta Utara"), sel(6, chapter)),
+			baris(sel(0, "Chapter:"), sel(12, chapter)),
+			baris(sel(0, "Member Name"), sel(4, "Classification"), sel(8, "Company Name"), sel(12, "Phone")),
+			baris(sel(0, "Budi Santoso"), sel(4, "Bisnis > Konstruksi"), sel(8, "PT Uji"), sel(12, "0812")),
+		)
+	}
+
+	t.Run("chapter yang sudah ada dipakai", func(t *testing.T) {
+		st := stubBNI()
+		h, err := jalankanOpsiErr(t, st, JenisMember, laporan("Rise"), true, Opsi{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Chapter == nil || h.Chapter.ID != "ch-rise" || h.Chapter.Baru {
+			t.Fatalf("chapter harus ch-rise yang sudah ada, dapat %+v", h.Chapter)
+		}
+		if h.Sama+h.Diperbarui != 1 || len(st.tulisCh) != 0 {
+			t.Errorf("Budi harus dicocokkan ke member ch-rise tanpa menulis chapter: %+v, chapter %+v", h, st.tulisCh)
+		}
+	})
+
+	t.Run("chapter baru hanya ditulis saat Terapkan", func(t *testing.T) {
+		st := stubBNI()
+		h, err := jalankanOpsiErr(t, st, JenisMember, laporan("Supreme"), false, Opsi{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.Chapter == nil || h.Chapter.ID != "ch-supreme" || !h.Chapter.Baru || h.Baru != 1 {
+			t.Fatalf("pratinjau harus menyebut chapter baru ch-supreme dan satu member baru: %+v %+v", h, h.Chapter)
+		}
+		if len(st.tulisCh)+len(st.tulisMem) != 0 {
+			t.Fatalf("pratinjau tidak boleh menulis: %+v %+v", st.tulisCh, st.tulisMem)
+		}
+
+		if _, err := jalankanOpsiErr(t, st, JenisMember, laporan("Supreme"), true, Opsi{}); err != nil {
+			t.Fatal(err)
+		}
+		mau := ChapterRow{ID: "ch-supreme", Name: "Supreme", DisplayName: "BNI Supreme", AreaName: "Jakarta Utara"}
+		if len(st.tulisCh) != 1 || st.tulisCh[0] != mau {
+			t.Errorf("chapter tertulis %+v, mau %+v", st.tulisCh, mau)
+		}
+		if len(st.tulisMem) != 1 || st.tulisMem[0].ChapterID != "ch-supreme" {
+			t.Errorf("member harus masuk ch-supreme: %+v", st.tulisMem)
+		}
+	})
+}
