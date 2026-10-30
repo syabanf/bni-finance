@@ -293,10 +293,17 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 		return nil, httpx.Forbidden("tidak boleh menerbitkan invoice untuk chapter lain")
 	}
 
+	// Baris member dikunci sampai transaksi selesai. Penjaga renewal per
+	// konfirmasi dan pendaftaran ganda di bawah membaca invoice yang sudah ada,
+	// dan tanpa kunci ini dua pembuatan serentak sama-sama tidak melihat yang
+	// lain lalu sama-sama lolos. Advisory lock penomoran tidak menutupnya: nomor
+	// dari klien melewatinya, dan kuncinya per tahun due date. NO KEY UPDATE,
+	// bukan UPDATE, supaya penulisan lain yang hanya merujuk member ini lewat
+	// foreign key tidak ikut tertahan.
 	var chapterMember string
 	var statusMember domain.MemberStatus
 	switch err := tx.QueryRow(ctx,
-		"SELECT chapter_id, status FROM members WHERE id = $1", in.MemberID,
+		"SELECT chapter_id, status FROM members WHERE id = $1 FOR NO KEY UPDATE", in.MemberID,
 	).Scan(&chapterMember, &statusMember); {
 	case errors.Is(err, pgx.ErrNoRows):
 		return nil, httpx.BadRequest("memberId tidak ditemukan")
