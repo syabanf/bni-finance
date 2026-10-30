@@ -72,6 +72,17 @@ type Hasil struct {
 	// terutama judul kolom yang tidak dikenal, satu-satunya petunjuk bahwa ada
 	// kolom yang salah ketik dan datanya tidak ikut terbaca.
 	Peringatan []string `json:"peringatan,omitempty"`
+	// Chapter hanya terisi untuk laporan BNI Connect: chapter tempat member
+	// ditulis, termasuk bila dibaca dari laporannya.
+	Chapter *ChapterHasil `json:"chapter,omitempty"`
+}
+
+// ChapterHasil menyebut chapter tujuan impor laporan BNI Connect. Baru = true
+// berarti chapter itu belum ada dan dibuat saat Terapkan.
+type ChapterHasil struct {
+	ID   string `json:"id"`
+	Nama string `json:"nama"`
+	Baru bool   `json:"baru"`
 }
 
 // Store adalah kontrak persistensi yang dibutuhkan importer.
