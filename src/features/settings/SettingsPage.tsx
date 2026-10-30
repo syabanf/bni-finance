@@ -266,7 +266,7 @@ export function SettingsPage() {
                 </div>
                 <div className="rounded-xl border border-ink-200 p-4">
                   <div className="mb-1 text-sm font-semibold text-ink-900">Jatuh Tempo Setelah Dikirim</div>
-                  <div className="mb-3 text-xs text-ink-400">Due date invoice = tanggal kirim + N hari</div>
+                  <div className="mb-3 text-xs text-ink-400">Jatuh tempo invoice = tanggal kirim + N hari</div>
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"

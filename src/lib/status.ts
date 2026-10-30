@@ -91,9 +91,9 @@ export const LABEL_KONFIRMASI: Record<StatusRenewal, string> = {
  * Hanya permintaan terakhir yang dihitung, sama seperti periksaKonfirmasiRenewal
  * di server: jawaban "Diterima" tahun lalu tidak membuka renewal tahun ini.
  *
- * "sudah_ditagih" menahan satu jawaban Diterima dipakai dua kali. Server belum
- * menolak invoice renewal kedua untuk konfirmasi yang sama, jadi tanpa ini
- * member yang ditagih dari Buat Invoice muncul lagi di Perlu Tindakan.
+ * "sudah_ditagih" menyembunyikan member yang jawaban Diterima-nya sudah dipakai.
+ * Server menolak invoice renewal kedua untuk konfirmasi yang sama; tanpa ini
+ * member itu tetap muncul di Perlu Tindakan dan baru ditolak saat dibuat.
  */
 export function statusRenewal(
   permintaan: { memberId: string; requestedAt: string; answer: RenewalAnswer }[],
