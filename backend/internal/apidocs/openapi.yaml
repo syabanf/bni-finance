@@ -2357,6 +2357,11 @@ paths:
         member yang pernah dikembalikan BNI VM. Member dari impor laporan BNI
         Connect dan Tambah Member tidak disentuh.
 
+        **Member yang sudah ada diperbarui dengan aturan ini:** nilai kosong dari
+        BNI VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,
+        dan status BNI VM hanya dipakai saat baris dibuat. Nilai lain yang dikirim
+        BNI VM, termasuk email dan telepon, menimpa nilai tersimpan.
+
         **Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan
         seluruh member BNI VM — jauh lebih mungkin BNI VM sedang bermasalah
         daripada organisasi kehilangan semua anggotanya sekaligus.
