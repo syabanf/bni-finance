@@ -2378,8 +2378,9 @@ paths:
 
         **Member yang sudah ada diperbarui dengan aturan ini:** nilai kosong dari
         BNI VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,
-        dan status BNI VM hanya dipakai saat baris dibuat. Nilai lain yang dikirim
-        BNI VM, termasuk email dan telepon, menimpa nilai tersimpan.
+        dan status BNI VM hanya dipakai saat baris dibuat, kecuali `inactive` yang
+        selalu menonaktifkan member. Nilai lain yang dikirim BNI VM, termasuk email
+        dan telepon, menimpa nilai tersimpan.
 
         **Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan
         seluruh member BNI VM — jauh lebih mungkin BNI VM sedang bermasalah

@@ -66,6 +66,6 @@
 - Data member adalah **read-only** — source of truth ada di BNI Visitor Management
 - Update via sync manual di `/settings/sync`
 - `renewalDate` di member tidak pernah dimundurkan sinkronisasi; pelunasan renewal memajukannya dari `invoices.period_end`
-- Sinkronisasi memakai status BNI VM hanya saat member dibuat; sesudah itu status berubah lewat Ubah Member, pelunasan, atau hilangnya member dari BNI VM
+- Sinkronisasi memakai status BNI VM saat member dibuat; sesudah itu BNI VM hanya bisa menonaktifkan, lewat status `inactive` atau hilangnya member dari snapshot, dan status lain berubah lewat Ubah Member dan pelunasan
 - Nilai kosong dari BNI VM tidak menimpa data tersimpan; nilai yang terisi, termasuk email dan telepon, menimpanya
 - Sinkronisasi hanya menonaktifkan member yang pernah dikembalikan BNI VM (`bni_vm_seen_at` terisi); member dari impor BNI Connect dan Tambah Member tidak disentuh

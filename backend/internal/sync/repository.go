@@ -72,9 +72,9 @@ func (r *Repository) Apply(ctx context.Context, members []RemoteMember, now time
 			  -- A paid renewal advances this date here before BNI VM knows about
 			  -- it, so a sync must not move it back. GREATEST ignores NULL.
 			  renewal_date = greatest(excluded.renewal_date, members.renewal_date),
-			  -- status stays out of this list on purpose: BNI VM only sets it on
-			  -- insert. Afterwards it belongs to PATCH, payments, and the
-			  -- deactivation below.
+			  -- BNI VM sets status on insert. Afterwards it can only deactivate;
+			  -- every other status belongs to PATCH and payments.
+			  status = CASE WHEN excluded.status = 'inactive' THEN excluded.status ELSE members.status END,
 			  synced_at = excluded.synced_at, bni_vm_seen_at = excluded.bni_vm_seen_at`
 		_, err := tx.Exec(ctx, q,
 			m.ID, m.ChapterID, m.Name, m.Email, m.Phone, m.Company,

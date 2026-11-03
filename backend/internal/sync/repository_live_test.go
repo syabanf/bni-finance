@@ -404,8 +404,8 @@ func TestLiveSyncNeverMovesRenewalDateBack(t *testing.T) {
 	}
 }
 
-// Status dari BNI VM hanya dipakai saat baris dibuat. Sesudah itu statusnya
-// berubah lewat PATCH, pelunasan, atau hilangnya member dari snapshot.
+// Status dari BNI VM dipakai saat baris dibuat. Sesudah itu BNI VM hanya bisa
+// menonaktifkan; status lain berubah lewat PATCH dan pelunasan.
 func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 	pool := livePool(t)
 	repo := NewRepository(pool)
@@ -421,11 +421,11 @@ func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 
 	baru := remote("mem-baru", "ch-1", "Garuda", "Baru", "active")
 	manual := remote("mem-manual", "ch-1", "Garuda", "Manual", "active")
-	aktif := remote("mem-aktif", "ch-1", "Garuda", "Aktif", "active")
+	keluar := remote("mem-keluar", "ch-1", "Garuda", "Keluar", "active")
 	kembali := remote("mem-kembali", "ch-1", "Garuda", "Kembali", "active")
 	asing := remote("mem-asing", "ch-1", "Garuda", "Asing", "suspended")
 	tunggu := remote("mem-tunggu", "ch-1", "Garuda", "Tunggu", "pending")
-	mustApply(t, repo, baru, manual, aktif, kembali, asing, tunggu)
+	mustApply(t, repo, baru, manual, keluar, kembali, asing, tunggu)
 
 	// Baris baru mengambil status BNI VM, dan yang tak dikenal menjadi active.
 	for id, want := range map[string]string{"mem-asing": "active", "mem-tunggu": "pending"} {
@@ -436,21 +436,34 @@ func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 
 	setStatus("mem-baru", domain.MemberNewMember)
 	setStatus("mem-manual", domain.MemberInactive)
-	aktif.Status = "inactive"
-	mustApply(t, repo, baru, manual, aktif, asing, tunggu) // mem-kembali hilang dari snapshot
+	setStatus("mem-keluar", domain.MemberNewMember)
+	keluar.Status = "inactive"
+	mustApply(t, repo, baru, manual, keluar, asing, tunggu) // mem-kembali hilang dari snapshot
+	if got := statusOf(t, pool, "mem-keluar"); got != "inactive" {
+		t.Errorf("inactive dari BNI VM harusnya menonaktifkan, dapat %q", got)
+	}
 	if got := statusOf(t, pool, "mem-kembali"); got != "inactive" {
 		t.Fatalf("member yang hilang harusnya inactive, dapat %q", got)
 	}
-	mustApply(t, repo, baru, manual, aktif, kembali, asing, tunggu)
+	keluar.Status = "active"
+	mustApply(t, repo, baru, manual, keluar, kembali, asing, tunggu)
 
 	for id, want := range map[string]string{
 		"mem-baru":    "new_member",
 		"mem-manual":  "inactive",
-		"mem-aktif":   "active",
+		"mem-keluar":  "inactive",
 		"mem-kembali": "inactive",
 	} {
 		if got := statusOf(t, pool, id); got != want {
 			t.Errorf("status %s harusnya %q, dapat %q", id, want, got)
 		}
+	}
+
+	// Selama BNI VM masih menyebutnya inactive, aktivasi lokal tidak bertahan.
+	setStatus("mem-keluar", domain.MemberActive)
+	keluar.Status = "inactive"
+	mustApply(t, repo, keluar)
+	if got := statusOf(t, pool, "mem-keluar"); got != "inactive" {
+		t.Errorf("status mem-keluar harusnya inactive lagi, dapat %q", got)
 	}
 }
