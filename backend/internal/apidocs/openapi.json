@@ -3318,7 +3318,7 @@
           "Member"
         ],
         "summary": "ST meminta konfirmasi renewal ke MC",
-        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n\n**Visitor dilewati**, dan dihitung terpisah dari `dilewati`. Tamu belum\nmenjadi anggota, jadi tidak ada keanggotaan yang bisa diperpanjang —\ndan inilah satu-satunya jalur yang bisa mengirimkan permintaan itu\nkepadanya, karena daftar id-nya dipilih operator, bukan dipanen query\nyang menyaring status. Disatukan dengan `dilewati`, tamu yang terlewat\ntidak bisa dibedakan dari pekerjaan yang memang sudah beres.\n",
+        "description": "**Admin dan ST.** MC tidak boleh meminta konfirmasi kepada dirinya sendiri.\n\n`chapter_id` diambil dari **membernya**, bukan dari klien — klien yang\nmenentukan chapter berarti ST bisa membuat permintaan atas nama chapter\nlain hanya dengan mengirim id yang berbeda. Member di chapter lain\ndijawab **403** dengan menyebut chapternya.\n\n**Satu baris per member per periode.** Menekan tombolnya dua kali tidak\nmenghasilkan permintaan ganda; jawabannya membedakan `dibuat` dari\n`dilewati`, supaya ST melihat \"0 baru, 12 sudah ada\" alih-alih mengira\npermintaan pertamanya hilang.\n\n**Visitor dilewati**, dan dihitung terpisah dari `dilewati`. Tamu belum\nmenjadi anggota, jadi tidak ada keanggotaan yang bisa diperpanjang —\ndan inilah satu-satunya jalur yang bisa mengirimkan permintaan itu\nkepadanya, karena daftar id-nya dipilih operator, bukan dipanen query\nyang menyaring status. Disatukan dengan `dilewati`, tamu yang terlewat\ntidak bisa dibedakan dari pekerjaan yang memang sudah beres.\n\n**MC diberi tahu lewat email**, satu pesan per MC berisi jumlah member\ndi chapternya. MC yang ditugaskan menjadi satu-satunya penerima di\nchapternya. Permintaan lama yang masih menunggu jawaban ikut dihitung,\njadi mengirim ulang id-nya mengulang pemberitahuan. Email yang gagal\ntidak menggagalkan permintaan; hasilnya dilaporkan di `email`.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -3372,6 +3372,29 @@
                     },
                     "total": {
                       "type": "integer"
+                    },
+                    "email": {
+                      "type": "object",
+                      "description": "Hasil pemberitahuan ke MC",
+                      "properties": {
+                        "terkirim": {
+                          "type": "integer"
+                        },
+                        "gagal": {
+                          "type": "integer"
+                        },
+                        "belumDikonfigurasi": {
+                          "type": "boolean",
+                          "description": "RESEND_API_KEY atau MAIL_FROM belum diisi"
+                        },
+                        "chapterTanpaMc": {
+                          "type": "array",
+                          "description": "Id chapter yang belum punya akun MC",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }

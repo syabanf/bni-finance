@@ -2093,6 +2093,12 @@ paths:
         kepadanya, karena daftar id-nya dipilih operator, bukan dipanen query
         yang menyaring status. Disatukan dengan `dilewati`, tamu yang terlewat
         tidak bisa dibedakan dari pekerjaan yang memang sudah beres.
+
+        **MC diberi tahu lewat email**, satu pesan per MC berisi jumlah member
+        di chapternya. MC yang ditugaskan menjadi satu-satunya penerima di
+        chapternya. Permintaan lama yang masih menunggu jawaban ikut dihitung,
+        jadi mengirim ulang id-nya mengulang pemberitahuan. Email yang gagal
+        tidak menggagalkan permintaan; hasilnya dilaporkan di `email`.
       requestBody:
         required: true
         content:
@@ -2124,6 +2130,19 @@ paths:
                   dilewati: { type: integer, description: Sudah ada untuk periode itu }
                   visitor: { type: integer, description: Dilewati karena belum menjadi anggota }
                   total: { type: integer }
+                  email:
+                    type: object
+                    description: Hasil pemberitahuan ke MC
+                    properties:
+                      terkirim: { type: integer }
+                      gagal: { type: integer }
+                      belumDikonfigurasi:
+                        type: boolean
+                        description: RESEND_API_KEY atau MAIL_FROM belum diisi
+                      chapterTanpaMc:
+                        type: array
+                        description: Id chapter yang belum punya akun MC
+                        items: { type: string }
         "403":
           description: Member ada di chapter lain, atau peran tidak boleh menulis
   /api/v1/renewal-requests/{id}:

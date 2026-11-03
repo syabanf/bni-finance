@@ -3,6 +3,7 @@ package chapter
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
+	"github.com/syabanf/bni-finance/backend/internal/httpx"
 	"github.com/syabanf/bni-finance/backend/internal/scope"
 	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
@@ -198,4 +200,30 @@ func ringkas(cs []domain.Chapter) []string {
 		out = append(out, c.ID)
 	}
 	return out
+}
+
+// Akun ST/MC merujuk chapter tanpa terhitung CountDependents. Chapter tanpa
+// member yang masih punya akun harus dijawab 409 yang menyebut sebabnya.
+func TestHapusChapterYangMasihPunyaAkun(t *testing.T) {
+	pool := livePool(t)
+	testdb.Serialize(t, pool)
+	ctx := context.Background()
+	repo := NewRepository(pool)
+	a, b := duaChapter(t, pool)
+
+	const email = "mc-uji-hapus-chapter@example.test"
+	t.Cleanup(func() { _, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE email = $1", email) })
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO users (email, password_hash, name, role, chapter_id) VALUES ($1,'x','Uji','mc',$2)`,
+		email, a); err != nil {
+		t.Fatalf("siapkan akun: %v", err)
+	}
+
+	err := repo.Delete(ctx, a)
+	if httpx.StatusOf(err) != http.StatusConflict || !strings.Contains(err.Error(), "akun ST atau MC") {
+		t.Errorf("chapter berakun: mau 409 yang menyebut akunnya, dapat %v", err)
+	}
+	if err := repo.Delete(ctx, b); err != nil {
+		t.Errorf("chapter kosong harus bisa dihapus: %v", err)
+	}
 }

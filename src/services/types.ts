@@ -131,9 +131,17 @@ export interface RenewalRepository {
     memberIds: string[],
     period: string,
     assignedMc?: string | null,
-  ): Promise<{ dibuat: number; dilewati: number; visitor: number; total: number }>
+  ): Promise<{ dibuat: number; dilewati: number; visitor: number; total: number; email?: HasilEmailMC }>
   /** MC menjawab satu permintaan. */
   answer(id: string, answer: RenewalAnswer, note?: string): Promise<RenewalRequest>
+}
+
+/** Pemberitahuan ke MC setelah permintaan konfirmasi renewal dibuat. */
+export interface HasilEmailMC {
+  terkirim: number
+  gagal: number
+  belumDikonfigurasi: boolean
+  chapterTanpaMc: string[]
 }
 
 export interface ChapterRepository {
@@ -143,6 +151,8 @@ export interface ChapterRepository {
   getById(id: string): Promise<Chapter | null>
   /** Tambah satu chapter (admin). */
   create(input: CreateChapterInput): Promise<Chapter>
+  /** Hapus chapter yang tidak lagi dipakai member, invoice, atau akun (admin). */
+  remove(id: string): Promise<void>
   /** Pull fresh data from BNI VM and refresh the local mirror. */
   sync(): Promise<{ count: number; syncedAt: string }>
 }
@@ -162,7 +172,16 @@ export interface MemberRepository {
   eligibleForRegistration(): Promise<MemberWithChapter[]>
   /** Tambah satu member (admin). */
   create(input: CreateMemberInput): Promise<Member>
+  /** Ubah kontak atau status member (admin). String kosong mengosongkan kolomnya. */
+  update(id: string, input: UpdateMemberInput): Promise<Member>
   sync(): Promise<{ count: number; syncedAt: string }>
+}
+
+export type UpdateMemberInput = Partial<Pick<Member, 'status'>> & {
+  email?: string
+  phone?: string
+  company?: string
+  businessField?: string
 }
 
 export interface CreateMemberInput {

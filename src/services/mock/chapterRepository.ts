@@ -27,6 +27,17 @@ export const mockChapterRepository: ChapterRepository = {
     return delay(chapter, 250)
   },
 
+  async remove(id) {
+    // Penjaga yang sama dengan server.
+    const member = store.members.filter((m) => m.chapterId === id).length
+    const invoice = store.invoices.filter((i) => i.chapterId === id).length
+    if (member > 0 || invoice > 0) {
+      throw new Error(`chapter masih dipakai oleh ${member} member dan ${invoice} invoice`)
+    }
+    store.chapters = store.chapters.filter((c) => c.id !== id)
+    return delay(undefined, 250)
+  },
+
   async getById(id) {
     return delay(store.chapters.find((c) => c.id === id) ?? null)
   },

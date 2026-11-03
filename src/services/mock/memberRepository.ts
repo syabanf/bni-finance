@@ -68,6 +68,13 @@ export const mockMemberRepository: MemberRepository = {
     return delay(member, 300)
   },
 
+  async update(id, input) {
+    const member = store.members.find((m) => m.id === id)
+    if (!member) throw new Error('Member tidak ditemukan.')
+    Object.assign(member, input)
+    return delay(member, 250)
+  },
+
   async sync() {
     const syncedAt = nowISO()
     store.members = store.members.map((m) => ({ ...m, syncedAt }))

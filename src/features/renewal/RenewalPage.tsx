@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, FileText, FileUp, HelpCircle, Send, XCircle } from 'lucide-react'
 import type { MemberWithChapter, RenewalAnswer, RenewalRequest } from '@/types'
 import {
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, importService, memberService, renewalService, userService } from '@/services'
+import type { HasilEmailMC } from '@/services/types'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useCan } from '@/features/auth/usePermission'
 import { muatStatusRenewal } from './statusRenewal'
@@ -97,7 +98,9 @@ const periodeAwal = periodeSemester(new Date())
 export function RenewalPage() {
   const { toast } = useToast()
   const { user } = useAuth()
-  const [period, setPeriod] = useState(periodeAwal)
+  // Email ke MC menautkan ?periode=, supaya halaman membuka periode yang ditanyakan.
+  const [params] = useSearchParams()
+  const [period, setPeriod] = useState(params.get('periode') ?? periodeAwal)
   const [chapterFilter, setChapterFilter] = useState('all')
   const permintaan = useAsync(() => renewalService.list({ period }), [period])
   const navigate = useNavigate()
@@ -253,6 +256,7 @@ export function RenewalPage() {
               sudahDiminta={new Set((permintaan.data ?? []).map((r) => r.memberId))}
               lintasChapter={lintasChapter}
               chapterOptions={(chapters.data ?? []).map((c) => ({ id: c.id, displayName: c.displayName }))}
+              namaChapter={(id) => namaChapterDari.get(id) ?? id}
               daftarMc={daftarMc.map((u) => ({
                 id: u.id,
                 nama: u.name,
@@ -516,12 +520,32 @@ const LABEL_KELOMPOK: Record<Kelompok, string> = {
   tanpaTanggal: 'Tanpa tanggal jatuh tempo',
 }
 
+/**
+ * Status pemberitahuan ke MC, untuk disebut di toast. Permintaan tetap tersimpan
+ * saat email gagal, jadi ST harus tahu MC mana yang perlu dihubungi sendiri.
+ */
+function pesanEmail(email: HasilEmailMC | undefined, namaChapter: (id: string) => string): string | null {
+  if (!email) return null
+  const tanpaMc = email.chapterTanpaMc.map(namaChapter).join(', ')
+  return (
+    [
+      email.belumDikonfigurasi ? 'email ke MC belum aktif di server' : null,
+      email.terkirim > 0 ? `email terkirim ke ${email.terkirim} MC` : null,
+      email.gagal > 0 ? `email gagal ke ${email.gagal} MC` : null,
+      tanpaMc ? `${tanpaMc} belum punya akun MC` : null,
+    ]
+      .filter(Boolean)
+      .join(', ') || null
+  )
+}
+
 function TombolMinta({
   period,
   sudahDiminta,
   daftarMc,
   lintasChapter,
   chapterOptions,
+  namaChapter,
   onDone,
 }: {
   period: string
@@ -529,6 +553,7 @@ function TombolMinta({
   daftarMc: { id: string; nama: string; chapterId: string | null; namaChapter: string | null }[]
   lintasChapter: boolean
   chapterOptions: { id: string; displayName: string }[]
+  namaChapter: (id: string) => string
   onDone: () => void
 }) {
   const { toast } = useToast()
@@ -652,6 +677,7 @@ function TombolMinta({
           ? `${hasil.visitor} dilewati karena masih berstatus visitor`
           : null,
         takDikenal.length > 0 ? `${takDikenal.length} nama di laporan tidak dikenal` : null,
+        pesanEmail(hasil.email, namaChapter),
       ].filter(Boolean)
       toast(
         bagian.length > 0
@@ -679,7 +705,7 @@ function TombolMinta({
         <div className="space-y-4">
           <Field
             label="Chapter"
-            hint="Menentukan member siapa saja yang ditanyakan."
+            hint="Menentukan member siapa saja yang ditanyakan. Dengan Semua chapter, tiap MC menerima email untuk chapternya sendiri."
           >
             <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)}>
               <option value="all">Semua chapter</option>

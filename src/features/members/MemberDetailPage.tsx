@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Calendar, Mail, Phone, Plus } from 'lucide-react'
+import { ArrowLeft, Calendar, Mail, Pencil, Phone, Plus } from 'lucide-react'
 import type { Invoice, MemberWithChapter } from '@/types'
 import {
   Avatar,
@@ -24,12 +25,18 @@ import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, memberService } from '@/services'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { bolehDitagih } from '@/lib/status'
+import { useCan } from '@/features/auth/usePermission'
+import { UbahMemberModal } from './components/UbahMemberModal'
 
 export function MemberDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
 
-  const { data: member, loading } = useAsync<MemberWithChapter | null>(
+  // Mengubah member admin-saja di server, sama seperti Tambah Member.
+  const bolehUbah = useCan('settings:manage')
+  const [ubahBuka, setUbahBuka] = useState(false)
+
+  const { data: member, loading, reload } = useAsync<MemberWithChapter | null>(
     () => memberService.getById(id),
     [id],
   )
@@ -70,18 +77,28 @@ export function MemberDetailPage() {
         action={
           // Tipe mengikuti status: yang belum anggota (termasuk New Member yang
           // baru ditambahkan) ditagih pendaftaran, member aktif ditagih renewal.
-          <Button
-            onClick={() =>
-              navigate(
-                `/invoices/new?type=${bolehDitagih(member.status, 'registration') ? 'registration' : 'renewal'}&member=${member.id}`,
-              )
-            }
-          >
-            <Plus className="h-4 w-4" />
-            Buat Invoice
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {bolehUbah && (
+              <Button variant="outline" onClick={() => setUbahBuka(true)}>
+                <Pencil className="h-4 w-4" />
+                Ubah Data
+              </Button>
+            )}
+            <Button
+              onClick={() =>
+                navigate(
+                  `/invoices/new?type=${bolehDitagih(member.status, 'registration') ? 'registration' : 'renewal'}&member=${member.id}`,
+                )
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Buat Invoice
+            </Button>
+          </div>
         }
       />
+
+      <UbahMemberModal open={ubahBuka} onClose={() => setUbahBuka(false)} onDisimpan={reload} member={member} />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Profile */}
@@ -96,8 +113,8 @@ export function MemberDetailPage() {
               </div>
             </CardBody>
             <div className="space-y-3 border-t border-ink-100 px-5 py-4 text-sm">
-              <InfoRow icon={Mail} value={member.email ?? '—'} />
-              <InfoRow icon={Phone} value={member.phone ?? '—'} />
+              <InfoRow icon={Mail} value={member.email || '—'} />
+              <InfoRow icon={Phone} value={member.phone || '—'} />
               {member.joinedDate && <InfoRow icon={Calendar} value={`Bergabung ${formatDate(member.joinedDate)}`} />}
             </div>
             <div className="border-t border-ink-100 px-5 py-4">

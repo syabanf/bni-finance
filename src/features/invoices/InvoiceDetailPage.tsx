@@ -707,7 +707,11 @@ export function InvoiceDetailPage() {
         open={dialog === 'cancel'}
         onClose={() => setDialog(null)}
         title="Batalkan invoice?"
-        description="Invoice yang dibatalkan tidak dapat dikembalikan."
+        description={
+          hasPayUrl
+            ? 'Invoice yang dibatalkan tidak dapat dikembalikan. Tautan pembayaran di Paper.id tidak ikut mati: batalkan juga di dashboard Paper.id, karena pembayaran lewat tautan itu tidak akan tercatat di sini.'
+            : 'Invoice yang dibatalkan tidak dapat dikembalikan.'
+        }
         footer={
           <>
             <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
