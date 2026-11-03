@@ -154,7 +154,7 @@ export interface ChapterRepository {
   /** Hapus chapter yang tidak lagi dipakai member, invoice, atau akun (admin). */
   remove(id: string): Promise<void>
   /** Pull fresh data from BNI VM and refresh the local mirror. */
-  sync(): Promise<{ count: number; syncedAt: string }>
+  sync(): Promise<{ count: number; syncedAt: string; needsReview?: string[] }>
 }
 
 export interface CreateChapterInput {
@@ -174,7 +174,7 @@ export interface MemberRepository {
   create(input: CreateMemberInput): Promise<Member>
   /** Ubah kontak atau status member (admin). String kosong mengosongkan kolomnya. */
   update(id: string, input: UpdateMemberInput): Promise<Member>
-  sync(): Promise<{ count: number; syncedAt: string }>
+  sync(): Promise<{ count: number; syncedAt: string; needsReview?: string[] }>
 }
 
 export type UpdateMemberInput = Partial<Pick<Member, 'status'>> & {

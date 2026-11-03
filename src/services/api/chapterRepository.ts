@@ -39,7 +39,7 @@ export const apiChapterRepository: ChapterRepository = {
     // One server-side call refreshes chapters AND members — BNI VM has no
     // chapters endpoint, so chapters are derived from the member list.
     const result = await runSync()
-    return { count: result.chapters, syncedAt: result.syncedAt }
+    return { count: result.chapters, syncedAt: result.syncedAt, needsReview: result.needsReview }
   },
 }
 

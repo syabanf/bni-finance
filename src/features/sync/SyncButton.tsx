@@ -39,6 +39,12 @@ export function SyncButton({
       const { chapterService, memberService } = await import('@/services')
       const res = jenis === 'member' ? await memberService.sync() : await chapterService.sync()
       toast(`${res.count} ${jenis} berhasil ditarik dari BNI Visitor Management.`)
+      const tinjau = res.needsReview ?? []
+      if (tinjau.length > 0) {
+        const contoh = tinjau.slice(0, 5).join(', ')
+        const sisa = tinjau.length > 5 ? ` dan ${tinjau.length - 5} lainnya` : ''
+        toast(`Periksa kemungkinan duplikat, namanya tidak unik: ${contoh}${sisa}.`, 'info')
+      }
       onSelesai?.()
     } catch (err) {
       toast(

@@ -58,6 +58,10 @@ func TestSamaChapter(t *testing.T) {
 	if !samaChapter("Champion", ChapterRow{ID: "ch-champion", Name: "Champion", DisplayName: "BNI Champion"}) {
 		t.Error("Champion harus cocok dengan BNI Champion")
 	}
+	// Contoh kontrak BNI VM menulis chapter dengan akhiran "Chapter".
+	if !samaChapter("BNI Supreme Chapter", c) {
+		t.Error("BNI Supreme Chapter harus cocok")
+	}
 	for _, n := range []string{"Supreme Jakarta", "Rise", ""} {
 		if samaChapter(n, c) {
 			t.Errorf("%q tidak boleh cocok", n)
@@ -119,4 +123,17 @@ func TestBNIConnectMembacaChapterDariLaporan(t *testing.T) {
 			t.Errorf("member harus masuk ch-supreme: %+v", st.tulisMem)
 		}
 	})
+}
+
+// Sinkron lama bisa meninggalkan dua chapter bernama sama. Map tidak punya urutan,
+// jadi memilih yang pertama cocok membuat tujuan impor berubah tiap unggahan.
+func TestChapterDariLaporanMenolakChapterGanda(t *testing.T) {
+	rows := []sheetRow{{"Chapter:", "Supreme"}}
+	chapters := map[string]ChapterRow{
+		"ch-supreme": {ID: "ch-supreme", Name: "Supreme", DisplayName: "BNI Supreme"},
+		"uuid-vm":    {ID: "uuid-vm", Name: "BNI Supreme Chapter", DisplayName: "BNI Supreme Chapter"},
+	}
+	if _, _, err := chapterDariLaporan(rows, chapters); err == nil {
+		t.Fatal("dua chapter cocok harus ditolak")
+	}
 }

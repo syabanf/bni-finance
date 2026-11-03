@@ -176,11 +176,6 @@ func bacaBNIConnect(rows []sheetRow, jenis laporanBNI) []barisBNI {
 
 var bukanAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
-// normalNama menyamakan "Anasthasia  Winna" dan "anasthasia winna".
-func normalNama(s string) string {
-	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
-}
-
 // idBNI menurunkan id member baru dari chapter dan namanya.
 //
 // Deterministik, bukan acak: laporan yang sama diimpor dua kali harus
@@ -237,7 +232,7 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 	perNama := map[string]MemberRow{}
 	for _, m := range tersimpan {
 		if m.ChapterID == opsi.Chapter {
-			perNama[normalNama(m.Name)] = m
+			perNama[domain.KunciNamaMember(m.Name)] = m
 		}
 	}
 
@@ -258,7 +253,7 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 	terlihat := map[string]int{}
 	for _, br := range bacaBNIConnect(rows, jenis) {
 		b := Baris{Nomor: br.Nomor, Nama: br.Nama}
-		kunci := normalNama(br.Nama)
+		kunci := domain.KunciNamaMember(br.Nama)
 		if n := terlihat[kunci]; n > 0 {
 			b.Tindakan = TindakanDitolak
 			b.Alasan = fmt.Sprintf("nama %q sudah muncul di baris %d", br.Nama, n)
@@ -355,10 +350,19 @@ func chapterDariLaporan(rows []sheetRow, chapters map[string]ChapterRow) (Chapte
 	if nama == "" {
 		return ChapterRow{}, false, fmt.Errorf("laporan ini tidak menyebut chapternya; pilih chapter tujuan dulu, lalu unggah lagi")
 	}
+	var cocok []ChapterRow
 	for _, c := range chapters {
 		if samaChapter(nama, c) {
-			return c, false, nil
+			cocok = append(cocok, c)
 		}
+	}
+	switch len(cocok) {
+	case 0:
+	case 1:
+		return cocok[0], false, nil
+	default:
+		return ChapterRow{}, false, fmt.Errorf("laporan chapter %q cocok dengan %d chapter tersimpan; pilih chapter tujuan dulu, lalu unggah lagi",
+			nama, len(cocok))
 	}
 	inti := strings.TrimSpace(awalanBNI.ReplaceAllString(nama, ""))
 	slug := strings.Trim(bukanAlnum.ReplaceAllString(strings.ToLower(inti), "-"), "-")
@@ -390,15 +394,9 @@ func nilaiParameter(rows []sheetRow, judul string) string {
 }
 
 // samaChapter mencocokkan nama chapter di laporan dengan chapter tujuan lewat
-// id, nama, atau nama tampilnya, mengabaikan huruf besar, spasi, tanda baca,
-// awalan "BNI" dan "ch-". "Supreme" cocok dengan "BNI Supreme" dan "ch-supreme".
+// id, nama, atau nama tampilnya, lewat domain.KunciChapter.
 func samaChapter(laporan string, c ChapterRow) bool {
-	inti := func(s string) string {
-		s = strings.ToLower(strings.TrimSpace(s))
-		s = strings.TrimPrefix(s, "ch-")
-		s = strings.TrimPrefix(s, "bni ")
-		return bukanAlnum.ReplaceAllString(s, "")
-	}
-	n := inti(laporan)
-	return n != "" && (n == inti(c.ID) || n == inti(c.Name) || n == inti(c.DisplayName))
+	n := domain.KunciChapter(laporan)
+	return n != "" && (n == domain.KunciChapter(c.ID) || n == domain.KunciChapter(c.Name) ||
+		n == domain.KunciChapter(c.DisplayName))
 }

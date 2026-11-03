@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -158,4 +159,9 @@ type MemberFilter struct {
 	RenewalTo   string
 	Limit       int
 	Offset      int
+}
+
+// KunciNamaMember menyamakan "Anasthasia  Winna" dan "anasthasia winna".
+func KunciNamaMember(s string) string {
+	return strings.Join(strings.Fields(strings.ToLower(s)), " ")
 }

@@ -68,4 +68,6 @@
 - `renewalDate` di member tidak pernah dimundurkan sinkronisasi; pelunasan renewal memajukannya dari `invoices.period_end`
 - Sinkronisasi memakai status BNI VM saat member dibuat; sesudah itu BNI VM hanya bisa menonaktifkan, lewat status `inactive` atau hilangnya member dari snapshot, dan status lain berubah lewat Ubah Member dan pelunasan
 - Nilai kosong dari BNI VM tidak menimpa data tersimpan; nilai yang terisi, termasuk email dan telepon, menimpanya
-- Sinkronisasi hanya menonaktifkan member yang pernah dikembalikan BNI VM (`bni_vm_seen_at` terisi); member dari impor BNI Connect dan Tambah Member tidak disentuh
+- Sinkronisasi hanya menonaktifkan member yang tertaut ke BNI VM (`bni_vm_id` terisi); member dari impor BNI Connect dan Tambah Member yang belum tertaut tidak disentuh
+- Sinkronisasi menautkan baris yang sudah ada lewat nama di dalam chapter yang sama, dan chapter lewat namanya, bila unik di kedua sisi; yang ambigu mendapat baris baru dan tercantum di `needsReview`
+- Id baris tidak berubah saat ditautkan. Duplikat yang terbentuk sebelum aturan ini tidak digabungkan otomatis

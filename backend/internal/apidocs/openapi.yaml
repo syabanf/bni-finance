@@ -2373,8 +2373,15 @@ paths:
         **Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**
         Menghapusnya akan melanggar foreign key begitu mereka punya invoice, dan
         membuang riwayat tagihan meski berhasil. Aturan ini hanya berlaku bagi
-        member yang pernah dikembalikan BNI VM. Member dari impor laporan BNI
-        Connect dan Tambah Member tidak disentuh.
+        member yang tertaut ke BNI VM. Member dari impor laporan BNI Connect dan
+        Tambah Member yang belum tertaut tidak disentuh.
+
+        **Baris yang sudah ada ditautkan, tidak digandakan.** Sinkronisasi mencari
+        baris lewat tautan sebelumnya, lalu lewat id, lalu lewat nama: chapter
+        dengan nama chapter, member dengan nama di dalam chapter yang sama. Nama
+        hanya menautkan bila unik di kedua sisi. Yang ambigu mendapat baris baru
+        dan tercantum di `needsReview`. Id baris tidak berubah, jadi invoice dan
+        lingkup akun ST/MC tetap utuh. Duplikat yang sudah ada tidak digabungkan.
 
         **Member yang sudah ada diperbarui dengan aturan ini:** nilai kosong dari
         BNI VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,
@@ -3607,7 +3614,7 @@ components:
 
     SyncResult:
       type: object
-      required: [chapters, members, deactivated, syncedAt]
+      required: [chapters, members, deactivated, linkedChapters, linkedMembers, needsReview, syncedAt]
       properties:
         chapters:
           type: integer
@@ -3620,6 +3627,18 @@ components:
           description: |
             Member lokal yang tidak lagi ada di BNI VM, jadi statusnya diubah
             menjadi `inactive`. Tidak ada yang dihapus.
+        linkedChapters:
+          type: integer
+          description: Chapter tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama.
+        linkedMembers:
+          type: integer
+          description: Member tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama.
+        needsReview:
+          type: array
+          items: { type: string }
+          description: |
+            Baris BNI VM yang namanya cocok secara ambigu dengan baris tersimpan.
+            Baris ini mendapat baris baru, jadi bisa saja duplikat.
         syncedAt: { type: string, format: date-time }
 
     XenditWebhook:
