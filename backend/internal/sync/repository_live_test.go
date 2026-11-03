@@ -190,6 +190,15 @@ func TestLiveSyncKeepsLocalDisplayName(t *testing.T) {
 	}
 }
 
+func strPtr(v string) *string { return &v }
+
+func mustApply(t *testing.T, repo *Repository, rows ...RemoteMember) {
+	t.Helper()
+	if _, err := repo.Apply(t.Context(), rows, time.Now()); err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+}
+
 func statusOf(t *testing.T, pool *pgxpool.Pool, id string) string {
 	t.Helper()
 	var status string
@@ -272,26 +281,20 @@ func TestLiveExistingMemberBecomesBNIVMWhenReturned(t *testing.T) {
 	repo := NewRepository(pool)
 	ctx := t.Context()
 	budi := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
-	apply := func(members ...RemoteMember) {
-		t.Helper()
-		if _, err := repo.Apply(ctx, members, time.Now()); err != nil {
-			t.Fatalf("sinkronisasi: %v", err)
-		}
-	}
 
-	apply(budi)
+	mustApply(t, repo, budi)
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO members (id, chapter_id, name, status) VALUES ('mem-lama', 'ch-1', 'Lama', 'active')`); err != nil {
 		t.Fatalf("buat member lama: %v", err)
 	}
 
-	apply(budi)
+	mustApply(t, repo, budi)
 	if got := statusOf(t, pool, "mem-lama"); got != "active" {
 		t.Fatalf("member yang belum pernah dikembalikan BNI VM dinonaktifkan: %q", got)
 	}
 
-	apply(budi, remote("mem-lama", "ch-1", "Garuda", "Lama", "active"))
-	apply(budi)
+	mustApply(t, repo, budi, remote("mem-lama", "ch-1", "Garuda", "Lama", "active"))
+	mustApply(t, repo, budi)
 	if got := statusOf(t, pool, "mem-lama"); got != "inactive" {
 		t.Errorf("member yang hilang dari BNI VM harusnya inactive, dapat %q", got)
 	}
@@ -302,23 +305,18 @@ func TestLiveSyncEmptyValuesKeepStoredData(t *testing.T) {
 	pool := livePool(t)
 	repo := NewRepository(pool)
 	ctx := t.Context()
-	s := func(v string) *string { return &v }
 
 	lengkap := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
-	lengkap.Email, lengkap.Phone = s("budi@example.com"), s("0811")
-	lengkap.Company, lengkap.BusinessField = s("PT Maju"), s("Konsultan")
-	lengkap.JoinedDate, lengkap.RenewalDate = s("2025-01-15"), s("2027-01-15")
-	if _, err := repo.Apply(ctx, []RemoteMember{lengkap}, time.Now()); err != nil {
-		t.Fatalf("sinkronisasi awal: %v", err)
-	}
+	lengkap.Email, lengkap.Phone = strPtr("budi@example.com"), strPtr("0811")
+	lengkap.Company, lengkap.BusinessField = strPtr("PT Maju"), strPtr("Konsultan")
+	lengkap.JoinedDate, lengkap.RenewalDate = strPtr("2025-01-15"), strPtr("2027-01-15")
+	mustApply(t, repo, lengkap)
 
 	sebagian := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
-	sebagian.Email, sebagian.Phone = nil, s("")
-	sebagian.Company, sebagian.BusinessField = s(""), nil
-	sebagian.JoinedDate, sebagian.RenewalDate = s(""), nil
-	if _, err := repo.Apply(ctx, []RemoteMember{sebagian}, time.Now()); err != nil {
-		t.Fatalf("sinkronisasi nilai kosong: %v", err)
-	}
+	sebagian.Email, sebagian.Phone = nil, strPtr("")
+	sebagian.Company, sebagian.BusinessField = strPtr(""), nil
+	sebagian.JoinedDate, sebagian.RenewalDate = strPtr(""), nil
+	mustApply(t, repo, sebagian)
 
 	var email, phone, company, field, joined, renewal string
 	if err := pool.QueryRow(ctx, `
@@ -337,21 +335,16 @@ func TestLiveSyncContactFollowsBNIVM(t *testing.T) {
 	pool := livePool(t)
 	repo := NewRepository(pool)
 	ctx := scope.WithoutLimit(t.Context())
-	s := func(v string) *string { return &v }
 
 	vm := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
-	vm.Email, vm.Phone = s("vm@example.com"), s("0811")
-	if _, err := repo.Apply(ctx, []RemoteMember{vm}, time.Now()); err != nil {
-		t.Fatalf("sinkronisasi awal: %v", err)
-	}
+	vm.Email, vm.Phone = strPtr("vm@example.com"), strPtr("0811")
+	mustApply(t, repo, vm)
 	if _, err := member.NewRepository(pool).Update(ctx, "mem-1", domain.UpdateMemberInput{
-		Email: s("manual@example.com"), Phone: s("0899"),
+		Email: strPtr("manual@example.com"), Phone: strPtr("0899"),
 	}); err != nil {
 		t.Fatalf("ubah member: %v", err)
 	}
-	if _, err := repo.Apply(ctx, []RemoteMember{vm}, time.Now()); err != nil {
-		t.Fatalf("sinkronisasi ulang: %v", err)
-	}
+	mustApply(t, repo, vm)
 
 	var email, phone string
 	if err := pool.QueryRow(ctx, "SELECT email, phone FROM members WHERE id = 'mem-1'").Scan(&email, &phone); err != nil {
@@ -369,23 +362,18 @@ func TestLiveSyncNeverMovesRenewalDateBack(t *testing.T) {
 	repo := NewRepository(pool)
 	ctx := t.Context()
 
-	dengan := func(tanggal string) RemoteMember {
+	syncRenewal := func(tanggal string) string {
+		t.Helper()
 		m := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
 		m.RenewalDate = &tanggal
-		return m
-	}
-	apply := func(m RemoteMember) string {
-		t.Helper()
-		if _, err := repo.Apply(ctx, []RemoteMember{m}, time.Now()); err != nil {
-			t.Fatalf("sinkronisasi: %v", err)
-		}
+		mustApply(t, repo, m)
 		var renewal string
 		if err := pool.QueryRow(ctx, "SELECT renewal_date::text FROM members WHERE id = 'mem-1'").Scan(&renewal); err != nil {
 			t.Fatalf("ambil renewal_date: %v", err)
 		}
 		return renewal
 	}
-	apply(dengan("2026-06-01"))
+	syncRenewal("2026-06-01")
 
 	var invoiceID string
 	if err := pool.QueryRow(ctx, `
@@ -408,10 +396,10 @@ func TestLiveSyncNeverMovesRenewalDateBack(t *testing.T) {
 		t.Fatalf("simpan pelunasan: %v", err)
 	}
 
-	if got := apply(dengan("2026-06-01")); got != "2028-06-01" {
+	if got := syncRenewal("2026-06-01"); got != "2028-06-01" {
 		t.Errorf("sinkronisasi memundurkan renewal_date yang sudah lunas ke %s", got)
 	}
-	if got := apply(dengan("2029-06-01")); got != "2029-06-01" {
+	if got := syncRenewal("2029-06-01"); got != "2029-06-01" {
 		t.Errorf("tanggal BNI VM yang lebih jauh harusnya dipakai, dapat %s", got)
 	}
 }
@@ -424,12 +412,6 @@ func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 	ctx := scope.WithoutLimit(t.Context())
 	members := member.NewRepository(pool)
 
-	apply := func(rows ...RemoteMember) {
-		t.Helper()
-		if _, err := repo.Apply(ctx, rows, time.Now()); err != nil {
-			t.Fatalf("sinkronisasi: %v", err)
-		}
-	}
 	setStatus := func(id string, status domain.MemberStatus) {
 		t.Helper()
 		if _, err := members.Update(ctx, id, domain.UpdateMemberInput{Status: &status}); err != nil {
@@ -443,7 +425,7 @@ func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 	kembali := remote("mem-kembali", "ch-1", "Garuda", "Kembali", "active")
 	asing := remote("mem-asing", "ch-1", "Garuda", "Asing", "suspended")
 	tunggu := remote("mem-tunggu", "ch-1", "Garuda", "Tunggu", "pending")
-	apply(baru, manual, aktif, kembali, asing, tunggu)
+	mustApply(t, repo, baru, manual, aktif, kembali, asing, tunggu)
 
 	// Baris baru mengambil status BNI VM, dan yang tak dikenal menjadi active.
 	for id, want := range map[string]string{"mem-asing": "active", "mem-tunggu": "pending"} {
@@ -455,11 +437,11 @@ func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 	setStatus("mem-baru", domain.MemberNewMember)
 	setStatus("mem-manual", domain.MemberInactive)
 	aktif.Status = "inactive"
-	apply(baru, manual, aktif, asing, tunggu) // mem-kembali hilang dari snapshot
+	mustApply(t, repo, baru, manual, aktif, asing, tunggu) // mem-kembali hilang dari snapshot
 	if got := statusOf(t, pool, "mem-kembali"); got != "inactive" {
 		t.Fatalf("member yang hilang harusnya inactive, dapat %q", got)
 	}
-	apply(baru, manual, aktif, kembali, asing, tunggu)
+	mustApply(t, repo, baru, manual, aktif, kembali, asing, tunggu)
 
 	for id, want := range map[string]string{
 		"mem-baru":    "new_member",
