@@ -131,16 +131,17 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*domain.RenewalReq
 // harus melihat "0 baru, 12 sudah ada", bukan "12 dibuat" yang membuatnya
 // mengira permintaan pertamanya hilang.
 func (r *Repository) Create(ctx context.Context, memberIDs []string, period string,
-	requestedBy string, assignedMC *string) (dibuat, dilewati, visitor int, err error) {
+	requestedBy string, assignedMC *string) (*HasilCreate, error) {
 
 	lim := scope.Chapter(ctx)
 	if lim.Buntu {
-		return 0, 0, 0, httpx.Forbidden("tidak ada lingkup chapter pada permintaan ini")
+		return nil, httpx.Forbidden("tidak ada lingkup chapter pada permintaan ini")
 	}
+	hasil := &HasilCreate{BelumDijawab: map[string]int{}}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("mulai transaksi: %w", err)
+		return nil, fmt.Errorf("mulai transaksi: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -153,12 +154,12 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 		switch err := tx.QueryRow(ctx,
 			"SELECT chapter_id, status FROM members WHERE id = $1", id).Scan(&chapterID, &status); {
 		case errors.Is(err, pgx.ErrNoRows):
-			return 0, 0, 0, httpx.BadRequest(fmt.Sprintf("member %q tidak ditemukan", id))
+			return nil, httpx.BadRequest(fmt.Sprintf("member %q tidak ditemukan", id))
 		case err != nil:
-			return 0, 0, 0, fmt.Errorf("baca chapter member: %w", err)
+			return nil, fmt.Errorf("baca chapter member: %w", err)
 		}
 		if lim.Terbatas && chapterID != lim.ChapterID {
-			return 0, 0, 0, httpx.Forbidden(fmt.Sprintf(
+			return nil, httpx.Forbidden(fmt.Sprintf(
 				"member %q ada di chapter lain (%s)", id, chapterID))
 		}
 
@@ -172,7 +173,7 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 		// keduanya membuat tamu yang terlewat tidak bisa dibedakan dari
 		// pekerjaan yang sudah beres. Yang satu wajar, yang satu perlu dilihat.
 		if !status.BolehDitagih(domain.TypeRenewal) {
-			visitor++
+			hasil.Visitor++
 			continue
 		}
 
@@ -186,19 +187,53 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 			ON CONFLICT (member_id, period) DO NOTHING`,
 			id, chapterID, period, requestedBy, assignedMC)
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("simpan permintaan renewal: %w", err)
+			return nil, fmt.Errorf("simpan permintaan renewal: %w", err)
 		}
 		if tag.RowsAffected() == 1 {
-			dibuat++
-		} else {
-			dilewati++
+			hasil.Dibuat++
+			hasil.BelumDijawab[chapterID]++
+			continue
+		}
+		hasil.Dilewati++
+		// Permintaan lama yang masih menunggu ikut dihitung: ST yang mencentangnya
+		// lagi sedang mengingatkan MC, atau mengulang email yang dulu gagal.
+		var jawaban domain.RenewalAnswer
+		if err := tx.QueryRow(ctx,
+			"SELECT answer FROM renewal_requests WHERE member_id = $1 AND period = $2", id, period,
+		).Scan(&jawaban); err != nil {
+			return nil, fmt.Errorf("baca permintaan renewal: %w", err)
+		}
+		if jawaban == domain.RenewalPending {
+			hasil.BelumDijawab[chapterID]++
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return 0, 0, 0, fmt.Errorf("simpan permintaan renewal: %w", err)
+		return nil, fmt.Errorf("simpan permintaan renewal: %w", err)
 	}
-	return dibuat, dilewati, visitor, nil
+	return hasil, nil
+}
+
+// PenerimaMC mengambil akun MC di chapter-chapter ini.
+func (r *Repository) PenerimaMC(ctx context.Context, chapterIDs []string) ([]PenerimaMC, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT u.id::text, u.email, u.name, u.chapter_id, c.display_name
+		FROM users u JOIN chapters c ON c.id = u.chapter_id
+		WHERE u.role = 'mc' AND u.chapter_id = ANY($1)`, chapterIDs)
+	if err != nil {
+		return nil, fmt.Errorf("ambil akun MC: %w", err)
+	}
+	defer rows.Close()
+
+	var out []PenerimaMC
+	for rows.Next() {
+		var p PenerimaMC
+		if err := rows.Scan(&p.ID, &p.Email, &p.Nama, &p.ChapterID, &p.NamaChapter); err != nil {
+			return nil, fmt.Errorf("baca akun MC: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // Answer mencatat jawaban MC.

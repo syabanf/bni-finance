@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Building2, MapPin, Plus, Search, Upload, Users, X } from 'lucide-react'
+import { Building2, MapPin, Plus, Search, Trash2, Upload, Users, X } from 'lucide-react'
 import type { Chapter, ChapterCounts } from '@/types'
 import {
   Button,
@@ -9,6 +9,7 @@ import {
   ExportMenu,
   Input,
   LoadingState,
+  Modal,
   PageHeader,
   Select,
   useToast,
@@ -33,6 +34,23 @@ export function ChapterListPage() {
   const { toast } = useToast()
   const { data: chapters, loading, reload } = useAsync<Chapter[]>(() => chapterService.list())
   const [tambahBuka, setTambahBuka] = useState(false)
+  const [akanDihapus, setAkanDihapus] = useState<Chapter | null>(null)
+  const [menghapus, setMenghapus] = useState(false)
+
+  const hapus = async () => {
+    if (!akanDihapus) return
+    setMenghapus(true)
+    try {
+      await chapterService.remove(akanDihapus.id)
+      toast(`${akanDihapus.displayName} dihapus.`)
+      setAkanDihapus(null)
+      reload()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menghapus chapter.', 'error')
+    } finally {
+      setMenghapus(false)
+    }
+  }
 
   /**
    * Angka per chapter dari server — satu permintaan, bukan dua tarikan penuh.
@@ -211,6 +229,22 @@ export function ChapterListPage() {
                           Impor
                         </button>
                       )}
+                      {bolehImpor && (
+                        <button
+                          type="button"
+                          onClick={() => setAkanDihapus(c)}
+                          disabled={memberCount(c.id) > 0}
+                          aria-label={`Hapus ${c.displayName}`}
+                          title={
+                            memberCount(c.id) > 0
+                              ? 'Chapter yang masih punya member tidak bisa dihapus.'
+                              : `Hapus ${c.displayName}`
+                          }
+                          className="text-ink-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => navigate(`/members?chapter=${c.id}`)}
                         className="text-xs font-medium text-brand-500 hover:text-brand-600"
@@ -249,6 +283,26 @@ export function ChapterListPage() {
           )}
         </>
       )}
+      <Modal
+        open={!!akanDihapus}
+        onClose={() => setAkanDihapus(null)}
+        title={`Hapus ${akanDihapus?.displayName ?? 'chapter'}?`}
+        description="Chapter yang masih dipakai invoice atau akun ST/MC tidak bisa dihapus."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setAkanDihapus(null)} disabled={menghapus}>
+              Batal
+            </Button>
+            <Button variant="danger" loading={menghapus} onClick={hapus}>
+              <Trash2 className="h-4 w-4" />
+              Hapus
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-ink-600">Penghapusan tidak bisa dibatalkan.</p>
+      </Modal>
+
       <TambahChapterModal open={tambahBuka} onClose={() => setTambahBuka(false)} onDibuat={reload} />
     </div>
   )

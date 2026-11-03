@@ -21,6 +21,10 @@ export const apiChapterRepository: ChapterRepository = {
     return api.post<Chapter>('/chapters', input)
   },
 
+  async remove(id) {
+    await api.delete(`/chapters/${encodeURIComponent(id)}`)
+  },
+
   async getById(id) {
     try {
       return await api.get<Chapter>(`/chapters/${encodeURIComponent(id)}`)
