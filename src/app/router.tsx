@@ -29,6 +29,7 @@ import { UrgentPage } from '@/features/urgent/UrgentPage'
 import { NotificationsPage } from '@/features/notifications/NotificationsPage'
 import { ProfilePage } from '@/features/profile/ProfilePage'
 import { ReportPage } from '@/features/reports/ReportPage'
+import { PanduanPage } from '@/features/panduan/PanduanPage'
 
 export const router = createBrowserRouter([
   {
@@ -70,6 +71,7 @@ export const router = createBrowserRouter([
           { path: '/payments', element: <PaymentListPage /> },
           { path: '/payments/:id', element: <PaymentDetailPage /> },
           { path: '/reports', element: <ReportPage /> },
+          { path: '/panduan', element: <PanduanPage /> },
 
           {
             path: '/settings',
