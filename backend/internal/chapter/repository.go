@@ -164,6 +164,11 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateChap
 func (r *Repository) Delete(ctx context.Context, id string) error {
 	tag, err := r.db.Exec(ctx, "DELETE FROM chapters WHERE id = $1", id)
 	if err != nil {
+		// CountDependents hanya menghitung member dan invoice; akun ST/MC dan
+		// permintaan renewal juga merujuk chapter.
+		if strings.Contains(err.Error(), "23503") {
+			return httpx.Conflict("chapter masih dipakai akun ST atau MC; pindahkan akunnya di halaman Pengguna dulu")
+		}
 		return fmt.Errorf("hapus chapter: %w", err)
 	}
 	if tag.RowsAffected() == 0 {

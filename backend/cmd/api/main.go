@@ -101,7 +101,7 @@ func run(log *slog.Logger) error {
 	if !surat.Siap() {
 		// Peringatan, bukan galat fatal: aplikasinya tetap berguna tanpa email,
 		// hanya fitur yang membutuhkannya yang menjawab 503 dengan pesan jelas.
-		log.Warn("email belum dikonfigurasi, reset kata sandi dan OTP tidak akan berfungsi",
+		log.Warn("email belum dikonfigurasi, reset kata sandi, OTP, dan pemberitahuan renewal ke MC tidak akan berfungsi",
 			"perlu", "RESEND_API_KEY dan MAIL_FROM")
 	} else if config.Lokal(cfg.AppBaseURL) {
 		// Pengiriman email menyala TAPI tautannya menunjuk localhost.
@@ -165,7 +165,7 @@ func run(log *slog.Logger) error {
 		Upload:    uploads,
 		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder),
 		Importer:  importer.NewService(importer.NewRepository(pool)),
-		Renewal:   renewal.NewService(renewal.NewRepository(pool)),
+		Renewal:   renewal.NewService(renewal.NewRepository(pool), surat, cfg.AppBaseURL),
 		PaperID:   paperSvc,
 		Blackbox:  recorder,
 		Metrics:   reg,

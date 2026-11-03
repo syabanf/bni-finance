@@ -47,6 +47,10 @@ export const apiMemberRepository: MemberRepository = {
     return api.post<Member>('/members', input)
   },
 
+  async update(id, input) {
+    return api.patch<Member>(`/members/${encodeURIComponent(id)}`, input)
+  },
+
   async sync() {
     const result = await runSync()
     return { count: result.members, syncedAt: result.syncedAt }

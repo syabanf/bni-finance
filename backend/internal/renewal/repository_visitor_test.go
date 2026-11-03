@@ -74,11 +74,12 @@ func TestVisitorDilewatiSaatMintaRenewal(t *testing.T) {
 	// dengan 403 alih-alih menguji apa yang dimaksud tes ini.
 	ctx = scope.WithoutLimit(ctx)
 
-	dibuat, dilewati, visitor, err := repo.Create(ctx,
+	h, err := repo.Create(ctx,
 		[]string{"mem-uji-anggota", "mem-uji-tamu"}, "2027-H1", "uji", nil)
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
+	dibuat, dilewati, visitor := h.Dibuat, h.Dilewati, h.Visitor
 	if dibuat != 1 {
 		t.Errorf("dibuat = %d, seharusnya 1 (hanya yang berstatus active)", dibuat)
 	}
@@ -99,5 +100,46 @@ func TestVisitorDilewatiSaatMintaRenewal(t *testing.T) {
 	}
 	if ada != 0 {
 		t.Errorf("ada %d permintaan renewal atas nama visitor", ada)
+	}
+
+	// Mencentang lagi permintaan yang masih menunggu mengulang pemberitahuan
+	// tanpa membuat baris baru. Yang sudah dijawab tidak ditanyakan lagi.
+	ulang, err := repo.Create(ctx, []string{"mem-uji-anggota"}, "2027-H1", "uji", nil)
+	if err != nil {
+		t.Fatalf("Create ulang: %v", err)
+	}
+	if ulang.Dibuat != 0 || ulang.Dilewati != 1 || ulang.BelumDijawab[ch] != 1 {
+		t.Errorf("permintaan yang menunggu harus dihitung tanpa baris baru: %+v", ulang)
+	}
+	if _, err := pool.Exec(ctx,
+		"UPDATE renewal_requests SET answer = 'will_renew' WHERE member_id = 'mem-uji-anggota'"); err != nil {
+		t.Fatalf("catat jawaban: %v", err)
+	}
+	dijawab, err := repo.Create(ctx, []string{"mem-uji-anggota"}, "2027-H1", "uji", nil)
+	if err != nil {
+		t.Fatalf("Create sesudah dijawab: %v", err)
+	}
+	if len(dijawab.BelumDijawab) != 0 {
+		t.Errorf("permintaan yang sudah dijawab tidak boleh diberitahukan lagi: %+v", dijawab)
+	}
+
+	// Hanya akun berperan MC di chapter itu yang menjadi penerima.
+	const emailMC, emailST = "mc-uji-renewal@example.test", "st-uji-renewal@example.test"
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), "DELETE FROM users WHERE email IN ($1,$2)", emailMC, emailST)
+	})
+	for email, peran := range map[string]string{emailMC: "mc", emailST: "st"} {
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO users (email, password_hash, name, role, chapter_id)
+			 VALUES ($1,'x','Uji',$2::user_role,$3)`, email, peran, ch); err != nil {
+			t.Fatalf("siapkan akun %s: %v", peran, err)
+		}
+	}
+	penerima, err := repo.PenerimaMC(ctx, []string{ch})
+	if err != nil {
+		t.Fatalf("PenerimaMC: %v", err)
+	}
+	if len(penerima) != 1 || penerima[0].Email != emailMC || penerima[0].NamaChapter != "Uji Visitor" {
+		t.Errorf("penerima harus hanya akun MC chapter itu: %+v", penerima)
 	}
 }

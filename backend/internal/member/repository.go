@@ -246,16 +246,16 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateMemb
 		set("name", *in.Name)
 	}
 	if in.Email != nil {
-		set("email", *in.Email)
+		set("email", nullBilaKosong(*in.Email))
 	}
 	if in.Phone != nil {
-		set("phone", *in.Phone)
+		set("phone", nullBilaKosong(*in.Phone))
 	}
 	if in.Company != nil {
-		set("company", *in.Company)
+		set("company", nullBilaKosong(*in.Company))
 	}
 	if in.BusinessField != nil {
-		set("business_field", *in.BusinessField)
+		set("business_field", nullBilaKosong(*in.BusinessField))
 	}
 	if in.Status != nil {
 		set("status", *in.Status)
@@ -301,6 +301,15 @@ func (r *Repository) CountInvoices(ctx context.Context, id string) (int, error) 
 	var n int
 	err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM invoices WHERE member_id = $1", id).Scan(&n)
 	return n, err
+}
+
+// nullBilaKosong menyimpan isian yang dikosongkan sebagai NULL, sama seperti
+// member yang dibuat tanpa kolom itu.
+func nullBilaKosong(v string) *string {
+	if v = strings.TrimSpace(v); v != "" {
+		return &v
+	}
+	return nil
 }
 
 // NaikkanStatusSetelahLunas memajukan status dan masa keanggotaan member saat
