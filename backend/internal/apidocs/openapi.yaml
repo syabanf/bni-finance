@@ -2353,11 +2353,13 @@ paths:
 
         **Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**
         Menghapusnya akan melanggar foreign key begitu mereka punya invoice, dan
-        membuang riwayat tagihan meski berhasil.
+        membuang riwayat tagihan meski berhasil. Aturan ini hanya berlaku bagi
+        member yang pernah dikembalikan BNI VM. Member dari impor laporan BNI
+        Connect dan Tambah Member tidak disentuh.
 
         **Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan
-        seluruh member — jauh lebih mungkin BNI VM sedang bermasalah daripada
-        organisasi kehilangan semua anggotanya sekaligus.
+        seluruh member BNI VM — jauh lebih mungkin BNI VM sedang bermasalah
+        daripada organisasi kehilangan semua anggotanya sekaligus.
       responses:
         "200":
           description: Sinkronisasi selesai

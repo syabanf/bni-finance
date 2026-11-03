@@ -9,6 +9,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/syabanf/bni-finance/backend/internal/domain"
+	"github.com/syabanf/bni-finance/backend/internal/importer"
+	"github.com/syabanf/bni-finance/backend/internal/member"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
@@ -183,5 +187,112 @@ func TestLiveSyncKeepsLocalDisplayName(t *testing.T) {
 	}
 	if name != "Garuda" {
 		t.Errorf("nama kanonik harusnya tetap dari BNI VM, dapat %q", name)
+	}
+}
+
+func statusOf(t *testing.T, pool *pgxpool.Pool, id string) string {
+	t.Helper()
+	var status string
+	if err := pool.QueryRow(t.Context(), "SELECT status FROM members WHERE id = $1", id).Scan(&status); err != nil {
+		t.Fatalf("ambil status %s: %v", id, err)
+	}
+	return status
+}
+
+// BNI VM hanya tahu member miliknya, jadi ketiadaan di snapshot baru berarti
+// sesuatu bagi member yang pernah ia kembalikan. Baris lain masuk lewat jalur
+// aslinya di sini, karena jalur itulah yang menentukan isi kolom-kolomnya.
+func TestLiveDeactivationOnlyTouchesBNIVMMembers(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := scope.WithoutLimit(t.Context())
+
+	// Bentuk id BNI VM sama dengan id Tambah Member: keduanya uuid.
+	const (
+		vmTetap  = "11111111-1111-4111-8111-111111111111"
+		vmHilang = "22222222-2222-4222-8222-222222222222"
+		bcID     = "bc-garuda-anasthasia-winna"
+		kodeID   = "KODE-0042"
+	)
+	if _, err := repo.Apply(ctx, []RemoteMember{
+		remote(vmTetap, "ch-1", "Garuda", "Budi", "active"),
+		remote(vmHilang, "ch-1", "Garuda", "Siti", "active"),
+	}, time.Now()); err != nil {
+		t.Fatalf("sinkronisasi awal: %v", err)
+	}
+
+	if err := importer.NewRepository(pool).UpsertMembers(ctx, []importer.MemberRow{
+		{ID: bcID, ChapterID: "ch-1", Name: "Anasthasia Winna", Status: "active"},
+		{ID: kodeID, ChapterID: "ch-1", Name: "Dari Berkas Umum", Status: "pending"},
+	}); err != nil {
+		t.Fatalf("impor: %v", err)
+	}
+
+	members := member.NewRepository(pool)
+	baru := domain.MemberNewMember
+	tambahan, err := members.Create(ctx, domain.CreateMemberInput{
+		ChapterID: "ch-1", Name: "Dari Tambah Member", Status: &baru,
+	})
+	if err != nil {
+		t.Fatalf("tambah member: %v", err)
+	}
+	// PATCH ikut mengisi synced_at, dan itu tidak menjadikannya milik BNI VM.
+	telepon := "081234567890"
+	if _, err := members.Update(ctx, tambahan.ID, domain.UpdateMemberInput{Phone: &telepon}); err != nil {
+		t.Fatalf("ubah member: %v", err)
+	}
+
+	result, err := repo.Apply(ctx, []RemoteMember{
+		remote(vmTetap, "ch-1", "Garuda", "Budi", "active"),
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi kedua: %v", err)
+	}
+
+	if result.Deactivated != 1 {
+		t.Errorf("hanya member BNI VM yang hilang yang boleh dinonaktifkan, dapat %d", result.Deactivated)
+	}
+	for id, want := range map[string]string{
+		vmTetap:     "active",
+		vmHilang:    "inactive",
+		bcID:        "active",
+		kodeID:      "pending",
+		tambahan.ID: "new_member",
+	} {
+		if got := statusOf(t, pool, id); got != want {
+			t.Errorf("status %s harusnya %q, dapat %q", id, want, got)
+		}
+	}
+}
+
+// Baris yang sudah ada sebelum asalnya dicatat tidak bisa dibedakan, jadi ia
+// aman sampai BNI VM mengembalikannya sekali. Sesudah itu ia member BNI VM biasa.
+func TestLiveExistingMemberBecomesBNIVMWhenReturned(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+	budi := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
+	apply := func(members ...RemoteMember) {
+		t.Helper()
+		if _, err := repo.Apply(ctx, members, time.Now()); err != nil {
+			t.Fatalf("sinkronisasi: %v", err)
+		}
+	}
+
+	apply(budi)
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO members (id, chapter_id, name, status) VALUES ('mem-lama', 'ch-1', 'Lama', 'active')`); err != nil {
+		t.Fatalf("buat member lama: %v", err)
+	}
+
+	apply(budi)
+	if got := statusOf(t, pool, "mem-lama"); got != "active" {
+		t.Fatalf("member yang belum pernah dikembalikan BNI VM dinonaktifkan: %q", got)
+	}
+
+	apply(budi, remote("mem-lama", "ch-1", "Garuda", "Lama", "active"))
+	apply(budi)
+	if got := statusOf(t, pool, "mem-lama"); got != "inactive" {
+		t.Errorf("member yang hilang dari BNI VM harusnya inactive, dapat %q", got)
 	}
 }

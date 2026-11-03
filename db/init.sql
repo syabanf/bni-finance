@@ -185,6 +185,17 @@ create index if not exists idx_members_name_trgm    on members using gin (name g
 create index if not exists idx_members_renewal_date on members (renewal_date)
   where status = 'active' and renewal_date is not null;
 
+-- Kapan BNI VM terakhir mengembalikan member ini. NULL berarti belum pernah:
+-- impor laporan dan Tambah Member. Hanya baris yang terisi yang boleh
+-- dinonaktifkan saat hilang dari snapshot BNI VM.
+--
+-- synced_at tidak bisa menjawabnya: kolom itu NOT NULL DEFAULT now(), dan PATCH
+-- ikut mengisinya. Bentuk id juga tidak: BNI VM dan Tambah Member sama-sama uuid.
+--
+-- Baris lama mulai dari NULL karena asalnya tidak tercatat, dan terisi saat
+-- sinkronisasi berikutnya mengembalikannya.
+alter table members add column if not exists bni_vm_seen_at timestamptz;
+
 -- ---------------------------------------------------------------------------
 -- fee_settings — baris tunggal id = 'default'
 -- ---------------------------------------------------------------------------
