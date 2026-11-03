@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   BarChart3,
   TerminalSquare,
+  BookOpen,
   type LucideIcon,
 } from 'lucide-react'
 import type { Permission } from '@/lib/rbac'
@@ -83,4 +84,7 @@ export const NAV: NavNode[] = [
       { to: '/blackbox', label: 'Blackbox Integrasi' },
     ],
   },
+
+  { kind: 'section', label: 'Bantuan' },
+  { kind: 'item', to: '/panduan', label: 'Panduan', icon: BookOpen },
 ]
