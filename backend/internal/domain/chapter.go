@@ -2,6 +2,8 @@ package domain
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -71,4 +73,19 @@ type ChapterCounts struct {
 	MemberCount int    `json:"memberCount"`
 	// Outstanding adalah NOMINAL invoice sent + overdue, bukan cacahnya.
 	Outstanding int64 `json:"outstanding"`
+}
+
+var bukanAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
+// KunciChapter menyamakan penulisan nama chapter antarsumber: "Supreme",
+// "BNI Supreme", "BNI Supreme Chapter", dan "ch-supreme" berkunci sama.
+func KunciChapter(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimPrefix(s, "ch-")
+	s = strings.TrimPrefix(s, "bni ")
+	s = bukanAlnum.ReplaceAllString(s, "")
+	if inti := strings.TrimSuffix(s, "chapter"); inti != "" {
+		return inti
+	}
+	return s
 }

@@ -13,6 +13,11 @@ export interface SyncResult {
   members: number
   /** Member yang hilang dari BNI VM — dinonaktifkan, bukan dihapus. */
   deactivated: number
+  /** Baris tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama. */
+  linkedChapters: number
+  linkedMembers: number
+  /** Baris BNI VM yang namanya ambigu. Mendapat baris baru, jadi bisa saja duplikat. */
+  needsReview: string[]
   syncedAt: string
 }
 

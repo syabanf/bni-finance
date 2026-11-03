@@ -162,6 +162,13 @@ create table if not exists chapters (
 create index if not exists idx_chapters_display_name on chapters (display_name);
 create index if not exists idx_chapters_city_name    on chapters (city_name) where city_name is not null;
 
+-- Id chapter ini di BNI VM. Laporan BNI Connect membuat chapter ber-id "ch-…"
+-- sedangkan BNI VM memakai uuid, dan users.chapter_id membatasi akun ST dan MC ke
+-- id baris, jadi chapter yang sudah ada ditautkan, id barisnya tidak diganti.
+alter table chapters add column if not exists bni_vm_id text;
+create unique index if not exists idx_chapters_bni_vm_id on chapters (bni_vm_id)
+  where bni_vm_id is not null;
+
 -- ---------------------------------------------------------------------------
 -- members
 -- ---------------------------------------------------------------------------
@@ -185,16 +192,33 @@ create index if not exists idx_members_name_trgm    on members using gin (name g
 create index if not exists idx_members_renewal_date on members (renewal_date)
   where status = 'active' and renewal_date is not null;
 
--- Kapan BNI VM terakhir mengembalikan member ini. NULL berarti belum pernah:
--- impor laporan dan Tambah Member. Hanya baris yang terisi yang boleh
--- dinonaktifkan saat hilang dari snapshot BNI VM.
+-- Id member ini di BNI VM. NULL berarti BNI VM belum pernah mengembalikannya:
+-- impor laporan dan Tambah Member. Hanya baris yang terisi yang boleh dinonaktifkan
+-- saat hilang dari snapshot BNI VM.
 --
 -- synced_at tidak bisa menjawabnya: kolom itu NOT NULL DEFAULT now(), dan PATCH
 -- ikut mengisinya. Bentuk id juga tidak: BNI VM dan Tambah Member sama-sama uuid.
 --
--- Baris lama mulai dari NULL karena asalnya tidak tercatat, dan terisi saat
--- sinkronisasi berikutnya mengembalikannya.
-alter table members add column if not exists bni_vm_seen_at timestamptz;
+-- Kolom terpisah, id baris tidak diganti: invoice, renewal_requests, dan
+-- customer.id di Paper.id merujuk id baris, jadi tautan bisa dibuat dan dilepas
+-- tanpa menyentuh riwayat tagihan. Baris lama terisi saat sinkronisasi berikutnya
+-- mengembalikannya.
+alter table members add column if not exists bni_vm_id text;
+create unique index if not exists idx_members_bni_vm_id on members (bni_vm_id)
+  where bni_vm_id is not null;
+
+-- bni_vm_seen_at digantikan bni_vm_id. Baris yang pernah dikembalikan BNI VM
+-- memakai id BNI VM sebagai id barisnya, jadi nilainya bisa diturunkan.
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = current_schema()
+               and table_name = 'members' and column_name = 'bni_vm_seen_at') then
+    update members set bni_vm_id = id
+      where bni_vm_seen_at is not null and bni_vm_id is null;
+    alter table members drop column bni_vm_seen_at;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- fee_settings — baris tunggal id = 'default'

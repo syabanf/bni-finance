@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -465,5 +466,272 @@ func TestLiveSyncKeepsLocalStatus(t *testing.T) {
 	mustApply(t, repo, keluar)
 	if got := statusOf(t, pool, "mem-keluar"); got != "inactive" {
 		t.Errorf("status mem-keluar harusnya inactive lagi, dapat %q", got)
+	}
+}
+
+const (
+	vmSupreme = "44444444-4444-4444-8444-444444444444"
+	vmBudi    = "33333333-3333-4333-8333-333333333333"
+)
+
+// imporRoster mengunggah laporan Roster lewat jalur impor yang asli, tanpa
+// chapter tujuan, jadi chapternya dibaca dari laporan.
+func imporRoster(t *testing.T, pool *pgxpool.Pool, nama ...string) *importer.Hasil {
+	t.Helper()
+	data := "Chapter:,Supreme\nMember Name,Classification,Company Name,Phone\n"
+	for _, n := range nama {
+		data += n + ",Konsultan,,\n"
+	}
+	hasil, err := importer.NewService(importer.NewRepository(pool)).
+		Jalankan(t.Context(), importer.JenisMember, []byte(data), true, importer.Opsi{})
+	if err != nil {
+		t.Fatalf("impor roster: %v", err)
+	}
+	return hasil
+}
+
+func hitung(t *testing.T, pool *pgxpool.Pool, q string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := pool.QueryRow(t.Context(), q, args...).Scan(&n); err != nil {
+		t.Fatalf("%s: %v", q, err)
+	}
+	return n
+}
+
+// Urutan yang menghasilkan duplikat: laporan BNI Connect diimpor lebih dulu, lalu
+// BNI VM mengembalikan orang yang sama dengan id dan id chapter uuid.
+func TestLiveSyncLinksImportedRowsInsteadOfDuplicating(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := scope.WithoutLimit(t.Context())
+	const bcID = "bc-supreme-budi-santoso"
+
+	imporRoster(t, pool, "Budi Santoso")
+	besok := time.Now().AddDate(0, 0, 10).Format("2006-01-02")
+	if _, err := pool.Exec(ctx, "UPDATE members SET renewal_date = $1 WHERE id = $2", besok, bcID); err != nil {
+		t.Fatalf("isi renewal_date: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO invoices (number, member_id, chapter_id, type, amount,
+		                      due_date, period_start, period_end, status)
+		VALUES ('INV-TAUT-1',$1,'ch-supreme','renewal',1500000,
+		        CURRENT_DATE, CURRENT_DATE, CURRENT_DATE + 365, 'sent')`, bcID); err != nil {
+		t.Fatalf("buat invoice: %v", err)
+	}
+
+	budi := remote(vmBudi, vmSupreme, "BNI Supreme Chapter", "budi  SANTOSO", "active")
+	budi.Phone, budi.RenewalDate = strPtr("0811"), &besok
+	result, err := repo.Apply(ctx, []RemoteMember{budi}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+	if result.LinkedChapters != 1 || result.LinkedMembers != 1 || len(result.NeedsReview) != 0 {
+		t.Errorf("hasil salah: %+v", result)
+	}
+
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM chapters"); n != 1 {
+		t.Errorf("harusnya satu chapter, dapat %d", n)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members"); n != 1 {
+		t.Errorf("harusnya satu member, dapat %d", n)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM invoices WHERE member_id = $1", bcID); n != 1 {
+		t.Errorf("invoice harusnya tetap di %s, dapat %d", bcID, n)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members WHERE id = $1 AND chapter_id = 'ch-supreme' AND phone = '0811'", bcID); n != 1 {
+		t.Errorf("baris %s harusnya menerima data BNI VM di chapter lokalnya", bcID)
+	}
+	due, err := member.NewRepository(pool).RenewalDue(ctx, 30, 10)
+	if err != nil {
+		t.Fatalf("daftar jatuh tempo: %v", err)
+	}
+	if len(due) != 1 {
+		t.Errorf("orang yang sama harusnya sekali di daftar jatuh tempo, dapat %d", len(due))
+	}
+
+	// Tautan bertahan saat BNI VM mengganti nama, dan tidak dihitung ulang.
+	budi.Name = "Budi Santoso, S.E."
+	result, err = repo.Apply(ctx, []RemoteMember{budi}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi ganti nama: %v", err)
+	}
+	if result.LinkedChapters != 0 || result.LinkedMembers != 0 {
+		t.Errorf("tautan yang sudah ada dihitung ulang: %+v", result)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members WHERE id = $1 AND name = 'Budi Santoso, S.E.'", bcID); n != 1 {
+		t.Error("ganti nama di BNI VM harusnya mengenai baris yang sama")
+	}
+
+	// Baris tertaut adalah member BNI VM: hilang dari snapshot berarti nonaktif.
+	result, err = repo.Apply(ctx, []RemoteMember{
+		remote("mem-lain", vmSupreme, "BNI Supreme Chapter", "Orang Lain", "active"),
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi tanpa budi: %v", err)
+	}
+	if result.Deactivated != 1 || statusOf(t, pool, bcID) != "inactive" {
+		t.Errorf("baris tertaut yang hilang harusnya inactive: %+v", result)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM chapters"); n != 1 {
+		t.Errorf("chapter tertaut harusnya dipakai ulang, dapat %d chapter", n)
+	}
+}
+
+// Urutan sebaliknya: impor menemukan baris BNI VM lewat nama di chapter yang sama.
+func TestLiveImportAfterSyncUsesSameRows(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+
+	mustApply(t, repo, remote(vmBudi, vmSupreme, "BNI Supreme", "Budi Santoso", "active"))
+	hasil := imporRoster(t, pool, "Budi Santoso")
+
+	if hasil.Baru != 0 {
+		t.Errorf("impor membuat %d baris baru", hasil.Baru)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members"); n != 1 {
+		t.Errorf("harusnya satu member, dapat %d", n)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM chapters"); n != 1 {
+		t.Errorf("harusnya satu chapter, dapat %d", n)
+	}
+}
+
+// Nama yang tidak unik di salah satu sisi tidak ditautkan. Salah tautan menimpa
+// kontak orang lain, sedangkan baris baru bisa dibereskan sesudahnya.
+func TestLiveSyncDoesNotGuessAmbiguousNames(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+
+	mustApply(t, repo, remote("vm-awal", "ch-1", "Garuda", "Awal", "active"))
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO members (id, chapter_id, name, phone) VALUES
+		  ('lokal-budi-1', 'ch-1', 'Budi', '0801'),
+		  ('lokal-budi-2', 'ch-1', 'budi', '0802'),
+		  ('lokal-siti',   'ch-1', 'Siti', '0803')`); err != nil {
+		t.Fatalf("buat member lokal: %v", err)
+	}
+
+	budi := remote("vm-budi", "ch-1", "Garuda", "Budi", "active")
+	siti1 := remote("vm-siti-1", "ch-1", "Garuda", "Siti", "active")
+	siti2 := remote("vm-siti-2", "ch-1", "Garuda", "SITI", "active")
+	for _, m := range []*RemoteMember{&budi, &siti1, &siti2} {
+		m.Phone = strPtr("0899")
+	}
+	result, err := repo.Apply(ctx, []RemoteMember{
+		remote("vm-awal", "ch-1", "Garuda", "Awal", "active"), budi, siti1, siti2,
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+
+	if result.LinkedMembers != 0 {
+		t.Errorf("nama ambigu tidak boleh ditautkan: %+v", result)
+	}
+	if len(result.NeedsReview) != 3 || !slices.IsSorted(result.NeedsReview) {
+		t.Errorf("ketiga nama harusnya perlu ditinjau, terurut: %q", result.NeedsReview)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members WHERE id LIKE 'vm-%'"); n != 4 {
+		t.Errorf("baris BNI VM harusnya berdiri sendiri, dapat %d", n)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members WHERE id LIKE 'lokal-%' AND phone <> '0899'"); n != 3 {
+		t.Errorf("kontak baris lokal tertimpa, tersisa %d", n)
+	}
+}
+
+// Nama hanya berarti di dalam satu chapter, dan baris yang sudah tertaut bukan
+// calon bagi id BNI VM lain.
+func TestLiveSyncLinksOnlyFreeRowsInSameChapter(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+
+	mustApply(t, repo, remote("vm-1", "ch-1", "Garuda", "Budi", "active"))
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO chapters (id, name, display_name) VALUES ('ch-lain', 'Rajawali', 'BNI Rajawali')`); err != nil {
+		t.Fatalf("buat chapter: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO members (id, chapter_id, name) VALUES ('lokal-lain', 'ch-lain', 'Budi')`); err != nil {
+		t.Fatalf("buat member: %v", err)
+	}
+
+	result, err := repo.Apply(ctx, []RemoteMember{
+		remote("vm-1", "ch-1", "Garuda", "Budi", "active"),
+		remote("vm-2", "ch-1", "Garuda", "Budi", "active"),
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+	if result.LinkedMembers != 0 || len(result.NeedsReview) != 0 {
+		t.Errorf("hasil salah: %+v", result)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members"); n != 3 {
+		t.Errorf("harusnya vm-1, vm-2, dan lokal-lain, dapat %d baris", n)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members WHERE id = 'lokal-lain' AND chapter_id = 'ch-lain'"); n != 1 {
+		t.Error("baris di chapter lain ikut tersentuh")
+	}
+}
+
+// Dua chapter yang sama-sama cocok tidak dipilih salah satunya.
+func TestLiveSyncDoesNotGuessAmbiguousChapters(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO chapters (id, name, display_name) VALUES
+		  ('ch-supreme',   'Supreme', 'BNI Supreme'),
+		  ('ch-supreme-2', 'Supreme', 'Supreme Lama')`); err != nil {
+		t.Fatalf("buat chapter: %v", err)
+	}
+
+	result, err := repo.Apply(ctx, []RemoteMember{
+		remote(vmBudi, vmSupreme, "BNI Supreme", "Budi", "active"),
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+	if result.LinkedChapters != 0 || len(result.NeedsReview) != 1 {
+		t.Errorf("hasil salah: %+v", result)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM chapters WHERE id = $1", vmSupreme); n != 1 {
+		t.Error("chapter BNI VM harusnya berdiri sendiri")
+	}
+}
+
+// Duplikat yang sudah terlanjur ada tidak disentuh: baris dengan id BNI VM tetap
+// dipakai, dan penggabungannya menunggu keputusan manusia.
+func TestLiveSyncLeavesExistingDuplicates(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO chapters (id, name, display_name) VALUES
+		  ('ch-supreme', 'Supreme', 'BNI Supreme'),
+		  ($1, 'BNI Supreme', 'BNI Supreme')`, vmSupreme); err != nil {
+		t.Fatalf("buat chapter: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO members (id, chapter_id, name) VALUES
+		  ('bc-supreme-budi', 'ch-supreme', 'Budi'),
+		  ($1, $2, 'Budi')`, vmBudi, vmSupreme); err != nil {
+		t.Fatalf("buat member: %v", err)
+	}
+
+	result, err := repo.Apply(ctx, []RemoteMember{
+		remote(vmBudi, vmSupreme, "BNI Supreme", "Budi", "active"),
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+	if result.LinkedMembers != 0 || result.LinkedChapters != 0 || len(result.NeedsReview) != 0 {
+		t.Errorf("hasil salah: %+v", result)
+	}
+	if n := hitung(t, pool, "SELECT COUNT(*) FROM members"); n != 2 {
+		t.Errorf("duplikat lama harusnya tidak tersentuh, dapat %d baris", n)
 	}
 }

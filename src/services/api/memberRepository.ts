@@ -53,6 +53,6 @@ export const apiMemberRepository: MemberRepository = {
 
   async sync() {
     const result = await runSync()
-    return { count: result.members, syncedAt: result.syncedAt }
+    return { count: result.members, syncedAt: result.syncedAt, needsReview: result.needsReview }
   },
 }
