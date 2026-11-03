@@ -73,9 +73,9 @@ func (s *Service) Run(ctx context.Context) (*Result, error) {
 		return nil, httpx.NewError(http.StatusBadGateway, err.Error(), err)
 	}
 	if len(members) == 0 {
-		// Applying an empty snapshot would deactivate everyone. Far more likely
-		// the upstream had a bad day than that the organisation lost every
-		// member at once.
+		// Applying an empty snapshot would deactivate every BNI VM member. Far
+		// more likely the upstream had a bad day than that the organisation lost
+		// every member at once.
 		return nil, httpx.NewError(http.StatusBadGateway,
 			"BNI VM tidak mengembalikan satu member pun — sinkronisasi dibatalkan agar data lokal tidak dinonaktifkan massal", nil)
 	}

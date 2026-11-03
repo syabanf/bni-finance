@@ -59,14 +59,23 @@ func (r *Repository) Apply(ctx context.Context, members []RemoteMember, now time
 		}
 		const q = `
 			INSERT INTO members (id, chapter_id, name, email, phone, company,
-			                     business_field, status, joined_date, renewal_date, synced_at)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			                     business_field, status, joined_date, renewal_date, synced_at, bni_vm_seen_at)
+			VALUES ($1,$2,$3,nullif($4,''),nullif($5,''),nullif($6,''),nullif($7,''),$8,$9,$10,$11,$11)
 			ON CONFLICT (id) DO UPDATE SET
 			  chapter_id = excluded.chapter_id, name = excluded.name,
-			  email = excluded.email, phone = excluded.phone, company = excluded.company,
-			  business_field = excluded.business_field, status = excluded.status,
-			  joined_date = excluded.joined_date, renewal_date = excluded.renewal_date,
-			  synced_at = excluded.synced_at`
+			  -- A value BNI VM left empty keeps what is stored.
+			  email = coalesce(excluded.email, members.email),
+			  phone = coalesce(excluded.phone, members.phone),
+			  company = coalesce(excluded.company, members.company),
+			  business_field = coalesce(excluded.business_field, members.business_field),
+			  joined_date = coalesce(excluded.joined_date, members.joined_date),
+			  -- A paid renewal advances this date here before BNI VM knows about
+			  -- it, so a sync must not move it back. GREATEST ignores NULL.
+			  renewal_date = greatest(excluded.renewal_date, members.renewal_date),
+			  -- BNI VM sets status on insert. Afterwards it can only deactivate;
+			  -- every other status belongs to PATCH and payments.
+			  status = CASE WHEN excluded.status = 'inactive' THEN excluded.status ELSE members.status END,
+			  synced_at = excluded.synced_at, bni_vm_seen_at = excluded.bni_vm_seen_at`
 		_, err := tx.Exec(ctx, q,
 			m.ID, m.ChapterID, m.Name, m.Email, m.Phone, m.Company,
 			m.BusinessField, status, nullableDate(m.JoinedDate), nullableDate(m.RenewalDate), now)
@@ -79,11 +88,14 @@ func (r *Repository) Apply(ctx context.Context, members []RemoteMember, now time
 	// A member who disappeared upstream is DEACTIVATED, never deleted. Deleting
 	// would fail the foreign key as soon as they have an invoice, and would
 	// throw away billing history even when it succeeded.
+	//
+	// Only members BNI VM has returned before count as disappeared. Members from
+	// a BNI Connect report or Tambah Member were never upstream to begin with.
 	var deactivated int
 	if len(seen) > 0 {
 		const q = `
 			UPDATE members SET status = 'inactive', synced_at = $2
-			WHERE id <> ALL($1) AND status <> 'inactive'`
+			WHERE id <> ALL($1) AND status <> 'inactive' AND bni_vm_seen_at IS NOT NULL`
 		tag, err := tx.Exec(ctx, q, seen, now)
 		if err != nil {
 			return nil, fmt.Errorf("nonaktifkan member yang hilang: %w", err)

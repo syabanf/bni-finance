@@ -9,6 +9,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/syabanf/bni-finance/backend/internal/domain"
+	"github.com/syabanf/bni-finance/backend/internal/importer"
+	"github.com/syabanf/bni-finance/backend/internal/member"
+	"github.com/syabanf/bni-finance/backend/internal/scope"
 	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
@@ -183,5 +187,283 @@ func TestLiveSyncKeepsLocalDisplayName(t *testing.T) {
 	}
 	if name != "Garuda" {
 		t.Errorf("nama kanonik harusnya tetap dari BNI VM, dapat %q", name)
+	}
+}
+
+func strPtr(v string) *string { return &v }
+
+func mustApply(t *testing.T, repo *Repository, rows ...RemoteMember) {
+	t.Helper()
+	if _, err := repo.Apply(t.Context(), rows, time.Now()); err != nil {
+		t.Fatalf("sinkronisasi: %v", err)
+	}
+}
+
+func statusOf(t *testing.T, pool *pgxpool.Pool, id string) string {
+	t.Helper()
+	var status string
+	if err := pool.QueryRow(t.Context(), "SELECT status FROM members WHERE id = $1", id).Scan(&status); err != nil {
+		t.Fatalf("ambil status %s: %v", id, err)
+	}
+	return status
+}
+
+// BNI VM hanya tahu member miliknya, jadi ketiadaan di snapshot baru berarti
+// sesuatu bagi member yang pernah ia kembalikan. Baris lain masuk lewat jalur
+// aslinya di sini, karena jalur itulah yang menentukan isi kolom-kolomnya.
+func TestLiveDeactivationOnlyTouchesBNIVMMembers(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := scope.WithoutLimit(t.Context())
+
+	// Bentuk id BNI VM sama dengan id Tambah Member: keduanya uuid.
+	const (
+		vmTetap  = "11111111-1111-4111-8111-111111111111"
+		vmHilang = "22222222-2222-4222-8222-222222222222"
+		bcID     = "bc-garuda-anasthasia-winna"
+		kodeID   = "KODE-0042"
+	)
+	if _, err := repo.Apply(ctx, []RemoteMember{
+		remote(vmTetap, "ch-1", "Garuda", "Budi", "active"),
+		remote(vmHilang, "ch-1", "Garuda", "Siti", "active"),
+	}, time.Now()); err != nil {
+		t.Fatalf("sinkronisasi awal: %v", err)
+	}
+
+	if err := importer.NewRepository(pool).UpsertMembers(ctx, []importer.MemberRow{
+		{ID: bcID, ChapterID: "ch-1", Name: "Anasthasia Winna", Status: "active"},
+		{ID: kodeID, ChapterID: "ch-1", Name: "Dari Berkas Umum", Status: "pending"},
+	}); err != nil {
+		t.Fatalf("impor: %v", err)
+	}
+
+	members := member.NewRepository(pool)
+	baru := domain.MemberNewMember
+	tambahan, err := members.Create(ctx, domain.CreateMemberInput{
+		ChapterID: "ch-1", Name: "Dari Tambah Member", Status: &baru,
+	})
+	if err != nil {
+		t.Fatalf("tambah member: %v", err)
+	}
+	// PATCH ikut mengisi synced_at, dan itu tidak menjadikannya milik BNI VM.
+	telepon := "081234567890"
+	if _, err := members.Update(ctx, tambahan.ID, domain.UpdateMemberInput{Phone: &telepon}); err != nil {
+		t.Fatalf("ubah member: %v", err)
+	}
+
+	result, err := repo.Apply(ctx, []RemoteMember{
+		remote(vmTetap, "ch-1", "Garuda", "Budi", "active"),
+	}, time.Now())
+	if err != nil {
+		t.Fatalf("sinkronisasi kedua: %v", err)
+	}
+
+	if result.Deactivated != 1 {
+		t.Errorf("hanya member BNI VM yang hilang yang boleh dinonaktifkan, dapat %d", result.Deactivated)
+	}
+	for id, want := range map[string]string{
+		vmTetap:     "active",
+		vmHilang:    "inactive",
+		bcID:        "active",
+		kodeID:      "pending",
+		tambahan.ID: "new_member",
+	} {
+		if got := statusOf(t, pool, id); got != want {
+			t.Errorf("status %s harusnya %q, dapat %q", id, want, got)
+		}
+	}
+}
+
+// Baris yang sudah ada sebelum asalnya dicatat tidak bisa dibedakan, jadi ia
+// aman sampai BNI VM mengembalikannya sekali. Sesudah itu ia member BNI VM biasa.
+func TestLiveExistingMemberBecomesBNIVMWhenReturned(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+	budi := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
+
+	mustApply(t, repo, budi)
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO members (id, chapter_id, name, status) VALUES ('mem-lama', 'ch-1', 'Lama', 'active')`); err != nil {
+		t.Fatalf("buat member lama: %v", err)
+	}
+
+	mustApply(t, repo, budi)
+	if got := statusOf(t, pool, "mem-lama"); got != "active" {
+		t.Fatalf("member yang belum pernah dikembalikan BNI VM dinonaktifkan: %q", got)
+	}
+
+	mustApply(t, repo, budi, remote("mem-lama", "ch-1", "Garuda", "Lama", "active"))
+	mustApply(t, repo, budi)
+	if got := statusOf(t, pool, "mem-lama"); got != "inactive" {
+		t.Errorf("member yang hilang dari BNI VM harusnya inactive, dapat %q", got)
+	}
+}
+
+// BNI VM yang tidak mengirim sebuah nilai tidak berarti nilainya sudah tidak ada.
+func TestLiveSyncEmptyValuesKeepStoredData(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+
+	lengkap := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
+	lengkap.Email, lengkap.Phone = strPtr("budi@example.com"), strPtr("0811")
+	lengkap.Company, lengkap.BusinessField = strPtr("PT Maju"), strPtr("Konsultan")
+	lengkap.JoinedDate, lengkap.RenewalDate = strPtr("2025-01-15"), strPtr("2027-01-15")
+	mustApply(t, repo, lengkap)
+
+	sebagian := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
+	sebagian.Email, sebagian.Phone = nil, strPtr("")
+	sebagian.Company, sebagian.BusinessField = strPtr(""), nil
+	sebagian.JoinedDate, sebagian.RenewalDate = strPtr(""), nil
+	mustApply(t, repo, sebagian)
+
+	var email, phone, company, field, joined, renewal string
+	if err := pool.QueryRow(ctx, `
+		SELECT email, phone, company, business_field, joined_date::text, renewal_date::text
+		FROM members WHERE id = 'mem-1'`).Scan(&email, &phone, &company, &field, &joined, &renewal); err != nil {
+		t.Fatalf("nilai tersimpan terhapus: %v", err)
+	}
+	if email != "budi@example.com" || phone != "0811" || company != "PT Maju" || field != "Konsultan" ||
+		joined != "2025-01-15" || renewal != "2027-01-15" {
+		t.Errorf("nilai tersimpan berubah: %s %s %s %s %s %s", email, phone, company, field, joined, renewal)
+	}
+}
+
+// Kontak tetap milik BNI VM: nilai yang ia kirim menimpa suntingan manual.
+func TestLiveSyncContactFollowsBNIVM(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := scope.WithoutLimit(t.Context())
+
+	vm := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
+	vm.Email, vm.Phone = strPtr("vm@example.com"), strPtr("0811")
+	mustApply(t, repo, vm)
+	if _, err := member.NewRepository(pool).Update(ctx, "mem-1", domain.UpdateMemberInput{
+		Email: strPtr("manual@example.com"), Phone: strPtr("0899"),
+	}); err != nil {
+		t.Fatalf("ubah member: %v", err)
+	}
+	mustApply(t, repo, vm)
+
+	var email, phone string
+	if err := pool.QueryRow(ctx, "SELECT email, phone FROM members WHERE id = 'mem-1'").Scan(&email, &phone); err != nil {
+		t.Fatalf("ambil kontak: %v", err)
+	}
+	if email != "vm@example.com" || phone != "0811" {
+		t.Errorf("kontak harusnya mengikuti BNI VM, dapat %q %q", email, phone)
+	}
+}
+
+// Renewal yang lunas memajukan tanggal di sistem ini lebih dulu daripada di BNI
+// VM. Sinkronisasi yang memundurkannya membuat member itu jatuh tempo lagi.
+func TestLiveSyncNeverMovesRenewalDateBack(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := t.Context()
+
+	syncRenewal := func(tanggal string) string {
+		t.Helper()
+		m := remote("mem-1", "ch-1", "Garuda", "Budi", "active")
+		m.RenewalDate = &tanggal
+		mustApply(t, repo, m)
+		var renewal string
+		if err := pool.QueryRow(ctx, "SELECT renewal_date::text FROM members WHERE id = 'mem-1'").Scan(&renewal); err != nil {
+			t.Fatalf("ambil renewal_date: %v", err)
+		}
+		return renewal
+	}
+	syncRenewal("2026-06-01")
+
+	var invoiceID string
+	if err := pool.QueryRow(ctx, `
+		INSERT INTO invoices (number, member_id, chapter_id, type, amount,
+		                      due_date, period_start, period_end, status)
+		VALUES ('INV-SYNC-2','mem-1','ch-1','renewal',1500000,
+		        CURRENT_DATE, '2027-06-01', '2028-06-01', 'paid')
+		RETURNING id`).Scan(&invoiceID); err != nil {
+		t.Fatalf("buat invoice: %v", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("mulai transaksi: %v", err)
+	}
+	defer tx.Rollback(ctx)
+	if err := member.NaikkanStatusSetelahLunas(ctx, tx, invoiceID); err != nil {
+		t.Fatalf("pelunasan: %v", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("simpan pelunasan: %v", err)
+	}
+
+	if got := syncRenewal("2026-06-01"); got != "2028-06-01" {
+		t.Errorf("sinkronisasi memundurkan renewal_date yang sudah lunas ke %s", got)
+	}
+	if got := syncRenewal("2029-06-01"); got != "2029-06-01" {
+		t.Errorf("tanggal BNI VM yang lebih jauh harusnya dipakai, dapat %s", got)
+	}
+}
+
+// Status dari BNI VM dipakai saat baris dibuat. Sesudah itu BNI VM hanya bisa
+// menonaktifkan; status lain berubah lewat PATCH dan pelunasan.
+func TestLiveSyncKeepsLocalStatus(t *testing.T) {
+	pool := livePool(t)
+	repo := NewRepository(pool)
+	ctx := scope.WithoutLimit(t.Context())
+	members := member.NewRepository(pool)
+
+	setStatus := func(id string, status domain.MemberStatus) {
+		t.Helper()
+		if _, err := members.Update(ctx, id, domain.UpdateMemberInput{Status: &status}); err != nil {
+			t.Fatalf("ubah status %s: %v", id, err)
+		}
+	}
+
+	baru := remote("mem-baru", "ch-1", "Garuda", "Baru", "active")
+	manual := remote("mem-manual", "ch-1", "Garuda", "Manual", "active")
+	keluar := remote("mem-keluar", "ch-1", "Garuda", "Keluar", "active")
+	kembali := remote("mem-kembali", "ch-1", "Garuda", "Kembali", "active")
+	asing := remote("mem-asing", "ch-1", "Garuda", "Asing", "suspended")
+	tunggu := remote("mem-tunggu", "ch-1", "Garuda", "Tunggu", "pending")
+	mustApply(t, repo, baru, manual, keluar, kembali, asing, tunggu)
+
+	// Baris baru mengambil status BNI VM, dan yang tak dikenal menjadi active.
+	for id, want := range map[string]string{"mem-asing": "active", "mem-tunggu": "pending"} {
+		if got := statusOf(t, pool, id); got != want {
+			t.Errorf("status awal %s harusnya %q, dapat %q", id, want, got)
+		}
+	}
+
+	setStatus("mem-baru", domain.MemberNewMember)
+	setStatus("mem-manual", domain.MemberInactive)
+	setStatus("mem-keluar", domain.MemberNewMember)
+	keluar.Status = "inactive"
+	mustApply(t, repo, baru, manual, keluar, asing, tunggu) // mem-kembali hilang dari snapshot
+	if got := statusOf(t, pool, "mem-keluar"); got != "inactive" {
+		t.Errorf("inactive dari BNI VM harusnya menonaktifkan, dapat %q", got)
+	}
+	if got := statusOf(t, pool, "mem-kembali"); got != "inactive" {
+		t.Fatalf("member yang hilang harusnya inactive, dapat %q", got)
+	}
+	keluar.Status = "active"
+	mustApply(t, repo, baru, manual, keluar, kembali, asing, tunggu)
+
+	for id, want := range map[string]string{
+		"mem-baru":    "new_member",
+		"mem-manual":  "inactive",
+		"mem-keluar":  "inactive",
+		"mem-kembali": "inactive",
+	} {
+		if got := statusOf(t, pool, id); got != want {
+			t.Errorf("status %s harusnya %q, dapat %q", id, want, got)
+		}
+	}
+
+	// Selama BNI VM masih menyebutnya inactive, aktivasi lokal tidak bertahan.
+	setStatus("mem-keluar", domain.MemberActive)
+	keluar.Status = "inactive"
+	mustApply(t, repo, keluar)
+	if got := statusOf(t, pool, "mem-keluar"); got != "inactive" {
+		t.Errorf("status mem-keluar harusnya inactive lagi, dapat %q", got)
 	}
 }
