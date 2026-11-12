@@ -175,7 +175,7 @@ export function ChapterListPage() {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-[13px] text-ink-500">Kota</span>
-                <Select value={city} onChange={(e) => setCity(e.target.value)} className="w-full sm:w-56">
+                <Select value={city} onChange={(e) => setCity(e.target.value)} className="w-full sm:w-56" aria-label="Filter kota">
                   <option value="all">Semua Kota</option>
                   {cities.map((ct) => (
                     <option key={ct} value={ct}>
@@ -225,7 +225,7 @@ export function ChapterListPage() {
                           type="button"
                           onClick={() => navigate(`/settings/import?chapter=${c.id}`)}
                           title={`Impor member ke ${c.displayName}`}
-                          className="flex items-center gap-1 text-xs font-medium text-ink-500 hover:text-ink-800"
+                          className="-my-1.5 flex items-center gap-1 py-1.5 text-xs font-medium text-ink-500 hover:text-ink-800"
                         >
                           <Upload className="h-3.5 w-3.5" />
                           Impor
@@ -237,7 +237,7 @@ export function ChapterListPage() {
                           onClick={() => setAkanDiubah(c)}
                           aria-label={`Ubah ${c.displayName}`}
                           title={`Ubah ${c.displayName}`}
-                          className="text-ink-400 hover:text-ink-800"
+                          className="-m-1.5 p-1.5 text-ink-400 hover:text-ink-800"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
@@ -253,14 +253,14 @@ export function ChapterListPage() {
                               ? 'Chapter yang masih punya member tidak bisa dihapus.'
                               : `Hapus ${c.displayName}`
                           }
-                          className="text-ink-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-400"
+                          className="-m-1.5 p-1.5 text-ink-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-400"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       )}
                       <button
                         onClick={() => navigate(`/members?chapter=${c.id}`)}
-                        className="text-xs font-medium text-brand-500 hover:text-brand-600"
+                        className="-my-1.5 py-1.5 text-xs font-medium text-brand-500 hover:text-brand-600"
                       >
                         Lihat member
                       </button>

@@ -108,6 +108,7 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 		// kosong. Lihat httpx.RapikanPath.
 		httpx.RapikanPath,
 		httpx.RequestID,
+		httpx.TanpaCache,
 		httpx.Logger(log),
 		httpx.Recoverer(log),
 		httpx.CORS(cfg.AllowedOrigins),

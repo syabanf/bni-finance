@@ -255,6 +255,7 @@ export function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
+                      aria-label="Hari sebelum renewal untuk membuat draft"
                       value={draftDaysBefore}
                       onChange={e => setDraftDaysBefore(Math.max(1, Number(e.target.value)))}
                       min={1}
@@ -270,6 +271,7 @@ export function SettingsPage() {
                   <div className="flex items-center gap-2">
                     <Input
                       type="number"
+                      aria-label="Hari jatuh tempo setelah dikirim"
                       value={dueDaysAfter}
                       onChange={e => setDueDaysAfter(Math.max(1, Number(e.target.value)))}
                       min={1}
@@ -347,6 +349,7 @@ function FeeInput({
         </span>
         <Input
           type="number"
+          aria-label={`${label} dalam dolar`}
           inputMode="decimal"
           min={0}
           step="0.01"

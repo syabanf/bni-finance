@@ -92,24 +92,10 @@ func (s *Service) IzinkanCallbackTanpaToken(izin bool) *Service {
 	return s
 }
 
-// recordInbound captures a callback we received, so the blackbox shows both
-// sides of the integration.
-// recordInbound menyimpan callback APA ADANYA.
-//
-// Dulu yang direkam adalah json.Marshal atas struct HASIL PARSE — yang kita
-// pahami, bukan yang Paper.id kirim. Kalau formatnya berbeda, blackbox
-// menampilkan struct nyaris kosong dan justru MENYESATKAN orang yang sedang
-// mendiagnosis: alat yang dipakai untuk menemukan ketidakcocokan format buta
-// terhadap ketidakcocokan format.
-//
-// Sekarang body mentah yang disimpan, beserta catatan selisihnya terhadap
-// bentuk yang kita harapkan.
-func (s *Service) recordInbound(raw []byte, status int, success bool, err error) {
-	s.recordInboundAt("/api/v1/webhooks/paperid", raw, status, success, err)
-}
-
-// recordInboundAt mencatat dengan alamat sebenarnya, sehingga halaman blackbox
-// langsung memberi tahu jenis callback mana yang datang.
+// recordInboundAt mencatat callback dengan alamat sebenarnya, sehingga halaman
+// blackbox langsung memberi tahu jenis callback mana yang datang. Body disimpan
+// apa adanya, bukan hasil parse: yang perlu dilihat saat mendiagnosis adalah
+// yang Paper.id kirim, bukan yang kita pahami darinya.
 func (s *Service) recordInboundAt(path string, raw []byte, status int, success bool, err error) {
 	if s.rec == nil {
 		return

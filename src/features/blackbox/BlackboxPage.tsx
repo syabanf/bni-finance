@@ -122,16 +122,19 @@ export function BlackboxPage() {
       <Card data-tour="blackbox-filters" className="mb-5">
         <CardBody className="flex flex-wrap items-center gap-3">
           <Select
+            label="Filter integrasi"
             value={filters.integration ?? 'all'}
             options={INTEGRATIONS}
             onChange={(v) => setFilters((f) => ({ ...f, integration: v as BlackboxFilters['integration'] }))}
           />
           <Select
+            label="Filter arah"
             value={filters.direction ?? 'all'}
             options={DIRECTIONS}
             onChange={(v) => setFilters((f) => ({ ...f, direction: v as BlackboxFilters['direction'] }))}
           />
           <Select
+            label="Filter status"
             value={filters.status ?? 'all'}
             options={STATUSES}
             onChange={(v) => setFilters((f) => ({ ...f, status: v as BlackboxFilters['status'] }))}
@@ -273,16 +276,19 @@ function BodyBlock({ title, body }: { title: string; body: unknown }) {
 }
 
 function Select({
+  label,
   value,
   options,
   onChange,
 }: {
+  label: string
   value: string
   options: readonly { value: string; label: string }[]
   onChange: (v: string) => void
 }) {
   return (
     <select
+      aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-700 focus:border-brand-500 focus:outline-none"

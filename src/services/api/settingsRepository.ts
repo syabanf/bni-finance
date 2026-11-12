@@ -1,4 +1,4 @@
-import { api, type ListResponse } from '@/lib/apiClient'
+import { api } from '@/lib/apiClient'
 import type { SettingsRepository } from '@/services/types'
 import type { FeeSettings } from '@/types'
 
@@ -28,11 +28,6 @@ export async function getAppSetting(key: string): Promise<string | null> {
 
 export async function setAppSetting(key: string, value: string): Promise<void> {
   await api.put<AppSetting>(`/app-settings/${encodeURIComponent(key)}`, { value })
-}
-
-export async function listAppSettings(): Promise<AppSetting[]> {
-  const res = await api.get<ListResponse<AppSetting>>('/app-settings')
-  return res.data
 }
 
 export const apiSettingsRepository: SettingsRepository = {

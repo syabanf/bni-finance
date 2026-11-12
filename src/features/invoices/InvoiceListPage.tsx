@@ -595,14 +595,14 @@ export function InvoiceListPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Select value={type} onChange={(e) => setType(e.target.value as InvoiceType | 'all')} className="w-full sm:w-40">
+            <Select value={type} onChange={(e) => setType(e.target.value as InvoiceType | 'all')} className="w-full sm:w-40" aria-label="Filter tipe invoice">
               {TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
               ))}
             </Select>
-            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-44">
+            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-44" aria-label="Filter chapter">
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (
                 <option key={c.id} value={c.id}>

@@ -123,7 +123,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 // payment page has to render them for someone who isn't signed in.
 func (h *Handler) RegisterFileServer(mux *http.ServeMux) {
 	fs := http.FileServer(http.Dir(h.store.dir))
-	mux.Handle("GET "+URLPrefix, http.StripPrefix(URLPrefix, noDirListing(fs)))
+	mux.Handle("GET "+URLPrefix, http.StripPrefix(URLPrefix, cacheLama(noDirListing(fs))))
 }
 
 func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
@@ -161,6 +161,16 @@ func noDirListing(next http.Handler) http.Handler {
 			httpx.Fail(w, httpx.NotFound("berkas tidak ditemukan"))
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// cacheLama mengizinkan browser menyimpan berkas unggahan selama setahun.
+// Namanya acak dan tidak pernah ditimpa, jadi isi di balik satu URL tidak
+// berubah. private, karena isinya bukti bayar dan faktur pajak.
+func cacheLama(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "private, max-age=31536000, immutable")
 		next.ServeHTTP(w, r)
 	})
 }

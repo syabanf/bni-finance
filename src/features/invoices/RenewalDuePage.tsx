@@ -162,7 +162,7 @@ export function RenewalDuePage() {
         breadcrumb={
           <button
             onClick={() => navigate('/invoices')}
-            className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-800"
+            className="-my-1.5 inline-flex items-center gap-1.5 py-1.5 text-sm text-ink-500 hover:text-ink-800"
           >
             <ArrowLeft className="h-4 w-4" />
             Kembali ke Invoice
@@ -184,6 +184,7 @@ export function RenewalDuePage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Select
+              aria-label="Filter urgensi"
               value={urgency}
               onChange={(e) => setUrgency(e.target.value as Urgency)}
               className="w-full sm:w-48"

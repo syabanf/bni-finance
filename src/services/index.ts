@@ -22,6 +22,7 @@ import type {
 } from './types'
 
 import { isMockMode } from './dataSource'
+import { cacheSingkat, lalu } from './cache'
 
 import { mockAuthRepository } from './mock/authRepository'
 import { mockChapterRepository } from './mock/chapterRepository'
@@ -86,7 +87,27 @@ const apiServices: Services = {
   imports: apiImportRepository,
 }
 
-export const services: Services = useMock ? mockServices : apiServices
+const dasar: Services = useMock ? mockServices : apiServices
+
+// Data referensi di-cache semenit dan dibuang setiap kali datanya diubah lewat
+// aplikasi ini, termasuk impor yang bisa membuat chapter baru.
+const daftarChapter = cacheSingkat(() => dasar.chapters.list(), 60_000)
+const biaya = cacheSingkat(() => dasar.settings.getFees(), 60_000)
+
+export const services: Services = {
+  ...dasar,
+  chapters: {
+    ...dasar.chapters,
+    list: daftarChapter.get,
+    create: lalu(dasar.chapters.create, daftarChapter),
+    update: lalu(dasar.chapters.update, daftarChapter),
+    remove: lalu(dasar.chapters.remove, daftarChapter),
+    sync: lalu(dasar.chapters.sync, daftarChapter),
+  },
+  members: { ...dasar.members, sync: lalu(dasar.members.sync, daftarChapter) },
+  settings: { ...dasar.settings, getFees: biaya.get, updateFees: lalu(dasar.settings.updateFees, biaya) },
+  imports: { ...dasar.imports, apply: lalu(dasar.imports.apply, daftarChapter) },
+}
 
 // Convenience named exports
 export const {

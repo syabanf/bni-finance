@@ -126,8 +126,10 @@ func TestRapikanPathMencegah301UntukWebhook(t *testing.T) {
 		return rec
 	}
 
-	if rec := kirim(mux); rec.Code != http.StatusTemporaryRedirect {
-		t.Fatalf("tanpa RapikanPath mux seharusnya redirect 307 untuk POST (itulah masalahnya), dapat %d", rec.Code)
+	// Go 1.25 menjawab 301, Go 1.26 menjawab 307. Keduanya masalah yang sama:
+	// klien webhook yang tidak mengikuti redirect untuk POST kehilangan body.
+	if rec := kirim(mux); rec.Code != http.StatusMovedPermanently && rec.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("tanpa RapikanPath mux seharusnya me-redirect POST (itulah masalahnya), dapat %d", rec.Code)
 	}
 
 	diterima = struct{ method, path, body string }{}

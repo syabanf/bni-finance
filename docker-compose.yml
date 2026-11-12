@@ -1,7 +1,10 @@
-# BNI Finance Hub — backend Go + Postgres.
+# BNI Finance Hub: Postgres, migrasi skema, backend Go, dan frontend nginx.
 #
 #   docker compose up -d --build
 #   docker compose logs -f api
+#
+# Frontend dan API satu origin di port WEB_PORT (bawaan 8081). Port API_PORT
+# tetap dibuka untuk reverse proxy yang sudah menunjuk ke backend langsung.
 #
 # Rahasia TIDAK ditulis di berkas ini. Semuanya dibaca dari backend/.env, yang
 # diabaikan git — lihat backend/.env.example untuk daftar variabelnya.
@@ -15,11 +18,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-bni_finance}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # init.sql idempoten: skema selalu diterapkan, akun awal dan data contoh
-      # hanya bila tabelnya kosong. Postgres menjalankan berkas di direktori ini
-      # HANYA saat data directory masih kosong, jadi pada volume yang sudah
-      # terisi berkas ini tidak dijalankan ulang — terapkan perubahan skema
-      # dengan `docker compose exec -T db psql … < db/init.sql`.
+      # Postgres menjalankan berkas di direktori ini hanya saat data directory
+      # masih kosong. Perubahan skema berikutnya diterapkan layanan migrate.
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       # Wajib, dan bukan basa-basi: tanpa ini `api` start lebih dulu daripada
@@ -29,6 +29,34 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
+
+  # Menerapkan db/init.sql setiap kali layanan dinyalakan. Berkas itu idempoten,
+  # dan Postgres sendiri hanya menjalankannya pada volume kosong, jadi perubahan
+  # skema dulu harus diterapkan dengan tangan sebelum deploy. api baru start
+  # setelah langkah ini selesai tanpa galat.
+  migrate:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    command:
+      - psql
+      - -h
+      - db
+      - -U
+      - ${POSTGRES_USER:-postgres}
+      - -d
+      - ${POSTGRES_DB:-bni_finance}
+      - -v
+      - ON_ERROR_STOP=1
+      - -q
+      - -f
+      - /init.sql
+    volumes:
+      - ./db/init.sql:/init.sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
   api:
     build:
@@ -61,6 +89,18 @@ services:
       - uploads:/app/uploads
     depends_on:
       db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+    ports:
+      - "${WEB_PORT:-8081}:80"
+    depends_on:
+      api:
         condition: service_healthy
     restart: unless-stopped
 

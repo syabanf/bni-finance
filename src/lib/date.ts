@@ -13,12 +13,6 @@ export function todayISO(): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-/** Current year-month (yyyy-mm) in local time. */
-export function monthNowKey(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`
-}
-
 /** Add a number of days to an ISO date, returning a new ISO date string. */
 export function addDays(iso: string, days: number): string {
   const d = new Date(iso)

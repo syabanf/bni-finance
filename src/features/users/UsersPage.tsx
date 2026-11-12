@@ -151,7 +151,7 @@ export function UsersPage() {
                       <div className="inline-flex items-center gap-3 whitespace-nowrap">
                         <button
                           onClick={() => setDiubah(u)}
-                          className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
+                          className="-my-1 inline-flex items-center gap-1 py-1 text-sm text-ink-500 hover:text-ink-900"
                         >
                           <Pencil className="h-4 w-4" />
                           Ubah Peran
@@ -159,14 +159,14 @@ export function UsersPage() {
                         <button
                           onClick={() => kirimReset(u)}
                           title="Kirim email tautan reset sandi"
-                          className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-ink-900"
+                          className="-my-1 inline-flex items-center gap-1 py-1 text-sm text-ink-500 hover:text-ink-900"
                         >
                           <KeyRound className="h-4 w-4" />
                           Reset Sandi
                         </button>
                         <button
                           onClick={() => hapus(u)}
-                          className="inline-flex items-center gap-1 text-sm text-ink-500 hover:text-red-600"
+                          className="-my-1 inline-flex items-center gap-1 py-1 text-sm text-ink-500 hover:text-red-600"
                         >
                           <Trash2 className="h-4 w-4" />
                           Hapus

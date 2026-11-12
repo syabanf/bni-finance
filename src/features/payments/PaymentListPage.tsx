@@ -227,7 +227,7 @@ export function PaymentListPage() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full sm:w-48">
+              <Select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full sm:w-48" aria-label="Filter metode pembayaran">
                 <option value="all">Semua Metode</option>
                 {methodOptions.map((m) => (
                   <option key={m} value={m}>

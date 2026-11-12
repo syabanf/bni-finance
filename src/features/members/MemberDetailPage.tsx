@@ -72,7 +72,7 @@ export function MemberDetailPage() {
         breadcrumb={
           <button
             onClick={() => navigate('/members')}
-            className="inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-800"
+            className="-my-1.5 inline-flex items-center gap-1.5 py-1.5 text-sm text-ink-500 hover:text-ink-800"
           >
             <ArrowLeft className="h-4 w-4" />
             Kembali ke Member
