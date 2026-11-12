@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, FileText, FileUp, HelpCircle, Send, XCircle } from 'lucide-react'
+import { CheckCircle2, FileText, FileUp, HelpCircle, Send, Trash2, XCircle } from 'lucide-react'
 import type { MemberWithChapter, RenewalAnswer, RenewalRequest } from '@/types'
 import {
   Badge,
@@ -231,6 +231,21 @@ export function RenewalPage() {
     )
   }
 
+  // Membatalkan mengikuti hak menulis (admin dan ST), sama seperti meminta.
+  const batalkan = async (r: RenewalRequest) => {
+    if (!window.confirm(`Batalkan permintaan konfirmasi ${r.memberName ?? r.memberId}?`)) return
+    setMemproses(r.id)
+    try {
+      await renewalService.cancel(r.id)
+      toast(`Permintaan ${r.memberName ?? r.memberId} dibatalkan.`)
+      permintaan.reload()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal membatalkan permintaan.', 'error')
+    } finally {
+      setMemproses(null)
+    }
+  }
+
   const jawab = async (r: RenewalRequest, answer: RenewalAnswer) => {
     setMemproses(r.id)
     try {
@@ -394,7 +409,7 @@ export function RenewalPage() {
                   <Th>Jatuh tempo</Th>
                   <Th>Ditugaskan</Th>
                   <Th>Jawaban</Th>
-                  {bolehMenjawab && <Th className="text-right">Tindakan</Th>}
+                  {(bolehMenjawab || bolehTagih) && <Th className="text-right">Tindakan</Th>}
                 </Tr>
               </THead>
               <TBody>
@@ -440,30 +455,43 @@ export function RenewalPage() {
                       <Badge tone={TONE[r.answer]}>{LABEL[r.answer]}</Badge>
                       {r.note && <div className="mt-1 text-xs text-ink-500">{r.note}</div>}
                     </Td>
-                    {bolehMenjawab && (
+                    {(bolehMenjawab || bolehTagih) && (
                       <Td className="text-right">
                         <div className="inline-flex gap-1">
-                          <TombolJawab
-                            icon={CheckCircle2}
-                            label="Diterima"
-                            tone="hover:text-emerald-600"
-                            disabled={memproses === r.id}
-                            onClick={() => jawab(r, 'will_renew')}
-                          />
-                          <TombolJawab
-                            icon={XCircle}
-                            label="Tolak"
-                            tone="hover:text-red-600"
-                            disabled={memproses === r.id}
-                            onClick={() => jawab(r, 'will_not')}
-                          />
-                          <TombolJawab
-                            icon={HelpCircle}
-                            label="Belum pasti"
-                            tone="hover:text-amber-600"
-                            disabled={memproses === r.id}
-                            onClick={() => jawab(r, 'unsure')}
-                          />
+                          {bolehMenjawab && (
+                            <>
+                              <TombolJawab
+                                icon={CheckCircle2}
+                                label="Diterima"
+                                tone="hover:text-emerald-600"
+                                disabled={memproses === r.id}
+                                onClick={() => jawab(r, 'will_renew')}
+                              />
+                              <TombolJawab
+                                icon={XCircle}
+                                label="Tolak"
+                                tone="hover:text-red-600"
+                                disabled={memproses === r.id}
+                                onClick={() => jawab(r, 'will_not')}
+                              />
+                              <TombolJawab
+                                icon={HelpCircle}
+                                label="Belum pasti"
+                                tone="hover:text-amber-600"
+                                disabled={memproses === r.id}
+                                onClick={() => jawab(r, 'unsure')}
+                              />
+                            </>
+                          )}
+                          {bolehTagih && r.answer === 'pending' && (
+                            <TombolJawab
+                              icon={Trash2}
+                              label="Batalkan"
+                              tone="hover:text-red-600"
+                              disabled={memproses === r.id}
+                              onClick={() => batalkan(r)}
+                            />
+                          )}
                         </div>
                       </Td>
                     )}

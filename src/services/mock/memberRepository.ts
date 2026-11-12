@@ -1,3 +1,4 @@
+import { hapusPermintaanMember } from './renewalRepository'
 import type { MemberRepository } from '@/services/types'
 import type { Member, MemberWithChapter } from '@/types'
 import { bolehDitagih } from '@/lib/status'
@@ -73,6 +74,16 @@ export const mockMemberRepository: MemberRepository = {
     if (!member) throw new Error('Member tidak ditemukan.')
     Object.assign(member, input)
     return delay(member, 250)
+  },
+
+  async remove(id) {
+    // Penjaga yang sama dengan server: member bertagihan diubah ke Inactive.
+    if (!store.members.some((m) => m.id === id)) throw new Error('Member tidak ditemukan.')
+    const n = store.invoices.filter((i) => i.memberId === id).length
+    if (n > 0) throw new Error(`member masih punya ${n} invoice; ubah statusnya menjadi inactive`)
+    hapusPermintaanMember(id)
+    store.members = store.members.filter((m) => m.id !== id)
+    return delay(undefined, 250)
   },
 
   async sync() {

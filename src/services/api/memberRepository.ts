@@ -51,6 +51,10 @@ export const apiMemberRepository: MemberRepository = {
     return api.patch<Member>(`/members/${encodeURIComponent(id)}`, input)
   },
 
+  async remove(id) {
+    await api.delete(`/members/${encodeURIComponent(id)}`)
+  },
+
   async sync() {
     const result = await runSync()
     return { count: result.members, syncedAt: result.syncedAt, needsReview: result.needsReview }

@@ -23,6 +23,7 @@ import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } fro
 import { paymentMethodLabel } from '@/lib/paymentMethod'
 import { todayISO } from '@/lib/date'
 import { downloadXlsxSheets } from '@/lib/xlsx'
+import { LaporanPengirimanCard } from './components/LaporanPengirimanCard'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
 import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
@@ -672,6 +673,13 @@ export function ReportPage() {
           </div>
         )}
       </Card>
+
+      <LaporanPengirimanCard
+        invoices={(invoices ?? []).filter((i) => tipe === 'all' || i.type === tipe)}
+        inRange={inRange}
+        loading={invLoading}
+        namaBerkas={exportBase}
+      />
     </div>
   )
 }

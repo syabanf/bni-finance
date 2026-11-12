@@ -691,13 +691,19 @@ paths:
       tags: [Invoice]
       summary: Hapus invoice
       description: |
-        **Admin saja.** Invoice yang sudah punya pembayaran **tidak bisa
-        dihapus** — batalkan saja, supaya riwayatnya utuh.
+        **Admin saja, dan hanya untuk draft.** Invoice yang sudah dikirim punya
+        tautan Paper.id yang tetap hidup, jadi dijawab 409; batalkan saja supaya
+        riwayatnya utuh. Menghapus ulang invoice yang sudah terhapus dijawab 404.
       parameters: [{ $ref: "#/components/parameters/InvoiceId" }]
       responses:
         "204": { description: Terhapus }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Invoice bukan draft, atau masih punya pembayaran
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "409":
           description: Masih ada pembayaran yang menunjuk ke invoice ini
           content:
@@ -856,10 +862,16 @@ paths:
       tags: [Pembayaran]
       summary: Hapus pembayaran
       description: |
-        **Admin saja.** Perhatikan: ini **tidak** mengembalikan status invoice
-        dari `paid`.
+        **Admin saja.** Pembayaran atas invoice `paid` dijawab 409: status
+        invoice dan masa keanggotaan member sudah maju karenanya, dan
+        menghapusnya tidak memundurkan keduanya.
       parameters: [{ $ref: "#/components/parameters/PaymentId" }]
       responses:
+        "409":
+          description: Invoice pembayaran ini sudah lunas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "204": { description: Terhapus }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1006,7 +1018,8 @@ paths:
       summary: Hapus member
       description: |
         **Admin saja.** Member yang punya invoice tidak bisa dihapus — ubah
-        statusnya menjadi `inactive` supaya riwayat tagihannya utuh.
+        statusnya menjadi `inactive` supaya riwayat tagihannya utuh. Permintaan
+        konfirmasi renewal member itu ikut terhapus dalam transaksi yang sama.
       parameters: [{ $ref: "#/components/parameters/MemberId" }]
       responses:
         "204": { description: Terhapus }
@@ -2146,6 +2159,25 @@ paths:
         "403":
           description: Member ada di chapter lain, atau peran tidak boleh menulis
   /api/v1/renewal-requests/{id}:
+    delete:
+      tags: [Member]
+      summary: Batalkan permintaan konfirmasi renewal
+      description: |
+        **Admin dan ST.** Hanya permintaan yang belum dijawab (`pending`).
+        Jawaban MC menjadi dasar invoice renewal, jadi permintaan yang sudah
+        dijawab dijawab 409. Permintaan chapter lain dan permintaan yang sudah
+        dibatalkan dijawab 404.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Dibatalkan }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Permintaan sudah dijawab MC
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
     patch:
       tags: [Member]
       summary: MC menjawab konfirmasi renewal

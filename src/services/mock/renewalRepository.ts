@@ -33,6 +33,13 @@ export function konfirmasiTerakhir(memberId: string): RenewalRequest | null {
   return milik.reduce((a, b) => (b.requestedAt > a.requestedAt ? b : a))
 }
 
+/** Dipakai hapus member: permintaannya ikut terhapus, seperti di server. */
+export function hapusPermintaanMember(memberId: string) {
+  for (let i = requests.length - 1; i >= 0; i--) {
+    if (requests[i].memberId === memberId) requests.splice(i, 1)
+  }
+}
+
 export const mockRenewalRepository: RenewalRepository = {
   async list(params) {
     let out = requests.map(isiRelasi)
@@ -90,6 +97,16 @@ export const mockRenewalRepository: RenewalRepository = {
     }
     await delay(null, 300)
     return { dibuat, dilewati, visitor, total: dibuat + dilewati + visitor }
+  },
+
+  async cancel(id) {
+    const i = requests.findIndex((x) => x.id === id)
+    if (i < 0) throw new Error('Permintaan tidak ditemukan.')
+    if (requests[i].answer !== 'pending') {
+      throw new Error('permintaan yang sudah dijawab MC tidak bisa dibatalkan')
+    }
+    requests.splice(i, 1)
+    return delay(undefined, 200)
   },
 
   async answer(id, answer: RenewalAnswer, note) {

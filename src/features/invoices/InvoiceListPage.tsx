@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, FileText, Plus, Search, Send, X } from 'lucide-react'
+import { Ban, ChevronLeft, ChevronRight, FileText, Plus, Search, Send, X } from 'lucide-react'
 import type {
   Chapter,
   InvoicePage,
@@ -15,11 +15,14 @@ import {
   EmptyState,
   ErrorState,
   ExportMenu,
+  Field,
   Input,
+  Modal,
   PageHeader,
   Select,
   SummaryCard,
   TableSkeleton,
+  Textarea,
   useToast,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
@@ -112,6 +115,9 @@ export function InvoiceListPage() {
   const [issuedTo, setIssuedTo] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkSending, setBulkSending] = useState(false)
+  const [batalBuka, setBatalBuka] = useState(false)
+  const [alasanBatal, setAlasanBatal] = useState('')
+  const [membatalkan, setMembatalkan] = useState(false)
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
@@ -228,6 +234,42 @@ export function InvoiceListPage() {
     () => selectedInvoices.filter((inv) => inv.status === 'draft' || inv.status === 'sent' || inv.status === 'overdue'),
     [selectedInvoices],
   )
+  const selectedOverdue = useMemo(
+    () => selectedInvoices.filter((inv) => inv.status === 'overdue'),
+    [selectedInvoices],
+  )
+
+  /**
+   * Batal massal invoice Terlambat. Satu kegagalan tidak menghentikan sisanya,
+   * dan pembatalan yang diulang tidak menulis apa pun di server, jadi menekan
+   * tombolnya lagi setelah sebagian gagal aman.
+   */
+  const handleBulkCancel = async () => {
+    const alasan = alasanBatal.trim()
+    if (!alasan || selectedOverdue.length === 0) return
+    setMembatalkan(true)
+    const gagal: string[] = []
+    for (const inv of selectedOverdue) {
+      try {
+        await invoiceService.cancel(inv.id, alasan)
+      } catch (err) {
+        gagal.push(`${inv.number} (${err instanceof Error ? err.message : 'gagal'})`)
+      }
+    }
+    setMembatalkan(false)
+    setBatalBuka(false)
+    setAlasanBatal('')
+    setSelected(new Set())
+    reload()
+    const berhasil = selectedOverdue.length - gagal.length
+    toast(
+      gagal.length === 0
+        ? `${berhasil} invoice dibatalkan. Batalkan juga tautannya di dashboard Paper.id.`
+        : `${berhasil} dibatalkan, ${gagal.length} gagal: ${gagal.slice(0, 3).join('; ')}`,
+      gagal.length === 0 ? undefined : 'error',
+    )
+  }
+
   const selectedTotal = useMemo(
     () => selectedInvoices.reduce((acc, inv) => acc + inv.amount, 0),
     [selectedInvoices],
@@ -422,6 +464,32 @@ export function InvoiceListPage() {
 
   return (
     <div>
+      <Modal
+        open={batalBuka}
+        onClose={() => setBatalBuka(false)}
+        title={`Batalkan ${selectedOverdue.length} invoice terlambat?`}
+        description="Tautan pembayaran di Paper.id tidak ikut mati. Batalkan juga di dashboard Paper.id, karena pembayaran lewat tautan itu tidak akan tercatat di sini."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setBatalBuka(false)} disabled={membatalkan}>
+              Batal
+            </Button>
+            <Button variant="danger" loading={membatalkan} disabled={!alasanBatal.trim()} onClick={handleBulkCancel}>
+              <Ban className="h-4 w-4" />
+              Batalkan {selectedOverdue.length} Invoice
+            </Button>
+          </>
+        }
+      >
+        <Field label="Alasan pembatalan" required>
+          <Textarea
+            value={alasanBatal}
+            onChange={(e) => setAlasanBatal(e.target.value)}
+            placeholder="Mis. member tidak memperpanjang."
+          />
+        </Field>
+      </Modal>
+
       <PageHeader
         title="Invoice"
         description="Kelola seluruh invoice pendaftaran dan renewal."
@@ -598,8 +666,14 @@ export function InvoiceListPage() {
                 <X className="h-4 w-4" />
                 Batal
               </Button>
+              {selectedOverdue.length > 0 && (
+                <Button size="sm" variant="danger" disabled={bulkSending} onClick={() => setBatalBuka(true)}>
+                  <Ban className="h-4 w-4" />
+                  Batalkan {selectedOverdue.length} Terlambat
+                </Button>
+              )}
               {selectedSendable.length > 0 && (
-                <Button size="sm" loading={bulkSending} onClick={handleBulkSend}>
+                <Button size="sm" loading={bulkSending} disabled={membatalkan} onClick={handleBulkSend}>
                   <Send className="h-4 w-4" />
                   {bulkProgress
                     ? `Mengirim ${bulkProgress.done}/${bulkProgress.total}…`

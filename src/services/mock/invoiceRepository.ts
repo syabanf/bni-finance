@@ -321,10 +321,35 @@ export const mockInvoiceRepository: InvoiceRepository = {
     return delay(invoice, 600)
   },
 
+  async updateDraft(id, input) {
+    const invoice = store.invoices.find((i) => i.id === id)
+    if (!invoice) throw new Error('Invoice tidak ditemukan.')
+    if (invoice.status !== 'draft') throw new Error('Hanya invoice draft yang bisa diubah di sini.')
+    const berubah = (Object.keys(input) as (keyof typeof input)[]).some((k) => input[k] !== invoice[k])
+    // Sama seperti server: patch yang tidak mengubah apa pun tidak menulis riwayat.
+    if (!berubah) return delay(invoice, 200)
+    Object.assign(invoice, input, { updatedAt: nowISO() })
+    pushAudit({ invoiceId: id, action: 'updated', actorName: 'Admin' })
+    return delay(invoice, 250)
+  },
+
+  async remove(id) {
+    const invoice = store.invoices.find((i) => i.id === id)
+    if (!invoice) throw new Error('Invoice tidak ditemukan.')
+    if (invoice.status !== 'draft') {
+      throw new Error('hanya invoice draft yang bisa dihapus; batalkan invoice yang sudah dikirim')
+    }
+    store.invoices = store.invoices.filter((i) => i.id !== id)
+    store.auditLog = store.auditLog.filter((a) => a.invoiceId !== id)
+    return delay(undefined, 250)
+  },
+
   async cancel(id, reason) {
     const invoice = store.invoices.find((i) => i.id === id)
     if (!invoice) throw new Error('Invoice tidak ditemukan.')
     if (invoice.status === 'paid') throw new Error('Invoice yang sudah dibayar tidak bisa dibatalkan.')
+    // Pembatalan ganda tidak menulis riwayat kedua, sama seperti server.
+    if (invoice.status === 'cancelled' && invoice.cancelReason === reason) return delay(invoice, 200)
 
     const old = invoice.status
     invoice.status = 'cancelled'

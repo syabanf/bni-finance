@@ -11,6 +11,14 @@ const PAYMENT_METHOD_LABEL: Record<string, string> = {
   other: 'Lainnya',
 }
 
+/** Metode yang bisa dipilih saat mencatat atau mengubah pembayaran manual. */
+export const MANUAL_METHODS: { value: string; label: string }[] = [
+  { value: 'bank_transfer', label: 'Transfer Bank' },
+  { value: 'cash', label: 'Tunai' },
+  { value: 'qris', label: 'QRIS' },
+  { value: 'other', label: 'Lainnya' },
+]
+
 /** Human-readable label for a payment-method code. Unknown codes are title-cased. */
 export function paymentMethodLabel(method?: string | null): string {
   const key = (method ?? '').trim()

@@ -30,6 +30,7 @@ import type {
   MemberWithChapter,
   PaymentWithInvoice,
   RenewalDueMember,
+  Payment,
 } from '@/types'
 
 export interface AuthRepository {
@@ -134,6 +135,8 @@ export interface RenewalRepository {
   ): Promise<{ dibuat: number; dilewati: number; visitor: number; total: number; email?: HasilEmailMC }>
   /** MC menjawab satu permintaan. */
   answer(id: string, answer: RenewalAnswer, note?: string): Promise<RenewalRequest>
+  /** Batalkan permintaan yang belum dijawab (admin, ST). */
+  cancel(id: string): Promise<void>
 }
 
 /** Pemberitahuan ke MC setelah permintaan konfirmasi renewal dibuat. */
@@ -144,6 +147,13 @@ export interface HasilEmailMC {
   chapterTanpaMc: string[]
 }
 
+export interface UpdateDraftInput {
+  amount?: number
+  periodStart?: string
+  periodEnd?: string
+  notes?: string
+}
+
 export interface ChapterRepository {
   list(): Promise<Chapter[]>
   /** Jumlah member dan nominal tunggakan tiap chapter, dihitung server. */
@@ -151,6 +161,8 @@ export interface ChapterRepository {
   getById(id: string): Promise<Chapter | null>
   /** Tambah satu chapter (admin). */
   create(input: CreateChapterInput): Promise<Chapter>
+  /** Ubah nama tampil, area, atau kota chapter (admin). */
+  update(id: string, input: UpdateChapterInput): Promise<Chapter>
   /** Hapus chapter yang tidak lagi dipakai member, invoice, atau akun (admin). */
   remove(id: string): Promise<void>
   /** Pull fresh data from BNI VM and refresh the local mirror. */
@@ -174,10 +186,16 @@ export interface MemberRepository {
   create(input: CreateMemberInput): Promise<Member>
   /** Ubah kontak atau status member (admin). String kosong mengosongkan kolomnya. */
   update(id: string, input: UpdateMemberInput): Promise<Member>
+  /** Hapus member tanpa invoice (admin). Permintaan konfirmasinya ikut terhapus. */
+  remove(id: string): Promise<void>
   sync(): Promise<{ count: number; syncedAt: string; needsReview?: string[] }>
 }
 
+export type UpdateChapterInput = Partial<Pick<Chapter, 'displayName' | 'areaName' | 'cityName'>>
+
 export type UpdateMemberInput = Partial<Pick<Member, 'status'>> & {
+  renewalDate?: string
+  joinedDate?: string
   email?: string
   phone?: string
   company?: string
@@ -213,6 +231,10 @@ export interface InvoiceRepository {
   /** Re-send an already-sent/overdue invoice to Paper.id (refreshes payment link). */
   resend(id: string): Promise<Invoice>
   cancel(id: string, reason: string): Promise<Invoice>
+  /** Ubah nominal, masa berlaku, atau catatan invoice draft. */
+  updateDraft(id: string, input: UpdateDraftInput): Promise<Invoice>
+  /** Hapus invoice draft. Invoice yang sudah dikirim dibatalkan, bukan dihapus. */
+  remove(id: string): Promise<void>
   /**
    * Memutus keanggotaan: invoicenya gugur karena hubungannya berakhir.
    *
@@ -264,6 +286,8 @@ export interface PaymentRepository {
   listByInvoice(invoiceId: string): Promise<PaymentWithInvoice[]>
   /** Upload a payment-proof file, returning a URL to store with the payment. */
   uploadProof(file: File): Promise<string>
+  /** Ubah metode atau catatan pembayaran. Nominal dan tanggalnya tetap. */
+  update(id: string, input: { paymentMethod?: string; note?: string }): Promise<Payment>
 }
 
 export interface UrgentCount {

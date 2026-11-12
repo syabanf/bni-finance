@@ -34,6 +34,10 @@ export const apiRenewalRepository: RenewalRepository = {
     })
   },
 
+  async cancel(id) {
+    await api.delete(`/renewal-requests/${encodeURIComponent(id)}`)
+  },
+
   async answer(id, answer, note) {
     return api.patch<RenewalRequest>(`/renewal-requests/${encodeURIComponent(id)}`, {
       answer,

@@ -378,18 +378,22 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvo
 	}
 	defer tx.Rollback(ctx)
 
-	var oldStatus domain.InvoiceStatus
-	if err := tx.QueryRow(ctx, "SELECT status FROM invoices WHERE id = $1 FOR UPDATE", id).Scan(&oldStatus); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, httpx.ErrNotFound
-		}
-		return nil, fmt.Errorf("kunci invoice: %w", err)
+	lama, err := scan(tx.QueryRow(ctx, "SELECT "+columns+" FROM invoices WHERE id = $1 FOR UPDATE", id))
+	if err != nil {
+		return nil, err
 	}
+	oldStatus := lama.Status
 
 	// Pemeriksaan yang mengikat, di bawah lock baris. Service sudah memeriksa
 	// hal yang sama sebelum transaksi, tetapi status bisa berubah di antaranya.
 	if err := oldStatus.ValidateUpdateFrom(in); err != nil {
 		return nil, httpx.Conflict(err.Error())
+	}
+	// Permintaan yang diulang, misalnya klik ganda pada Batalkan, tidak
+	// menulis apa pun: tidak ada baris yang berubah, dan riwayat tidak
+	// bertambah satu entri "diubah" untuk setiap klik.
+	if !berubah(lama, in) {
+		return lama, nil
 	}
 
 	sets := []string{"updated_at = now()"}
@@ -575,6 +579,16 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 	}
 	defer tx.Rollback(ctx)
 
+	var status domain.InvoiceStatus
+	switch err := tx.QueryRow(ctx, "SELECT status FROM invoices WHERE id = $1 FOR UPDATE", id).Scan(&status); {
+	case errors.Is(err, pgx.ErrNoRows):
+		return httpx.ErrNotFound
+	case err != nil:
+		return fmt.Errorf("baca invoice: %w", err)
+	case status != domain.StatusDraft:
+		return httpx.Conflict(errBukanDraft)
+	}
+
 	if _, err := tx.Exec(ctx, "DELETE FROM invoice_audit_log WHERE invoice_id = $1", id); err != nil {
 		return fmt.Errorf("hapus jejak audit: %w", err)
 	}
@@ -592,6 +606,21 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 		return fmt.Errorf("hapus invoice: %w", err)
 	}
 	return nil
+}
+
+// berubah melaporkan apakah patch mengubah setidaknya satu kolom tersimpan.
+func berubah(lama *domain.Invoice, in domain.UpdateInvoiceInput) bool {
+	beda := func(baru, sekarang *string) bool { return baru != nil && (sekarang == nil || *baru != *sekarang) }
+	tanggal := func(baru *domain.Date, sekarang domain.Date) bool {
+		return baru != nil && baru.String() != sekarang.String()
+	}
+	return (in.Amount != nil && *in.Amount != lama.Amount) ||
+		tanggal(in.DueDate, lama.DueDate) || tanggal(in.PeriodStart, lama.PeriodStart) || tanggal(in.PeriodEnd, lama.PeriodEnd) ||
+		(in.Status != nil && *in.Status != lama.Status) ||
+		beda(in.Notes, lama.Notes) || beda(in.CancelReason, lama.CancelReason) || beda(in.CancelledBy, lama.CancelledBy) ||
+		beda(in.PaperIDInvoiceID, lama.PaperIDInvoiceID) || beda(in.PaperIDInvoiceURL, lama.PaperIDInvoiceURL) ||
+		beda(in.PaperIDPaymentURL, lama.PaperIDPaymentURL) ||
+		(in.PaperIDSentAt != nil && (lama.PaperIDSentAt == nil || !in.PaperIDSentAt.Equal(*lama.PaperIDSentAt)))
 }
 
 // CountPayments reports how many payments reference an invoice — used to block

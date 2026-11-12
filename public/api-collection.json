@@ -726,7 +726,7 @@
       "path": "/api/v1/invoices/{id}",
       "tag": "Invoice",
       "summary": "Hapus invoice",
-      "description": "**Admin saja.** Invoice yang sudah punya pembayaran **tidak bisa\ndihapus** — batalkan saja, supaya riwayatnya utuh.\n",
+      "description": "**Admin saja, dan hanya untuk draft.** Invoice yang sudah dikirim punya\ntautan Paper.id yang tetap hidup, jadi dijawab 409; batalkan saja supaya\nriwayatnya utuh. Menghapus ulang invoice yang sudah terhapus dijawab 404.\n",
       "params": [
         {
           "name": "id",
@@ -1182,7 +1182,7 @@
       "path": "/api/v1/payments/{id}",
       "tag": "Pembayaran",
       "summary": "Hapus pembayaran",
-      "description": "**Admin saja.** Perhatikan: ini **tidak** mengembalikan status invoice\ndari `paid`.\n",
+      "description": "**Admin saja.** Pembayaran atas invoice `paid` dijawab 409: status\ninvoice dan masa keanggotaan member sudah maju karenanya, dan\nmenghapusnya tidak memundurkan keduanya.\n",
       "params": [
         {
           "name": "id",
@@ -1472,7 +1472,7 @@
       "path": "/api/v1/members/{id}",
       "tag": "Member",
       "summary": "Hapus member",
-      "description": "**Admin saja.** Member yang punya invoice tidak bisa dihapus — ubah\nstatusnya menjadi `inactive` supaya riwayat tagihannya utuh.\n",
+      "description": "**Admin saja.** Member yang punya invoice tidak bisa dihapus — ubah\nstatusnya menjadi `inactive` supaya riwayat tagihannya utuh. Permintaan\nkonfirmasi renewal member itu ikut terhapus dalam transaksi yang sama.\n",
       "params": [
         {
           "name": "id",
@@ -1738,6 +1738,27 @@
         }
       ],
       "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "delete:/api/v1/renewal-requests/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/renewal-requests/{id}",
+      "tag": "Member",
+      "summary": "Batalkan permintaan konfirmasi renewal",
+      "description": "**Admin dan ST.** Hanya permintaan yang belum dijawab (`pending`).\nJawaban MC menjadi dasar invoice renewal, jadi permintaan yang sudah\ndijawab dijawab 409. Permintaan chapter lain dan permintaan yang sudah\ndibatalkan dijawab 404.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
       "multipart": false,
       "auth": true,
       "admin": false
