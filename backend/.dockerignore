@@ -5,6 +5,8 @@
 !.env.example
 uploads/
 *.log
+.secrets-key
+bin/
 
 # Berkas di luar backend/ tidak pernah dibutuhkan binary ini.
 ../node_modules

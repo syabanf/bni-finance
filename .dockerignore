@@ -1,0 +1,20 @@
+# Konteks build frontend. Yang tidak ada di sini tidak bisa bocor ke image.
+.git
+.claude
+node_modules
+dist
+dev-dist
+test-report
+loadtest
+docs
+**/.DS_Store
+
+# Data pribadi dan rahasia.
+.trial-bnic
+.env.local
+.env.*.local
+
+# Backend dibangun dari konteksnya sendiri. Skrip build frontend hanya butuh
+# spesifikasi OpenAPI-nya.
+backend
+!backend/internal/apidocs/openapi.json

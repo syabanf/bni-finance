@@ -382,11 +382,23 @@ rekaman Blackbox ke Paper.id.
 
 ## 10. Deploy
 
-**Frontend** — Vercel. `npm run build` menjalankan generator koleksi API, type-check, lalu
-build PWA ke `dist/`. `vercel.json` mengatur SPA rewrite + header keamanan.
+**Docker** — `make deploy` menyalakan empat layanan dari `docker-compose.yml`:
 
-**Backend** — layanan server-side terpisah dengan Postgres. Setelah upgrade, pastikan kunci
-`app_settings` yang baru ada:
+| Layanan | Isi |
+| --- | --- |
+| `db` | Postgres 17 |
+| `migrate` | Menerapkan `db/init.sql` (idempoten) setiap kali stack dinyalakan, lalu keluar. `api` baru start setelahnya |
+| `api` | Backend Go di `API_PORT` (bawaan 8080) |
+| `web` | nginx di `WEB_PORT` (bawaan 8081): bundel frontend, dan meneruskan `/api`, `/uploads`, `/healthz`, `/docs`, `/openapi.*` ke `api` |
+
+Kebijakan cache ada di `docker/nginx.conf`: aset ber-hash disimpan setahun, video Panduan
+seminggu, `index.html` dan service worker selalu divalidasi ulang, dan gzip menyala untuk teks dan
+JSON. Backend menandai setiap jawaban `/api/` dengan `Cache-Control: no-store`.
+
+**Frontend di Vercel** — tetap bisa dipakai. `npm run build` menjalankan generator koleksi API,
+type-check, lalu build PWA ke `dist/`. `vercel.json` mengatur SPA rewrite dan header keamanan.
+
+**Backend** — setelah upgrade, pastikan kunci `app_settings` yang baru ada:
 
 ```sql
 insert into app_settings (key, value) values

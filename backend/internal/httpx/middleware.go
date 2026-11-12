@@ -191,3 +191,15 @@ func rapikan(p string) string {
 	}
 	return p
 }
+
+// TanpaCache menandai jawaban /api/ sebagai no-store. Isinya data keuangan
+// per pengguna; tanpa ini browser atau proxy di antaranya boleh menyimpan
+// daftar invoice dan menampilkannya lagi kepada orang lain atau setelah logout.
+func TanpaCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			w.Header().Set("Cache-Control", "no-store")
+		}
+		next.ServeHTTP(w, r)
+	})
+}

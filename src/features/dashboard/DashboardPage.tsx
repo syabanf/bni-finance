@@ -276,7 +276,7 @@ export function DashboardPage() {
             action={
               <Link
                 to="/invoices"
-                className="inline-flex items-center gap-1 text-sm font-medium text-brand-500 hover:text-brand-600"
+                className="-my-1 inline-flex items-center gap-1 py-1 text-sm font-medium text-brand-500 hover:text-brand-600"
               >
                 Lihat semua
                 <ArrowUpRight className="h-4 w-4" />

@@ -64,6 +64,3 @@ export function can(role: UserRole | null | undefined, permission: Permission): 
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false
 }
 
-export function isAdmin(role: UserRole | null | undefined): boolean {
-  return role === 'admin'
-}

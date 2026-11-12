@@ -90,7 +90,7 @@ export function PaymentDetailPage() {
     <div>
       <Link
         to="/payments"
-        className="mb-3 inline-flex items-center gap-1.5 text-sm text-ink-500 hover:text-ink-700"
+        className="mb-3 -my-1.5 inline-flex items-center gap-1.5 py-1.5 text-sm text-ink-500 hover:text-ink-700"
       >
         <ArrowLeft className="h-4 w-4" />
         Kembali ke Pembayaran

@@ -61,11 +61,6 @@ export function isMockMode(): boolean {
   return current === 'mock'
 }
 
-/** Nilai tersimpan saat ini — bisa berbeda dari `current` bila baru diganti. */
-export function getStoredDataSource(): DataSource {
-  return read()
-}
-
 /**
  * Menyimpan pilihan lalu memuat ulang halaman.
  *

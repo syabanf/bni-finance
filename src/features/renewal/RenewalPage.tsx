@@ -735,7 +735,7 @@ function TombolMinta({
             label="Chapter"
             hint="Menentukan member siapa saja yang ditanyakan. Dengan Semua chapter, tiap MC menerima email untuk chapternya sendiri."
           >
-            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)}>
+            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} aria-label="Filter chapter">
               <option value="all">Semua chapter</option>
               {chapterOptions.map((c) => (
                 <option key={c.id} value={c.id}>{c.displayName}</option>

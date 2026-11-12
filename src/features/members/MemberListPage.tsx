@@ -289,6 +289,7 @@ export function MemberListPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Select
+              aria-label="Filter keanggotaan"
               value={keanggotaan}
               onChange={(e) => setKeanggotaan(e.target.value as Keanggotaan)}
               className="w-full sm:w-44"
@@ -299,7 +300,7 @@ export function MemberListPage() {
                 </option>
               ))}
             </Select>
-            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-52">
+            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-52" aria-label="Filter chapter">
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (
                 <option key={c.id} value={c.id}>

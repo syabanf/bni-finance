@@ -31,7 +31,6 @@
 | 08 | Profil | [docs/features/08-profile.md](features/08-profile.md) | `done` |
 | 09 | Pengaturan | [docs/features/09-settings.md](features/09-settings.md) | `done` |
 | 10 | Urgent | [docs/features/10-urgent.md](features/10-urgent.md) | `done` |
-| 11 | Public Payment | [docs/features/11-public-payment.md](features/11-public-payment.md) | `done` |
 
 ---
 

@@ -27,16 +27,6 @@ export const INVOICE_STATUS_COLOR: Record<InvoiceStatus, string> = {
 }
 
 /**
- * "Outstanding" = invoice sudah diterbitkan tapi belum dibayar.
- * Always means sent + overdue — used everywhere outstanding is shown/filtered.
- */
-export const OUTSTANDING_STATUSES: InvoiceStatus[] = ['sent', 'overdue']
-
-export function isOutstanding(status: InvoiceStatus): boolean {
-  return status === 'sent' || status === 'overdue'
-}
-
-/**
  * Status member yang boleh menerima tiap tipe invoice. Cermin dari
  * MemberStatus.BolehDitagih di server: pendaftaran untuk yang belum anggota,
  * renewal untuk yang sudah. Formulir memakainya untuk menyaring pilihan, mock

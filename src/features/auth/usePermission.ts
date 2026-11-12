@@ -1,5 +1,5 @@
 import { useAuth } from './AuthContext'
-import { can, isAdmin, type Permission } from '@/lib/rbac'
+import { can, type Permission } from '@/lib/rbac'
 
 /** Apakah pengguna saat ini boleh melakukan aksi tertentu. */
 export function useCan(permission: Permission): boolean {
@@ -7,7 +7,3 @@ export function useCan(permission: Permission): boolean {
   return can(user?.role, permission)
 }
 
-export function useIsAdmin(): boolean {
-  const { user } = useAuth()
-  return isAdmin(user?.role)
-}

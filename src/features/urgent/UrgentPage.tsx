@@ -113,7 +113,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
         action={
           <button
             onClick={() => navigate('/invoices?status=overdue')}
-            className="inline-flex items-center gap-1 text-sm font-medium text-brand-500 hover:text-brand-600"
+            className="-my-1 inline-flex items-center gap-1 py-1 text-sm font-medium text-brand-500 hover:text-brand-600"
           >
             Lihat semua <ArrowRight className="h-4 w-4" />
           </button>
@@ -333,7 +333,7 @@ function RenewalSection({
               onClick={() =>
                 setSelected(allSelected ? new Set() : new Set(allIds))
               }
-              className="text-sm font-medium text-brand-500 hover:text-brand-600"
+              className="-my-1 py-1 text-sm font-medium text-brand-500 hover:text-brand-600"
             >
               {allSelected ? 'Batal semua' : 'Pilih semua'}
             </button>
@@ -578,7 +578,7 @@ function RegistrationSection({
           !loading && members && members.length > 0 ? (
             <button
               onClick={() => setSelected(allSelected ? new Set() : new Set(members.map((m) => m.id)))}
-              className="text-sm font-medium text-brand-500 hover:text-brand-600"
+              className="-my-1 py-1 text-sm font-medium text-brand-500 hover:text-brand-600"
             >
               {allSelected ? 'Batal semua' : 'Pilih semua'}
             </button>
@@ -636,6 +636,7 @@ function RegistrationSection({
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); navigate(`/members/${m.id}`) }}
+                  aria-label={`Buka ${m.name}`}
                   className="shrink-0 rounded-lg p-1.5 text-brand-500 hover:bg-brand-50"
                 >
                   <ArrowRight className="h-4 w-4" />
@@ -825,8 +826,7 @@ export function UrgentPage() {
             <Select
               value={chapterId}
               onChange={(e) => setChapterId(e.target.value)}
-              className="w-full sm:w-44"
-            >
+              className="w-full sm:w-44" aria-label="Filter chapter">
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (
                 <option key={c.id} value={c.id}>

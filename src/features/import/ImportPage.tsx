@@ -491,7 +491,7 @@ export function ImportPage() {
                     type="button"
                     onClick={() => maju(null)}
                     disabled={sibuk || butuhChapter}
-                    className="text-ink-500 hover:text-ink-800 disabled:opacity-50"
+                    className="-my-1.5 py-1.5 text-ink-500 hover:text-ink-800 disabled:opacity-50"
                   >
                     Lewati langkah ini
                   </button>

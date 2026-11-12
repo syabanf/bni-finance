@@ -93,7 +93,7 @@ export function MembershipLengthPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-52">
+            <Select value={chapterId} onChange={(e) => setChapterId(e.target.value)} className="w-full sm:w-52" aria-label="Filter chapter">
               <option value="all">Semua Chapter</option>
               {chapters?.map((c) => (
                 <option key={c.id} value={c.id}>
