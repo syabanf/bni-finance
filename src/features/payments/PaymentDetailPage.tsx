@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { ArrowLeft, ArrowUpRight, FileText, Printer, Wallet } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, FileText, Pencil, Printer, Wallet } from 'lucide-react'
 import type { PaymentWithInvoice } from '@/types'
 import {
   Avatar,
@@ -9,15 +10,20 @@ import {
   CardHeader,
   EmptyState,
   ErrorState,
+  Field,
   InvoiceTypeBadge,
   LoadingState,
+  Modal,
   PageHeader,
+  Select,
+  Textarea,
   useToast,
 } from '@/components/ui'
+import { useCan } from '@/features/auth/usePermission'
 import { useAsync } from '@/hooks/useAsync'
 import { paymentService } from '@/services'
 import { formatCurrency, formatDateTime } from '@/lib/format'
-import { paymentMethodLabel } from '@/lib/paymentMethod'
+import { MANUAL_METHODS, paymentMethodLabel } from '@/lib/paymentMethod'
 import { printReceipt } from '@/lib/receipt'
 
 /**
@@ -37,6 +43,11 @@ export function PaymentDetailPage() {
     () => paymentService.getById(id),
     [id],
   )
+  const bolehUbah = useCan('payment:record')
+  const [ubahBuka, setUbahBuka] = useState(false)
+  const [metode, setMetode] = useState('')
+  const [catatan, setCatatan] = useState('')
+  const [menyimpan, setMenyimpan] = useState(false)
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={reload} />
@@ -85,6 +96,53 @@ export function PaymentDetailPage() {
         Kembali ke Pembayaran
       </Link>
 
+      <Modal
+        open={ubahBuka}
+        onClose={() => setUbahBuka(false)}
+        title="Ubah pembayaran"
+        description="Nominal dan tanggal bayar tetap, karena status invoice dan masa keanggotaan member sudah mengikutinya."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setUbahBuka(false)} disabled={menyimpan}>
+              Batal
+            </Button>
+            <Button
+              loading={menyimpan}
+              onClick={async () => {
+                setMenyimpan(true)
+                try {
+                  await paymentService.update(data.id, { paymentMethod: metode, note: catatan.trim() })
+                  toast('Pembayaran disimpan.')
+                  setUbahBuka(false)
+                  reload()
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Gagal menyimpan pembayaran.', 'error')
+                } finally {
+                  setMenyimpan(false)
+                }
+              }}
+            >
+              Simpan
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Metode pembayaran">
+            <Select value={metode} onChange={(e) => setMetode(e.target.value)}>
+              {[...new Set([metode, ...MANUAL_METHODS.map((m) => m.value)])].map((m) => (
+                <option key={m} value={m}>
+                  {paymentMethodLabel(m)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Catatan">
+            <Textarea value={catatan} onChange={(e) => setCatatan(e.target.value)} />
+          </Field>
+        </div>
+      </Modal>
+
       <PageHeader
         title="Detail Pembayaran"
         description={`Diterima ${formatDateTime(data.paidAt)}`}
@@ -94,6 +152,19 @@ export function PaymentDetailPage() {
               <Printer className="h-4 w-4" />
               Cetak Nota
             </Button>
+            {bolehUbah && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setMetode(data.paymentMethod ?? 'other')
+                  setCatatan(data.note ?? '')
+                  setUbahBuka(true)
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+                Ubah
+              </Button>
+            )}
             {data.invoice && (
               <Button onClick={() => navigate(`/invoices/${data.invoice!.id}`)}>
                 <FileText className="h-4 w-4" />

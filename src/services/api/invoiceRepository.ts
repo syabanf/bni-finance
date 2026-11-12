@@ -302,6 +302,14 @@ export const apiInvoiceRepository: InvoiceRepository = {
     }
   },
 
+  async updateDraft(id, input) {
+    return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, input)
+  },
+
+  async remove(id) {
+    await api.delete(`/invoices/${encodeURIComponent(id)}`)
+  },
+
   async cancel(id, reason) {
     return api.patch<Invoice>(`/invoices/${encodeURIComponent(id)}`, {
       status: 'cancelled',

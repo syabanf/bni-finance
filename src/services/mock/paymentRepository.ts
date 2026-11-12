@@ -29,6 +29,13 @@ export const mockPaymentRepository: PaymentRepository = {
     )
   },
 
+  async update(id, input) {
+    const payment = store.payments.find((p) => p.id === id)
+    if (!payment) throw new Error('Pembayaran tidak ditemukan.')
+    Object.assign(payment, input)
+    return delay(payment, 250)
+  },
+
   async uploadProof(file) {
     // Mock: no real storage — return an in-session object URL so the uploaded
     // proof can still be previewed during the demo.

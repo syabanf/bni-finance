@@ -27,6 +27,13 @@ export const mockChapterRepository: ChapterRepository = {
     return delay(chapter, 250)
   },
 
+  async update(id, input) {
+    const chapter = store.chapters.find((c) => c.id === id)
+    if (!chapter) throw new Error('Chapter tidak ditemukan.')
+    Object.assign(chapter, input)
+    return delay(chapter, 250)
+  },
+
   async remove(id) {
     // Penjaga yang sama dengan server.
     const member = store.members.filter((m) => m.chapterId === id).length

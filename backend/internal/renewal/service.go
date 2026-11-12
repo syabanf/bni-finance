@@ -24,6 +24,7 @@ type Store interface {
 	Create(ctx context.Context, memberIDs []string, period, requestedBy string, assignedMC *string) (*HasilCreate, error)
 	PenerimaMC(ctx context.Context, chapterIDs []string) ([]PenerimaMC, error)
 	Answer(ctx context.Context, id string, in domain.AnswerRenewalInput, answeredBy string) (*domain.RenewalRequest, error)
+	Delete(ctx context.Context, id string) error
 }
 
 var _ Store = (*Repository)(nil)
@@ -228,6 +229,12 @@ func (s *Service) Jawab(ctx context.Context, id string, in domain.AnswerRenewalI
 	return s.repo.Answer(ctx, id, in, user.ID)
 }
 
+// Batalkan menghapus permintaan yang belum dijawab MC. Jawaban yang sudah ada
+// menjadi dasar invoice renewal, jadi tidak ikut terhapus.
+func (s *Service) Batalkan(ctx context.Context, id string) error {
+	return s.repo.Delete(ctx, id)
+}
+
 func dedup(ids []string) []string {
 	seen := map[string]bool{}
 	out := make([]string, 0, len(ids))
@@ -256,6 +263,15 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// Menjawab TIDAK memakai RequireWrite: MC hanya boleh membaca di tempat
 	// lain, tapi harus boleh menjawab di sini. Perannya diperiksa di service.
 	mux.HandleFunc("PATCH /api/v1/renewal-requests/{id}", h.jawab)
+	mux.HandleFunc("DELETE /api/v1/renewal-requests/{id}", auth.RequireWrite(h.batalkan))
+}
+
+func (h *Handler) batalkan(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.Batalkan(r.Context(), r.PathValue("id")); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {

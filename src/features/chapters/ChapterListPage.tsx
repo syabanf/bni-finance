@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Building2, MapPin, Plus, Search, Trash2, Upload, Users, X } from 'lucide-react'
+import { Building2, MapPin, Pencil, Plus, Search, Trash2, Upload, Users, X } from 'lucide-react'
 import type { Chapter, ChapterCounts } from '@/types'
 import {
   Button,
@@ -17,6 +17,7 @@ import {
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
 import { TambahChapterModal } from './components/TambahChapterModal'
+import { UbahChapterModal } from './components/UbahChapterModal'
 import { useAuth } from '@/features/auth/AuthContext'
 import { can } from '@/lib/rbac'
 import { chapterService } from '@/services'
@@ -35,6 +36,7 @@ export function ChapterListPage() {
   const { data: chapters, loading, reload } = useAsync<Chapter[]>(() => chapterService.list())
   const [tambahBuka, setTambahBuka] = useState(false)
   const [akanDihapus, setAkanDihapus] = useState<Chapter | null>(null)
+  const [akanDiubah, setAkanDiubah] = useState<Chapter | null>(null)
   const [menghapus, setMenghapus] = useState(false)
 
   const hapus = async () => {
@@ -232,6 +234,17 @@ export function ChapterListPage() {
                       {bolehImpor && (
                         <button
                           type="button"
+                          onClick={() => setAkanDiubah(c)}
+                          aria-label={`Ubah ${c.displayName}`}
+                          title={`Ubah ${c.displayName}`}
+                          className="text-ink-400 hover:text-ink-800"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {bolehImpor && (
+                        <button
+                          type="button"
                           onClick={() => setAkanDihapus(c)}
                           disabled={memberCount(c.id) > 0}
                           aria-label={`Hapus ${c.displayName}`}
@@ -302,6 +315,8 @@ export function ChapterListPage() {
       >
         <p className="text-sm text-ink-600">Penghapusan tidak bisa dibatalkan.</p>
       </Modal>
+
+      <UbahChapterModal chapter={akanDiubah} onClose={() => setAkanDiubah(null)} onDisimpan={reload} />
 
       <TambahChapterModal open={tambahBuka} onClose={() => setTambahBuka(false)} onDibuat={reload} />
     </div>

@@ -214,6 +214,34 @@ func (r *Repository) Create(ctx context.Context, memberIDs []string, period stri
 	return hasil, nil
 }
 
+// Delete menghapus satu permintaan yang masih pending, di dalam lingkup chapter
+// pemanggil. Permintaan chapter lain dijawab 404, sama seperti Answer.
+func (r *Repository) Delete(ctx context.Context, id string) error {
+	lim := scope.Chapter(ctx)
+	if lim.Buntu {
+		return httpx.ErrNotFound
+	}
+	klausa, args := "id = $1", []any{id}
+	if lim.Terbatas {
+		klausa, args = "id = $1 AND chapter_id = $2", append(args, lim.ChapterID)
+	}
+	var jawaban domain.RenewalAnswer
+	err := r.db.QueryRow(ctx, `
+		WITH target AS (SELECT id, answer FROM renewal_requests WHERE `+klausa+` FOR UPDATE),
+		     hapus AS (DELETE FROM renewal_requests r USING target t
+		               WHERE r.id = t.id AND t.answer = 'pending')
+		SELECT answer FROM target`, args...).Scan(&jawaban)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return httpx.ErrNotFound
+	case err != nil:
+		return fmt.Errorf("batalkan permintaan renewal: %w", err)
+	case jawaban != domain.RenewalPending:
+		return httpx.Conflict("permintaan yang sudah dijawab MC tidak bisa dibatalkan")
+	}
+	return nil
+}
+
 // PenerimaMC mengambil akun MC di chapter-chapter ini.
 func (r *Repository) PenerimaMC(ctx context.Context, chapterIDs []string) ([]PenerimaMC, error) {
 	rows, err := r.db.Query(ctx, `

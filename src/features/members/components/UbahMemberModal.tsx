@@ -38,6 +38,8 @@ export function UbahMemberModal({
   const [company, setCompany] = useState('')
   const [bidang, setBidang] = useState('')
   const [status, setStatus] = useState<MemberStatus>(member.status)
+  const [jatuhTempo, setJatuhTempo] = useState('')
+  const [bergabung, setBergabung] = useState('')
   const [menyimpan, setMenyimpan] = useState(false)
 
   useEffect(() => {
@@ -47,6 +49,8 @@ export function UbahMemberModal({
     setCompany(member.company ?? '')
     setBidang(member.businessField ?? '')
     setStatus(member.status)
+    setJatuhTempo(member.renewalDate?.slice(0, 10) ?? '')
+    setBergabung(member.joinedDate?.slice(0, 10) ?? '')
   }, [open, member])
 
   const simpan = async () => {
@@ -56,6 +60,9 @@ export function UbahMemberModal({
     if (company.trim() !== (member.company ?? '')) ubah.company = company.trim()
     if (bidang.trim() !== (member.businessField ?? '')) ubah.businessField = bidang.trim()
     if (status !== member.status) ubah.status = status
+    // Tanggal tidak bisa dikosongkan lewat API, jadi hanya tanggal terisi yang dikirim.
+    if (jatuhTempo && jatuhTempo !== member.renewalDate?.slice(0, 10)) ubah.renewalDate = jatuhTempo
+    if (bergabung && bergabung !== member.joinedDate?.slice(0, 10)) ubah.joinedDate = bergabung
     if (Object.keys(ubah).length === 0) {
       onClose()
       return
@@ -101,6 +108,12 @@ export function UbahMemberModal({
         </Field>
         <Field label="Bidang usaha">
           <Input value={bidang} onChange={(e) => setBidang(e.target.value)} />
+        </Field>
+        <Field label="Jatuh tempo membership" hint="Renewal yang lunas memajukannya otomatis.">
+          <Input type="date" value={jatuhTempo} onChange={(e) => setJatuhTempo(e.target.value)} />
+        </Field>
+        <Field label="Bergabung">
+          <Input type="date" value={bergabung} onChange={(e) => setBergabung(e.target.value)} />
         </Field>
         <div className="sm:col-span-2">
           <Field

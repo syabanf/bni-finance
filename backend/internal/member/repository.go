@@ -284,15 +284,31 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateMemb
 	return r.GetByID(ctx, updatedID)
 }
 
+// Delete ikut menghapus permintaan konfirmasi renewal member itu, dalam satu
+// transaksi. Permintaan tanpa member tidak berarti apa-apa, dan tanpa ini
+// foreign key-nya menolak penghapusan dengan galat 500.
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, "DELETE FROM members WHERE id = $1", id)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "DELETE FROM renewal_requests WHERE member_id = $1", id); err != nil {
+		return fmt.Errorf("hapus permintaan renewal: %w", err)
+	}
+	tag, err := tx.Exec(ctx, "DELETE FROM members WHERE id = $1", id)
+	if err != nil {
+		// Invoice yang terbit di antara pemeriksaan service dan penghapusan ini.
+		if strings.Contains(err.Error(), "23503") {
+			return httpx.Conflict("member masih punya invoice; ubah statusnya menjadi inactive")
+		}
 		return fmt.Errorf("hapus member: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return httpx.ErrNotFound
 	}
-	return nil
+	return tx.Commit(ctx)
 }
 
 // CountInvoices reports how many invoices a member has — a delete would

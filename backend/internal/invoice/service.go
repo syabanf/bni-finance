@@ -127,10 +127,19 @@ func (s *Service) Update(ctx context.Context, id string, in domain.UpdateInvoice
 	return s.repo.Update(ctx, id, in)
 }
 
-// Delete refuses to remove an invoice that still has payments attached.
+const errBukanDraft = "hanya invoice draft yang bisa dihapus; batalkan invoice yang sudah dikirim"
+
+// Delete hanya untuk draft yang belum punya pembayaran. Invoice yang sudah
+// dikirim punya tautan Paper.id yang tetap hidup; menghapusnya membuat
+// pembayaran lewat tautan itu jatuh ke "invoice tidak ditemukan". Repository
+// memeriksa ulang status draft di dalam transaksinya.
 func (s *Service) Delete(ctx context.Context, id string) error {
-	if _, err := s.repo.GetByID(ctx, id); err != nil {
+	current, err := s.repo.GetByID(ctx, id)
+	if err != nil {
 		return err
+	}
+	if current.Status != domain.StatusDraft {
+		return httpx.Conflict(errBukanDraft)
 	}
 	n, err := s.repo.CountPayments(ctx, id)
 	if err != nil {

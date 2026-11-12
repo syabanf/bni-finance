@@ -93,6 +93,18 @@ export const FAQ: { kelompok: string; butir: FaqPanduan[] }[] = [
         jawab: 'Buka detail member, tekan Ubah Data, lalu ubah Status keanggotaan ke Inactive. Invoice yang sudah terbit tidak ikut berubah; batalkan dari halaman invoice bila perlu. Khusus Admin.',
       },
       {
+        tanya: 'Bagaimana cara mengubah jatuh tempo membership?',
+        jawab: 'Buka detail member, tekan Ubah Data, lalu isi Jatuh tempo membership. Renewal yang lunas memajukan tanggal ini otomatis, jadi pengubahan manual hanya untuk koreksi. Khusus Admin.',
+      },
+      {
+        tanya: 'Bagaimana cara menghapus member?',
+        jawab: 'Buka detail member, lalu tekan Hapus. Member yang sudah punya invoice tidak bisa dihapus; ubah statusnya ke Inactive supaya riwayat tagihannya utuh. Khusus Admin.',
+      },
+      {
+        tanya: 'Bagaimana cara mengubah chapter?',
+        jawab: 'Buka Chapter, lalu tekan ikon pensil di kartu chapter untuk mengubah nama tampil, area, dan kota. Khusus Admin.',
+      },
+      {
         tanya: 'Bagaimana cara menghapus chapter?',
         jawab: 'Buka Chapter, lalu tekan ikon tempat sampah di kartu chapter. Chapter hanya bisa dihapus bila tidak lagi punya member, invoice, atau akun ST/MC. Khusus Admin.',
       },
@@ -101,6 +113,10 @@ export const FAQ: { kelompok: string; butir: FaqPanduan[] }[] = [
   {
     kelompok: 'Konfirmasi renewal',
     butir: [
+      {
+        tanya: 'Bagaimana membatalkan permintaan konfirmasi yang salah kirim?',
+        jawab: 'Di Konfirmasi Renewal, tekan Batalkan pada baris yang belum dijawab MC. Permintaan yang sudah dijawab tidak bisa dibatalkan, karena jawabannya menjadi dasar invoice renewal.',
+      },
       {
         tanya: 'Bagaimana cara menambah periode renewal?',
         jawab: 'Tidak perlu ditambah. Dropdown periode di Konfirmasi Renewal otomatis berisi semester berjalan dan 5 semester berikutnya.',
@@ -132,7 +148,7 @@ export const FAQ: { kelompok: string; butir: FaqPanduan[] }[] = [
       },
       {
         tanya: 'Apakah bisa melihat invoice sudah diterima member?',
-        jawab: 'Belum. Status Menunggu berarti invoice sudah dikirim lewat Paper.id. Paper.id hanya memberi kabar ke sistem saat invoice lunas, jadi sistem tidak tahu kapan invoice sampai atau dibuka member.',
+        jawab: 'Kartu Laporan Pengiriman di halaman Laporan menampilkan tanggal kirim, jumlah pengingat, dan status bayar tiap invoice. Paper.id hanya memberi kabar ke sistem saat invoice lunas, jadi sistem tidak tahu kapan invoice dibuka member.',
       },
       {
         tanya: 'Apakah link invoice yang sudah jatuh tempo masih bisa dipakai?',
@@ -140,7 +156,11 @@ export const FAQ: { kelompok: string; butir: FaqPanduan[] }[] = [
       },
       {
         tanya: 'Bagaimana bila invoice yang sudah dikirim dibatalkan?',
-        jawab: 'Membatalkan invoice di sistem tidak mematikan link di Paper.id, dan pembayaran lewat link itu tidak tercatat di sistem. Batalkan juga invoice tersebut di dashboard Paper.id.',
+        jawab: 'Membatalkan invoice di sistem tidak mematikan link di Paper.id, dan pembayaran lewat link itu tidak tercatat di sistem. Batalkan juga invoice tersebut di dashboard Paper.id. Untuk banyak invoice Terlambat sekaligus, centang di Semua Invoice lalu tekan Batalkan Terlambat.',
+      },
+      {
+        tanya: 'Bagaimana mengubah atau menghapus invoice?',
+        jawab: 'Invoice draft bisa diubah nominal, masa berlaku, dan catatannya lewat Ubah Draft, atau dihapus lewat Hapus Draft. Invoice yang sudah dikirim tidak bisa dihapus; batalkan saja supaya riwayatnya utuh.',
       },
     ],
   },

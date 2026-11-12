@@ -13,6 +13,7 @@ import { BellRing,
   FileText,
   Link2,
   Pencil,
+  Trash2,
   Send,
   TriangleAlert,
   Upload,
@@ -43,8 +44,8 @@ import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
 import { invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
-import { paymentMethodLabel } from '@/lib/paymentMethod'
-import { todayISO } from '@/lib/date'
+import { MANUAL_METHODS, paymentMethodLabel } from '@/lib/paymentMethod'
+import { addYear, todayISO } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
 import { downloadInvoice } from './lib/invoiceDocument'
@@ -73,14 +74,8 @@ const AUDIT_LABEL: Record<AuditAction, string> = {
   tax_invoice: 'Faktur pajak dilampirkan',
 }
 
-type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | 'terminate' | null
+type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | 'terminate' | 'edit' | 'delete' | null
 
-const MANUAL_METHODS: { value: string; label: string }[] = [
-  { value: 'bank_transfer', label: 'Transfer Bank' },
-  { value: 'cash', label: 'Tunai' },
-  { value: 'qris', label: 'QRIS' },
-  { value: 'other', label: 'Lainnya' },
-]
 
 export function InvoiceDetailPage() {
   const { id = '' } = useParams()
@@ -113,6 +108,10 @@ export function InvoiceDetailPage() {
   const [mpMethod, setMpMethod] = useState('bank_transfer')
   const [mpNote, setMpNote] = useState('')
   const [mpFile, setMpFile] = useState<File | null>(null)
+  // Formulir ubah draft.
+  const [edAmount, setEdAmount] = useState(0)
+  const [edStart, setEdStart] = useState('')
+  const [edNotes, setEdNotes] = useState('')
 
   if (loading) return <LoadingState label="Memuat invoice…" />
   if (!invoice)
@@ -229,6 +228,26 @@ export function InvoiceDetailPage() {
   // yang diputus.
   const canTerminate = canManage && status !== 'paid' && status !== 'terminated'
   const canAttachTax = canManage && status === 'paid'
+  const canEditDraft = canManage && status === 'draft'
+
+  const openEdit = () => {
+    setEdAmount(invoice.amount)
+    setEdStart(invoice.periodStart.slice(0, 10))
+    setEdNotes(invoice.notes ?? '')
+    setDialog('edit')
+  }
+
+  const hapusDraft = async () => {
+    setBusy(true)
+    try {
+      await invoiceService.remove(invoice.id)
+      toast(`${invoice.number} dihapus.`)
+      navigate('/invoices')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menghapus invoice.', 'error')
+      setBusy(false)
+    }
+  }
 
   const lampirkanFaktur = (file: File | null) => {
     if (!file) return
@@ -269,6 +288,18 @@ export function InvoiceDetailPage() {
               <Download className="h-4 w-4" />
               Download Invoice
             </Button>
+            {canEditDraft && (
+              <Button variant="outline" onClick={openEdit}>
+                <Pencil className="h-4 w-4" />
+                Ubah Draft
+              </Button>
+            )}
+            {canEditDraft && (
+              <Button variant="outline" onClick={() => setDialog('delete')}>
+                <Trash2 className="h-4 w-4" />
+                Hapus Draft
+              </Button>
+            )}
             {canSend && (
               <Button onClick={() => setDialog('send')}>
                 <Send className="h-4 w-4" />
@@ -702,6 +733,64 @@ export function InvoiceDetailPage() {
           </Field>
         </div>
       </Modal>
+
+      <Modal
+        open={dialog === 'edit'}
+        onClose={() => setDialog(null)}
+        title={`Ubah draft ${invoice.number}`}
+        description="Masa berlaku dihitung satu tahun dari tanggal mulai."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
+            <Button
+              loading={busy}
+              disabled={edAmount <= 0 || !edStart}
+              onClick={() =>
+                runAction(
+                  () =>
+                    invoiceService.updateDraft(invoice.id, {
+                      amount: edAmount,
+                      periodStart: edStart,
+                      periodEnd: addYear(edStart),
+                      notes: edNotes.trim(),
+                    }),
+                  'Draft disimpan.',
+                )
+              }
+            >
+              Simpan
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Nominal (Rp)" required>
+            <MoneyInput value={edAmount} onChange={setEdAmount} />
+          </Field>
+          <Field label="Mulai masa berlaku" required hint={edStart ? `Berakhir ${formatDate(addYear(edStart))}` : undefined}>
+            <Input type="date" value={edStart} onChange={(e) => setEdStart(e.target.value)} />
+          </Field>
+          <Field label="Catatan">
+            <Textarea value={edNotes} onChange={(e) => setEdNotes(e.target.value)} />
+          </Field>
+        </div>
+      </Modal>
+
+      <Modal
+        open={dialog === 'delete'}
+        onClose={() => setDialog(null)}
+        title={`Hapus ${invoice.number}?`}
+        description="Draft ini belum pernah dikirim ke member. Penghapusan tidak bisa dibatalkan."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDialog(null)} disabled={busy}>Batal</Button>
+            <Button variant="danger" loading={busy} onClick={hapusDraft}>
+              <Trash2 className="h-4 w-4" />
+              Hapus Draft
+            </Button>
+          </>
+        }
+      />
 
       <Modal
         open={dialog === 'cancel'}

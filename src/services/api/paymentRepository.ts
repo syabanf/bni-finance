@@ -52,6 +52,10 @@ export const apiPaymentRepository: PaymentRepository = {
     return withRelations(res.data)
   },
 
+  async update(id, input) {
+    return api.patch<Payment>(`/payments/${encodeURIComponent(id)}`, input)
+  },
+
   async uploadProof(file) {
     const { url } = await api.upload('/uploads', file)
     return url

@@ -220,13 +220,29 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdatePaym
 	return scan(r.db.QueryRow(ctx, q, args...))
 }
 
+// Delete menolak pembayaran atas invoice yang sudah lunas. Status invoice dan
+// masa keanggotaan member sudah maju karena pembayaran itu, dan menghapusnya
+// tidak memundurkan keduanya.
 func (r *Repository) Delete(ctx context.Context, id string) error {
-	tag, err := r.db.Exec(ctx, "DELETE FROM payments WHERE id = $1", id)
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var status domain.InvoiceStatus
+	switch err := tx.QueryRow(ctx, `
+		SELECT i.status FROM payments p JOIN invoices i ON i.id = p.invoice_id
+		WHERE p.id = $1 FOR UPDATE OF p, i`, id).Scan(&status); {
+	case errors.Is(err, pgx.ErrNoRows):
+		return httpx.ErrNotFound
+	case err != nil:
+		return fmt.Errorf("baca payment: %w", err)
+	case status == domain.StatusPaid:
+		return httpx.Conflict("pembayaran atas invoice lunas tidak bisa dihapus; ubah catatannya bila ada yang salah")
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM payments WHERE id = $1", id); err != nil {
 		return fmt.Errorf("hapus payment: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return httpx.ErrNotFound
-	}
-	return nil
+	return tx.Commit(ctx)
 }

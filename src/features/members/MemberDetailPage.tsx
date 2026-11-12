@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Calendar, Mail, Pencil, Phone, Plus } from 'lucide-react'
+import { ArrowLeft, Calendar, Mail, Pencil, Phone, Plus, Trash2 } from 'lucide-react'
 import type { Invoice, MemberWithChapter } from '@/types'
 import {
   Avatar,
@@ -10,6 +10,7 @@ import {
   CardHeader,
   EmptyState,
   InvoiceStatusBadge,
+  Modal,
   InvoiceTypeBadge,
   LoadingState,
   MemberStatusBadge,
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, memberService } from '@/services'
+import { useToast } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { bolehDitagih } from '@/lib/status'
 import { useCan } from '@/features/auth/usePermission'
@@ -35,6 +37,9 @@ export function MemberDetailPage() {
   // Mengubah member admin-saja di server, sama seperti Tambah Member.
   const bolehUbah = useCan('settings:manage')
   const [ubahBuka, setUbahBuka] = useState(false)
+  const [hapusBuka, setHapusBuka] = useState(false)
+  const [menghapus, setMenghapus] = useState(false)
+  const { toast } = useToast()
 
   const { data: member, loading, reload } = useAsync<MemberWithChapter | null>(
     () => memberService.getById(id),
@@ -84,6 +89,21 @@ export function MemberDetailPage() {
                 Ubah Data
               </Button>
             )}
+            {bolehUbah && (
+              <Button
+                variant="outline"
+                onClick={() => setHapusBuka(true)}
+                disabled={(invoices ?? []).length > 0}
+                title={
+                  (invoices ?? []).length > 0
+                    ? 'Member yang punya invoice tidak bisa dihapus; ubah statusnya ke Inactive.'
+                    : undefined
+                }
+              >
+                <Trash2 className="h-4 w-4" />
+                Hapus
+              </Button>
+            )}
             <Button
               onClick={() =>
                 navigate(
@@ -99,6 +119,37 @@ export function MemberDetailPage() {
       />
 
       <UbahMemberModal open={ubahBuka} onClose={() => setUbahBuka(false)} onDisimpan={reload} member={member} />
+      <Modal
+        open={hapusBuka}
+        onClose={() => setHapusBuka(false)}
+        title={`Hapus ${member.name}?`}
+        description="Permintaan konfirmasi renewal member ini ikut terhapus. Penghapusan tidak bisa dibatalkan."
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setHapusBuka(false)} disabled={menghapus}>
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              loading={menghapus}
+              onClick={async () => {
+                setMenghapus(true)
+                try {
+                  await memberService.remove(member.id)
+                  toast(`${member.name} dihapus.`)
+                  navigate('/members')
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Gagal menghapus member.', 'error')
+                  setMenghapus(false)
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Hapus
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Profile */}

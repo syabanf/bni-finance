@@ -21,6 +21,10 @@ export const apiChapterRepository: ChapterRepository = {
     return api.post<Chapter>('/chapters', input)
   },
 
+  async update(id, input) {
+    return api.patch<Chapter>(`/chapters/${encodeURIComponent(id)}`, input)
+  },
+
   async remove(id) {
     await api.delete(`/chapters/${encodeURIComponent(id)}`)
   },
