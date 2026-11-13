@@ -3,7 +3,9 @@ package settings
 import (
 	"context"
 	"strings"
+	"time"
 
+	"github.com/syabanf/bni-finance/backend/internal/cache"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/httpx"
 )
@@ -20,13 +22,29 @@ type Store interface {
 var _ Store = (*Repository)(nil)
 
 type Service struct {
-	repo Store
+	repo  Store
+	cache *cache.Redis
 }
 
 func NewService(repo Store) *Service { return &Service{repo: repo} }
 
+// PakaiCache memasang Redis untuk biaya keanggotaan. nil berarti tanpa cache.
+func (s *Service) PakaiCache(c *cache.Redis) *Service {
+	s.cache = c
+	return s
+}
+
+// kunciBiaya dihapus setiap UpdateFees berhasil, termasuk dari worker kurs.
+// TTL-nya batas atas bila penghapusan itu gagal karena Redis sedang mati.
+const (
+	kunciBiaya = "fees"
+	ttlBiaya   = 10 * time.Minute
+)
+
 func (s *Service) GetFees(ctx context.Context) (*domain.FeeSettings, error) {
-	return s.repo.GetFees(ctx)
+	return cache.Ingat(ctx, s.cache, kunciBiaya, ttlBiaya, func() (*domain.FeeSettings, error) {
+		return s.repo.GetFees(ctx)
+	})
 }
 
 func (s *Service) UpdateFees(ctx context.Context, in domain.UpdateFeeSettingsInput) (*domain.FeeSettings, error) {
@@ -69,7 +87,11 @@ func (s *Service) UpdateFees(ctx context.Context, in domain.UpdateFeeSettingsInp
 		reg, ren := domain.TurunkanRupiah(usdReg, rate), domain.TurunkanRupiah(usdRen, rate)
 		in.RegistrationFee, in.RenewalFee = &reg, &ren
 	}
-	return s.repo.UpdateFees(ctx, in)
+	fees, err := s.repo.UpdateFees(ctx, in)
+	if err == nil {
+		_ = s.cache.Hapus(ctx, kunciBiaya)
+	}
+	return fees, err
 }
 
 // ListApp returns every setting with credential-shaped values redacted.

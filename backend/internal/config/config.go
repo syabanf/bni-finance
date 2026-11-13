@@ -94,6 +94,10 @@ type Config struct {
 	// DBMaxConns membatasi ukuran connection pool. 0 = DefaultMaxConns.
 	// Naikkan bila db_pool_acquire_empty_total di /metrics terus bertambah.
 	DBMaxConns int
+
+	// RedisURL menyalakan cache, pembatas login, dan kunci tugas berkala yang
+	// dibagi antar replika. Kosong berarti satu instance tanpa Redis.
+	RedisURL string
 }
 
 // Load reads configuration from the environment, first pulling in a .env file
@@ -138,6 +142,7 @@ func Load() (Config, error) {
 		QuickLoginEmails: splitAndTrim(os.Getenv("AUTH_QUICK_LOGIN")),
 		MetricsToken:     strings.TrimSpace(os.Getenv("METRICS_TOKEN")),
 		DBMaxConns:       int(bytesOr("DB_MAX_CONNS", 0)),
+		RedisURL:         strings.TrimSpace(os.Getenv("REDIS_URL")),
 	}
 
 	if cfg.DatabaseURL == "" {

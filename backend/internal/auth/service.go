@@ -74,6 +74,16 @@ type Service struct {
 	// mail boleh nil: aplikasinya tetap berjalan tanpa pengirim email, hanya fitur yang
 	// membutuhkannya yang menjawab 503 dengan pesan yang jelas.
 	mail PengirimEmail
+
+	// pembatas dipakai bersama oleh seluruh handler auth.
+	pembatas PembatasLogin
+}
+
+// PakaiPembatas mengganti pembatas login, dipakai main.go untuk memasang
+// PembatasBersama saat Redis tersedia.
+func (s *Service) PakaiPembatas(p PembatasLogin) *Service {
+	s.pembatas = p
+	return s
 }
 
 // PakaiPengirimEmail memasang pengirim email.
@@ -93,7 +103,7 @@ func NewService(repo Store, signer *Signer, quickLogin ...string) *Service {
 			allowed = append(allowed, e)
 		}
 	}
-	return &Service{repo: repo, signer: signer, now: time.Now, quickLogin: allowed}
+	return &Service{repo: repo, signer: signer, now: time.Now, quickLogin: allowed, pembatas: NewPembatas()}
 }
 
 // invalidCredentials is deliberately the same message for an unknown email and

@@ -382,18 +382,38 @@ rekaman Blackbox ke Paper.id.
 
 ## 10. Deploy
 
-**Docker** — `make deploy` menyalakan empat layanan dari `docker-compose.yml`:
+**Docker** — `make deploy` menyalakan enam layanan dari `docker-compose.yml`:
 
 | Layanan | Isi |
 | --- | --- |
 | `db` | Postgres 17 |
+| `redis` | Redis 7.4 tanpa persistensi, maksimal 128 MB. Isinya bisa dibangun ulang dari Postgres |
 | `migrate` | Menerapkan `db/init.sql` (idempoten) setiap kali stack dinyalakan, lalu keluar. `api` baru start setelahnya |
-| `api` | Backend Go di `API_PORT` (bawaan 8080) |
-| `web` | nginx di `WEB_PORT` (bawaan 8081): bundel frontend, dan meneruskan `/api`, `/uploads`, `/healthz`, `/docs`, `/openapi.*` ke `api` |
+| `api` | Backend Go, `API_REPLICAS` replika (bawaan 2). Tidak membuka port ke host |
+| `lb` | nginx load balancer di `API_PORT` (bawaan 8080), membagi permintaan ke semua replika `api` |
+| `web` | nginx di `WEB_PORT` (bawaan 8081): bundel frontend, dan meneruskan `/api`, `/uploads`, `/healthz`, `/docs`, `/openapi.*` ke `lb` |
 
-Kebijakan cache ada di `docker/nginx.conf`: aset ber-hash disimpan setahun, video Panduan
+Reverse proxy yang sudah menunjuk ke `:8080` tetap jalan tanpa diubah, karena port itu sekarang
+dipegang `lb`. Jumlah replika diubah dengan `API_REPLICAS=3 make deploy`. Tiap replika membuka
+`DB_MAX_CONNS` koneksi (bawaan 10), jadi jumlah replika kali angka itu harus di bawah
+`max_connections` Postgres (bawaan 100).
+
+Yang dibagi antar replika lewat Redis:
+
+| Apa | Kenapa |
+| --- | --- |
+| Pembatas login (10 gagal per 15 menit per email) | Tanpa Redis tiap replika menghitung sendiri, dan batasnya berlipat dengan jumlah replika |
+| Cache daftar chapter (5 menit) dan biaya keanggotaan (10 menit) | Dibuang saat chapter atau biaya berubah, termasuk dari impor dan sinkronisasi |
+| Giliran worker kurs KMK | Hanya satu replika yang memeriksa dalam 20 jam |
+
+Worker pengingat tidak memakai Redis: ia sudah dijaga advisory lock Postgres. Bila Redis mati,
+API tetap melayani dari Postgres. Pembatas login jatuh ke hitungan per replika, dan Redis
+dilewati 5 detik setelah setiap kegagalan supaya permintaan tidak ikut menunggu.
+
+Kebijakan cache HTTP ada di `docker/nginx.conf`: aset ber-hash disimpan setahun, video Panduan
 seminggu, `index.html` dan service worker selalu divalidasi ulang, dan gzip menyala untuk teks dan
-JSON. Backend menandai setiap jawaban `/api/` dengan `Cache-Control: no-store`.
+JSON. Backend menandai setiap jawaban `/api/` dengan `Cache-Control: no-store`, jadi data
+keuangan per pengguna tidak pernah disimpan browser atau proxy.
 
 **Frontend di Vercel** — tetap bisa dipakai. `npm run build` menjalankan generator koleksi API,
 type-check, lalu build PWA ke `dist/`. `vercel.json` mengatur SPA rewrite dan header keamanan.

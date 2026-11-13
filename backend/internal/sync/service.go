@@ -37,6 +37,16 @@ type Service struct {
 
 	// newFetcher is swapped in tests.
 	newFetcher func(baseURL, token string) Fetcher
+
+	// setelahJalan dipanggil di akhir Run, karena sinkronisasi bisa membuat
+	// chapter baru.
+	setelahJalan func(context.Context)
+}
+
+// SetelahJalan memasang fn yang dipanggil setiap kali Run selesai.
+func (s *Service) SetelahJalan(fn func(context.Context)) *Service {
+	s.setelahJalan = fn
+	return s
 }
 
 func NewService(repo Store, baseURL, envToken string, rec *blackbox.Recorder) *Service {
@@ -56,6 +66,9 @@ func NewService(repo Store, baseURL, envToken string, rec *blackbox.Recorder) *S
 // The token comes from app_settings first so it can be rotated from the
 // settings page without a redeploy, falling back to the environment.
 func (s *Service) Run(ctx context.Context) (*Result, error) {
+	if s.setelahJalan != nil {
+		defer s.setelahJalan(ctx)
+	}
 	token, err := s.repo.Setting(ctx, TokenSettingKey)
 	if err != nil {
 		return nil, err
