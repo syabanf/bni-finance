@@ -15,7 +15,7 @@ var timeNow = time.Now
 
 type Handler struct {
 	svc      *Service
-	pembatas *Pembatas
+	pembatas PembatasLogin
 	// baseURL adalah alamat aplikasi web, dipakai merakit tautan reset.
 	//
 	// Dari konfigurasi server, BUKAN dari header Host permintaan. Host bisa
@@ -35,7 +35,7 @@ type Handler struct {
 // berisik, jadi arahnya aman; tapi bentuk panggilan yang lebih datar membuatnya
 // tidak perlu gagal sama sekali.
 func NewHandler(svc *Service, baseURL string) *Handler {
-	return &Handler{svc: svc, pembatas: NewPembatas(), baseURL: baseURL}
+	return &Handler{svc: svc, pembatas: svc.pembatas, baseURL: baseURL}
 }
 
 // RegisterPublic wires the routes that must work WITHOUT a token — login being

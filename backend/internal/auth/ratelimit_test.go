@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -147,5 +149,66 @@ func TestPetaBerbatasMeskiEmailSelaluBaru(t *testing.T) {
 
 	if n > maksEntri {
 		t.Errorf("peta tumbuh sampai %d entri, batasnya %d", n, maksEntri)
+	}
+}
+
+// penghitungPalsu meniru cache.Redis: penghitung per kunci yang dibagi oleh
+// beberapa PembatasBersama, seperti Redis dibagi oleh beberapa replika.
+type penghitungPalsu struct {
+	n     map[string]int64
+	rusak bool
+}
+
+func (p *penghitungPalsu) Tambah(_ context.Context, key string, _ time.Duration) (int64, error) {
+	if p.rusak {
+		return 0, errors.New("redis mati")
+	}
+	p.n[key]++
+	return p.n[key], nil
+}
+
+func (p *penghitungPalsu) Hitung(_ context.Context, key string) (int64, time.Duration, error) {
+	if p.rusak {
+		return 0, 0, errors.New("redis mati")
+	}
+	return p.n[key], JendelaGagal, nil
+}
+
+func (p *penghitungPalsu) Hapus(_ context.Context, key string) error {
+	delete(p.n, key)
+	return nil
+}
+
+// Inti perubahan ini: dua replika di belakang load balancer harus berbagi
+// SATU hitungan. Kegagalan yang tersebar bergiliran di dua replika tetap
+// mengunci akun pada percobaan ke-MaksGagal, bukan ke-2xMaksGagal.
+func TestPembatasBersamaBerbagiHitunganAntarReplika(t *testing.T) {
+	redis := &penghitungPalsu{n: map[string]int64{}}
+	replika := []*PembatasBersama{NewPembatasBersama(redis), NewPembatasBersama(redis)}
+
+	for i := 0; i < MaksGagal; i++ {
+		replika[i%2].Gagal("Orang@Contoh.id ")
+	}
+	for i, p := range replika {
+		if _, terkunci := p.Terkunci("orang@contoh.id"); !terkunci {
+			t.Errorf("replika %d tidak melihat kunci setelah %d kegagalan gabungan", i, MaksGagal)
+		}
+	}
+
+	replika[1].Berhasil("orang@contoh.id")
+	if _, terkunci := replika[0].Terkunci("orang@contoh.id"); terkunci {
+		t.Error("login berhasil di replika lain tidak membuka kunci")
+	}
+}
+
+// Redis yang mati tidak boleh membuka login tanpa batas.
+func TestPembatasBersamaJatuhKeMemoriSaatRedisMati(t *testing.T) {
+	redis := &penghitungPalsu{n: map[string]int64{}, rusak: true}
+	p := NewPembatasBersama(redis)
+	for i := 0; i < MaksGagal; i++ {
+		p.Gagal("orang@contoh.id")
+	}
+	if _, terkunci := p.Terkunci("orang@contoh.id"); !terkunci {
+		t.Error("tanpa Redis, pembatas berhenti membatasi")
 	}
 }

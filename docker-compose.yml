@@ -1,10 +1,16 @@
-# BNI Finance Hub: Postgres, migrasi skema, backend Go, dan frontend nginx.
+# BNI Finance Hub: Postgres, Redis, migrasi skema, beberapa replika backend Go
+# di belakang load balancer, dan frontend nginx.
 #
 #   docker compose up -d --build
 #   docker compose logs -f api
+#   API_REPLICAS=3 docker compose up -d    # ubah jumlah replika (bawaan 2)
+#
+#   web (WEB_PORT 8081) ── /api ──────┐
+#                                     ├──> lb ──> api x API_REPLICAS ──> db, redis
+#   reverse proxy (API_PORT 8080) ────┘
 #
 # Frontend dan API satu origin di port WEB_PORT (bawaan 8081). Port API_PORT
-# tetap dibuka untuk reverse proxy yang sudah menunjuk ke backend langsung.
+# dipegang load balancer, untuk reverse proxy yang sudah menunjuk ke :8080.
 #
 # Rahasia TIDAK ditulis di berkas ini. Semuanya dibaca dari backend/.env, yang
 # diabaikan git — lihat backend/.env.example untuk daftar variabelnya.
@@ -27,6 +33,23 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-bni_finance}"]
       interval: 5s
       timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # Cache, pembatas login, dan giliran worker yang dibagi seluruh replika API.
+  #
+  # Tanpa persistensi (--save "" dan tanpa appendonly): seluruh isinya bisa
+  # dibangun ulang dari Postgres, dan Redis yang restart hanya membuat beberapa
+  # permintaan pertama sedikit lebih lambat. volatile-lru membuang kunci ber-TTL
+  # lebih dulu saat memori penuh; penghitung generasi cache tidak ber-TTL dan
+  # tidak ikut terbuang.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "volatile-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 20
     restart: unless-stopped
 
@@ -81,17 +104,46 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-bni_finance}?sslmode=disable
       PORT: "8080"
       UPLOAD_DIR: /app/uploads
-    ports:
-      - "${API_PORT:-8080}:8080"
+      REDIS_URL: redis://redis:6379/0
+    # Tanpa `ports`: beberapa replika tidak bisa memegang satu port host yang
+    # sama. Semua lalu lintas masuk lewat `lb`.
+    #
+    # Setiap replika membuka DB_MAX_CONNS koneksi (bawaan 10). Jumlah replika
+    # kali angka itu harus di bawah max_connections Postgres (bawaan 100).
+    deploy:
+      replicas: ${API_REPLICAS:-2}
     volumes:
       # Bukti pembayaran harus selamat dari `docker compose down`. Tanpa volume,
       # setiap pembangunan ulang menghapus seluruh lampiran yang pernah diunggah.
+      # Volume yang sama dipasang di setiap replika, jadi berkas yang diunggah
+      # lewat satu replika bisa dibuka lewat replika lain.
       - uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      # service_started, bukan service_healthy: API tetap berjalan tanpa Redis
+      # (membaca langsung dari database), jadi Redis yang bermasalah tidak boleh
+      # menahan API untuk start.
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  lb:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./docker/lb.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "${API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
   web:
@@ -100,7 +152,7 @@ services:
     ports:
       - "${WEB_PORT:-8081}:80"
     depends_on:
-      api:
+      lb:
         condition: service_healthy
     restart: unless-stopped
 

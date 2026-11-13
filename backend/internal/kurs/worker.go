@@ -56,6 +56,18 @@ type Worker struct {
 	log      *slog.Logger
 	interval time.Duration
 	sekarang func() time.Time
+	// giliran, bila diisi, memutuskan replika mana yang menjalankan putaran.
+	giliran func(context.Context) bool
+}
+
+// HanyaSatuReplika membatasi pemeriksaan ke replika yang mendapat giliran.
+//
+// Tanpa ini setiap replika mengambil halaman KMK dan menulis catatan
+// pemeriksaan sendiri-sendiri. Hasilnya tetap benar karena putaran tanpa
+// perubahan tidak menulis biaya, tapi N replika berarti N kali kerja yang sama.
+func (w *Worker) HanyaSatuReplika(giliran func(context.Context) bool) *Worker {
+	w.giliran = giliran
+	return w
 }
 
 func NewWorker(store Store, log *slog.Logger) *Worker {
@@ -87,6 +99,9 @@ func (w *Worker) Jalankan(ctx context.Context) {
 // Putaran menjalankan satu pemeriksaan. Diekspor supaya bisa diuji tanpa ticker.
 func (w *Worker) Putaran(ctx context.Context) {
 	if !w.aktif(ctx) {
+		return
+	}
+	if w.giliran != nil && !w.giliran(ctx) {
 		return
 	}
 	kmk, err := Ambil(ctx, w.client, w.url)

@@ -105,3 +105,24 @@ func TestPutaranMenghormatiSakelarDanGagalDenganAman(t *testing.T) {
 		}
 	})
 }
+
+// Replika yang tidak mendapat giliran tidak mengambil halaman dan tidak
+// menulis apa pun. Sakelar mati diperiksa lebih dulu, supaya worker yang
+// dimatikan tidak menghabiskan giliran replika lain.
+func TestPutaranHanyaDiReplikaYangMendapatGiliran(t *testing.T) {
+	store := &storeUji{rate: 16_000, app: map[string]string{}}
+	diminta := 0
+	w := workerUji(t, store, halamanContoh, http.StatusOK).
+		HanyaSatuReplika(func(context.Context) bool { diminta++; return false })
+
+	w.Putaran(context.Background())
+	if len(store.diperbarui) != 0 || store.app[KunciTerakhir] != "" {
+		t.Error("replika tanpa giliran tetap memeriksa kurs")
+	}
+
+	store.app[KunciOtomatis] = "false"
+	w.Putaran(context.Background())
+	if diminta != 1 {
+		t.Errorf("giliran diminta %d kali; worker yang dimatikan tidak boleh memintanya", diminta)
+	}
+}

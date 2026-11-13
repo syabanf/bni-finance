@@ -120,9 +120,18 @@ type MemberRow struct {
 
 type Service struct {
 	repo Store
+	// setelahTerapkan dipanggil sesudah impor yang menulis, karena impor
+	// laporan BNI Connect bisa membuat chapter baru.
+	setelahTerapkan func(context.Context)
 }
 
 func NewService(repo Store) *Service { return &Service{repo: repo} }
+
+// SetelahTerapkan memasang fn yang dipanggil setiap kali impor diterapkan.
+func (s *Service) SetelahTerapkan(fn func(context.Context)) *Service {
+	s.setelahTerapkan = fn
+	return s
+}
 
 // Jalankan memeriksa berkas, dan menerapkannya hanya bila terapkan = true.
 //
@@ -154,6 +163,9 @@ type Opsi struct {
 }
 
 func (s *Service) Jalankan(ctx context.Context, jenis Jenis, data []byte, terapkan bool, opsi Opsi) (*Hasil, error) {
+	if terapkan && s.setelahTerapkan != nil {
+		defer s.setelahTerapkan(ctx)
+	}
 	rows, format, err := Baca(data)
 	if err != nil {
 		return nil, err

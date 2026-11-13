@@ -17,6 +17,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/audit"
 	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/blackbox"
+	"github.com/syabanf/bni-finance/backend/internal/cache"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
@@ -74,6 +75,17 @@ func run(log *slog.Logger) error {
 	defer pool.Close()
 	log.Info("terhubung ke database")
 
+	// Redis dibagi seluruh replika API. Tanpa REDIS_URL, rdb bernilai nil dan
+	// setiap pemakainya kembali ke perilaku satu instance.
+	rdb, err := cache.Buka(ctx, cfg.RedisURL, log)
+	if err != nil {
+		return err
+	}
+	defer rdb.Close()
+	if rdb != nil {
+		log.Info("redis dipakai untuk cache, pembatas login, dan giliran worker")
+	}
+
 	// One recorder shared by every integration, so the blackbox page shows all
 	// traffic in a single timeline.
 	//
@@ -117,6 +129,9 @@ func run(log *slog.Logger) error {
 	}
 	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...).
 		PakaiPengirimEmail(surat)
+	if rdb != nil {
+		authSvc.PakaiPembatas(auth.NewPembatasBersama(rdb))
+	}
 
 	// Passwordless sign-in is a deliberate hole in authentication. Say so at
 	// every start, naming the accounts, so it can never be on unnoticed.
@@ -151,24 +166,27 @@ func run(log *slog.Logger) error {
 			"endpoint", "/api/v1/webhooks/paperid/*")
 	}
 
-	settingsSvc := settings.NewService(settings.NewRepository(pool))
+	settingsSvc := settings.NewService(settings.NewRepository(pool)).PakaiCache(rdb)
+	chapterSvc := chapter.NewService(chapter.NewRepository(pool)).PakaiCache(rdb)
 
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
 		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
 		Payment:   payment.NewService(payment.NewRepository(pool)),
 		Member:    member.NewService(member.NewRepository(pool)),
-		Chapter:   chapter.NewService(chapter.NewRepository(pool)),
+		Chapter:   chapterSvc,
 		Settings:  settingsSvc,
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
 		Upload:    uploads,
-		Sync:      sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder),
-		Importer:  importer.NewService(importer.NewRepository(pool)),
-		Renewal:   renewal.NewService(renewal.NewRepository(pool), surat, cfg.AppBaseURL),
-		PaperID:   paperSvc,
-		Blackbox:  recorder,
-		Metrics:   reg,
+		Sync: sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder).
+			SetelahJalan(chapterSvc.Kedaluwarsakan),
+		Importer: importer.NewService(importer.NewRepository(pool)).
+			SetelahTerapkan(chapterSvc.Kedaluwarsakan),
+		Renewal:  renewal.NewService(renewal.NewRepository(pool), surat, cfg.AppBaseURL),
+		PaperID:  paperSvc,
+		Blackbox: recorder,
+		Metrics:  reg,
 	}, pool.Ping)
 
 	srv := &http.Server{
@@ -197,7 +215,15 @@ func run(log *slog.Logger) error {
 	// Kurs pajak KMK diperiksa saat start lalu sekali sehari; kurs USD di
 	// fee_settings mengikutinya kecuali app_settings.kurs_kmk_otomatis = false.
 	// Melewati settings.Service supaya Rupiah ikut diturunkan ulang dari USD.
-	go kurs.NewWorker(settingsSvc, log).Jalankan(workerCtx)
+	//
+	// Dengan beberapa replika, hanya yang pertama mengambil giliran dalam 20 jam
+	// yang memeriksa. Worker pengingat tidak butuh ini: ia sudah memakai
+	// advisory lock Postgres.
+	go kurs.NewWorker(settingsSvc, log).
+		HanyaSatuReplika(func(ctx context.Context) bool {
+			return rdb.Sekali(ctx, "kurs:giliran", 20*time.Hour)
+		}).
+		Jalankan(workerCtx)
 
 	errCh := make(chan error, 1)
 	go func() {

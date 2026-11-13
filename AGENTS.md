@@ -18,7 +18,7 @@ or tell the user to run them in Claude Code.
 - **Frontend**: Vite 5 + React 18 + TypeScript + Tailwind CSS 3 + React Router 6
 - **Backend**: REST API Go 1.25 (stdlib + pgx) di atas PostgreSQL — `backend/`
 - **Payment**: Paper.id (invoice, pengingat, dan callback pembayaran)
-- **Hosting**: Vercel (frontend); backend Go dijalankan terpisah
+- **Hosting**: Vercel (frontend), atau seluruh stack via Docker Compose: beberapa replika API di belakang load balancer nginx, Redis untuk cache dan pembatas login
 - **Data source**: BNI Visitor Management API — disinkronkan `POST /api/v1/sync`
 - **Auth**: Tabel `users` + JWT HS256 (mock localStorage di dev)
 
