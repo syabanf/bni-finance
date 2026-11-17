@@ -45,7 +45,7 @@ export function makeExportHandlers(cfg: PageExport) {
         totals: cfg.totals,
         summary: cfg.summary,
         extraSections: cfg.extraSections,
-        documentTitle: `${cfg.title} — BNI Finance`,
+        documentTitle: `${cfg.title} — Business Network International Finance`,
       })
       if (!ok) cfg.onPopupBlocked?.()
     },

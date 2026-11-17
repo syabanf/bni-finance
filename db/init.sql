@@ -755,7 +755,7 @@ create index if not exists idx_integration_calls_failed
 insert into users (email, password_hash, name, role)
 select * from (values
   ('admin@bni-finance.com', 'pbkdf2_sha256$600000$pcdAmM7g/k6c76RFc0wInw$zb0Xz7WyApNl4/U8yrSUwrIVf1bsC0AZljajOhe2Z+o', 'Admin Nasional', 'admin'::user_role),
-  ('user@bni-finance.com',  'pbkdf2_sha256$600000$vdiDsSUR+cMP1RrISviV5Q$7j279skDDr8+vTXfB2dXOf16bNU+9JBfYhcoYG1lDh4', 'User BNI',       'user'::user_role)
+  ('user@bni-finance.com',  'pbkdf2_sha256$600000$vdiDsSUR+cMP1RrISviV5Q$7j279skDDr8+vTXfB2dXOf16bNU+9JBfYhcoYG1lDh4', 'User Business Network International',       'user'::user_role)
 ) as awal(email, password_hash, name, role)
 where not exists (select 1 from users);
 
@@ -772,10 +772,10 @@ begin
   end if;
   
   insert into chapters (id, name, display_name, area_name, city_name) values
-    ('ch-garuda',   'Garuda',   'BNI Garuda',   'Jakarta Pusat',  'Jakarta'),
-    ('ch-nusantara','Nusantara','BNI Nusantara','Jakarta Selatan','Jakarta'),
-    ('ch-merdeka',  'Merdeka',  'BNI Merdeka',  'Bandung Kota',   'Bandung'),
-    ('ch-samudra',  'Samudra',  'BNI Samudra',  'Surabaya Timur', 'Surabaya')
+    ('ch-garuda',   'Garuda',   'Business Network International Garuda',   'Jakarta Pusat',  'Jakarta'),
+    ('ch-nusantara','Nusantara','Business Network International Nusantara','Jakarta Selatan','Jakarta'),
+    ('ch-merdeka',  'Merdeka',  'Business Network International Merdeka',  'Bandung Kota',   'Bandung'),
+    ('ch-samudra',  'Samudra',  'Business Network International Samudra',  'Surabaya Timur', 'Surabaya')
   on conflict (id) do nothing;
   
   -- Semua member memakai NOMOR DAN EMAIL YANG SAMA, dan itu disengaja.

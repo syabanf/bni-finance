@@ -10,7 +10,7 @@ import { chapterService } from '@/services'
  * Laporan BNI Connect menyebut chapternya di baris parameter ("Chapter:
  * Supreme"), dan importer menolak laporan yang tidak cocok dengan chapter
  * tujuan. Nama yang diisi di sini sebaiknya sama dengan nama di BNI Connect;
- * nama tampil diturunkan dengan awalan "BNI", dan id dengan awalan "ch-".
+ * nama tampil diturunkan dengan awalan "Business Network International", dan id dengan awalan "ch-".
  */
 export function TambahChapterModal({
   open,
@@ -34,9 +34,13 @@ export function TambahChapterModal({
     setKota('')
   }, [open])
 
-  const bersih = nama.trim()
+  // Sama dengan aturan impor laporan di server (domain.IntiChapter dan
+  // AwalanChapter): nama organisasi dibuang dari depan, lalu nama tampilnya
+  // selalu ditulis lengkap. "Supreme", "BNI Supreme", dan nama lengkapnya
+  // menghasilkan chapter yang sama.
+  const bersih = nama.trim().replace(/^(bni|business network international)\s+/i, '').trim()
   const id = `ch-${bersih.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`
-  const tampil = /^bni\s/i.test(bersih) ? bersih : `BNI ${bersih}`
+  const tampil = `Business Network International ${bersih}`
 
   const simpan = async () => {
     if (!bersih) {
@@ -47,7 +51,7 @@ export function TambahChapterModal({
     try {
       await chapterService.create({
         id,
-        name: bersih.replace(/^bni\s+/i, ''),
+        name: bersih,
         displayName: tampil,
         areaName: area.trim() || undefined,
         cityName: kota.trim() || undefined,
@@ -67,7 +71,7 @@ export function TambahChapterModal({
       open={open}
       onClose={onClose}
       title="Tambah Chapter"
-      description="Pakai nama yang sama dengan di BNI Connect, supaya laporannya bisa diimpor ke chapter ini."
+      description="Pakai nama yang sama dengan di Business Network International Connect, supaya laporannya bisa diimpor ke chapter ini."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={menyimpan}>

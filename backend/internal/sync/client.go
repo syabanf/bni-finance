@@ -102,19 +102,19 @@ func (c *Client) FetchMembers(ctx context.Context) ([]RemoteMember, error) {
 			return all, nil
 		}
 	}
-	return nil, fmt.Errorf("sinkronisasi dihentikan setelah %d halaman — BNI VM terus melaporkan ada data berikutnya", maxPages)
+	return nil, fmt.Errorf("sinkronisasi dihentikan setelah %d halaman — Business Network International VM terus melaporkan ada data berikutnya", maxPages)
 }
 
 func (c *Client) fetchPage(ctx context.Context, offset int) ([]RemoteMember, bool, error) {
 	endpoint, err := url.JoinPath(c.baseURL, "members")
 	if err != nil {
-		return nil, false, fmt.Errorf("URL BNI VM tidak valid: %w", err)
+		return nil, false, fmt.Errorf("URL Business Network International VM tidak valid: %w", err)
 	}
 	endpoint += "?limit=" + strconv.Itoa(pageSize) + "&offset=" + strconv.Itoa(offset)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, false, fmt.Errorf("buat permintaan BNI VM: %w", err)
+		return nil, false, fmt.Errorf("buat permintaan Business Network International VM: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
@@ -127,7 +127,7 @@ func (c *Client) fetchPage(ctx context.Context, offset int) ([]RemoteMember, boo
 			Method: http.MethodGet, URL: endpoint,
 			Success: false, Duration: time.Since(started), Err: err,
 		})
-		return nil, false, fmt.Errorf("hubungi BNI VM: %w", err)
+		return nil, false, fmt.Errorf("hubungi Business Network International VM: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -140,18 +140,18 @@ func (c *Client) fetchPage(ctx context.Context, offset int) ([]RemoteMember, boo
 	})
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return nil, false, fmt.Errorf("BNI VM menolak token (HTTP %d) — periksa pengaturan bni_vm_token", resp.StatusCode)
+		return nil, false, fmt.Errorf("Business Network International VM menolak token (HTTP %d) — periksa pengaturan bni_vm_token", resp.StatusCode)
 	}
 	if resp.StatusCode >= 300 {
-		return nil, false, fmt.Errorf("BNI VM membalas HTTP %d", resp.StatusCode)
+		return nil, false, fmt.Errorf("Business Network International VM membalas HTTP %d", resp.StatusCode)
 	}
 	if readErr != nil {
-		return nil, false, fmt.Errorf("baca balasan BNI VM: %w", readErr)
+		return nil, false, fmt.Errorf("baca balasan Business Network International VM: %w", readErr)
 	}
 
 	var page memberPage
 	if err := json.Unmarshal(raw, &page); err != nil {
-		return nil, false, fmt.Errorf("baca balasan BNI VM: %w", err)
+		return nil, false, fmt.Errorf("baca balasan Business Network International VM: %w", err)
 	}
 	return page.Data, page.Pagination.HasMore, nil
 }

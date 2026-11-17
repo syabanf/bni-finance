@@ -11,10 +11,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Finance Hub BNI Indonesia',
+        name: 'Finance Hub Business Network International Indonesia',
         short_name: 'Finance Hub',
         description:
-          'Sistem internal invoice dan iuran keanggotaan BNI (Business Networking International) Indonesia. Tidak terkait Bank BNI.',
+          'Sistem internal invoice dan iuran keanggotaan Business Network International Indonesia. Tidak terkait Bank BNI.',
         id: '/',
         start_url: '/',
         scope: '/',

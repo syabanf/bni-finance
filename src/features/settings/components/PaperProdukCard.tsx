@@ -25,9 +25,9 @@ const KUNCI = [
 type Kunci = (typeof KUNCI)[number]
 
 const BAWAAN: Record<Kunci, string> = {
-  paper_produk_pendaftaran: 'Biaya Pendaftaran Member BNI',
+  paper_produk_pendaftaran: 'Biaya Pendaftaran Member Business Network International',
   paper_deskripsi_pendaftaran: 'Pendaftaran anggota baru (berlaku 1 tahun)',
-  paper_produk_renewal: 'Perpanjangan Keanggotaan BNI',
+  paper_produk_renewal: 'Perpanjangan Keanggotaan Business Network International',
   paper_deskripsi_renewal: 'Perpanjangan keanggotaan tahunan',
 }
 

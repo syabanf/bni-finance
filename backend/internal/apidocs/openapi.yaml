@@ -1,10 +1,10 @@
 openapi: 3.1.0
 
 info:
-  title: BNI Finance API
+  title: Business Network International Finance API
   version: "1.0.0"
   description: |
-    REST API untuk BNI — invoice keanggotaan
+    REST API untuk Business Network International — invoice keanggotaan
     (pendaftaran & renewal), pembayaran, member, chapter, dan pelaporan.
 
     ## Autentikasi
@@ -46,7 +46,7 @@ info:
     `src/types`, sehingga bisa dipakai klien TypeScript tanpa lapisan pemetaan.
 
   license:
-    name: Internal — BNI
+    name: Internal — Business Network International
 
 servers:
   - url: http://localhost:8080
@@ -62,7 +62,7 @@ tags:
   - name: Member
     description: Anggota chapter, termasuk yang mendekati jatuh tempo renewal
   - name: Chapter
-    description: Chapter BNI
+    description: Chapter Business Network International
   - name: Pengaturan
     description: Biaya keanggotaan dan konfigurasi aplikasi
   - name: Dashboard
@@ -70,11 +70,11 @@ tags:
   - name: Unggahan
     description: Bukti pembayaran
   - name: Sinkronisasi
-    description: Tarik data member & chapter dari BNI Visitor Management
+    description: Tarik data member & chapter dari Business Network International Visitor Management
   - name: Paper.id
     description: Kirim invoice ke Paper.id & terima callback pembayaran
   - name: Blackbox
-    description: Rekaman lalu lintas integrasi (Paper.id, Xendit, BNI VM)
+    description: Rekaman lalu lintas integrasi (Paper.id, Xendit, Business Network International VM)
   - name: Publik
     description: Dapat diakses tanpa token — pembayar bukan pengguna aplikasi
   - name: Sistem
@@ -668,7 +668,7 @@ paths:
             examples:
               terbitkan:
                 summary: Terbitkan (draft → sent)
-                value: { status: "sent", actorName: "Admin BNI" }
+                value: { status: "sent", actorName: "Admin Business Network International" }
               batalkan:
                 summary: Batalkan dengan alasan
                 value: { status: "cancelled", cancelReason: "Salah member" }
@@ -929,7 +929,7 @@ paths:
       summary: Tambah member
       description: |
         **Admin saja.** `id` opsional — database membuatkan bila kosong, yang
-        tepat untuk member yang tidak berasal dari BNI VM.
+        tepat untuk member yang tidak berasal dari Business Network International VM.
       requestBody:
         required: true
         content:
@@ -1229,7 +1229,7 @@ paths:
         | `invoice_due_days_after` | Jatuh tempo = tanggal kirim ke Paper.id + N hari | `3` |
         | `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |
         | `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |
-        | `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |
+        | `bni_vm_token` | Token sinkronisasi Business Network International VM (tersamar) | — |
 
         Untuk kunci `paperid_send_*`, hanya nilai `false` yang mematikan —
         baris yang belum ada tetap berarti mengantar. Untuk `self_payment_mode`
@@ -2246,10 +2246,10 @@ paths:
         dihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.
 
         Format ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang
-        di-rename menjadi `.csv` tetap terbaca benar. Ekspor BNI Connect
+        di-rename menjadi `.csv` tetap terbaca benar. Ekspor Business Network International Connect
         (berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.
 
-        **Laporan BNI Connect** (Membership Dues, Chapter Roster, Membership
+        **Laporan Business Network International Connect** (Membership Dues, Chapter Roster, Membership
         Length) dikenali dari judul kolomnya di baris mana pun dan dibaca
         dengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan
         lewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan
@@ -2305,7 +2305,7 @@ paths:
             baris yang menyebut chapter lain **ditolak**. Tidak berlaku untuk
             `jenis=chapters` — berkasnyalah yang mendefinisikan chapter, jadi
             kombinasi itu dijawab 400 alih-alih diabaikan diam-diam.
-            Untuk laporan BNI Connect parameter ini boleh dikosongkan: chapter
+            Untuk laporan Business Network International Connect parameter ini boleh dikosongkan: chapter
             dibaca dari baris "Chapter:" laporan, dan chapter yang belum ada
             dibuat saat `terapkan=true` (id `ch-…`, wilayah dari kolom Region).
           schema: { type: string }
@@ -2359,7 +2359,7 @@ paths:
                   chapter:
                     type: object
                     description: >
-                      Hanya untuk laporan BNI Connect: chapter tempat member
+                      Hanya untuk laporan Business Network International Connect: chapter tempat member
                       ditulis. `baru` berarti chapter itu dibaca dari laporan,
                       belum ada, dan dibuat saat diterapkan.
                     properties:
@@ -2388,9 +2388,9 @@ paths:
   /api/v1/sync:
     post:
       tags: [Sinkronisasi]
-      summary: Tarik member & chapter dari BNI Visitor Management
+      summary: Tarik member & chapter dari Business Network International Visitor Management
       description: |
-        **Admin saja.** Satu panggilan menyegarkan **keduanya** — BNI VM tidak
+        **Admin saja.** Satu panggilan menyegarkan **keduanya** — Business Network International VM tidak
         punya endpoint chapter tersendiri, jadi chapter diturunkan dari daftar
         member.
 
@@ -2402,10 +2402,10 @@ paths:
         Seluruh snapshot ditulis dalam **satu transaksi**. Penulisan sebagian
         bisa meninggalkan member yang menunjuk chapter yang belum ada.
 
-        **Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**
+        **Member yang hilang dari Business Network International VM dinonaktifkan, bukan dihapus.**
         Menghapusnya akan melanggar foreign key begitu mereka punya invoice, dan
         membuang riwayat tagihan meski berhasil. Aturan ini hanya berlaku bagi
-        member yang tertaut ke BNI VM. Member dari impor laporan BNI Connect dan
+        member yang tertaut ke Business Network International VM. Member dari impor laporan Business Network International Connect dan
         Tambah Member yang belum tertaut tidak disentuh.
 
         **Baris yang sudah ada ditautkan, tidak digandakan.** Sinkronisasi mencari
@@ -2416,13 +2416,13 @@ paths:
         lingkup akun ST/MC tetap utuh. Duplikat yang sudah ada tidak digabungkan.
 
         **Member yang sudah ada diperbarui dengan aturan ini:** nilai kosong dari
-        BNI VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,
-        dan status BNI VM hanya dipakai saat baris dibuat, kecuali `inactive` yang
-        selalu menonaktifkan member. Nilai lain yang dikirim BNI VM, termasuk email
+        Business Network International VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,
+        dan status Business Network International VM hanya dipakai saat baris dibuat, kecuali `inactive` yang
+        selalu menonaktifkan member. Nilai lain yang dikirim Business Network International VM, termasuk email
         dan telepon, menimpa nilai tersimpan.
 
         **Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan
-        seluruh member BNI VM — jauh lebih mungkin BNI VM sedang bermasalah
+        seluruh member Business Network International VM — jauh lebih mungkin Business Network International VM sedang bermasalah
         daripada organisasi kehilangan semua anggotanya sekaligus.
       responses:
         "200":
@@ -2433,12 +2433,12 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "502":
-          description: BNI VM tidak bisa dihubungi, menolak token, atau balasannya kosong
+          description: Business Network International VM tidak bisa dihubungi, menolak token, atau balasannya kosong
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "503":
-          description: Token BNI VM belum dikonfigurasi
+          description: Token Business Network International VM belum dikonfigurasi
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -2546,7 +2546,7 @@ paths:
       summary: Rekaman panggilan integrasi
       description: |
         **Admin saja.** Perekam "kotak hitam": setiap panggilan **keluar** ke API
-        eksternal (Paper.id, Xendit, BNI VM) dan setiap **callback masuk**
+        eksternal (Paper.id, Xendit, Business Network International VM) dan setiap **callback masuk**
         terekam dengan body request, endpoint yang dihubungi, body response, dan
         status berhasil/gagal.
 
@@ -3455,7 +3455,7 @@ components:
         customerName:
           title: Nama Penerima
           type: string
-          default: Uji Coba BNI Finance
+          default: Uji Coba Business Network International Finance
           description: Nama penerima invoice.
         customerPhone:
           title: Nomor Telepon
@@ -3653,23 +3653,23 @@ components:
           description: Chapter unik yang ditemukan pada snapshot.
         members:
           type: integer
-          description: Member yang diterima dari BNI VM.
+          description: Member yang diterima dari Business Network International VM.
         deactivated:
           type: integer
           description: |
-            Member lokal yang tidak lagi ada di BNI VM, jadi statusnya diubah
+            Member lokal yang tidak lagi ada di Business Network International VM, jadi statusnya diubah
             menjadi `inactive`. Tidak ada yang dihapus.
         linkedChapters:
           type: integer
-          description: Chapter tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama.
+          description: Chapter tersimpan yang pada sinkronisasi ini ditautkan ke Business Network International VM lewat nama.
         linkedMembers:
           type: integer
-          description: Member tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama.
+          description: Member tersimpan yang pada sinkronisasi ini ditautkan ke Business Network International VM lewat nama.
         needsReview:
           type: array
           items: { type: string }
           description: |
-            Baris BNI VM yang namanya cocok secara ambigu dengan baris tersimpan.
+            Baris Business Network International VM yang namanya cocok secara ambigu dengan baris tersimpan.
             Baris ini mendapat baris baru, jadi bisa saja duplikat.
         syncedAt: { type: string, format: date-time }
 

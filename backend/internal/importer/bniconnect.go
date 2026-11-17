@@ -199,7 +199,7 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 	}
 	// Tanpa chapter tujuan, chapternya dibaca dari baris parameter laporan.
 	// Chapter yang belum ada disiapkan di sini dan baru ditulis saat Terapkan.
-	var chapterBaru *ChapterRow
+	chapterBaru := false
 	tujuan, ada := chapters[opsi.Chapter]
 	switch {
 	case opsi.Chapter == "":
@@ -207,13 +207,16 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 		if err != nil {
 			return nil, err
 		}
-		tujuan, opsi.Chapter = c, c.ID
-		if baru {
-			chapterBaru = &c
-		}
+		tujuan, opsi.Chapter, chapterBaru = c, c.ID, baru
 	case !ada:
 		return nil, fmt.Errorf("chapter %q tidak ada", opsi.Chapter)
 	}
+	// Chapter lama yang nama tampilnya masih "BNI …" ikut ditulis ulang dengan
+	// nama lengkap saat laporannya diimpor, supaya tidak ada dua bentuk nama
+	// berdampingan di daftar chapter.
+	namaLama := tujuan.DisplayName
+	tujuan.DisplayName = domain.PanjangkanBNI(tujuan.DisplayName)
+	tulisChapter := chapterBaru || tujuan.DisplayName != namaLama
 	// Laporan menyebut chapternya di baris parameter ("Chapter: Supreme").
 	// Karena barisnya sendiri tidak membawa chapter, berkas chapter A yang
 	// diunggah ke tujuan B akan menempelkan seluruh namanya ke B tanpa satu
@@ -239,10 +242,10 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 	hasil := &Hasil{Format: format, Jenis: JenisMember, Chapter: &ChapterHasil{
 		ID:   tujuan.ID,
 		Nama: cmp.Or(tujuan.DisplayName, tujuan.Name, tujuan.ID),
-		Baru: chapterBaru != nil,
+		Baru: chapterBaru,
 	}}
 	hasil.Peringatan = append(hasil.Peringatan, fmt.Sprintf(
-		"Laporan BNI Connect (%s). Member dicocokkan lewat NAMA di chapter %s; yang belum ada dibuat baru dengan id bc-…",
+		"Laporan Business Network International Connect (%s). Member dicocokkan lewat NAMA di chapter %s; yang belum ada dibuat baru dengan id bc-…",
 		jenis, hasil.Chapter.Nama))
 	if jenis == laporanLength {
 		hasil.Peringatan = append(hasil.Peringatan,
@@ -309,8 +312,8 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 	if terapkan && len(tulis) > 0 {
 		// Chapter lebih dulu: member merujuknya. Bila penulisan member gagal,
 		// chapternya tetap ada, dan unggahan ulang akan mencocokkannya.
-		if chapterBaru != nil {
-			if err := s.repo.UpsertChapters(ctx, []ChapterRow{*chapterBaru}); err != nil {
+		if tulisChapter {
+			if err := s.repo.UpsertChapters(ctx, []ChapterRow{tujuan}); err != nil {
 				return nil, err
 			}
 		}
@@ -343,8 +346,8 @@ func chapterLaporan(rows []sheetRow) string {
 
 // chapterDariLaporan mencari chapter yang disebut laporan di antara chapter
 // tersimpan. Bila belum ada, ia menyiapkan baris baru dengan aturan yang sama
-// dengan Tambah Chapter (id "ch-…", nama tampil "BNI …") dan wilayah dari
-// kolom Region laporan.
+// dengan Tambah Chapter (id "ch-…", nama tampil domain.AwalanChapter + nama)
+// dan wilayah dari kolom Region laporan.
 func chapterDariLaporan(rows []sheetRow, chapters map[string]ChapterRow) (ChapterRow, bool, error) {
 	nama := chapterLaporan(rows)
 	if nama == "" {
@@ -364,7 +367,7 @@ func chapterDariLaporan(rows []sheetRow, chapters map[string]ChapterRow) (Chapte
 		return ChapterRow{}, false, fmt.Errorf("laporan chapter %q cocok dengan %d chapter tersimpan; pilih chapter tujuan dulu, lalu unggah lagi",
 			nama, len(cocok))
 	}
-	inti := strings.TrimSpace(awalanBNI.ReplaceAllString(nama, ""))
+	inti := domain.IntiChapter(nama)
 	slug := strings.Trim(bukanAlnum.ReplaceAllString(strings.ToLower(inti), "-"), "-")
 	if slug == "" {
 		return ChapterRow{}, false, fmt.Errorf("nama chapter %q di laporan tidak bisa dipakai; pilih chapter tujuan dulu", nama)
@@ -372,12 +375,10 @@ func chapterDariLaporan(rows []sheetRow, chapters map[string]ChapterRow) (Chapte
 	return ChapterRow{
 		ID:          "ch-" + slug,
 		Name:        inti,
-		DisplayName: "BNI " + inti,
+		DisplayName: domain.AwalanChapter + inti,
 		AreaName:    nilaiParameter(rows, "Region"),
 	}, true, nil
 }
-
-var awalanBNI = regexp.MustCompile(`(?i)^bni\s+`)
 
 // nilaiParameter membaca blok "Running User | Run At | Country | Region |
 // Chapter" di kepala laporan: nilai kolom itu ada di baris tepat di bawah

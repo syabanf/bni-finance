@@ -99,11 +99,11 @@ func (m *Mailer) Siap() bool {
 // email jenis baru tidak bisa lupa membawanya.
 const (
 	tandaTeks = "\r\n--\r\n" +
-		"Finance Hub, sistem internal BNI (Business Networking International) Indonesia.\r\n" +
+		"Finance Hub, sistem internal Business Network International Indonesia.\r\n" +
 		"Tidak terkait Bank BNI. Kami tidak pernah meminta PIN, OTP bank, atau nomor kartu.\r\n"
 	tandaHTML = `<p style="font:12px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;` +
 		`color:#888;border-top:1px solid #eee;margin-top:24px;padding-top:12px">` +
-		`Finance Hub, sistem internal BNI (Business Networking International) Indonesia.<br>` +
+		`Finance Hub, sistem internal Business Network International Indonesia.<br>` +
 		`Tidak terkait Bank BNI. Kami tidak pernah meminta PIN, OTP bank, atau nomor kartu.</p>`
 )
 

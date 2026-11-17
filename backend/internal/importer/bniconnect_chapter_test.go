@@ -94,8 +94,25 @@ func TestBNIConnectMembacaChapterDariLaporan(t *testing.T) {
 		if h.Chapter == nil || h.Chapter.ID != "ch-rise" || h.Chapter.Baru {
 			t.Fatalf("chapter harus ch-rise yang sudah ada, dapat %+v", h.Chapter)
 		}
-		if h.Sama+h.Diperbarui != 1 || len(st.tulisCh) != 0 {
-			t.Errorf("Budi harus dicocokkan ke member ch-rise tanpa menulis chapter: %+v, chapter %+v", h, st.tulisCh)
+		if h.Sama+h.Diperbarui != 1 {
+			t.Errorf("Budi harus dicocokkan ke member ch-rise: %+v", h)
+		}
+		// Chapter lama bernama tampil "BNI Rise" ditulis ulang dengan nama
+		// lengkap pada impor yang sama, tanpa mengubah id maupun namanya.
+		mau := ChapterRow{ID: "ch-rise", Name: "Rise", DisplayName: "Business Network International Rise"}
+		if len(st.tulisCh) != 1 || st.tulisCh[0] != mau || h.Chapter.Nama != mau.DisplayName {
+			t.Errorf("chapter tertulis %+v (pratinjau %q), mau %+v", st.tulisCh, h.Chapter.Nama, mau)
+		}
+	})
+
+	t.Run("chapter yang sudah bernama lengkap tidak ditulis ulang", func(t *testing.T) {
+		st := stubBNI()
+		st.chapters["ch-rise"] = ChapterRow{ID: "ch-rise", Name: "Rise", DisplayName: "Business Network International Rise"}
+		if _, err := jalankanOpsiErr(t, st, JenisMember, laporan("BNI Rise"), true, Opsi{}); err != nil {
+			t.Fatal(err)
+		}
+		if len(st.tulisCh) != 0 {
+			t.Errorf("tidak ada yang berubah, tapi chapter ditulis: %+v", st.tulisCh)
 		}
 	})
 
@@ -115,7 +132,7 @@ func TestBNIConnectMembacaChapterDariLaporan(t *testing.T) {
 		if _, err := jalankanOpsiErr(t, st, JenisMember, laporan("Supreme"), true, Opsi{}); err != nil {
 			t.Fatal(err)
 		}
-		mau := ChapterRow{ID: "ch-supreme", Name: "Supreme", DisplayName: "BNI Supreme", AreaName: "Jakarta Utara"}
+		mau := ChapterRow{ID: "ch-supreme", Name: "Supreme", DisplayName: "Business Network International Supreme", AreaName: "Jakarta Utara"}
 		if len(st.tulisCh) != 1 || st.tulisCh[0] != mau {
 			t.Errorf("chapter tertulis %+v, mau %+v", st.tulisCh, mau)
 		}

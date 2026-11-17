@@ -454,9 +454,9 @@ func (s *Service) paidAt(in WebhookInput) time.Time {
 // adanya. Baris kosong di invoice orang lebih buruk daripada teks bawaan yang
 // masih masuk akal.
 const (
-	produkPendaftaranBawaan    = "Biaya Pendaftaran Member BNI"
+	produkPendaftaranBawaan    = "Biaya Pendaftaran Member Business Network International"
 	deskripsiPendaftaranBawaan = "Pendaftaran anggota baru (berlaku 1 tahun)"
-	produkRenewalBawaan        = "Perpanjangan Keanggotaan BNI"
+	produkRenewalBawaan        = "Perpanjangan Keanggotaan Business Network International"
 	deskripsiRenewalBawaan     = "Perpanjangan keanggotaan tahunan"
 )
 

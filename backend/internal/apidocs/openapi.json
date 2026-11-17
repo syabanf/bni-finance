@@ -1,11 +1,11 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "BNI Finance API",
+    "title": "Business Network International Finance API",
     "version": "1.0.0",
-    "description": "REST API untuk BNI — invoice keanggotaan\n(pendaftaran & renewal), pembayaran, member, chapter, dan pelaporan.\n\n## Autentikasi\n\nSemua endpoint `/api/v1/**` butuh token, **kecuali** yang ditandai\n`security: []` — login, halaman bayar publik, dan webhook.\n\n```\nAuthorization: Bearer <token>\n```\n\nToken didapat dari `POST /api/v1/auth/login` dan berlaku 12 jam (bisa\ndiubah lewat `TOKEN_TTL`). Tidak ada sesi di server: token yang sudah\nditerbitkan berlaku sampai kedaluwarsa, jadi keluar (logout) cukup dengan\nmembuang token di sisi klien.\n\n## Peran\n\n| Peran | Boleh |\n|---|---|\n| `admin` | Semuanya |\n| `user` | Hanya **pembacaan** (`GET`) |\n\nSetiap penulisan oleh peran `user` dibalas **403**. Ini batas yang\nsebenarnya — cek peran di UI hanya menyembunyikan tombol.\n\n## Bentuk respons\n\nDaftar selalu memakai amplop yang sama:\n\n```json\n{ \"data\": [ … ], \"meta\": { \"total\": 47, \"limit\": 50, \"offset\": 0 } }\n```\n\n`data` selalu larik — tidak pernah `null` — meski kosong.\nGalat selalu `{ \"error\": \"pesan dalam Bahasa Indonesia\" }`.\n\nSeluruh field JSON memakai **camelCase**, sama persis dengan tipe di\n`src/types`, sehingga bisa dipakai klien TypeScript tanpa lapisan pemetaan.\n",
+    "description": "REST API untuk Business Network International — invoice keanggotaan\n(pendaftaran & renewal), pembayaran, member, chapter, dan pelaporan.\n\n## Autentikasi\n\nSemua endpoint `/api/v1/**` butuh token, **kecuali** yang ditandai\n`security: []` — login, halaman bayar publik, dan webhook.\n\n```\nAuthorization: Bearer <token>\n```\n\nToken didapat dari `POST /api/v1/auth/login` dan berlaku 12 jam (bisa\ndiubah lewat `TOKEN_TTL`). Tidak ada sesi di server: token yang sudah\nditerbitkan berlaku sampai kedaluwarsa, jadi keluar (logout) cukup dengan\nmembuang token di sisi klien.\n\n## Peran\n\n| Peran | Boleh |\n|---|---|\n| `admin` | Semuanya |\n| `user` | Hanya **pembacaan** (`GET`) |\n\nSetiap penulisan oleh peran `user` dibalas **403**. Ini batas yang\nsebenarnya — cek peran di UI hanya menyembunyikan tombol.\n\n## Bentuk respons\n\nDaftar selalu memakai amplop yang sama:\n\n```json\n{ \"data\": [ … ], \"meta\": { \"total\": 47, \"limit\": 50, \"offset\": 0 } }\n```\n\n`data` selalu larik — tidak pernah `null` — meski kosong.\nGalat selalu `{ \"error\": \"pesan dalam Bahasa Indonesia\" }`.\n\nSeluruh field JSON memakai **camelCase**, sama persis dengan tipe di\n`src/types`, sehingga bisa dipakai klien TypeScript tanpa lapisan pemetaan.\n",
     "license": {
-      "name": "Internal — BNI"
+      "name": "Internal — Business Network International"
     }
   },
   "servers": [
@@ -33,7 +33,7 @@
     },
     {
       "name": "Chapter",
-      "description": "Chapter BNI"
+      "description": "Chapter Business Network International"
     },
     {
       "name": "Pengaturan",
@@ -49,7 +49,7 @@
     },
     {
       "name": "Sinkronisasi",
-      "description": "Tarik data member & chapter dari BNI Visitor Management"
+      "description": "Tarik data member & chapter dari Business Network International Visitor Management"
     },
     {
       "name": "Paper.id",
@@ -57,7 +57,7 @@
     },
     {
       "name": "Blackbox",
-      "description": "Rekaman lalu lintas integrasi (Paper.id, Xendit, BNI VM)"
+      "description": "Rekaman lalu lintas integrasi (Paper.id, Xendit, Business Network International VM)"
     },
     {
       "name": "Publik",
@@ -1000,7 +1000,7 @@
                   "summary": "Terbitkan (draft → sent)",
                   "value": {
                     "status": "sent",
-                    "actorName": "Admin BNI"
+                    "actorName": "Admin Business Network International"
                   }
                 },
                 "batalkan": {
@@ -1510,7 +1510,7 @@
           "Member"
         ],
         "summary": "Tambah member",
-        "description": "**Admin saja.** `id` opsional — database membuatkan bila kosong, yang\ntepat untuk member yang tidak berasal dari BNI VM.\n",
+        "description": "**Admin saja.** `id` opsional — database membuatkan bila kosong, yang\ntepat untuk member yang tidak berasal dari Business Network International VM.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -2047,7 +2047,7 @@
           "Pengaturan"
         ],
         "summary": "Semua konfigurasi key/value",
-        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal kirim ke Paper.id + N hari | `3` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |\n| `bni_vm_token` | Token sinkronisasi BNI VM (tersamar) | — |\n\nUntuk kunci `paperid_send_*`, hanya nilai `false` yang mematikan —\nbaris yang belum ada tetap berarti mengantar. Untuk `self_payment_mode`\nsebaliknya: hanya `true` yang mengaktifkan.\n",
+        "description": "Nilai yang namanya berbau kredensial **selalu tersamar** — lihat\n`AppSetting.masked`.\n\nKunci yang dipakai sistem:\n\n| Kunci | Arti | Bawaan |\n|---|---|---|\n| `self_payment_mode` | `true` → pembayaran lewat Xendit, Paper.id tidak dipanggil | `false` |\n| `invoice_draft_days_before` | Invoice renewal disusun N hari sebelum periode berakhir | `30` |\n| `invoice_due_days_after` | Jatuh tempo = tanggal kirim ke Paper.id + N hari | `3` |\n| `paperid_send_email` | Paper.id mengantar invoice via email saat Terbitkan | `true` |\n| `paperid_send_whatsapp` | Paper.id mengantar invoice via WhatsApp saat Terbitkan | `true` |\n| `bni_vm_token` | Token sinkronisasi Business Network International VM (tersamar) | — |\n\nUntuk kunci `paperid_send_*`, hanya nilai `false` yang mematikan —\nbaris yang belum ada tetap berarti mengantar. Untuk `self_payment_mode`\nsebaliknya: hanya `true` yang mengaktifkan.\n",
         "responses": {
           "200": {
             "description": "Konfigurasi",
@@ -3602,7 +3602,7 @@
           "Sinkronisasi"
         ],
         "summary": "Impor chapter atau member dari berkas CSV/XLSX",
-        "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar. Ekspor BNI Connect\n(berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.\n\n**Laporan BNI Connect** (Membership Dues, Chapter Roster, Membership\nLength) dikenali dari judul kolomnya di baris mana pun dan dibaca\ndengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan\nlewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan\nyang belum ada dibuat baru dengan id `bc-…`. Dues mengisi jatuh tempo\ndan status (Active/Dropped), Roster mengisi perusahaan, telepon, dan\nbidang usaha, Length mengisi tanggal bergabung. Laporan Dues yang\nmenumpuk beberapa tabel di satu lembar dibaca seluruhnya.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
+        "description": "**Admin saja.** Impor menulis lintas chapter sekaligus, jadi mengizinkan\nST berarti memberi jalan mengubah data chapter lain lewat satu berkas —\nmelewati seluruh batas chapter yang dijaga di sisi query.\n\n**Bawaannya PRATINJAU, bukan penulisan.** Tanpa `?terapkan=true` tidak\nada satu baris pun yang ditulis. Arah ini disengaja: panggilan yang salah\nketik menghasilkan laporan, bukan data keanggotaan yang tertimpa.\n\nPratinjau dan penerapan dihitung **kode yang sama**. Pratinjau yang\ndihitung terpisah dari yang menulis adalah pratinjau yang bisa berbohong.\n\nFormat ditentukan dari **isi** berkas, bukan namanya — `.xlsx` yang\ndi-rename menjadi `.csv` tetap terbaca benar. Ekspor Business Network International Connect\n(berekstensi `.xls`, berisi XML SpreadsheetML) ikut dikenali.\n\n**Laporan Business Network International Connect** (Membership Dues, Chapter Roster, Membership\nLength) dikenali dari judul kolomnya di baris mana pun dan dibaca\ndengan aturannya sendiri: tidak ada kolom id, jadi member dicocokkan\nlewat **nama** di dalam chapter tujuan (`chapter` wajib diisi), dan\nyang belum ada dibuat baru dengan id `bc-…`. Dues mengisi jatuh tempo\ndan status (Active/Dropped), Roster mengisi perusahaan, telepon, dan\nbidang usaha, Length mengisi tanggal bergabung. Laporan Dues yang\nmenumpuk beberapa tabel di satu lembar dibaca seluruhnya.\n\nKolom dicari lewat **judulnya**, bukan posisinya, dan judul berbahasa\nIndonesia maupun Inggris sama-sama diterima (`nama`/`name`,\n`telepon`/`phone`, `kode`/`id`). Judul yang tidak dikenal **dilaporkan**\ndi `peringatan` — itu satu-satunya petunjuk bahwa ada kolom salah ketik\nyang datanya tidak ikut terbaca.\n\n**Kolom yang tidak ada di berkas tidak mengosongkan data tersimpan.**\nBerkas yang hanya memuat sebagian kolom adalah hal biasa; menganggap yang\nhilang sebagai \"kosongkan\" akan menghapus email seluruh member dalam satu\nimpor yang tampak wajar.\n\nBaris ditolak bila: `id`/`name` kosong, `chapter_id` tidak ada di basis\ndata, `status` tidak dikenal, `id` ganda di dalam berkas yang sama, atau\nbarisnya menyebut chapter lain padahal impornya ditujukan ke satu\nchapter. Setiap penolakan menyebut **nomor barisnya seperti di Excel**.\n\n**Impor yang ditujukan ke satu chapter** (`?chapter=`) membuat kolom\n`chapter_id` menjadi opsional: baris tanpa kolom itu mengikuti chapter\ntujuan. Baris yang menyebut chapter **lain** ditolak — tidak dipindahkan\ndan tidak ditimpa. Memindahkan member antar chapter mengubah ke mana\ntagihannya pergi dan pendapatan siapa yang bertambah; itu keputusan yang\nharus diambil orang, bukan efek samping impor. Menimpanya dengan chapter\ntujuan sama buruknya: berkasnya menyatakan sesuatu, dan kita\nmengabaikannya tanpa memberi tahu siapa pun.\n",
         "parameters": [
           {
             "name": "jenis",
@@ -3632,7 +3632,7 @@
             "name": "chapter",
             "in": "query",
             "required": false,
-            "description": "Batasi impor ke satu chapter. Membuat kolom `chapter_id` opsional; baris yang menyebut chapter lain **ditolak**. Tidak berlaku untuk `jenis=chapters` — berkasnyalah yang mendefinisikan chapter, jadi kombinasi itu dijawab 400 alih-alih diabaikan diam-diam. Untuk laporan BNI Connect parameter ini boleh dikosongkan: chapter dibaca dari baris \"Chapter:\" laporan, dan chapter yang belum ada dibuat saat `terapkan=true` (id `ch-…`, wilayah dari kolom Region).\n",
+            "description": "Batasi impor ke satu chapter. Membuat kolom `chapter_id` opsional; baris yang menyebut chapter lain **ditolak**. Tidak berlaku untuk `jenis=chapters` — berkasnyalah yang mendefinisikan chapter, jadi kombinasi itu dijawab 400 alih-alih diabaikan diam-diam. Untuk laporan Business Network International Connect parameter ini boleh dikosongkan: chapter dibaca dari baris \"Chapter:\" laporan, dan chapter yang belum ada dibuat saat `terapkan=true` (id `ch-…`, wilayah dari kolom Region).\n",
             "schema": {
               "type": "string"
             }
@@ -3719,7 +3719,7 @@
                     },
                     "chapter": {
                       "type": "object",
-                      "description": "Hanya untuk laporan BNI Connect: chapter tempat member ditulis. `baru` berarti chapter itu dibaca dari laporan, belum ada, dan dibuat saat diterapkan.\n",
+                      "description": "Hanya untuk laporan Business Network International Connect: chapter tempat member ditulis. `baru` berarti chapter itu dibaca dari laporan, belum ada, dan dibuat saat diterapkan.\n",
                       "properties": {
                         "id": {
                           "type": "string"
@@ -3787,8 +3787,8 @@
         "tags": [
           "Sinkronisasi"
         ],
-        "summary": "Tarik member & chapter dari BNI Visitor Management",
-        "description": "**Admin saja.** Satu panggilan menyegarkan **keduanya** — BNI VM tidak\npunya endpoint chapter tersendiri, jadi chapter diturunkan dari daftar\nmember.\n\nToken diambil dari `app_settings.bni_vm_token` lebih dulu (bisa diganti\ndari halaman Pengaturan tanpa redeploy), lalu jatuh ke variabel\nlingkungan `BNI_VM_TOKEN`. Token **tidak pernah** sampai ke browser:\nseluruh proses berjalan di server.\n\nSeluruh snapshot ditulis dalam **satu transaksi**. Penulisan sebagian\nbisa meninggalkan member yang menunjuk chapter yang belum ada.\n\n**Member yang hilang dari BNI VM dinonaktifkan, bukan dihapus.**\nMenghapusnya akan melanggar foreign key begitu mereka punya invoice, dan\nmembuang riwayat tagihan meski berhasil. Aturan ini hanya berlaku bagi\nmember yang tertaut ke BNI VM. Member dari impor laporan BNI Connect dan\nTambah Member yang belum tertaut tidak disentuh.\n\n**Baris yang sudah ada ditautkan, tidak digandakan.** Sinkronisasi mencari\nbaris lewat tautan sebelumnya, lalu lewat id, lalu lewat nama: chapter\ndengan nama chapter, member dengan nama di dalam chapter yang sama. Nama\nhanya menautkan bila unik di kedua sisi. Yang ambigu mendapat baris baru\ndan tercantum di `needsReview`. Id baris tidak berubah, jadi invoice dan\nlingkup akun ST/MC tetap utuh. Duplikat yang sudah ada tidak digabungkan.\n\n**Member yang sudah ada diperbarui dengan aturan ini:** nilai kosong dari\nBNI VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,\ndan status BNI VM hanya dipakai saat baris dibuat, kecuali `inactive` yang\nselalu menonaktifkan member. Nilai lain yang dikirim BNI VM, termasuk email\ndan telepon, menimpa nilai tersimpan.\n\n**Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan\nseluruh member BNI VM — jauh lebih mungkin BNI VM sedang bermasalah\ndaripada organisasi kehilangan semua anggotanya sekaligus.\n",
+        "summary": "Tarik member & chapter dari Business Network International Visitor Management",
+        "description": "**Admin saja.** Satu panggilan menyegarkan **keduanya** — Business Network International VM tidak\npunya endpoint chapter tersendiri, jadi chapter diturunkan dari daftar\nmember.\n\nToken diambil dari `app_settings.bni_vm_token` lebih dulu (bisa diganti\ndari halaman Pengaturan tanpa redeploy), lalu jatuh ke variabel\nlingkungan `BNI_VM_TOKEN`. Token **tidak pernah** sampai ke browser:\nseluruh proses berjalan di server.\n\nSeluruh snapshot ditulis dalam **satu transaksi**. Penulisan sebagian\nbisa meninggalkan member yang menunjuk chapter yang belum ada.\n\n**Member yang hilang dari Business Network International VM dinonaktifkan, bukan dihapus.**\nMenghapusnya akan melanggar foreign key begitu mereka punya invoice, dan\nmembuang riwayat tagihan meski berhasil. Aturan ini hanya berlaku bagi\nmember yang tertaut ke Business Network International VM. Member dari impor laporan Business Network International Connect dan\nTambah Member yang belum tertaut tidak disentuh.\n\n**Baris yang sudah ada ditautkan, tidak digandakan.** Sinkronisasi mencari\nbaris lewat tautan sebelumnya, lalu lewat id, lalu lewat nama: chapter\ndengan nama chapter, member dengan nama di dalam chapter yang sama. Nama\nhanya menautkan bila unik di kedua sisi. Yang ambigu mendapat baris baru\ndan tercantum di `needsReview`. Id baris tidak berubah, jadi invoice dan\nlingkup akun ST/MC tetap utuh. Duplikat yang sudah ada tidak digabungkan.\n\n**Member yang sudah ada diperbarui dengan aturan ini:** nilai kosong dari\nBusiness Network International VM tidak menimpa nilai tersimpan, `renewal_date` tidak pernah mundur,\ndan status Business Network International VM hanya dipakai saat baris dibuat, kecuali `inactive` yang\nselalu menonaktifkan member. Nilai lain yang dikirim Business Network International VM, termasuk email\ndan telepon, menimpa nilai tersimpan.\n\n**Snapshot kosong ditolak** (502). Menerapkannya akan menonaktifkan\nseluruh member Business Network International VM — jauh lebih mungkin Business Network International VM sedang bermasalah\ndaripada organisasi kehilangan semua anggotanya sekaligus.\n",
         "responses": {
           "200": {
             "description": "Sinkronisasi selesai",
@@ -3807,7 +3807,7 @@
             "$ref": "#/components/responses/Forbidden"
           },
           "502": {
-            "description": "BNI VM tidak bisa dihubungi, menolak token, atau balasannya kosong",
+            "description": "Business Network International VM tidak bisa dihubungi, menolak token, atau balasannya kosong",
             "content": {
               "application/json": {
                 "schema": {
@@ -3817,7 +3817,7 @@
             }
           },
           "503": {
-            "description": "Token BNI VM belum dikonfigurasi",
+            "description": "Token Business Network International VM belum dikonfigurasi",
             "content": {
               "application/json": {
                 "schema": {
@@ -3968,7 +3968,7 @@
           "Blackbox"
         ],
         "summary": "Rekaman panggilan integrasi",
-        "description": "**Admin saja.** Perekam \"kotak hitam\": setiap panggilan **keluar** ke API\neksternal (Paper.id, Xendit, BNI VM) dan setiap **callback masuk**\nterekam dengan body request, endpoint yang dihubungi, body response, dan\nstatus berhasil/gagal.\n\nDisimpan di **memori** sebagai ring buffer (default 200 entri, atur lewat\n`BLACKBOX_SIZE`), terbaru dulu — bukan tabel database. Ini alat\ndiagnosis: hanya lalu lintas terkini yang berguna, dan menyimpannya di\nmemori menghindari satu penulisan DB pada tiap panggilan integrasi.\n**Isinya hilang saat server restart** — memang disengaja.\n\n**Kredensial tidak pernah terekam.** Hanya body yang dicatat; `client_id`,\n`client_secret`, dan bearer token ada di header, jadi secara konstruksi\ntidak bisa masuk ke sini.\n",
+        "description": "**Admin saja.** Perekam \"kotak hitam\": setiap panggilan **keluar** ke API\neksternal (Paper.id, Xendit, Business Network International VM) dan setiap **callback masuk**\nterekam dengan body request, endpoint yang dihubungi, body response, dan\nstatus berhasil/gagal.\n\nDisimpan di **memori** sebagai ring buffer (default 200 entri, atur lewat\n`BLACKBOX_SIZE`), terbaru dulu — bukan tabel database. Ini alat\ndiagnosis: hanya lalu lintas terkini yang berguna, dan menyimpannya di\nmemori menghindari satu penulisan DB pada tiap panggilan integrasi.\n**Isinya hilang saat server restart** — memang disengaja.\n\n**Kredensial tidak pernah terekam.** Hanya body yang dicatat; `client_id`,\n`client_secret`, dan bearer token ada di header, jadi secara konstruksi\ntidak bisa masuk ke sini.\n",
         "parameters": [
           {
             "name": "integration",
@@ -5953,7 +5953,7 @@
           "customerName": {
             "title": "Nama Penerima",
             "type": "string",
-            "default": "Uji Coba BNI Finance",
+            "default": "Uji Coba Business Network International Finance",
             "description": "Nama penerima invoice."
           },
           "customerPhone": {
@@ -6282,26 +6282,26 @@
           },
           "members": {
             "type": "integer",
-            "description": "Member yang diterima dari BNI VM."
+            "description": "Member yang diterima dari Business Network International VM."
           },
           "deactivated": {
             "type": "integer",
-            "description": "Member lokal yang tidak lagi ada di BNI VM, jadi statusnya diubah\nmenjadi `inactive`. Tidak ada yang dihapus.\n"
+            "description": "Member lokal yang tidak lagi ada di Business Network International VM, jadi statusnya diubah\nmenjadi `inactive`. Tidak ada yang dihapus.\n"
           },
           "linkedChapters": {
             "type": "integer",
-            "description": "Chapter tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama."
+            "description": "Chapter tersimpan yang pada sinkronisasi ini ditautkan ke Business Network International VM lewat nama."
           },
           "linkedMembers": {
             "type": "integer",
-            "description": "Member tersimpan yang pada sinkronisasi ini ditautkan ke BNI VM lewat nama."
+            "description": "Member tersimpan yang pada sinkronisasi ini ditautkan ke Business Network International VM lewat nama."
           },
           "needsReview": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Baris BNI VM yang namanya cocok secara ambigu dengan baris tersimpan.\nBaris ini mendapat baris baru, jadi bisa saja duplikat.\n"
+            "description": "Baris Business Network International VM yang namanya cocok secara ambigu dengan baris tersimpan.\nBaris ini mendapat baris baru, jadi bisa saja duplikat.\n"
           },
           "syncedAt": {
             "type": "string",

@@ -667,7 +667,7 @@ function TombolMinta({
 
   const minta = async () => {
     if (berkas && chapterId === 'all') {
-      toast('Pilih chapternya dulu: laporan BNI Connect tidak memuat kolom chapter.', 'error')
+      toast('Pilih chapternya dulu: laporan Business Network International Connect tidak memuat kolom chapter.', 'error')
       return
     }
     setMengirim(true)
@@ -744,7 +744,7 @@ function TombolMinta({
           </Field>
 
           <Field
-            label="Dari laporan BNI Connect (opsional)"
+            label="Dari laporan Business Network International Connect (opsional)"
             hint="Laporan Membership Dues (.xls) atau template jatuh tempo dari halaman Impor. Bila diisi, nama di laporan yang ditanyakan, menggantikan daftar di bawah."
           >
             <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-ink-300 px-4 py-3 text-sm transition-colors hover:bg-ink-50">

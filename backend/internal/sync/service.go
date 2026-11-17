@@ -78,7 +78,7 @@ func (s *Service) Run(ctx context.Context) (*Result, error) {
 	}
 	if strings.TrimSpace(token) == "" {
 		return nil, httpx.NewError(http.StatusServiceUnavailable,
-			"token BNI VM belum dikonfigurasi — isi 'bni_vm_token' di Pengaturan", nil)
+			"token Business Network International VM belum dikonfigurasi — isi 'bni_vm_token' di Pengaturan", nil)
 	}
 
 	members, err := s.newFetcher(s.baseURL, token).FetchMembers(ctx)
@@ -90,7 +90,7 @@ func (s *Service) Run(ctx context.Context) (*Result, error) {
 		// more likely the upstream had a bad day than that the organisation lost
 		// every member at once.
 		return nil, httpx.NewError(http.StatusBadGateway,
-			"BNI VM tidak mengembalikan satu member pun — sinkronisasi dibatalkan agar data lokal tidak dinonaktifkan massal", nil)
+			"Business Network International VM tidak mengembalikan satu member pun — sinkronisasi dibatalkan agar data lokal tidak dinonaktifkan massal", nil)
 	}
 
 	return s.repo.Apply(ctx, members, s.now())

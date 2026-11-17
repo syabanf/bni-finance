@@ -458,7 +458,7 @@ export function InvoiceListPage() {
           '',
           '',
         ],
-        documentTitle: 'Daftar Invoice — BNI Finance',
+        documentTitle: 'Daftar Invoice — Business Network International Finance',
       }),
     )
 
