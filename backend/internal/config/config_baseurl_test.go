@@ -65,3 +65,28 @@ func TestDocsPublicMengikutiBaseURL(t *testing.T) {
 		}
 	}
 }
+
+// Pengirim di domain lain dari tautannya adalah yang membuat situs ditandai
+// phishing; pengirim di subdomain (pola umum penyedia email) harus tetap lolos.
+func TestPengirimSedomain(t *testing.T) {
+	kasus := []struct {
+		dari, baseURL string
+		ingin         bool
+	}{
+		{"no-reply@bnisystem.id", "https://bnisystem.id", true},
+		{"Finance Hub <no-reply@mail.bnisystem.id>", "https://bnisystem.id", true},
+		{"no-reply@bnisystem.id", "https://app.bnisystem.id", true},
+		{"No-Reply@BNISystem.ID", "https://bnisystem.id/", true},
+		{"no-reply@reddie.id", "https://bnisystem.id", false},
+		{"Finance Hub <no-reply@reddie.id>", "https://bnisystem.id", false},
+		{"no-reply@jahatbnisystem.id", "https://bnisystem.id", false},
+		{"no-reply@bnisystem.id.jahat.com", "https://bnisystem.id", false},
+		{"bukan-alamat", "https://bnisystem.id", false},
+		{"no-reply@reddie.id", "http://localhost:5173", true},
+	}
+	for _, k := range kasus {
+		if got := PengirimSedomain(k.dari, k.baseURL); got != k.ingin {
+			t.Errorf("PengirimSedomain(%q, %q) = %v, ingin %v", k.dari, k.baseURL, got, k.ingin)
+		}
+	}
+}

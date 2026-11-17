@@ -126,6 +126,17 @@ func run(log *slog.Logger) error {
 		log.Warn("APP_BASE_URL menunjuk localhost padahal pengiriman email aktif — "+
 			"tautan reset yang dikirim TIDAK akan bisa dibuka penerimanya",
 			"app_base_url", cfg.AppBaseURL)
+	} else if !config.PengirimSedomain(cfg.MailFrom, cfg.AppBaseURL) {
+		// Pengirim dan tautan beda domain: pengiriman DIMATIKAN, bukan hanya
+		// diperingatkan. Lihat config.PengirimSedomain untuk akibatnya.
+		//
+		// Yang terjadi setelah ini sama dengan email yang belum dikonfigurasi:
+		// login tanpa OTP, reset kata sandi menjawab 503, dan permintaan
+		// konfirmasi renewal tetap tersimpan tanpa email ke MC.
+		log.Warn("PENGIRIMAN EMAIL DIMATIKAN — domain MAIL_FROM berbeda dari APP_BASE_URL; "+
+			"pakai alamat pengirim di domain aplikasinya untuk menyalakannya lagi",
+			"mail_from", cfg.MailFrom, "app_base_url", cfg.AppBaseURL)
+		surat = mailer.New(mailer.Config{})
 	}
 	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...).
 		PakaiPengirimEmail(surat)
