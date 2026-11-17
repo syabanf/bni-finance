@@ -77,12 +77,39 @@ type ChapterCounts struct {
 
 var bukanAlnum = regexp.MustCompile(`[^a-z0-9]+`)
 
+// AwalanChapter mendahului nama tampil setiap chapter.
+//
+// Nama organisasinya ditulis lengkap, bukan "BNI": singkatan itu juga dipakai
+// Bank Negara Indonesia, dan situs yang menampilkannya di samping formulir
+// kata sandi ditandai sebagai phishing.
+const AwalanChapter = "Business Network International "
+
+var awalanOrganisasi = regexp.MustCompile(`(?i)^(bni|business network international)\s+`)
+
+// IntiChapter membuang nama organisasi dari depan nama chapter:
+// "BNI Supreme" dan "Business Network International Supreme" menjadi "Supreme".
+func IntiChapter(nama string) string {
+	return strings.TrimSpace(awalanOrganisasi.ReplaceAllString(strings.TrimSpace(nama), ""))
+}
+
+// PanjangkanBNI menulis ulang nama tampil berawalan "BNI " dengan
+// AwalanChapter. Nama tanpa awalan organisasi dikembalikan apa adanya: nama
+// tampil bisa diubah admin, dan nama yang sengaja ditulis lain bukan untuk
+// ditimpa.
+func PanjangkanBNI(namaTampil string) string {
+	inti := IntiChapter(namaTampil)
+	if inti == "" || inti == strings.TrimSpace(namaTampil) {
+		return namaTampil
+	}
+	return AwalanChapter + inti
+}
+
 // KunciChapter menyamakan penulisan nama chapter antarsumber: "Supreme",
-// "BNI Supreme", "BNI Supreme Chapter", dan "ch-supreme" berkunci sama.
+// "BNI Supreme", "Business Network International Supreme", "BNI Supreme
+// Chapter", dan "ch-supreme" berkunci sama.
 func KunciChapter(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.TrimPrefix(s, "ch-")
-	s = strings.TrimPrefix(s, "bni ")
+	s = IntiChapter(strings.TrimPrefix(s, "ch-"))
 	s = bukanAlnum.ReplaceAllString(s, "")
 	if inti := strings.TrimSuffix(s, "chapter"); inti != "" {
 		return inti

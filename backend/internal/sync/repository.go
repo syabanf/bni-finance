@@ -69,7 +69,7 @@ func (r *Repository) Apply(ctx context.Context, members []RemoteMember, now time
 			  display_name = COALESCE(NULLIF(chapters.display_name, ''), excluded.display_name),
 			  synced_at = excluded.synced_at,
 			  bni_vm_id = excluded.bni_vm_id`
-		if _, err := tx.Exec(ctx, q, id, c.Name, c.Name, now, c.ID); err != nil {
+		if _, err := tx.Exec(ctx, q, id, c.Name, domain.PanjangkanBNI(c.Name), now, c.ID); err != nil {
 			return nil, fmt.Errorf("simpan chapter %s: %w", c.ID, err)
 		}
 	}

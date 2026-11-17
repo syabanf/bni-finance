@@ -272,6 +272,7 @@ func (s *Service) chapters(ctx context.Context, t *Tabel, format Format, terapka
 		if row.DisplayName == "" {
 			row.DisplayName = nama
 		}
+		row.DisplayName = domain.PanjangkanBNI(row.DisplayName)
 
 		lama, ada := tersimpan[id]
 		switch {
