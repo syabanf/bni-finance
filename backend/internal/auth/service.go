@@ -166,7 +166,7 @@ func (s *Service) kirimOTP(ctx context.Context, user *domain.User) error {
 	return s.mail.Kirim(ctx, mailer.Pesan{
 		Ke:     user.Email,
 		Jenis:  "otp",
-		Subjek: "Kode masuk " + kode + " — BNI Finance Hub",
+		Subjek: "Kode masuk " + kode + " — Finance Hub",
 		Teks: "Halo " + user.Name + ",\r\n\r\n" +
 			"Kode masuk Anda: " + kode + "\r\n\r\n" +
 			"Berlaku " + strconv.Itoa(menit) + " menit dan hanya bisa dipakai sekali.\r\n\r\n" +
@@ -470,7 +470,7 @@ type PengirimEmail interface {
 func (s *Service) MintaResetKataSandi(ctx context.Context, email, baseURL string) error {
 	if s.mail == nil || !s.mail.Siap() {
 		return httpx.NewError(http.StatusServiceUnavailable,
-			"pengiriman email belum dikonfigurasi — hubungi administrator", nil)
+			"reset lewat email sedang tidak aktif. Minta admin mengganti kata sandi Anda dari halaman Pengguna", nil)
 	}
 
 	user, err := s.repo.GetByEmail(ctx, strings.TrimSpace(email))
@@ -493,7 +493,7 @@ func (s *Service) MintaResetKataSandi(ctx context.Context, email, baseURL string
 	return s.mail.Kirim(ctx, mailer.Pesan{
 		Ke:     user.Email,
 		Jenis:  "reset-kata-sandi",
-		Subjek: "Atur ulang kata sandi — BNI Finance Hub",
+		Subjek: "Atur ulang kata sandi — Finance Hub",
 		Teks: "Halo " + user.Name + ",\r\n\r\n" +
 			"Ada permintaan untuk mengatur ulang kata sandi akun Anda.\r\n" +
 			"Buka tautan berikut untuk membuat kata sandi baru:\r\n\r\n" +

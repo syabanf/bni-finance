@@ -33,6 +33,15 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Untuk crawler dan peninjau yang tidak menjalankan JavaScript: tanpa ini
+         halaman kosong, dan yang terbaca hanya domain yang memuat "bni". -->
+    <noscript>
+      <p>
+        Finance Hub adalah sistem internal invoice dan iuran keanggotaan BNI (Business Networking
+        International) Indonesia. Tidak terkait Bank BNI (PT Bank Negara Indonesia) dan tidak
+        pernah meminta PIN, OTP bank, atau nomor kartu. Aktifkan JavaScript untuk masuk.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
