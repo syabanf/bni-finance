@@ -271,3 +271,38 @@ func Lokal(raw string) bool {
 	host := u.Hostname()
 	return host == "localhost" || host == "127.0.0.1" || host == "::1" || host == ""
 }
+
+// PengirimSedomain melaporkan alamat pengirim email berada di domain yang sama
+// dengan aplikasinya, atau di subdomainnya (mail.contoh.id untuk contoh.id,
+// dan sebaliknya).
+//
+// Email dari satu domain yang tautannya menuju domain lain adalah pola khas
+// phishing. Penerima yang menekan "laporkan phishing" pada satu email seperti
+// itu cukup untuk membuat Google Safe Browsing menandai seluruh situs, dan
+// Chrome lalu menutupnya dengan halaman peringatan merah bagi semua orang.
+//
+// APP_BASE_URL lokal selalu lolos: di mesin pengembang tautannya memang tidak
+// menuju domain pengirim, dan untuk itu sudah ada peringatannya sendiri.
+func PengirimSedomain(mailFrom, baseURL string) bool {
+	if Lokal(baseURL) {
+		return true
+	}
+	u, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return false
+	}
+	situs := strings.ToLower(u.Hostname())
+
+	alamat := strings.TrimSpace(mailFrom)
+	if i := strings.LastIndex(alamat, "<"); i >= 0 {
+		alamat = strings.TrimSuffix(alamat[i+1:], ">")
+	}
+	_, pengirim, ada := strings.Cut(alamat, "@")
+	pengirim = strings.ToLower(strings.TrimSpace(pengirim))
+	if !ada || pengirim == "" || situs == "" {
+		return false
+	}
+	return pengirim == situs ||
+		strings.HasSuffix(pengirim, "."+situs) ||
+		strings.HasSuffix(situs, "."+pengirim)
+}
