@@ -127,16 +127,14 @@ func run(log *slog.Logger) error {
 			"tautan reset yang dikirim TIDAK akan bisa dibuka penerimanya",
 			"app_base_url", cfg.AppBaseURL)
 	} else if !config.PengirimSedomain(cfg.MailFrom, cfg.AppBaseURL) {
-		// Pengirim dan tautan beda domain: pengiriman DIMATIKAN, bukan hanya
-		// diperingatkan. Lihat config.PengirimSedomain untuk akibatnya.
-		//
-		// Yang terjadi setelah ini sama dengan email yang belum dikonfigurasi:
-		// login tanpa OTP, reset kata sandi menjawab 503, dan permintaan
-		// konfirmasi renewal tetap tersimpan tanpa email ke MC.
-		log.Warn("PENGIRIMAN EMAIL DIMATIKAN — domain MAIL_FROM berbeda dari APP_BASE_URL; "+
-			"pakai alamat pengirim di domain aplikasinya untuk menyalakannya lagi",
+		// Pengirim dan tautan beda domain: email tetap terkirim, dan yang
+		// tersisa hanya peringatan ini. Lihat config.PengirimSedomain untuk
+		// risikonya. Pengiriman sempat dimatikan di sini, lalu dinyalakan
+		// lagi supaya OTP dan reset kata sandi bisa diuji sebelum domain
+		// pengirimnya diganti.
+		log.Warn("domain MAIL_FROM berbeda dari APP_BASE_URL: email seperti ini mudah dilaporkan "+
+			"sebagai phishing; ganti MAIL_FROM ke alamat di domain aplikasinya",
 			"mail_from", cfg.MailFrom, "app_base_url", cfg.AppBaseURL)
-		surat = mailer.New(mailer.Config{})
 	}
 	authSvc := auth.NewService(auth.NewRepository(pool), signer, cfg.QuickLoginEmails...).
 		PakaiPengirimEmail(surat)
