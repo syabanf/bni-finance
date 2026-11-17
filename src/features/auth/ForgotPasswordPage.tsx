@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, Mail, Send } from 'lucide-react'
 import { Button, Field, Input } from '@/components/ui'
 import { authService } from '@/services'
+import { IdentitasOrganisasi } from './IdentitasOrganisasi'
 
 /**
  * Meminta tautan reset kata sandi.
@@ -95,6 +96,8 @@ export function ForgotPasswordPage() {
           <ArrowLeft className="h-4 w-4" />
           Kembali ke halaman masuk
         </Link>
+
+        <IdentitasOrganisasi />
       </div>
     </div>
   )
