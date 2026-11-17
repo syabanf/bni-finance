@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { Button, Field, Input } from '@/components/ui'
 import { authService } from '@/services'
+import { IdentitasOrganisasi } from './IdentitasOrganisasi'
 
 const MIN_SANDI = 6
 
@@ -141,6 +142,8 @@ export function ResetPasswordPage() {
           <ArrowLeft className="h-4 w-4" />
           Kembali ke halaman masuk
         </Link>
+
+        <IdentitasOrganisasi />
       </div>
     </div>
   )

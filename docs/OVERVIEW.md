@@ -181,7 +181,13 @@ Cek peran di UI hanya menyembunyikan tombol — batas sebenarnya ada di backend.
 | **`/metrics`** | Backend | Metrik Prometheus — lihat bagian di bawah |
 
 Daftar endpoint Konsol API **dibangkitkan dari spesifikasi** (`npm run api-collection`,
-ikut jalan pada `npm run build`), jadi tidak bisa melenceng dari route sungguhan.
+ikut jalan pada `npm run build`), jadi tidak bisa melenceng dari route sungguhan. Hasilnya
+`src/services/api-collection.json`, dimuat sebagai chunk terpisah saat Konsol API dibuka. Berkas
+itu sengaja tidak ditaruh di `public/`, supaya daftar endpoint tidak punya alamat tetap yang bisa
+dibuka tanpa login.
+
+`/docs` dan `/openapi.*` hanya terdaftar bila `DOCS_PUBLIC` menyala. Bawaannya mengikuti
+`APP_BASE_URL`: terbuka di localhost, dan 404 begitu aplikasi menunjuk domain sungguhan.
 
 Spesifikasinya sendiri dijaga lima tes di `internal/apidocs`, yang memindai sumber dengan
 `go/ast` dan membandingkannya dengan `openapi.yaml`:

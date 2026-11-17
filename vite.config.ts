@@ -11,9 +11,10 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'BNI Finance Hub',
+        name: 'Finance Hub BNI Indonesia',
         short_name: 'Finance Hub',
-        description: 'Invoice & pembayaran keanggotaan BNI.',
+        description:
+          'Sistem internal invoice dan iuran keanggotaan BNI (Business Networking International) Indonesia. Tidak terkait Bank BNI.',
         id: '/',
         start_url: '/',
         scope: '/',
@@ -22,7 +23,9 @@ export default defineConfig({
         background_color: '#ffffff',
         theme_color: '#ffffff',
         lang: 'id',
-        categories: ['finance', 'business', 'productivity'],
+        // Tanpa 'finance': bersama nama "BNI", kategori itu membuat aplikasi ini
+        // terbaca sebagai aplikasi bank.
+        categories: ['business', 'productivity'],
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
@@ -31,6 +34,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Koleksi Konsol API hanya dibuka admin; jangan ikut diunduh semua orang.
+        globIgnores: ['**/api-collection-*.js'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },

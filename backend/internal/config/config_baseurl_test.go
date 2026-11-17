@@ -38,3 +38,30 @@ func TestDeteksiURLLokal(t *testing.T) {
 		}
 	}
 }
+
+// Bawaan DOCS_PUBLIC mengikuti APP_BASE_URL, supaya produksi tertutup tanpa
+// perlu mengingat satu variabel lagi di .env.production.
+func TestDocsPublicMengikutiBaseURL(t *testing.T) {
+	kasus := []struct {
+		baseURL, docsPublic string
+		ingin               bool
+	}{
+		{"http://localhost:5173", "", true},
+		{"https://bnisystem.id", "", false},
+		{"https://bnisystem.id", "true", true},
+		{"http://localhost:5173", "false", false},
+	}
+	for _, k := range kasus {
+		t.Setenv("DATABASE_URL", "postgres://x/y")
+		t.Setenv("JWT_SECRET", "rahasia-uji")
+		t.Setenv("APP_BASE_URL", k.baseURL)
+		t.Setenv("DOCS_PUBLIC", k.docsPublic)
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.DocsPublic != k.ingin {
+			t.Errorf("APP_BASE_URL=%s DOCS_PUBLIC=%q: DocsPublic=%v, ingin %v", k.baseURL, k.docsPublic, cfg.DocsPublic, k.ingin)
+		}
+	}
+}

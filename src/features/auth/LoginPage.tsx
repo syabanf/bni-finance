@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound, Users } from 'lucide-react'
 import type { UserRole } from '@/types'
 import { BniLogo, Button, Field, Input } from '@/components/ui'
+import { IdentitasOrganisasi, ORGANISASI } from './IdentitasOrganisasi'
 import { useAuth } from './AuthContext'
 import { cn } from '@/lib/cn'
 import { DATA_SOURCE_LABEL, getDataSource, isMockMode, setDataSource } from '@/services/dataSource'
@@ -165,7 +166,7 @@ export function LoginPage() {
           </span>
           <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink-900">Finance Hub</h1>
           <p className="mt-1 text-sm text-ink-500">
-            Invoice &amp; pembayaran keanggotaan BNI
+            Invoice &amp; iuran keanggotaan {ORGANISASI}
           </p>
         </div>
 
@@ -357,10 +358,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-ink-400">
-          <ShieldCheck className="h-3.5 w-3.5" />
-          Akses internal BNI · Terenkripsi
-        </div>
+        <IdentitasOrganisasi />
       </div>
     </div>
   )

@@ -39,7 +39,7 @@ const TANGGAL_CONTOH = '2026-01-31'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SPEC = resolve(root, 'backend/internal/apidocs/openapi.json')
-const OUT = resolve(root, 'public/api-collection.json')
+const OUT = resolve(root, 'src/services/api-collection.json')
 
 const spec = JSON.parse(readFileSync(SPEC, 'utf8'))
 
@@ -232,7 +232,7 @@ if (process.argv.includes('--check')) {
   }
   if (tersimpan !== isi) {
     console.error(
-      'public/api-collection.json tidak sesuai openapi.json.\n' +
+      'src/services/api-collection.json tidak sesuai openapi.json.\n' +
         'Jalankan `npm run api-collection` lalu commit hasilnya.',
     )
     process.exit(1)
@@ -241,5 +241,5 @@ if (process.argv.includes('--check')) {
 } else {
   writeFileSync(OUT, isi)
   const bytes = readFileSync(OUT).length
-  console.log(`${operations.length} operasi → public/api-collection.json (${(bytes / 1024).toFixed(1)} KB)`)
+  console.log(`${operations.length} operasi → src/services/api-collection.json (${(bytes / 1024).toFixed(1)} KB)`)
 }
