@@ -67,5 +67,5 @@ export function clearBlackbox(): Promise<void> {
 
 export const INTEGRATION_LABEL: Record<BlackboxIntegration, string> = {
   paper_id: 'Paper.id',
-  bni_vm: 'BNI VM',
+  bni_vm: 'Business Network International VM',
 }

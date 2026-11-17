@@ -386,7 +386,7 @@ export function ReportPage() {
           ]),
         },
       ],
-      documentTitle: 'Laporan Keuangan — BNI Finance',
+      documentTitle: 'Laporan Keuangan — Business Network International Finance',
     })
     if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
   }

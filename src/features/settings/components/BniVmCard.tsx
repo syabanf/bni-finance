@@ -42,7 +42,7 @@ export function BniVmCard() {
     try {
       await setAppSetting('bni_vm_url', url.trim())
       await setAppSetting('bni_vm_token', token.trim())
-      toast('Konfigurasi BNI VM disimpan.')
+      toast('Konfigurasi Business Network International VM disimpan.')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal menyimpan konfigurasi.', 'error')
     } finally {
@@ -58,7 +58,7 @@ export function BniVmCard() {
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-500">
               <Key className="h-5 w-5" />
             </span>
-            BNI Visitor Management
+            Business Network International Visitor Management
           </span>
         }
         subtitle="Sumber data member dan chapter. Tombol tariknya ada di halaman Member dan Chapter."

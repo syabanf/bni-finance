@@ -59,11 +59,11 @@ func main() {
 
 	id, err := surat.KirimDenganID(ctx, mailer.Pesan{
 		Ke:     tujuan,
-		Subjek: "Uji kirim — BNI Finance Hub",
-		Teks: "Email ini dikirim oleh perkakas uji BNI Finance Hub.\n\n" +
+		Subjek: "Uji kirim — Business Network International Finance Hub",
+		Teks: "Email ini dikirim oleh perkakas uji Business Network International Finance Hub.\n\n" +
 			"Kalau ia sampai, tautan reset kata sandi dan kode OTP juga akan sampai\n" +
 			"ke alamat ini.",
-		HTML: `<p>Email ini dikirim oleh perkakas uji <b>BNI Finance Hub</b>.</p>` +
+		HTML: `<p>Email ini dikirim oleh perkakas uji <b>Business Network International Finance Hub</b>.</p>` +
 			`<p>Kalau ia sampai, tautan reset kata sandi dan kode OTP juga akan sampai ke alamat ini.</p>`,
 	})
 	if err != nil {

@@ -150,7 +150,7 @@ func (s *Service) TestInvoice(ctx context.Context, in TestInvoiceInput) (*TestIn
 func (s *Service) buildTestPayload(in TestInvoiceInput, now time.Time) CreateInput {
 	name := strings.TrimSpace(in.CustomerName)
 	if name == "" {
-		name = "Uji Coba BNI Finance"
+		name = "Uji Coba Business Network International Finance"
 	}
 	phone := strings.TrimSpace(in.CustomerPhone)
 	if phone == "" {

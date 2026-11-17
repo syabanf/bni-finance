@@ -92,17 +92,17 @@ interface Langkah {
 const LANGKAH_MEMBER: Langkah[] = [
   {
     key: 'roster',
-    judul: 'Data lama di BNI',
+    judul: 'Data lama di Business Network International',
     berkas: 'Chapter_Roster_Report.xls',
     keterangan:
-      'Laporan Chapter Roster dari BNI Connect: nama, perusahaan, bidang usaha, dan telepon yang tercatat di BNI. Nama yang belum ada di chapter dibuat sebagai member baru. Laporan Membership Length juga diterima di sini.',
+      'Laporan Chapter Roster dari Business Network International Connect: nama, perusahaan, bidang usaha, dan telepon yang tercatat di Business Network International. Nama yang belum ada di chapter dibuat sebagai member baru. Laporan Membership Length juga diterima di sini.',
   },
   {
     key: 'dues',
     judul: 'Urutan jatuh tempo',
     berkas: 'Chapter_Membership_Dues_Report.xls',
     keterangan:
-      'Laporan Membership Dues dari BNI Connect, atau template jatuh tempo di bawah. Mengisi tanggal perpanjangan member yang namanya sudah ada di chapter.',
+      'Laporan Membership Dues dari Business Network International Connect, atau template jatuh tempo di bawah. Mengisi tanggal perpanjangan member yang namanya sudah ada di chapter.',
     template: 'jatuhTempo',
   },
 ]
@@ -309,7 +309,7 @@ export function ImportPage() {
       {isMockMode() && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>
-            <span className="font-semibold">Anda di mode Data Contoh.</span> Impor laporan BNI Connect
+            <span className="font-semibold">Anda di mode Data Contoh.</span> Impor laporan Business Network International Connect
             (.xls) dan penyimpanan ke server butuh mode Backend API.
           </span>
           <Button size="sm" onClick={() => setDataSource('api')}>
@@ -325,7 +325,7 @@ export function ImportPage() {
             ? 'Impor daftar chapter. Selalu ditinjau dulu sebelum ditulis.'
             : statusBawaan
               ? 'Impor daftar visitor ke satu chapter. Selalu ditinjau dulu sebelum ditulis.'
-              : 'Dua langkah dari laporan BNI Connect: data lama di BNI, lalu urutan jatuh tempo.'
+              : 'Dua langkah dari laporan Business Network International Connect: data lama di Business Network International, lalu urutan jatuh tempo.'
         }
       />
 
@@ -338,13 +338,13 @@ export function ImportPage() {
               jenis === 'members'
                 ? statusBawaan
                   ? 'Daftar visitor tidak memuat chapter; semua baris masuk ke chapter ini.'
-                  : 'Kosongkan untuk memakai chapter yang tertulis di laporan BNI Connect. Chapter yang belum ada dibuat saat Terapkan.'
+                  : 'Kosongkan untuk memakai chapter yang tertulis di laporan Business Network International Connect. Chapter yang belum ada dibuat saat Terapkan.'
                 : 'Impor chapter berlaku nasional.'
             }
           >
             <Select value={chapterTujuan} onChange={(e) => pilihChapter(e.target.value)} disabled={sibuk}>
               <option value="">
-                {jenis === 'chapters' ? 'Semua chapter (nasional)' : statusBawaan ? 'Pilih chapter…' : 'Dari laporan BNI Connect'}
+                {jenis === 'chapters' ? 'Semua chapter (nasional)' : statusBawaan ? 'Pilih chapter…' : 'Dari laporan Business Network International Connect'}
               </option>
               {daftarChapter.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -436,7 +436,7 @@ export function ImportPage() {
                       {berkas ? berkas.name : 'Pilih berkas…'}
                     </span>
                     <span className="block text-xs text-ink-500">
-                      {berkas ? `${(berkas.size / 1024).toFixed(0)} KB` : 'CSV, XLSX, atau .xls BNI Connect, maks. 10 MB'}
+                      {berkas ? `${(berkas.size / 1024).toFixed(0)} KB` : 'CSV, XLSX, atau .xls Business Network International Connect, maks. 10 MB'}
                     </span>
                   </span>
                 </button>

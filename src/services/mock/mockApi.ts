@@ -21,7 +21,7 @@ function ddmmyyyy(d: Date): string {
 }
 
 function itemNameFor(type: Invoice['type']): string {
-  return type === 'registration' ? 'Pendaftaran Keanggotaan BNI' : 'Perpanjangan Keanggotaan BNI'
+  return type === 'registration' ? 'Pendaftaran Keanggotaan Business Network International' : 'Perpanjangan Keanggotaan Business Network International'
 }
 
 export interface MockResponse {
@@ -679,7 +679,7 @@ export async function mockApiFetch(
           number: `TEST-MOCK-${Date.now()}`,
           customer: {
             id: 'console-test',
-            name: (b.customerName as string) || 'Uji Coba BNI Finance',
+            name: (b.customerName as string) || 'Uji Coba Business Network International Finance',
             // Nomor milik tim, bukan angka karangan: bila uji ini dijalankan
             // dengan kanal menyala, pesannya harus mendarat di ponsel kita —
             // bukan di ponsel orang lain yang kebetulan memiliki nomor itu.

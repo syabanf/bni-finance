@@ -67,7 +67,7 @@ export function TambahChapterModal({
       open={open}
       onClose={onClose}
       title="Tambah Chapter"
-      description="Pakai nama yang sama dengan di BNI Connect, supaya laporannya bisa diimpor ke chapter ini."
+      description="Pakai nama yang sama dengan di Business Network International Connect, supaya laporannya bisa diimpor ke chapter ini."
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} disabled={menyimpan}>

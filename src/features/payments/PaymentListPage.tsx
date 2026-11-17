@@ -173,7 +173,7 @@ export function PaymentListPage() {
         formatDateTime(p.paidAt),
       ]),
       totals: ['Total', '', '', '', formatCurrency(total), '', ''],
-      documentTitle: 'Riwayat Pembayaran — BNI Finance',
+      documentTitle: 'Riwayat Pembayaran — Business Network International Finance',
     })
     if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
   }

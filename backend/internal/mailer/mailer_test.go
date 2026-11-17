@@ -116,7 +116,7 @@ func TestSetiapEmailMembawaTandaPengirim(t *testing.T) {
 	}
 	b := badan(t, *mentah)
 	for nama, isi := range map[string]string{"teks": b.Text, "html": b.HTML} {
-		if !strings.Contains(isi, "Business Networking International") || !strings.Contains(isi, "Tidak terkait Bank BNI") {
+		if !strings.Contains(isi, "Business Network International") || !strings.Contains(isi, "Tidak terkait Bank BNI") {
 			t.Errorf("versi %s tanpa tanda pengirim: %q", nama, isi)
 		}
 	}

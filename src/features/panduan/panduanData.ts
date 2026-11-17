@@ -17,11 +17,11 @@ export interface AlurPanduan {
 export const ALUR: AlurPanduan[] = [
   {
     id: 'impor-member',
-    judul: 'Impor member dari BNI Connect',
-    ringkas: 'Dua laporan BNI Connect mengisi data member dan jatuh temponya.',
+    judul: 'Impor member dari Business Network International Connect',
+    ringkas: 'Dua laporan Business Network International Connect mengisi data member dan jatuh temponya.',
     khususAdmin: true,
     langkah: [
-      'Buka Pengaturan, lalu Impor Data. Biarkan Chapter tujuan pada pilihan Dari laporan BNI Connect.',
+      'Buka Pengaturan, lalu Impor Data. Biarkan Chapter tujuan pada pilihan Dari laporan Business Network International Connect.',
       'Unggah Chapter Roster Report, lalu tekan Tinjau. Chapter dibaca dari laporan, dan chapter yang belum ada dibuat saat Terapkan.',
       'Periksa pratinjau, tekan Terapkan, lalu Lanjut ke langkah 2.',
       'Unggah Membership Dues Report, atau template jatuh tempo yang diunduh di langkah itu.',
@@ -123,7 +123,7 @@ export const FAQ: { kelompok: string; butir: FaqPanduan[] }[] = [
       },
       {
         tanya: 'Apakah harus memilih chapter, atau otomatis ke chapter masing-masing?',
-        jawab: 'Tidak harus memilih. Dengan Semua chapter, tiap permintaan otomatis masuk ke chapter member masing-masing, dan tiap MC menerima email untuk chapternya. Chapter hanya wajib dipilih bila memakai unggahan laporan BNI Connect.',
+        jawab: 'Tidak harus memilih. Dengan Semua chapter, tiap permintaan otomatis masuk ke chapter member masing-masing, dan tiap MC menerima email untuk chapternya. Chapter hanya wajib dipilih bila memakai unggahan laporan Business Network International Connect.',
       },
       {
         tanya: 'Email konfirmasi tidak masuk ke MC. Apa yang harus diperiksa?',

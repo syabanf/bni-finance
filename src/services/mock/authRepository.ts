@@ -14,7 +14,7 @@ export const DEMO_ACCOUNTS: Record<
   // kedua sumber; `undefined` dan `null` terbaca berbeda oleh kode yang
   // menyaring berdasarkan chapter.
   'admin@bni-finance.com': { id: 'admin-national', name: 'Admin Nasional', role: 'admin', chapterId: null },
-  'user@bni-finance.com': { id: 'user-demo', name: 'User BNI', role: 'user', chapterId: null },
+  'user@bni-finance.com': { id: 'user-demo', name: 'User Business Network International', role: 'user', chapterId: null },
 }
 
 const DEFAULT_ACCOUNT = DEMO_ACCOUNTS['admin@bni-finance.com']

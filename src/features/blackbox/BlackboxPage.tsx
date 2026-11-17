@@ -35,7 +35,7 @@ const useMock = isMockMode()
 const INTEGRATIONS = [
   { value: 'all', label: 'Semua Integrasi' },
   { value: 'paper_id', label: 'Paper.id' },
-  { value: 'bni_vm', label: 'BNI VM' },
+  { value: 'bni_vm', label: 'Business Network International VM' },
 ] as const
 
 const DIRECTIONS = [
@@ -98,7 +98,7 @@ export function BlackboxPage() {
     <div>
       <PageHeader
         title="Blackbox Integrasi"
-        description="Setiap panggilan ke dan dari Paper.id dan BNI VM — request, endpoint, response, dan statusnya."
+        description="Setiap panggilan ke dan dari Paper.id dan Business Network International VM — request, endpoint, response, dan statusnya."
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={reload} disabled={loading}>
@@ -162,7 +162,7 @@ export function BlackboxPage() {
             <EmptyState
               icon={Radio}
               title="Belum ada panggilan terekam"
-              description="Terbitkan invoice, jalankan sinkronisasi BNI VM, atau kirim callback pembayaran — panggilannya akan muncul di sini."
+              description="Terbitkan invoice, jalankan sinkronisasi Business Network International VM, atau kirim callback pembayaran — panggilannya akan muncul di sini."
             />
           </CardBody>
         </Card>

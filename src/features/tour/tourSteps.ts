@@ -46,7 +46,7 @@ export const TOURS: Tour[] = [
       {
         title: 'Selamat datang',
         body:
-          'Halaman ini adalah ringkasan keuangan keanggotaan BNI. ' +
+          'Halaman ini adalah ringkasan keuangan keanggotaan Business Network International. ' +
           'Semua yang Anda lihat di sini dihitung langsung dari data tagihan yang sebenarnya, ' +
           'jadi tidak ada angka yang disimpan terpisah lalu berbeda dengan kenyataan. ' +
           'Mari saya tunjukkan bagian-bagiannya. Tekan Lanjut untuk berpindah, ' +
@@ -367,7 +367,7 @@ export const TOURS: Tour[] = [
         anchor: 'sync-run',
         title: 'Menarik data terbaru',
         body:
-          'Tombol ini menarik data keanggotaan dari sistem BNI VM, ' +
+          'Tombol ini menarik data keanggotaan dari sistem Business Network International VM, ' +
           'supaya daftar di sini tidak perlu dijaga manual. ' +
           'Menjalankannya dua kali berturut-turut tidak menggandakan data — ' +
           'yang sudah ada diperbarui, bukan ditambahkan lagi, jadi aman mengulang ' +

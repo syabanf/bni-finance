@@ -242,7 +242,7 @@ func (s *Service) membersBNIConnect(ctx context.Context, rows []sheetRow, jenis 
 		Baru: chapterBaru != nil,
 	}}
 	hasil.Peringatan = append(hasil.Peringatan, fmt.Sprintf(
-		"Laporan BNI Connect (%s). Member dicocokkan lewat NAMA di chapter %s; yang belum ada dibuat baru dengan id bc-…",
+		"Laporan Business Network International Connect (%s). Member dicocokkan lewat NAMA di chapter %s; yang belum ada dibuat baru dengan id bc-…",
 		jenis, hasil.Chapter.Nama))
 	if jenis == laporanLength {
 		hasil.Peringatan = append(hasil.Peringatan,

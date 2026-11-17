@@ -38,7 +38,7 @@ export function SyncButton({
       // membayarnya hanya karena menampilkan sebuah tombol.
       const { chapterService, memberService } = await import('@/services')
       const res = jenis === 'member' ? await memberService.sync() : await chapterService.sync()
-      toast(`${res.count} ${jenis} berhasil ditarik dari BNI Visitor Management.`)
+      toast(`${res.count} ${jenis} berhasil ditarik dari Business Network International Visitor Management.`)
       const tinjau = res.needsReview ?? []
       if (tinjau.length > 0) {
         const contoh = tinjau.slice(0, 5).join(', ')
@@ -48,7 +48,7 @@ export function SyncButton({
       onSelesai?.()
     } catch (err) {
       toast(
-        err instanceof Error ? err.message : `Gagal menarik data ${jenis} dari BNI VM.`,
+        err instanceof Error ? err.message : `Gagal menarik data ${jenis} dari Business Network International VM.`,
         'error',
       )
     } finally {
@@ -57,9 +57,17 @@ export function SyncButton({
   }
 
   return (
-    <Button variant="outline" onClick={jalankan} loading={sibuk} data-tour="sync-run">
-      {!sibuk && <RefreshCw className="h-4 w-4" />}
-      Tarik dari BNI VM
+    // Labelnya lebih lebar dari layar ponsel, jadi dibiarkan turun ke baris
+    // kedua alih-alih menembus tepi halaman.
+    <Button
+      variant="outline"
+      onClick={jalankan}
+      loading={sibuk}
+      data-tour="sync-run"
+      className="h-auto min-h-10 max-w-full whitespace-normal py-2 text-left"
+    >
+      {!sibuk && <RefreshCw className="h-4 w-4 shrink-0" />}
+      Tarik dari Business Network International VM
     </Button>
   )
 }

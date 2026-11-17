@@ -328,7 +328,7 @@ function FormTambah({
         />
 
         <Field
-          label="Ambil dari member BNI Connect"
+          label="Ambil dari member Business Network International Connect"
           hint={
             calon.length
               ? 'Mengisi nama, dan email bila tercatat; keduanya tetap bisa diubah.'
@@ -353,7 +353,7 @@ function FormTambah({
           label="Email"
           hint={
             tanpaEmail && !email
-              ? 'Member ini belum punya email di sistem (laporan BNI Connect tidak memuatnya). Isi email login-nya di sini.'
+              ? 'Member ini belum punya email di sistem (laporan Business Network International Connect tidak memuatnya). Isi email login-nya di sini.'
               : undefined
           }
         >

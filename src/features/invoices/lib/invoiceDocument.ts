@@ -68,7 +68,7 @@ function barisTotal(label: string, nilai: string, tebal = false): string {
 export function renderInvoiceBody(inv: InvoiceWithRelations): string {
   const m = inv.member
   const produk =
-    inv.type === 'registration' ? 'Pendaftaran Keanggotaan BNI' : 'Perpanjangan Keanggotaan BNI'
+    inv.type === 'registration' ? 'Pendaftaran Keanggotaan Business Network International' : 'Perpanjangan Keanggotaan Business Network International'
   const deskripsi =
     inv.type === 'registration'
       ? 'Pendaftaran anggota baru'
@@ -136,8 +136,8 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
 
       <div class="inv-head" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:30px;">
         <div>
-          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px;">BNI Finance Hub</div>
-          <div style="font-size:10.5px;color:#7f8c9a;margin-top:2px;">Invoice &amp; pembayaran keanggotaan BNI</div>
+          <div style="font-size:21px;font-weight:800;letter-spacing:-.4px;">Business Network International Finance Hub</div>
+          <div style="font-size:10.5px;color:#7f8c9a;margin-top:2px;">Invoice &amp; pembayaran keanggotaan Business Network International</div>
         </div>
         <div class="inv-head-kanan">
           <div style="font-size:30px;font-weight:400;color:#5b8db8;line-height:1;margin-bottom:12px;text-align:right;">Invoice</div>
@@ -153,7 +153,7 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
       <div class="inv-parties" style="display:flex;gap:40px;margin-bottom:26px;">
         <div style="flex:1;min-width:0;">
           <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Info Perusahaan</h2>
-          <div style="font-size:15px;font-weight:700;margin-bottom:5px;">BNI Indonesia</div>
+          <div style="font-size:15px;font-weight:700;margin-bottom:5px;">Business Network International Indonesia</div>
           <p style="margin:1px 0;color:${MUTED};">Chapter : ${esc(inv.chapter?.displayName ?? '-')}</p>
           <p style="margin:1px 0;color:${MUTED};">Email : no-reply@reddie.id</p>
         </div>

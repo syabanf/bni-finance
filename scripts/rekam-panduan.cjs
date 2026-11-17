@@ -124,7 +124,7 @@ function laporanFiktif() {
 
 const ALUR = {
   'impor-member': {
-    judul: 'Impor member dari BNI Connect',
+    judul: 'Impor member dari Business Network International Connect',
     api: true,
     async jalan(r) {
       const { roster, dues } = laporanFiktif()
@@ -135,7 +135,7 @@ const ALUR = {
       }
       await r.klik(r.page.getByRole('button', { name: 'Pengaturan' }))
       await r.klik(r.menu('Impor Data'))
-      await r.teks('Biarkan Chapter tujuan pada pilihan "Dari laporan BNI Connect".')
+      await r.teks('Biarkan Chapter tujuan pada pilihan "Dari laporan Business Network International Connect".')
       await r.teks('Langkah 1: unggah Chapter Roster Report, lalu tekan Tinjau.')
       await unggah(roster)
       await r.klik(r.tombol('Tinjau'))
@@ -161,7 +161,7 @@ const ALUR = {
       await r.klik(r.tombol('Tambah Member'))
       const d = p.getByRole('dialog')
       await r.ketik(d.getByPlaceholder('Nama lengkap'), 'Rina Wulandari')
-      await d.locator('select').selectOption({ label: 'BNI Garuda' })
+      await d.locator('select').selectOption({ label: 'Business Network International Garuda' })
       await r.teks('Isi nama dan chapter. Member masuk dengan status New Member.')
       await r.klik(d.getByRole('button', { name: 'Tambah' }))
       await r.ketik(p.getByPlaceholder('Cari nama, ID, atau email…'), 'Rina')

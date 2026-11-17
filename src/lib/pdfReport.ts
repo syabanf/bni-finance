@@ -145,7 +145,7 @@ export function buildTableReportDocument(o: TableReportOptions): string {
   ${renderTable(o.columns, o.rows, o.totals)}
   ${sections}
   <div style="margin-top:20px;text-align:center;font-size:11px;color:#94a3b8;border-top:1px solid ${LINE};padding-top:12px;">
-    BNI Finance Hub — dokumen dibuat otomatis oleh sistem.
+    Business Network International Finance Hub — dokumen dibuat otomatis oleh sistem.
   </div>
 </body>
 </html>`

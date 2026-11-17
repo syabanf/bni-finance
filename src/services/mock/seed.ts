@@ -30,19 +30,19 @@ const SYNCED_AT = '2026-06-15T07:30:00Z'
 // ---------------------------------------------------------------------------
 
 export const seedChapters: Chapter[] = [
-  { id: 'ch-garuda', name: 'Garuda', displayName: 'BNI Garuda', areaName: 'Jakarta Pusat', cityName: 'Jakarta', syncedAt: SYNCED_AT },
-  { id: 'ch-nusantara', name: 'Nusantara', displayName: 'BNI Nusantara', areaName: 'Jakarta Selatan', cityName: 'Jakarta', syncedAt: SYNCED_AT },
-  { id: 'ch-merdeka', name: 'Merdeka', displayName: 'BNI Merdeka', areaName: 'Bandung Kota', cityName: 'Bandung', syncedAt: SYNCED_AT },
-  { id: 'ch-samudra', name: 'Samudra', displayName: 'BNI Samudra', areaName: 'Surabaya Timur', cityName: 'Surabaya', syncedAt: SYNCED_AT },
+  { id: 'ch-garuda', name: 'Garuda', displayName: 'Business Network International Garuda', areaName: 'Jakarta Pusat', cityName: 'Jakarta', syncedAt: SYNCED_AT },
+  { id: 'ch-nusantara', name: 'Nusantara', displayName: 'Business Network International Nusantara', areaName: 'Jakarta Selatan', cityName: 'Jakarta', syncedAt: SYNCED_AT },
+  { id: 'ch-merdeka', name: 'Merdeka', displayName: 'Business Network International Merdeka', areaName: 'Bandung Kota', cityName: 'Bandung', syncedAt: SYNCED_AT },
+  { id: 'ch-samudra', name: 'Samudra', displayName: 'Business Network International Samudra', areaName: 'Surabaya Timur', cityName: 'Surabaya', syncedAt: SYNCED_AT },
   // Seed 2026-08-24 — dua kota yang sebelumnya belum terwakili.
-  { id: 'ch-cakrawala', name: 'Cakrawala', displayName: 'BNI Cakrawala', areaName: 'Denpasar Selatan', cityName: 'Denpasar', syncedAt: SYNCED_AT },
-  { id: 'ch-mahakam', name: 'Mahakam', displayName: 'BNI Mahakam', areaName: 'Samarinda Kota', cityName: 'Samarinda', syncedAt: SYNCED_AT },
+  { id: 'ch-cakrawala', name: 'Cakrawala', displayName: 'Business Network International Cakrawala', areaName: 'Denpasar Selatan', cityName: 'Denpasar', syncedAt: SYNCED_AT },
+  { id: 'ch-mahakam', name: 'Mahakam', displayName: 'Business Network International Mahakam', areaName: 'Samarinda Kota', cityName: 'Samarinda', syncedAt: SYNCED_AT },
   // Seed 2026-08-24 — empat chapter beserta membernya, melebarkan sebaran ke
   // luar Jawa/Bali/Kalimantan yang sebelumnya jadi satu-satunya bentuk data.
-  { id: 'ch-bhinneka', name: 'Bhinneka', displayName: 'BNI Bhinneka', areaName: 'Medan Kota', cityName: 'Medan', syncedAt: SYNCED_AT },
-  { id: 'ch-kartika', name: 'Kartika', displayName: 'BNI Kartika', areaName: 'Semarang Tengah', cityName: 'Semarang', syncedAt: SYNCED_AT },
-  { id: 'ch-rinjani', name: 'Rinjani', displayName: 'BNI Rinjani', areaName: 'Mataram Barat', cityName: 'Mataram', syncedAt: SYNCED_AT },
-  { id: 'ch-khatulistiwa', name: 'Khatulistiwa', displayName: 'BNI Khatulistiwa', areaName: 'Pontianak Kota', cityName: 'Pontianak', syncedAt: SYNCED_AT },
+  { id: 'ch-bhinneka', name: 'Bhinneka', displayName: 'Business Network International Bhinneka', areaName: 'Medan Kota', cityName: 'Medan', syncedAt: SYNCED_AT },
+  { id: 'ch-kartika', name: 'Kartika', displayName: 'Business Network International Kartika', areaName: 'Semarang Tengah', cityName: 'Semarang', syncedAt: SYNCED_AT },
+  { id: 'ch-rinjani', name: 'Rinjani', displayName: 'Business Network International Rinjani', areaName: 'Mataram Barat', cityName: 'Mataram', syncedAt: SYNCED_AT },
+  { id: 'ch-khatulistiwa', name: 'Khatulistiwa', displayName: 'Business Network International Khatulistiwa', areaName: 'Pontianak Kota', cityName: 'Pontianak', syncedAt: SYNCED_AT },
 ]
 
 // ---------------------------------------------------------------------------

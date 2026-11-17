@@ -73,8 +73,8 @@ export function buildReceiptDocument(n: Nota): string {
 <body>
   <div class="kop">
     <div>
-      <div class="merek">BNI Finance Hub</div>
-      <div class="sub">Invoice &amp; pembayaran keanggotaan BNI</div>
+      <div class="merek">Business Network International Finance Hub</div>
+      <div class="sub">Invoice &amp; pembayaran keanggotaan Business Network International</div>
     </div>
     <div>
       <div class="judul">Nota Pembayaran</div>

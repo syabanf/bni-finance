@@ -100,16 +100,16 @@ func (r *Repository) Apply(ctx context.Context, members []RemoteMember, now time
 			VALUES ($1,$2,$3,nullif($4,''),nullif($5,''),nullif($6,''),nullif($7,''),$8,$9,$10,$11,$12)
 			ON CONFLICT (id) DO UPDATE SET
 			  chapter_id = excluded.chapter_id, name = excluded.name,
-			  -- A value BNI VM left empty keeps what is stored.
+			  -- A value Business Network International VM left empty keeps what is stored.
 			  email = coalesce(excluded.email, members.email),
 			  phone = coalesce(excluded.phone, members.phone),
 			  company = coalesce(excluded.company, members.company),
 			  business_field = coalesce(excluded.business_field, members.business_field),
 			  joined_date = coalesce(excluded.joined_date, members.joined_date),
-			  -- A paid renewal advances this date here before BNI VM knows about
+			  -- A paid renewal advances this date here before Business Network International VM knows about
 			  -- it, so a sync must not move it back. GREATEST ignores NULL.
 			  renewal_date = greatest(excluded.renewal_date, members.renewal_date),
-			  -- BNI VM sets status on insert. Afterwards it can only deactivate;
+			  -- Business Network International VM sets status on insert. Afterwards it can only deactivate;
 			  -- every other status belongs to PATCH and payments.
 			  status = CASE WHEN excluded.status = 'inactive' THEN excluded.status ELSE members.status END,
 			  synced_at = excluded.synced_at, bni_vm_id = excluded.bni_vm_id`
