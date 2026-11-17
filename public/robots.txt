@@ -1,0 +1,5 @@
+# Halaman boleh dibuka crawler; yang mencegahnya masuk hasil pencarian adalah
+# meta robots noindex di index.html. Disallow di sini justru menghalangi
+# peninjau Google Safe Browsing membaca pernyataan identitas organisasi.
+User-agent: *
+Allow: /

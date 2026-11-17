@@ -99,8 +99,26 @@ func TestHTMLSelaluDisertaiTeks(t *testing.T) {
 		t.Fatalf("kirim: %v", err)
 	}
 	b := badan(t, *mentah)
-	if b.Text != "versi teks" || b.HTML != "<p>versi html</p>" {
+	if !strings.HasPrefix(b.Text, "versi teks") || !strings.HasPrefix(b.HTML, "<p>versi html</p>") {
 		t.Errorf("text=%q html=%q — keduanya harus terkirim", b.Text, b.HTML)
+	}
+}
+
+// Setiap email menyebut siapa pengirimnya dan bahwa ia bukan Bank BNI, di
+// versi teks maupun HTML. Email kode masuk atas nama "BNI" tanpa keterangan
+// itu dilaporkan penerima sebagai phishing perbankan.
+func TestSetiapEmailMembawaTandaPengirim(t *testing.T) {
+	m, mentah, _ := resendPalsu(t, nil)
+	if err := m.Kirim(context.Background(), Pesan{
+		Ke: "a@b.test", Subjek: "s", Teks: "isi", HTML: "<p>isi</p>",
+	}); err != nil {
+		t.Fatalf("kirim: %v", err)
+	}
+	b := badan(t, *mentah)
+	for nama, isi := range map[string]string{"teks": b.Text, "html": b.HTML} {
+		if !strings.Contains(isi, "Business Networking International") || !strings.Contains(isi, "Tidak terkait Bank BNI") {
+			t.Errorf("versi %s tanpa tanda pengirim: %q", nama, isi)
+		}
 	}
 }
 
@@ -278,7 +296,7 @@ func TestPenerimaKosongDitolak(t *testing.T) {
 
 // SUBJEK TIDAK BOLEH SAMPAI KE LOG.
 //
-// Subjek email OTP berbunyi "Kode masuk 817810 — BNI Finance Hub": kodenya ada
+// Subjek email OTP berbunyi "Kode masuk 817810 — Finance Hub": kodenya ada
 // di dalamnya supaya terbaca dari pratinjau notifikasi tanpa membuka email.
 // Mencatat subjek berarti setiap kode masuk yang masih berlaku tersimpan apa
 // adanya di log aplikasi.
@@ -297,7 +315,7 @@ func TestSubjekTidakMasukLog(t *testing.T) {
 	err := m.Kirim(context.Background(), Pesan{
 		Ke:     "a@b.test",
 		Jenis:  "otp",
-		Subjek: "Kode masuk " + kode + " — BNI Finance Hub",
+		Subjek: "Kode masuk " + kode + " — Finance Hub",
 		Teks:   "Kode masuk Anda: " + kode,
 	})
 	if err != nil {

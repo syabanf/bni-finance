@@ -90,6 +90,31 @@ func (m *Mailer) Siap() bool {
 	return m != nil && m.cfg.APIKey != "" && alamatSaja(m.cfg.From) != ""
 }
 
+// Tanda pengirim, ditambahkan ke SETIAP email di KirimDenganID.
+//
+// "BNI" juga singkatan Bank Negara Indonesia, dan email berisi kode masuk atau
+// tautan kata sandi atas nama "BNI" terbaca sebagai phishing perbankan. Satu
+// penerima yang melaporkannya cukup untuk membuat Google Safe Browsing
+// menandai seluruh situs. Ditaruh di sini, bukan di tiap pemanggil, supaya
+// email jenis baru tidak bisa lupa membawanya.
+const (
+	tandaTeks = "\r\n--\r\n" +
+		"Finance Hub, sistem internal BNI (Business Networking International) Indonesia.\r\n" +
+		"Tidak terkait Bank BNI. Kami tidak pernah meminta PIN, OTP bank, atau nomor kartu.\r\n"
+	tandaHTML = `<p style="font:12px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;` +
+		`color:#888;border-top:1px solid #eee;margin-top:24px;padding-top:12px">` +
+		`Finance Hub, sistem internal BNI (Business Networking International) Indonesia.<br>` +
+		`Tidak terkait Bank BNI. Kami tidak pernah meminta PIN, OTP bank, atau nomor kartu.</p>`
+)
+
+// denganTandaHTML membiarkan pesan tanpa HTML tetap tanpa HTML.
+func denganTandaHTML(html string) string {
+	if html == "" {
+		return ""
+	}
+	return html + tandaHTML
+}
+
 // Pesan adalah satu email teks-dan-HTML untuk satu penerima.
 type Pesan struct {
 	Ke     string
@@ -97,7 +122,7 @@ type Pesan struct {
 	// Jenis adalah label pendek untuk log, mis. "otp" atau "reset-kata-sandi".
 	//
 	// ADA KARENA SUBJEK TIDAK BOLEH DICATAT. Subjek email OTP berbunyi
-	// "Kode masuk 817810 — BNI Finance Hub": kodenya ada di dalamnya, supaya
+	// "Kode masuk 817810 — Finance Hub": kodenya ada di dalamnya, supaya
 	// terbaca dari pratinjau notifikasi tanpa membuka email. Mencatat subjek
 	// berarti setiap kode masuk yang masih berlaku tersimpan apa adanya di log
 	// aplikasi — yang dibaca lebih banyak orang, disimpan lebih lama, dan
@@ -176,8 +201,8 @@ func (m *Mailer) KirimDenganID(ctx context.Context, p Pesan) (string, error) {
 		From:    bersih(m.cfg.From),
 		To:      []string{ke},
 		Subject: bersih(p.Subjek),
-		Text:    p.Teks,
-		HTML:    p.HTML,
+		Text:    p.Teks + tandaTeks,
+		HTML:    denganTandaHTML(p.HTML),
 	})
 	if err != nil {
 		return "", fmt.Errorf("rakit permintaan: %w", err)
