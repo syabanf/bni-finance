@@ -13,7 +13,7 @@ import { ShieldCheck } from 'lucide-react'
  * organisasi; jangan diisi alamat contoh, karena kontak yang tidak bisa
  * dihubungi justru menguatkan dugaan situs palsu.
  */
-export const ORGANISASI = 'BNI (Business Network International) Indonesia'
+export const ORGANISASI = 'BNI (Business Networking International) Indonesia'
 
 const KONTAK: { email: string; situs: string } = { email: '', situs: '' }
 

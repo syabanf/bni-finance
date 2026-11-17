@@ -85,8 +85,11 @@ func NewHandler(log *slog.Logger, cfg config.Config, signer *auth.Signer, svc Se
 	})
 
 	// Documentation is unauthenticated: it has to be readable while you are
-	// still working out how to authenticate.
-	apidocs.NewHandler().Register(root)
+	// still working out how to authenticate. Di produksi rutenya tidak
+	// didaftarkan sama sekali, lihat config.DocsPublic.
+	if cfg.DocsPublic {
+		apidocs.NewHandler().Register(root)
+	}
 
 	if svc.Auth != nil {
 		auth.NewHandler(svc.Auth, cfg.AppBaseURL).RegisterPublic(root)

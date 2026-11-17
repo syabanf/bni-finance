@@ -401,3 +401,23 @@ func TestUbahPeranMenyimpanLingkup(t *testing.T) {
 		t.Errorf("admin dengan chapter kosong harus nasional: status %d, chapter %v", code, out.ChapterID)
 	}
 }
+
+// Dokumentasi memuat daftar lengkap endpoint. Di produksi (DocsPublic false)
+// rutenya tidak boleh terdaftar; 401 saja masih memberi tahu bahwa rutenya ada.
+func TestDokumentasiHanyaTerbukaBilaDiizinkan(t *testing.T) {
+	log := slog.New(slog.NewJSONHandler(io.Discard, nil))
+	for _, terbuka := range []bool{false, true} {
+		h := api.NewHandler(log, config.Config{DocsPublic: terbuka}, testSigner(t), api.Services{}, nil)
+		for _, path := range []string{"/docs", "/openapi.json", "/openapi.yaml"} {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+			ingin := http.StatusNotFound
+			if terbuka {
+				ingin = http.StatusOK
+			}
+			if rec.Code != ingin {
+				t.Errorf("DocsPublic=%v: GET %s = %d, ingin %d", terbuka, path, rec.Code, ingin)
+			}
+		}
+	}
+}

@@ -14,7 +14,7 @@ export default defineConfig({
         name: 'Finance Hub BNI Indonesia',
         short_name: 'Finance Hub',
         description:
-          'Sistem internal invoice dan iuran keanggotaan BNI (Business Network International) Indonesia. Tidak terkait Bank BNI.',
+          'Sistem internal invoice dan iuran keanggotaan BNI (Business Networking International) Indonesia. Tidak terkait Bank BNI.',
         id: '/',
         start_url: '/',
         scope: '/',
@@ -34,6 +34,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // Koleksi Konsol API hanya dibuka admin; jangan ikut diunduh semua orang.
+        globIgnores: ['**/api-collection-*.js'],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
       },

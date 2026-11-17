@@ -91,6 +91,14 @@ type Config struct {
 	// see internal/metrics.Handler for why that is the default.
 	MetricsToken string
 
+	// DocsPublic membuka /docs dan /openapi.* tanpa login.
+	//
+	// Bawaannya mengikuti APP_BASE_URL: terbuka di mesin pengembang, tertutup
+	// begitu aplikasi menunjuk domain sungguhan. Dokumentasi itu memuat daftar
+	// lengkap endpoint, dan situs produksi tidak perlu membagikannya ke setiap
+	// pengunjung. DOCS_PUBLIC=true membukanya kembali.
+	DocsPublic bool
+
 	// DBMaxConns membatasi ukuran connection pool. 0 = DefaultMaxConns.
 	// Naikkan bila db_pool_acquire_empty_total di /metrics terus bertambah.
 	DBMaxConns int
@@ -144,6 +152,8 @@ func Load() (Config, error) {
 		DBMaxConns:       int(bytesOr("DB_MAX_CONNS", 0)),
 		RedisURL:         strings.TrimSpace(os.Getenv("REDIS_URL")),
 	}
+
+	cfg.DocsPublic = boolOr("DOCS_PUBLIC", Lokal(cfg.AppBaseURL))
 
 	if cfg.DatabaseURL == "" {
 		return cfg, fmt.Errorf("DATABASE_URL wajib diisi (lihat .env.example)")

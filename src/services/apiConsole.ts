@@ -78,14 +78,16 @@ export interface ConsoleResult {
 let cached: Promise<ApiCollection> | null = null
 
 /**
- * Loads the generated collection. Kept out of the bundle and fetched on demand
- * so the 43 KB only costs the people who open the console.
+ * Loads the generated collection as its own chunk, so the 80 KB only costs the
+ * people who open the console.
+ *
+ * Diimpor, bukan di-fetch dari /api-collection.json: berkas di public/ punya
+ * alamat tetap yang bisa ditebak dan dibuka siapa pun tanpa login, dan isinya
+ * daftar lengkap endpoint. Sebagai chunk, namanya ber-hash dan hanya diminta
+ * oleh halaman Konsol API yang ada di balik izin settings:manage.
  */
 export function loadCollection(): Promise<ApiCollection> {
-  cached ??= fetch(`${import.meta.env.BASE_URL}api-collection.json`).then((res) => {
-    if (!res.ok) throw new Error(`Gagal memuat koleksi API (HTTP ${res.status})`)
-    return res.json() as Promise<ApiCollection>
-  })
+  cached ??= import('./api-collection.json').then((m) => m.default as unknown as ApiCollection)
   return cached
 }
 
