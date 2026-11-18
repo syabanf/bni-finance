@@ -33,7 +33,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { getToken } from '@/lib/apiClient'
-import { isMockMode } from '@/services/dataSource'
+import { SUMBER_TERKUNCI, isMockMode } from '@/services/dataSource'
 import { autofill } from '@/services/apiAutofill'
 import { BodyForm } from './BodyForm'
 import {
@@ -608,7 +608,8 @@ export function ApiConsolePage() {
         </code>
         <p className="mt-3 text-sm text-ink-500">
           Sumber data sedang <strong>Backend API</strong>, jadi perubahan tersimpan sungguhan.
-          Untuk mencoba tanpa risiko, alihkan ke Data Contoh di halaman Pengaturan.
+          {!SUMBER_TERKUNCI &&
+            ' Untuk mencoba tanpa risiko, alihkan ke Data Contoh di halaman Integrasi & Sumber Data.'}
         </p>
       </Modal>
     </div>

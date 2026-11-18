@@ -13,8 +13,8 @@ const STORAGE_KEY = 'bni.dataSource'
 
 /**
  * Host yang punya backend di origin yang sama (reverse proxy meneruskan /api ke
- * Go). Di host ini Backend API menjadi nilai awal; di host lain, misalnya
- * pratinjau Vercel yang tidak punya /api, nilai awalnya tetap Data Contoh.
+ * Go). Di host lain, misalnya pratinjau Vercel yang tidak punya /api, nilai
+ * awalnya tetap Data Contoh.
  */
 const hostBackend = (import.meta.env.VITE_API_HOSTS ?? '')
   .split(',')
@@ -29,11 +29,22 @@ function diHostBackend(): boolean {
   }
 }
 
+/**
+ * Di host yang punya backend, sumber datanya selalu Backend API dan pemilihnya
+ * tidak ditampilkan. Di sana Data Contoh hanya membingungkan: orang mengira
+ * sedang bekerja dengan data sungguhan, lalu semuanya hilang saat halaman
+ * dimuat ulang.
+ */
+export const SUMBER_TERKUNCI = diHostBackend()
+
 /** Nilai awal, dipakai hanya saat pengguna belum pernah memilih. */
 const envDefault: DataSource =
-  import.meta.env.VITE_USE_MOCK === 'false' || diHostBackend() ? 'api' : 'mock'
+  import.meta.env.VITE_USE_MOCK === 'false' ? 'api' : 'mock'
 
 function read(): DataSource {
+  // Pilihan lama di browser diabaikan: tanpa pemilih, orang yang dulu memilih
+  // Data Contoh tidak punya jalan kembali.
+  if (SUMBER_TERKUNCI) return 'api'
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === 'mock' || stored === 'api') return stored
