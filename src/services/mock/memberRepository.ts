@@ -1,6 +1,6 @@
 import { hapusPermintaanMember } from './renewalRepository'
 import type { MemberRepository } from '@/services/types'
-import type { Member, MemberWithChapter } from '@/types'
+import type { Member, MemberFilters, MemberPage, MemberStatus, MemberWithChapter } from '@/types'
 import { bolehDitagih } from '@/lib/status'
 import { delay, nextId, nowISO, store } from './store'
 
@@ -13,23 +13,61 @@ function withChapter(memberId: string): MemberWithChapter | null {
   }
 }
 
+const STATUS_VISITOR: MemberStatus[] = ['pending', 'visitor']
+
+/**
+ * Saringan yang SAMA dengan klausaMember di server.
+ *
+ * Dipakai bersama list() dan listPaged(). `denganStatus=false` meniru
+ * ringkasan server, yang menghitung per status tanpa saringan statusnya.
+ */
+function saring(f: MemberFilters | undefined, denganStatus: boolean): MemberWithChapter[] {
+  const q = f?.search?.trim().toLowerCase()
+  const kosong = (v?: string | null) => !v?.trim()
+  return store.members
+    .filter((m) => {
+      if (f?.chapterId && f.chapterId !== 'all' && m.chapterId !== f.chapterId) return false
+      if (denganStatus && f?.status && f.status !== 'all' && m.status !== f.status) return false
+      if (f?.kelompok && f.kelompok !== 'all' && STATUS_VISITOR.includes(m.status) !== (f.kelompok === 'visitor'))
+        return false
+      if (f?.kontak === 'no-phone' && !kosong(m.phone)) return false
+      if (f?.kontak === 'no-email' && !kosong(m.email)) return false
+      if (f?.kontak === 'no-contact' && !(kosong(m.phone) && kosong(m.email))) return false
+      if (f?.punyaJatuhTempo && !m.renewalDate) return false
+      if (f?.dueFrom && (!m.renewalDate || m.renewalDate < f.dueFrom)) return false
+      if (f?.dueTo && (!m.renewalDate || m.renewalDate > f.dueTo)) return false
+      if (
+        q &&
+        !m.name.toLowerCase().includes(q) &&
+        !m.id.toLowerCase().includes(q) &&
+        !(m.email ?? '').toLowerCase().includes(q) &&
+        !(m.company ?? '').toLowerCase().includes(q)
+      )
+        return false
+      return true
+    })
+    .map((m) => withChapter(m.id)!)
+    .sort((a, b) => a.name.localeCompare(b.name))
+}
+
 export const mockMemberRepository: MemberRepository = {
   async list(params) {
-    let result = store.members.map((m) => withChapter(m.id)!).filter(Boolean)
+    return delay(saring(params, true))
+  },
 
-    if (params?.chapterId && params.chapterId !== 'all') {
-      result = result.filter((m) => m.chapterId === params.chapterId)
+  async listPaged(filters) {
+    const semua = saring(filters, true)
+    const offset = filters?.offset ?? 0
+    const halaman: MemberPage = {
+      rows: semua.slice(offset, offset + (filters?.limit ?? 25)),
+      total: semua.length,
     }
-    if (params?.search) {
-      const q = params.search.toLowerCase()
-      result = result.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q) ||
-          (m.email ?? '').toLowerCase().includes(q),
-      )
+    if (filters?.summary) {
+      const byStatus: NonNullable<MemberPage['summary']>['byStatus'] = {}
+      for (const m of saring(filters, false)) byStatus[m.status] = (byStatus[m.status] ?? 0) + 1
+      halaman.summary = { byStatus }
     }
-    return delay(result.sort((a, b) => a.name.localeCompare(b.name)))
+    return delay(halaman)
   },
 
   async getById(id) {

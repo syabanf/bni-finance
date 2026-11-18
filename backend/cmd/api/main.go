@@ -177,16 +177,17 @@ func run(log *slog.Logger) error {
 
 	settingsSvc := settings.NewService(settings.NewRepository(pool)).PakaiCache(rdb)
 	chapterSvc := chapter.NewService(chapter.NewRepository(pool)).PakaiCache(rdb)
+	dashboardSvc := dashboard.NewService(dashboard.NewRepository(pool)).PakaiCache(rdb)
 
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
-		Invoice:   invoice.NewService(invoice.NewRepository(pool)),
-		Payment:   payment.NewService(payment.NewRepository(pool)),
+		Invoice:   invoice.NewService(invoice.NewRepository(pool)).SetelahTulis(dashboardSvc.Kedaluwarsakan),
+		Payment:   payment.NewService(payment.NewRepository(pool)).SetelahTulis(dashboardSvc.Kedaluwarsakan),
 		Member:    member.NewService(member.NewRepository(pool)),
 		Chapter:   chapterSvc,
 		Settings:  settingsSvc,
 		Audit:     audit.NewService(audit.NewRepository(pool)),
-		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
+		Dashboard: dashboardSvc,
 		Upload:    uploads,
 		Sync: sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder).
 			SetelahJalan(chapterSvc.Kedaluwarsakan),

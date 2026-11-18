@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Search, Wallet } from 'lucide-react'
-import type { Chapter, PaymentWithInvoice } from '@/types'
+import type { Chapter, PaymentFilters } from '@/types'
 import {
   Avatar,
   Badge,
@@ -34,16 +34,12 @@ import { formatCurrency, formatDateTime } from '@/lib/format'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
-import { usePaginasi } from '@/hooks/usePaginasi'
 import { useTampilan } from '@/hooks/useTampilan'
+import { useHalamanServer, useTertunda } from '@/hooks/useHalamanServer'
 
 export function PaymentListPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { data: payments, loading, error, reload } = useAsync<PaymentWithInvoice[]>(() =>
-    paymentService.list(),
-  )
-
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
   const [searchParams] = useSearchParams()
@@ -95,47 +91,44 @@ export function PaymentListPage() {
   const mtdAktif = dueFrom === awalBulan && dueTo === akhir
   const ytdAktif = dueFrom === awalTahun && dueTo === akhir
 
-  const methodOptions = useMemo(() => {
-    const set = new Set<string>()
-    ;(payments ?? []).forEach((p) => {
-      if (p.paymentMethod) set.add(p.paymentMethod)
-    })
-    return Array.from(set).sort()
-  }, [payments])
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return (payments ?? []).filter((p) => {
-      if (method !== 'all' && (p.paymentMethod ?? '') !== method) return false
-      if (chapterId !== 'all' && p.invoice?.chapterId !== chapterId) return false
-      if (tipe !== 'all' && p.invoice?.type !== tipe) return false
-      const day = p.paidAt ? p.paidAt.slice(0, 10) : ''
-      if (dueFrom && (!day || day < dueFrom)) return false
-      if (dueTo && (!day || day > dueTo)) return false
-      if (
-        q &&
-        !(p.member?.name ?? '').toLowerCase().includes(q) &&
-        !(p.invoice?.number ?? '').toLowerCase().includes(q)
-      )
-        return false
-      return true
-    })
-  }, [payments, search, method, chapterId, tipe, dueFrom, dueTo])
-  const { potongan, paginasi } = usePaginasi(filtered)
+  // Seluruh saringan dijalankan server. Sebelumnya 200 pembayaran terbaru
+  // ditarik lalu disaring dan dijumlahkan di sini, jadi "Total Diterima"
+  // berhenti tumbuh begitu pembayarannya melewati angka itu.
+  const searchTertunda = useTertunda(search)
+  const filterAktif = useMemo<PaymentFilters>(
+    () => ({
+      search: searchTertunda,
+      method,
+      chapterId,
+      type: tipe,
+      paidFrom: dueFrom,
+      paidTo: dueTo,
+      summary: true,
+    }),
+    [searchTertunda, method, chapterId, tipe, dueFrom, dueTo],
+  )
+  const { halaman, loading, error, reload, paginasi } = useHalamanServer(
+    (f: PaymentFilters) => paymentService.listPaged(f),
+    filterAktif,
+  )
+  const potongan = halaman?.rows ?? []
+  const totalBaris = halaman?.total ?? 0
+  const ringkas = halaman?.summary
+  const methodOptions = ringkas?.methods ?? []
+  const adaSaringan =
+    Boolean(searchTertunda.trim() || dueFrom || dueTo) || method !== 'all' || chapterId !== 'all' || tipe !== 'all'
   const [tampilan, setTampilan] = useTampilan('pembayaran')
   const kelas = kelasTampilan(tampilan)
 
-  // Ringkasan mengikuti filter yang sedang aktif.
-  const total = filtered.reduce((acc, p) => acc + p.amount, 0)
-
+  // Ringkasan untuk SELURUH hasil saringan, dijumlahkan server.
+  //
   // MOM: "setiap yang berbau data payment - outstanding terbagi 2 pendaftaran
   // dan renewal". Tipenya diambil dari invoice yang dibayar, bukan dari
   // pembayarannya — pembayaran sendiri tidak punya tipe, dan menebaknya dari
   // nominal akan salah begitu harga pendaftaran dan renewal berdekatan.
-  const jumlahTipe = (t: string) =>
-    filtered.filter((p) => p.invoice?.type === t).reduce((a, p) => a + p.amount, 0)
-  const totalRenewal = jumlahTipe('renewal')
-  const totalPendaftaran = jumlahTipe('registration')
+  const total = ringkas?.amount ?? 0
+  const totalRenewal = ringkas?.byType.renewal ?? 0
+  const totalPendaftaran = ringkas?.byType.registration ?? 0
 
   const chapterName = (id?: string) =>
     id ? (chapters?.find((c) => c.id === id)?.displayName ?? '') : ''
@@ -143,63 +136,84 @@ export function PaymentListPage() {
   const EXPORT_HEADERS = ['Member', 'Chapter', 'No. Invoice', 'Tipe', 'Nominal', 'Metode', 'Waktu Bayar']
   const labelTipe = (t?: string) =>
     t === 'renewal' ? 'Renewal' : t === 'registration' ? 'Pendaftaran' : ''
-  // Raw rows (amount numeric so Excel can sum) — always the FILTERED set.
-  const exportRows = () =>
-    filtered.map((p) => [
-      p.member?.name ?? '',
-      chapterName(p.invoice?.chapterId),
-      p.invoice?.number ?? '',
-      labelTipe(p.invoice?.type),
-      p.amount,
-      paymentMethodLabel(p.paymentMethod),
-      formatDateTime(p.paidAt),
-    ])
-
-  const exportExcel = () =>
-    downloadXlsx('pembayaran', 'Riwayat Pembayaran', EXPORT_HEADERS, exportRows())
-
-  const exportPdf = () => {
-    const ok = printTableReport({
-      title: 'Riwayat Pembayaran',
-      meta: [`${filtered.length} transaksi`, `Dibuat ${formatDateTime(new Date())}`],
-      columns: [
-        { label: 'Member' },
-        { label: 'Chapter' },
-        { label: 'No. Invoice' },
-        { label: 'Tipe' },
-        { label: 'Nominal', align: 'right' },
-        { label: 'Metode' },
-        { label: 'Waktu Bayar' },
-      ],
-      rows: filtered.map((p) => [
-        p.member?.name ?? '—',
-        chapterName(p.invoice?.chapterId) || '—',
-        p.invoice?.number ?? '—',
-        labelTipe(p.invoice?.type) || '—',
-        formatCurrency(p.amount),
-        paymentMethodLabel(p.paymentMethod),
-        formatDateTime(p.paidAt),
-      ]),
-      totals: ['Total', '', '', '', formatCurrency(total), '', ''],
-      documentTitle: 'Riwayat Pembayaran — Business Network International Finance',
-    })
-    if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
+  // Ekspor memuat SELURUH hasil saringan, bukan halaman yang sedang tampil.
+  const [mengekspor, setMengekspor] = useState(false)
+  const ekspor = async (jenis: 'excel' | 'pdf') => {
+    setMengekspor(true)
+    try {
+      const semua = await paymentService.list(filterAktif)
+      if (jenis === 'excel') {
+        // Nominal tetap angka supaya Excel bisa menjumlahkannya.
+        downloadXlsx(
+          'pembayaran',
+          'Riwayat Pembayaran',
+          EXPORT_HEADERS,
+          semua.map((p) => [
+            p.member?.name ?? '',
+            chapterName(p.invoice?.chapterId),
+            p.invoice?.number ?? '',
+            labelTipe(p.invoice?.type),
+            p.amount,
+            paymentMethodLabel(p.paymentMethod),
+            formatDateTime(p.paidAt),
+          ]),
+        )
+        return
+      }
+      const ok = printTableReport({
+        title: 'Riwayat Pembayaran',
+        meta: [`${semua.length} transaksi`, `Dibuat ${formatDateTime(new Date())}`],
+        columns: [
+          { label: 'Member' },
+          { label: 'Chapter' },
+          { label: 'No. Invoice' },
+          { label: 'Tipe' },
+          { label: 'Nominal', align: 'right' },
+          { label: 'Metode' },
+          { label: 'Waktu Bayar' },
+        ],
+        rows: semua.map((p) => [
+          p.member?.name ?? '—',
+          chapterName(p.invoice?.chapterId) || '—',
+          p.invoice?.number ?? '—',
+          labelTipe(p.invoice?.type) || '—',
+          formatCurrency(p.amount),
+          paymentMethodLabel(p.paymentMethod),
+          formatDateTime(p.paidAt),
+        ]),
+        totals: ['Total', '', '', '', formatCurrency(semua.reduce((a, p) => a + p.amount, 0)), '', ''],
+        documentTitle: 'Riwayat Pembayaran — Business Network International Finance',
+      })
+      if (!ok) toast('Izinkan popup di browser untuk mengekspor PDF.', 'error')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengekspor pembayaran.', 'error')
+    } finally {
+      setMengekspor(false)
+    }
   }
 
-  const hasData = !loading && payments && payments.length > 0
+  // Bilah saringan dan kartu tampil begitu halaman pertama tiba, dan tetap
+  // tampil saat saringannya tidak menemukan apa pun.
+  const hasData = Boolean(halaman) && (totalBaris > 0 || adaSaringan)
 
   return (
     <div>
       <PageHeader
         title="Pembayaran"
         description="Riwayat pembayaran yang diterima melalui webhook Paper.id."
-        action={<ExportMenu onExcel={exportExcel} onPdf={exportPdf} disabled={filtered.length === 0} />}
+        action={
+          <ExportMenu
+            onExcel={() => void ekspor('excel')}
+            onPdf={() => void ekspor('pdf')}
+            disabled={totalBaris === 0 || mengekspor}
+          />
+        }
       />
 
       {hasData && (
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <SummaryCard label="Total Diterima" value={formatCurrency(total)} tone="green" />
-          <SummaryCard label="Jumlah Transaksi" value={filtered.length} tone="brand" />
+          <SummaryCard label="Jumlah Transaksi" value={ringkas?.count ?? totalBaris} tone="brand" />
           {/* Kartunya juga menyaring, sama seperti di halaman invoice: menekan
               "Renewal" mempersempit tabel di bawahnya. Angka yang bisa ditekan
               menjawab pertanyaan berikutnya — "yang mana saja itu" — tanpa
@@ -304,15 +318,15 @@ export function PaymentListPage() {
 
         {error ? (
           <ErrorState message={error} onRetry={reload} />
-        ) : loading ? (
+        ) : loading && !halaman ? (
           <TableSkeleton rows={8} cols={5} />
-        ) : !payments || payments.length === 0 ? (
+        ) : totalBaris === 0 && !adaSaringan ? (
           <EmptyState
             icon={Wallet}
             title="Belum ada pembayaran"
             description="Pembayaran akan muncul di sini setelah diterima dari Paper.id."
           />
-        ) : filtered.length === 0 ? (
+        ) : totalBaris === 0 ? (
           <EmptyState
             icon={Wallet}
             title="Tidak ada hasil"

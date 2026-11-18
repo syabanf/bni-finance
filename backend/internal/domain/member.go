@@ -157,8 +157,27 @@ type MemberFilter struct {
 	Search      string
 	RenewalFrom string
 	RenewalTo   string
-	Limit       int
-	Offset      int
+	// IDs membatasi ke member tertentu. Dipakai halaman invoice dan pembayaran
+	// untuk mengambil nama member yang tampil di satu halaman saja, bukan
+	// seluruh direktori.
+	IDs []string
+	// Kelompok: "member" (sudah atau pernah jadi anggota) atau "visitor"
+	// (tamu dan yang pendaftarannya masih diproses).
+	Kelompok string
+	// Kontak: "no-phone", "no-email", atau "no-contact" (tanpa keduanya).
+	Kontak string
+	// PunyaJatuhTempo menyisakan member yang renewal_date-nya terisi.
+	PunyaJatuhTempo bool
+	Limit           int
+	Offset          int
+}
+
+// KelompokMemberValid dan KontakMemberValid menjaga nilai saringan yang
+// dikenal, supaya salah ketik dijawab 400 dan bukan diam-diam diabaikan.
+func KelompokMemberValid(s string) bool { return s == "" || s == "member" || s == "visitor" }
+
+func KontakMemberValid(s string) bool {
+	return s == "" || s == "no-phone" || s == "no-email" || s == "no-contact"
 }
 
 // KunciNamaMember menyamakan "Anasthasia  Winna" dan "anasthasia winna".

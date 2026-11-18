@@ -26,6 +26,8 @@ type listMeta struct {
 	Total  int `json:"total"`
 	Limit  int `json:"limit"`
 	Offset int `json:"offset"`
+	// Summary hanya terisi bila diminta lewat ?summary=true.
+	Summary *domain.PaymentSummary `json:"summary,omitempty"`
 }
 
 type listResponse struct {
@@ -39,6 +41,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		Method:    httpx.Query(r, "method"),
 		PaidFrom:  httpx.Query(r, "paidFrom"),
 		PaidTo:    httpx.Query(r, "paidTo"),
+		Search:    httpx.Query(r, "q"),
+		ChapterID: httpx.Query(r, "chapterId"),
+		Type:      httpx.Query(r, "type"),
 		Limit:     httpx.QueryInt(r, "limit", 50, 1, 200),
 		Offset:    httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
 	}
@@ -48,10 +53,16 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, listResponse{
-		Data: items,
-		Meta: listMeta{Total: total, Limit: f.Limit, Offset: f.Offset},
-	})
+	meta := listMeta{Total: total, Limit: f.Limit, Offset: f.Offset}
+	if httpx.Query(r, "summary") == "true" {
+		ringkas, err := h.svc.Summary(r.Context(), f)
+		if err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+		meta.Summary = ringkas
+	}
+	httpx.JSON(w, http.StatusOK, listResponse{Data: items, Meta: meta})
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {

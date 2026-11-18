@@ -47,7 +47,16 @@ func scan(row scannable) (*domain.Payment, error) {
 	return &p, nil
 }
 
-func (r *Repository) List(ctx context.Context, f domain.PaymentFilter) ([]domain.Payment, int, error) {
+// klausaPayment merakit WHERE untuk PaymentFilter.
+//
+// denganMetode=false membuang saringan metode, untuk daftar metode yang bisa
+// dipilih: dengan saringannya menyala, daftar itu menyusut jadi satu pilihan.
+//
+// Saringan yang menyangkut invoice atau member ditulis sebagai subquery pada
+// invoice_id, bukan JOIN: payments tetap satu-satunya tabel di FROM, jadi
+// kolom tanpa awalan di query pemanggilnya tidak pernah ambigu, dan baris
+// pembayaran tidak bisa tergandakan.
+func klausaPayment(ctx context.Context, f domain.PaymentFilter, denganMetode bool) (string, []any) {
 	where := []string{"1=1"}
 	args := []any{}
 	add := func(clause string, value any) {
@@ -59,14 +68,28 @@ func (r *Repository) List(ctx context.Context, f domain.PaymentFilter) ([]domain
 		add("invoice_id = $%d", f.InvoiceID)
 	}
 	// payments tidak punya chapter_id sendiri — lingkupnya diwarisi dari invoice
-	// induknya. Subquery, bukan JOIN, supaya bentuk query yang sudah ada beserta
-	// penomoran argumennya tidak berubah sama sekali.
+	// induknya.
 	if lim := scope.Chapter(ctx); lim.Buntu {
 		where = append(where, "1=0")
 	} else if lim.Terbatas {
 		add("invoice_id IN (SELECT id FROM invoices WHERE chapter_id = $%d)", lim.ChapterID)
 	}
-	if f.Method != "" {
+	if f.ChapterID != "" {
+		add("invoice_id IN (SELECT id FROM invoices WHERE chapter_id = $%d)", f.ChapterID)
+	}
+	if f.Type != "" {
+		add("invoice_id IN (SELECT id FROM invoices WHERE type = $%d)", domain.InvoiceType(f.Type))
+	}
+	if f.Search != "" {
+		// Dua subquery, bukan satu JOIN dengan OR: masing-masing bisa memakai
+		// indeks trigramnya sendiri (nomor invoice, nama member). Digabung
+		// dengan OR dalam satu JOIN, Postgres memindai seluruh invoice.
+		add(`(invoice_id IN (SELECT id FROM invoices WHERE number ILIKE $%[1]d)
+			OR invoice_id IN (
+				SELECT id FROM invoices WHERE member_id IN (
+					SELECT id FROM members WHERE name ILIKE $%[1]d)))`, "%"+f.Search+"%")
+	}
+	if denganMetode && f.Method != "" {
 		add("payment_method = $%d", f.Method)
 	}
 	if f.PaidFrom != "" {
@@ -76,7 +99,59 @@ func (r *Repository) List(ctx context.Context, f domain.PaymentFilter) ([]domain
 		add("paid_at < ($%d::date + interval '1 day')", f.PaidTo)
 	}
 
-	clause := strings.Join(where, " AND ")
+	return strings.Join(where, " AND "), args
+}
+
+// Summary menjumlahkan SELURUH hasil filter, dipecah menurut tipe invoice.
+func (r *Repository) Summary(ctx context.Context, f domain.PaymentFilter) (*domain.PaymentSummary, error) {
+	clause, args := klausaPayment(ctx, f, true)
+	rows, err := r.db.Query(ctx, `
+		SELECT i.type, COUNT(*), COALESCE(SUM(p.amount), 0)
+		FROM payments p JOIN invoices i ON i.id = p.invoice_id
+		WHERE p.id IN (SELECT id FROM payments WHERE `+clause+`)
+		GROUP BY i.type`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("ringkas payment: %w", err)
+	}
+	defer rows.Close()
+
+	out := &domain.PaymentSummary{ByType: map[string]int64{}}
+	for rows.Next() {
+		var tipe string
+		var n int
+		var jumlah int64
+		if err := rows.Scan(&tipe, &n, &jumlah); err != nil {
+			return nil, fmt.Errorf("scan ringkasan payment: %w", err)
+		}
+		out.Count += n
+		out.Amount += jumlah
+		out.ByType[tipe] = jumlah
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	clause, args = klausaPayment(ctx, f, false)
+	metode, err := r.db.Query(ctx, `
+		SELECT DISTINCT payment_method FROM payments
+		WHERE payment_method IS NOT NULL AND payment_method <> '' AND `+clause+`
+		ORDER BY payment_method`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("daftar metode: %w", err)
+	}
+	defer metode.Close()
+	for metode.Next() {
+		var m string
+		if err := metode.Scan(&m); err != nil {
+			return nil, fmt.Errorf("scan metode: %w", err)
+		}
+		out.Methods = append(out.Methods, m)
+	}
+	return out, metode.Err()
+}
+
+func (r *Repository) List(ctx context.Context, f domain.PaymentFilter) ([]domain.Payment, int, error) {
+	clause, args := klausaPayment(ctx, f, true)
 
 	var total int
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) FROM payments WHERE "+clause, args...).Scan(&total); err != nil {

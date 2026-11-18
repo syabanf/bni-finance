@@ -75,6 +75,26 @@ type PaymentFilter struct {
 	Method    string
 	PaidFrom  string
 	PaidTo    string
+	// Search mencocokkan nomor invoice atau nama member pembayarnya.
+	Search string
+	// ChapterID dan Type menyaring lewat invoice induknya: payments tidak
+	// menyimpan chapter maupun tipe sendiri.
+	ChapterID string
+	Type      string
 	Limit     int
 	Offset    int
+}
+
+// PaymentSummary adalah agregat untuk SELURUH hasil filter, bukan halaman yang
+// sedang tampil. Alasannya sama dengan InvoiceSummary: kartu ringkasan yang
+// dihitung dari satu halaman menampilkan angka uang yang terlalu kecil tanpa
+// tanda apa pun.
+type PaymentSummary struct {
+	Count  int   `json:"count"`
+	Amount int64 `json:"amount"`
+	// ByType dijumlahkan menurut tipe invoice induknya.
+	ByType map[string]int64 `json:"byType"`
+	// Methods adalah metode yang muncul di hasil filter TANPA saringan
+	// metodenya, untuk mengisi pilihan saringan itu.
+	Methods []string `json:"methods"`
 }

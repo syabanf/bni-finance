@@ -1,6 +1,7 @@
-import { api, query, type ListResponse } from '@/lib/apiClient'
+import { api } from '@/lib/apiClient'
 import type { UserRepository } from '@/services/types'
 import type { ManagedUser } from '@/types'
+import { tarikSemua } from './kumpulan'
 
 /**
  * Pengelolaan akun lewat backend Go.
@@ -10,8 +11,7 @@ import type { ManagedUser } from '@/types'
  */
 export const apiUserRepository: UserRepository = {
   async list() {
-    const res = await api.get<ListResponse<ManagedUser>>(`/users${query({ limit: 200 })}`)
-    return res.data
+    return tarikSemua<ManagedUser>('/users')
   },
 
   async create(input) {

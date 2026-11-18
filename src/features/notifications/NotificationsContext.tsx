@@ -95,7 +95,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           dueTo: besok7.toISOString().slice(0, 10),
           limit: BATAS_INVOICE,
         }),
-        paymentService.list(),
+        // Hanya yang akan ditampilkan. Blok ini berjalan di setiap pemuatan
+        // aplikasi, jadi menarik seluruh riwayat pembayaran di sini berarti
+        // setiap halaman membayarnya.
+        paymentService.listPaged({ limit: PAYMENT_LIMIT }).then((h) => h.rows),
       ])
       setItems(buildNotifications([...telat.rows, ...segera.rows], payments))
     } catch {

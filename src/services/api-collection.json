@@ -521,6 +521,20 @@
           "description": ""
         },
         {
+          "name": "ids",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Id invoice berpisah koma, paling banyak 200. Dipakai halaman pembayaran untuk mengambil invoice milik baris yang sedang tampil. Entri yang bukan UUID diabaikan."
+        },
+        {
+          "name": "memberIds",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Id member berpisah koma, paling banyak 200."
+        },
+        {
           "name": "q",
           "in": "query",
           "required": false,
@@ -1076,6 +1090,41 @@
           "description": "Inklusif — mencakup seluruh hari itu."
         },
         {
+          "name": "q",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Pencarian pada nomor invoice atau nama member pembayarnya."
+        },
+        {
+          "name": "chapterId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Chapter invoice yang dibayar."
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "registration",
+            "renewal"
+          ],
+          "description": "Tipe invoice yang dibayar."
+        },
+        {
+          "name": "summary",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "true"
+          ],
+          "description": "true menambahkan meta.summary untuk seluruh hasil filter: count, amount, byType (jumlah per tipe invoice), dan methods (metode yang ada tanpa saringan metodenya)."
+        },
+        {
           "name": "limit",
           "in": "query",
           "required": false,
@@ -1317,7 +1366,7 @@
           "in": "query",
           "required": false,
           "type": "string",
-          "description": "Pencarian pada nama, email, atau perusahaan."
+          "description": "Pencarian pada nama, id, email, atau perusahaan."
         },
         {
           "name": "renewalFrom",
@@ -1332,6 +1381,56 @@
           "required": false,
           "type": "string",
           "description": ""
+        },
+        {
+          "name": "ids",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Id member berpisah koma, paling banyak 200. Dipakai halaman invoice dan pembayaran untuk mengambil member milik baris yang sedang tampil, bukan seluruh direktori."
+        },
+        {
+          "name": "kelompok",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "member",
+            "visitor"
+          ],
+          "description": "visitor mencakup status visitor dan pending; member mencakup sisanya, termasuk inactive."
+        },
+        {
+          "name": "kontak",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "no-phone",
+            "no-email",
+            "no-contact"
+          ],
+          "description": "Kelengkapan kontak. Nilai yang hanya berisi spasi dihitung kosong."
+        },
+        {
+          "name": "punyaJatuhTempo",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "true"
+          ],
+          "description": "true menyisakan member yang tanggal jatuh temponya terisi."
+        },
+        {
+          "name": "summary",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "true"
+          ],
+          "description": "true menambahkan meta.summary.byStatus: jumlah member per status untuk seluruh hasil filter, tanpa saringan status."
         },
         {
           "name": "limit",

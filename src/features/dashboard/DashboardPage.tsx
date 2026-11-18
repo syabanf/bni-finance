@@ -159,8 +159,10 @@ export function DashboardPage() {
     () => dashboardService.summary(tipe === 'all' ? undefined : { type: tipe }),
     [tipe],
   )
+  // Enam invoice terbaru saja. Sebelumnya seluruh daftar invoice ditarik lalu
+  // lima dari enam ratus barisnya dibuang di sini.
   const { data: recent, loading: recentLoading } = useAsync<InvoiceWithRelations[]>(() =>
-    invoiceService.list(),
+    invoiceService.listPaged({ limit: 6 }).then((h) => h.rows),
   )
 
   const donutData: DonutSegment[] =
@@ -298,7 +300,7 @@ export function DashboardPage() {
             <TableSkeleton rows={6} cols={6} />
           ) : (
             <>
-              <InvoiceTable invoices={recent.slice(0, 6)} compact />
+              <InvoiceTable invoices={recent} compact />
               <div className="px-5 py-3 text-xs text-ink-400">
                 Menampilkan {Math.min(6, recent.length)} dari {recent.length} invoice
               </div>

@@ -31,10 +31,24 @@ type Store interface {
 var _ Store = (*Repository)(nil)
 
 type Service struct {
-	repo Store
+	repo         Store
+	setelahTulis func(context.Context)
 }
 
 func NewService(repo Store) *Service { return &Service{repo: repo} }
+
+// SetelahTulis mendaftarkan fungsi yang dipanggil setiap kali layanan ini
+// berhasil menulis. Dipakai untuk menggugurkan cache ringkasan dashboard.
+func (s *Service) SetelahTulis(fn func(context.Context)) *Service {
+	s.setelahTulis = fn
+	return s
+}
+
+func (s *Service) kabari(ctx context.Context, err error) {
+	if err == nil && s.setelahTulis != nil {
+		s.setelahTulis(ctx)
+	}
+}
 
 func (s *Service) List(ctx context.Context, f domain.InvoiceFilter) ([]domain.Invoice, int, error) {
 	items, total, err := s.repo.List(ctx, f)
@@ -102,7 +116,9 @@ func (s *Service) Create(ctx context.Context, in domain.CreateInvoiceInput) (*do
 		number = *in.Number
 	}
 
-	return s.repo.Create(ctx, in, number, currency)
+	inv, err := s.repo.Create(ctx, in, number, currency)
+	s.kabari(ctx, err)
+	return inv, err
 }
 
 // Update applies a patch, rejecting illegal status transitions so an invoice
@@ -124,7 +140,9 @@ func (s *Service) Update(ctx context.Context, id string, in domain.UpdateInvoice
 		return nil, httpx.Conflict(err.Error())
 	}
 
-	return s.repo.Update(ctx, id, in)
+	inv, err := s.repo.Update(ctx, id, in)
+	s.kabari(ctx, err)
+	return inv, err
 }
 
 const errBukanDraft = "hanya invoice draft yang bisa dihapus; batalkan invoice yang sudah dikirim"
@@ -148,7 +166,9 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	if n > 0 {
 		return httpx.Conflict("invoice masih punya data pembayaran — batalkan invoice alih-alih menghapusnya")
 	}
-	return s.repo.Delete(ctx, id)
+	err = s.repo.Delete(ctx, id)
+	s.kabari(ctx, err)
+	return err
 }
 
 // MarkOverdue is a helper the caller can schedule: any sent invoice past its

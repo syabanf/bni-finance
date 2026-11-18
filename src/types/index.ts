@@ -289,6 +289,62 @@ export interface InvoicePage {
   summary?: InvoiceSummary
 }
 
+/** Saringan daftar member. Seluruhnya dijalankan server. */
+export interface MemberFilters {
+  search?: string
+  chapterId?: string | 'all'
+  status?: MemberStatus | 'all'
+  /** `visitor` mencakup tamu dan yang pendaftarannya masih diproses. */
+  kelompok?: 'all' | 'member' | 'visitor'
+  kontak?: 'all' | 'no-phone' | 'no-email' | 'no-contact'
+  /** Hanya member yang tanggal jatuh temponya terisi. */
+  punyaJatuhTempo?: boolean
+  dueFrom?: string
+  dueTo?: string
+  limit?: number
+  offset?: number
+  /** Minta hitungan per status untuk seluruh hasil filter. */
+  summary?: boolean
+}
+
+/** Satu halaman member, beserta hitungan untuk keseluruhan hasil filter. */
+export interface MemberPage {
+  rows: MemberWithChapter[]
+  total: number
+  /** Dihitung TANPA saringan status, supaya kartu status lain tidak nol. */
+  summary?: { byStatus: Partial<Record<MemberStatus, number>> }
+}
+
+/** Saringan daftar pembayaran. Seluruhnya dijalankan server. */
+export interface PaymentFilters {
+  /** Nomor invoice atau nama member. */
+  search?: string
+  method?: string | 'all'
+  chapterId?: string | 'all'
+  /** Tipe invoice yang dibayar. */
+  type?: InvoiceType | 'all'
+  paidFrom?: string
+  paidTo?: string
+  limit?: number
+  offset?: number
+  summary?: boolean
+}
+
+export interface PaymentSummary {
+  count: number
+  amount: number
+  byType: Partial<Record<InvoiceType, number>>
+  /** Metode yang ada di hasil filter tanpa saringan metodenya. */
+  methods: string[]
+}
+
+/** Satu halaman pembayaran, beserta jumlah untuk keseluruhan hasil filter. */
+export interface PaymentPage {
+  rows: PaymentWithInvoice[]
+  total: number
+  summary?: PaymentSummary
+}
+
 export interface RenewalDueMember extends MemberWithChapter {
   /** The most recent invoice whose period is ending. */
   lastInvoice: Invoice

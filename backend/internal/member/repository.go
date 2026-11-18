@@ -82,7 +82,12 @@ func scan(row scannable, extra ...any) (*domain.Member, error) {
 	return &m, nil
 }
 
-func (r *Repository) List(ctx context.Context, f domain.MemberFilter) ([]domain.Member, int, error) {
+// klausaMember merakit WHERE untuk MemberFilter.
+//
+// denganStatus=false membuang saringan status. Ringkasan per status
+// membutuhkannya: dengan saringan status menyala, semua status lain selalu
+// terhitung nol dan kartu ringkasan tidak lagi bisa dipakai berpindah status.
+func klausaMember(ctx context.Context, f domain.MemberFilter, denganStatus bool) (string, []any) {
 	where := []string{"1=1"}
 	args := []any{}
 	add := func(clause string, value any) {
@@ -101,15 +106,39 @@ func (r *Repository) List(ctx context.Context, f domain.MemberFilter) ([]domain.
 		}
 		where = append(where, klausa)
 	}
-	if f.Status != "" {
+	if denganStatus && f.Status != "" {
 		add("m.status = $%d", domain.MemberStatus(f.Status))
+	}
+	if len(f.IDs) > 0 {
+		add("m.id = ANY($%d)", f.IDs)
+	}
+	switch f.Kelompok {
+	case "visitor":
+		where = append(where, "m.status IN ('pending','visitor')")
+	case "member":
+		where = append(where, "m.status NOT IN ('pending','visitor')")
+	}
+	// Kelengkapan kontak. Spasi saja dihitung kosong, sama dengan cara
+	// penerbitan invoice menilainya.
+	const tanpaHP = "coalesce(btrim(m.phone), '') = ''"
+	const tanpaEmail = "coalesce(btrim(m.email), '') = ''"
+	switch f.Kontak {
+	case "no-phone":
+		where = append(where, tanpaHP)
+	case "no-email":
+		where = append(where, tanpaEmail)
+	case "no-contact":
+		where = append(where, tanpaHP, tanpaEmail)
+	}
+	if f.PunyaJatuhTempo {
+		where = append(where, "m.renewal_date IS NOT NULL")
 	}
 	if f.Search != "" {
 		args = append(args, "%"+f.Search+"%")
 		n := len(args)
 		where = append(where, fmt.Sprintf(
-			"(m.name ILIKE $%d OR coalesce(m.email,'') ILIKE $%d OR coalesce(m.company,'') ILIKE $%d)",
-			n, n, n))
+			"(m.name ILIKE $%d OR m.id ILIKE $%d OR coalesce(m.email,'') ILIKE $%d OR coalesce(m.company,'') ILIKE $%d)",
+			n, n, n, n))
 	}
 	if f.RenewalFrom != "" {
 		add("m.renewal_date >= $%d", f.RenewalFrom)
@@ -118,7 +147,33 @@ func (r *Repository) List(ctx context.Context, f domain.MemberFilter) ([]domain.
 		add("m.renewal_date <= $%d", f.RenewalTo)
 	}
 
-	clause := strings.Join(where, " AND ")
+	return strings.Join(where, " AND "), args
+}
+
+// Summary menghitung member per status untuk SELURUH hasil filter, tanpa
+// saringan statusnya. Lihat klausaMember.
+func (r *Repository) Summary(ctx context.Context, f domain.MemberFilter) (map[string]int, error) {
+	clause, args := klausaMember(ctx, f, false)
+	rows, err := r.db.Query(ctx, "SELECT m.status, COUNT(*) "+from+" WHERE "+clause+" GROUP BY m.status", args...)
+	if err != nil {
+		return nil, fmt.Errorf("ringkas member: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[string]int{}
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return nil, fmt.Errorf("scan ringkasan member: %w", err)
+		}
+		out[status] = n
+	}
+	return out, rows.Err()
+}
+
+func (r *Repository) List(ctx context.Context, f domain.MemberFilter) ([]domain.Member, int, error) {
+	clause, args := klausaMember(ctx, f, true)
 
 	var total int
 	if err := r.db.QueryRow(ctx, "SELECT COUNT(*) "+from+" WHERE "+clause, args...).Scan(&total); err != nil {
