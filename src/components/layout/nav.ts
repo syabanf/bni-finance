@@ -89,3 +89,25 @@ export const NAV: NavNode[] = [
   { kind: 'section', label: 'Bantuan' },
   { kind: 'item', to: '/panduan', label: 'Panduan', icon: BookOpen },
 ]
+
+const SEMUA_TUJUAN = NAV.flatMap((n): { to: string; end?: boolean }[] =>
+  n.kind === 'item' ? [n] : n.kind === 'group' ? n.children : [],
+)
+
+/**
+ * Tujuan menu yang cocok dengan alamat ini. Bila beberapa cocok, yang
+ * terpanjang menang.
+ *
+ * `/members/lama-keanggotaan` berawalan `/members`, jadi dengan pencocokan
+ * awalan biasa menu Member ikut menyala di halaman Lama Keanggotaan dan dua
+ * menu tampak terpilih sekaligus. Halaman detail seperti `/members/123` tetap
+ * menyalakan Member, karena tidak ada tujuan lain yang lebih panjang.
+ */
+export function tujuanAktif(pathname: string): string | null {
+  let terbaik: string | null = null
+  for (const { to, end } of SEMUA_TUJUAN) {
+    const cocok = pathname === to || (!end && pathname.startsWith(`${to}/`))
+    if (cocok && (terbaik === null || to.length > terbaik.length)) terbaik = to
+  }
+  return terbaik
+}
