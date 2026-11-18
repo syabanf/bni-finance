@@ -22,6 +22,7 @@
  * Empat sampai enam langkah per halaman. Lebih dari itu, orang berhenti
  * menyimak sebelum sampai akhir.
  */
+import { TARIK_VM_TAMPIL } from '@/lib/fitur'
 
 export interface TourStep {
   /** Nilai atribut data-tour pada elemen yang disorot. Kosong = di tengah layar. */
@@ -363,18 +364,22 @@ export const TOURS: Tour[] = [
           'Data ini yang dipakai saat tagihan dikirim, jadi ketepatannya berpengaruh langsung ' +
           'pada apakah pesannya sampai.',
       },
-      {
-        anchor: 'sync-run',
-        title: 'Menarik data terbaru',
-        body:
-          'Tombol ini menarik data keanggotaan dari sistem Business Network International VM, ' +
-          'supaya daftar di sini tidak perlu dijaga manual. ' +
-          'Menjalankannya dua kali berturut-turut tidak menggandakan data — ' +
-          'yang sudah ada diperbarui, bukan ditambahkan lagi, jadi aman mengulang ' +
-          'bila Anda ragu apakah yang tadi berhasil. ' +
-          'Member yang hilang dari sumber dinonaktifkan, bukan dihapus, ' +
-          'karena tagihan lama mereka harus tetap bisa ditelusuri.',
-      },
+      ...(TARIK_VM_TAMPIL
+        ? [
+          {
+            anchor: 'sync-run',
+            title: 'Menarik data terbaru',
+            body:
+              'Tombol ini menarik data keanggotaan dari sistem Business Network International VM, ' +
+              'supaya daftar di sini tidak perlu dijaga manual. ' +
+              'Menjalankannya dua kali berturut-turut tidak menggandakan data — ' +
+              'yang sudah ada diperbarui, bukan ditambahkan lagi, jadi aman mengulang ' +
+              'bila Anda ragu apakah yang tadi berhasil. ' +
+              'Member yang hilang dari sumber dinonaktifkan, bukan dihapus, ' +
+              'karena tagihan lama mereka harus tetap bisa ditelusuri.',
+          },
+          ]
+        : []),
       {
         anchor: 'member-filters',
         title: 'Menemukan yang bermasalah',

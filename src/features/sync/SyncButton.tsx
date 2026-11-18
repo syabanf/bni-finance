@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { Button, useToast } from '@/components/ui'
 import { useCan } from '@/features/auth/usePermission'
+import { TARIK_VM_TAMPIL } from '@/lib/fitur'
 
 /**
  * Tombol tarik-data, dipakai di halaman Member dan Chapter.
@@ -28,7 +29,7 @@ export function SyncButton({
   const boleh = useCan('sync:run')
   const [sibuk, setSibuk] = useState(false)
 
-  if (!boleh) return null
+  if (!TARIK_VM_TAMPIL || !boleh) return null
 
   const jalankan = async () => {
     setSibuk(true)

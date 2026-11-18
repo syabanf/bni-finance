@@ -34,6 +34,7 @@ import {
 } from '@/components/ui'
 import { getToken } from '@/lib/apiClient'
 import { SUMBER_TERKUNCI, isMockMode } from '@/services/dataSource'
+import { JUDUL_INTEGRASI } from '@/lib/fitur'
 import { autofill } from '@/services/apiAutofill'
 import { BodyForm } from './BodyForm'
 import {
@@ -609,7 +610,7 @@ export function ApiConsolePage() {
         <p className="mt-3 text-sm text-ink-500">
           Sumber data sedang <strong>Backend API</strong>, jadi perubahan tersimpan sungguhan.
           {!SUMBER_TERKUNCI &&
-            ' Untuk mencoba tanpa risiko, alihkan ke Data Contoh di halaman Integrasi & Sumber Data.'}
+            ` Untuk mencoba tanpa risiko, alihkan ke Data Contoh di halaman ${JUDUL_INTEGRASI}.`}
         </p>
       </Modal>
     </div>

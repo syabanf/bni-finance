@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/ui'
 import { BniVmCard } from './components/BniVmCard'
 import { DataSourceCard } from './components/DataSourceCard'
 import { SUMBER_TERKUNCI } from '@/services/dataSource'
+import { JUDUL_INTEGRASI, TARIK_VM_TAMPIL } from '@/lib/fitur'
 
 /**
  * Alamat API, token, dan pemilihan sumber data.
@@ -19,15 +20,13 @@ export function IntegrasiPage() {
   return (
     <div>
       <PageHeader
-        title={SUMBER_TERKUNCI ? 'Integrasi' : 'Integrasi & Sumber Data'}
+        title={JUDUL_INTEGRASI}
         description={
-          SUMBER_TERKUNCI
-            ? 'Sambungan ke sistem luar.'
-            : 'Sambungan ke sistem luar, dan dari mana aplikasi membaca datanya.'
+          TARIK_VM_TAMPIL ? 'Sambungan ke sistem luar.' : 'Dari mana aplikasi membaca datanya.'
         }
       />
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <BniVmCard />
+        {TARIK_VM_TAMPIL && <BniVmCard />}
         {!SUMBER_TERKUNCI && <DataSourceCard />}
       </div>
     </div>

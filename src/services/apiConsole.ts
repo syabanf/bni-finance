@@ -11,6 +11,7 @@
 
 import { apiBaseUrl, getToken } from '@/lib/apiClient'
 import { isMockMode } from './dataSource'
+import { TARIK_VM_TAMPIL } from '@/lib/fitur'
 import { mockApiFetch } from './mock/mockApi'
 
 export interface ConsoleParam {
@@ -87,7 +88,11 @@ let cached: Promise<ApiCollection> | null = null
  * oleh halaman Konsol API yang ada di balik izin settings:manage.
  */
 export function loadCollection(): Promise<ApiCollection> {
-  cached ??= import('./api-collection.json').then((m) => m.default as unknown as ApiCollection)
+  cached ??= import('./api-collection.json').then((m) => {
+    const semua = m.default as unknown as ApiCollection
+    if (TARIK_VM_TAMPIL) return semua
+    return { ...semua, operations: semua.operations.filter((o) => !o.path.startsWith('/api/v1/sync')) }
+  })
   return cached
 }
 
