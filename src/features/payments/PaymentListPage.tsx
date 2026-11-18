@@ -23,6 +23,9 @@ import {
   Th,
   Tr,
   useToast,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { cn } from '@/lib/cn'
@@ -31,6 +34,8 @@ import { formatCurrency, formatDateTime } from '@/lib/format'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan } from '@/hooks/useTampilan'
 
 export function PaymentListPage() {
   const navigate = useNavigate()
@@ -116,6 +121,9 @@ export function PaymentListPage() {
       return true
     })
   }, [payments, search, method, chapterId, tipe, dueFrom, dueTo])
+  const { potongan, paginasi } = usePaginasi(filtered)
+  const [tampilan, setTampilan] = useTampilan('pembayaran')
+  const kelas = kelasTampilan(tampilan)
 
   // Ringkasan mengikuti filter yang sedang aktif.
   const total = filtered.reduce((acc, p) => acc + p.amount, 0)
@@ -227,6 +235,7 @@ export function PaymentListPage() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-3">
+              <TampilanToggle value={tampilan} onChange={setTampilan} />
               <Select value={method} onChange={(e) => setMethod(e.target.value)} className="w-full sm:w-48" aria-label="Filter metode pembayaran">
                 <option value="all">Semua Metode</option>
                 {methodOptions.map((m) => (
@@ -311,9 +320,9 @@ export function PaymentListPage() {
           />
         ) : (
           <>
-            {/* Mobile card list */}
-            <div className="divide-y divide-ink-100 lg:hidden">
-              {filtered.map((p) => (
+            {/* Kartu */}
+            <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
+              {potongan.map((p) => (
                 <div
                   key={p.id}
                   onClick={() => navigate(`/payments/${p.id}`)}
@@ -342,8 +351,8 @@ export function PaymentListPage() {
               ))}
             </div>
 
-            {/* Desktop table */}
-            <div className="hidden lg:block">
+            {/* Tabel */}
+            <div className={kelas.tabel}>
               <Table>
                 <THead>
                   <Tr>
@@ -356,7 +365,7 @@ export function PaymentListPage() {
                   </Tr>
                 </THead>
                 <TBody>
-                  {filtered.map((p) => (
+                  {potongan.map((p) => (
                     <Tr key={p.id} onClick={() => navigate(`/payments/${p.id}`)}>
                       <Td>
                         <div className="flex items-center gap-3">
@@ -386,9 +395,7 @@ export function PaymentListPage() {
                 </TBody>
               </Table>
             </div>
-            <div className="px-5 py-3 text-xs text-ink-400">
-              Menampilkan {filtered.length} dari {payments.length} pembayaran
-            </div>
+            <Pagination {...paginasi} satuan="pembayaran" />
           </>
         )}
       </Card>

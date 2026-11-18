@@ -20,6 +20,9 @@ import {
   Tr,
   TableSkeleton,
   useToast,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
@@ -30,6 +33,9 @@ import { makeExportHandlers } from '@/lib/exporters'
 import { muatStatusRenewal } from '@/features/renewal/statusRenewal'
 import { buatMassal, pesanMassal } from './lib/buatMassal'
 import { KonfirmasiBadge } from '@/features/renewal/components/KonfirmasiBadge'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan } from '@/hooks/useTampilan'
+import { cn } from '@/lib/cn'
 
 type Urgency = 'all' | 'overdue' | 'week' | 'later'
 
@@ -80,6 +86,9 @@ export function RenewalDuePage() {
       return true
     })
   }, [members, search, urgency])
+  const { potongan, paginasi } = usePaginasi(filtered)
+  const [tampilan, setTampilan] = useTampilan('jatuh-tempo')
+  const kelas = kelasTampilan(tampilan)
 
   const bisaDipilih = filtered.filter((m) => boleh(m.id))
   const allSelected = bisaDipilih.length > 0 && bisaDipilih.every((m) => selected.has(m.id))
@@ -183,6 +192,7 @@ export function RenewalDuePage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <TampilanToggle value={tampilan} onChange={setTampilan} />
             <Select
               aria-label="Filter urgensi"
               value={urgency}
@@ -246,9 +256,9 @@ export function RenewalDuePage() {
           />
         ) : (
           <>
-            {/* Mobile cards */}
-            <div className="divide-y divide-ink-100 lg:hidden">
-              {filtered.map((m) => (
+            {/* Kartu */}
+            <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
+              {potongan.map((m) => (
                 <div
                   key={m.id}
                   onClick={() => toggle(m.id)}
@@ -282,8 +292,8 @@ export function RenewalDuePage() {
                 </div>
               ))}
             </div>
-            {/* Desktop table */}
-            <div className="hidden lg:block">
+            {/* Tabel */}
+            <div className={kelas.tabel}>
               <Table>
                 <THead>
                   <Tr>
@@ -306,7 +316,7 @@ export function RenewalDuePage() {
                   </Tr>
                 </THead>
                 <TBody>
-                  {filtered.map((m) => (
+                  {potongan.map((m) => (
                     <Tr key={m.id} onClick={() => toggle(m.id)} className={selected.has(m.id) ? 'bg-brand-50/40' : ''}>
                       <Td>
                         <input
@@ -344,6 +354,7 @@ export function RenewalDuePage() {
                 </TBody>
               </Table>
             </div>
+            <Pagination {...paginasi} satuan="member" />
           </>
         )}
       </Card>

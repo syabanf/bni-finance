@@ -21,6 +21,9 @@ import {
   Th,
   THead,
   Tr,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, memberService } from '@/services'
@@ -29,6 +32,9 @@ import { formatCurrency, formatDate } from '@/lib/format'
 import { bolehDitagih } from '@/lib/status'
 import { useCan } from '@/features/auth/usePermission'
 import { UbahMemberModal } from './components/UbahMemberModal'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan } from '@/hooks/useTampilan'
+import { cn } from '@/lib/cn'
 
 export function MemberDetailPage() {
   const { id = '' } = useParams()
@@ -46,6 +52,9 @@ export function MemberDetailPage() {
     [id],
   )
   const { data: invoices } = useAsync<Invoice[]>(() => invoiceService.listByMember(id), [id])
+  const { potongan, paginasi } = usePaginasi(invoices, 10)
+  const [tampilan, setTampilan] = useTampilan('riwayat-invoice')
+  const kelas = kelasTampilan(tampilan)
 
   if (loading) return <LoadingState label="Memuat member…" />
   if (!member)
@@ -202,14 +211,15 @@ export function MemberDetailPage() {
                 ? `Keanggotaan aktif s/d ${formatDate(activePeriodEnd)}`
                 : 'Belum ada keanggotaan aktif'
             }
+            action={<TampilanToggle value={tampilan} onChange={setTampilan} />}
           />
           {!invoices || invoices.length === 0 ? (
             <EmptyState title="Belum ada invoice" description="Member ini belum memiliki invoice." />
           ) : (
             <>
-              {/* Mobile cards */}
-              <div className="divide-y divide-ink-100 lg:hidden">
-                {invoices.map((inv) => (
+              {/* Kartu */}
+              <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
+                {potongan.map((inv) => (
                   <div
                     key={inv.id}
                     onClick={() => navigate(`/invoices/${inv.id}`)}
@@ -233,8 +243,8 @@ export function MemberDetailPage() {
                   </div>
                 ))}
               </div>
-              {/* Desktop table */}
-              <div className="hidden lg:block">
+              {/* Tabel */}
+              <div className={kelas.tabel}>
                 <Table>
                   <THead>
                     <Tr>
@@ -246,7 +256,7 @@ export function MemberDetailPage() {
                     </Tr>
                   </THead>
                   <TBody>
-                    {invoices.map((inv) => (
+                    {potongan.map((inv) => (
                       <Tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}>
                         <Td>
                           <span className="font-mono text-[13px] text-ink-700">{inv.number}</span>
@@ -266,6 +276,7 @@ export function MemberDetailPage() {
                   </TBody>
                 </Table>
               </div>
+              <Pagination {...paginasi} satuan="invoice" />
             </>
           )}
         </Card>

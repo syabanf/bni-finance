@@ -22,6 +22,7 @@ import {
   Th,
   Tr,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, importService, memberService, renewalService, userService } from '@/services'
@@ -32,6 +33,7 @@ import { muatStatusRenewal } from './statusRenewal'
 import { formatDate } from '@/lib/format'
 import { bolehDitagih } from '@/lib/status'
 import { cn } from '@/lib/cn'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 /**
  * Konfirmasi renewal — ST menanyakan, MC menjawab.
@@ -166,6 +168,7 @@ export function RenewalPage() {
     const d = permintaan.data ?? []
     return chapterFilter === 'all' ? d : d.filter((r) => r.chapterId === chapterFilter)
   }, [permintaan.data, chapterFilter])
+  const { potongan, paginasi } = usePaginasi(tersaring)
 
   const ringkas = useMemo(() => {
     const d = tersaring
@@ -413,7 +416,7 @@ export function RenewalPage() {
                 </Tr>
               </THead>
               <TBody>
-                {tersaring.map((r) => (
+                {potongan.map((r) => (
                   <Tr key={r.id}>
                     {bolehMenjawab && (
                       <Td>
@@ -501,6 +504,7 @@ export function RenewalPage() {
             </Table>
           )}
         </CardBody>
+        <Pagination {...paginasi} satuan="permintaan" />
       </Card>
     </div>
   )

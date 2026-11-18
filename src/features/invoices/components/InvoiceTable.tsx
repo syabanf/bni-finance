@@ -13,11 +13,13 @@ import {
   THead,
   Tr,
   useToast,
+  kelasTampilan,
 } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { daysUntil } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { invoiceService } from '@/services'
+import type { Tampilan } from '@/hooks/useTampilan'
 
 /** Relative due-date hint, e.g. "3 hari lagi" / "terlambat 5 hari". Only for unpaid issued invoices. */
 function DueHint({ dueDate, status }: { dueDate: string; status: InvoiceWithRelations['status'] }) {
@@ -36,6 +38,8 @@ interface InvoiceTableProps {
   compact?: boolean
   selected?: Set<string>
   onSelectChange?: (s: Set<string>) => void
+  /** Kosong berarti mengikuti lebar layar: kartu di bawah lg, tabel di atasnya. */
+  tampilan?: Tampilan
 }
 
 /**
@@ -97,7 +101,8 @@ function canRemind(inv: InvoiceWithRelations): boolean {
   return inv.status === 'sent' || inv.status === 'overdue'
 }
 
-export function InvoiceTable({ invoices, compact = false, selected, onSelectChange }: InvoiceTableProps) {
+export function InvoiceTable({ invoices, compact = false, selected, onSelectChange, tampilan }: InvoiceTableProps) {
+  const kelas = tampilan ? kelasTampilan(tampilan) : { kartu: 'lg:hidden', tabel: 'hidden lg:block' }
   const selectable = !!onSelectChange
   const navigate = useNavigate()
   const [sortKey, setSortKey] = useState<SortKey>('dueDate')
@@ -167,8 +172,8 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
 
   return (
     <>
-      {/* Mobile card list */}
-      <div className="divide-y divide-ink-100 lg:hidden">
+      {/* Kartu */}
+      <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
         {selectable && (
           <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-50">
             <input
@@ -237,8 +242,8 @@ export function InvoiceTable({ invoices, compact = false, selected, onSelectChan
         })}
       </div>
 
-      {/* Desktop table */}
-      <div className="hidden lg:block">
+      {/* Tabel */}
+      <div className={kelas.tabel}>
         <Table>
           <THead>
             <Tr>

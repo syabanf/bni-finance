@@ -22,6 +22,9 @@ import {
   PageHeader,
   StatCard,
   TableSkeleton,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { dashboardService, invoiceService } from '@/services'
@@ -30,6 +33,8 @@ import { InvoiceTable } from '@/features/invoices/components/InvoiceTable'
 import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
 import { INVOICE_STATUS_COLOR, INVOICE_STATUS_LABEL } from '@/lib/status'
 import { cn } from '@/lib/cn'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan } from '@/hooks/useTampilan'
 
 /** A drill-down number cell — clickable when > 0. */
 function StatCell({ value, tone, onSelect }: { value: number; tone: string; onSelect: () => void }) {
@@ -53,15 +58,20 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
   const drill = (chapterId: string, status?: InvoiceStatus) =>
     navigate(`/invoices?chapter=${chapterId}${status ? `&status=${status}` : ''}`)
 
+  const { potongan, paginasi } = usePaginasi(stats, 10)
+  const [tampilan, setTampilan] = useTampilan('statistik-chapter')
+  const kelas = kelasTampilan(tampilan)
+
   return (
     <Card>
       <CardHeader
         title="Statistik per Chapter"
         subtitle="Klik chapter atau angka untuk membuka invoice terkait."
+        action={<TampilanToggle value={tampilan} onChange={setTampilan} />}
       />
-      {/* Mobile cards */}
-      <div className="divide-y divide-ink-100 lg:hidden">
-        {stats.map((s) => (
+      {/* Kartu */}
+      <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
+        {potongan.map((s) => (
           <button
             key={s.chapterId}
             onClick={() => drill(s.chapterId)}
@@ -86,8 +96,8 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
           </button>
         ))}
       </div>
-      {/* Desktop table */}
-      <div className="hidden lg:block overflow-x-auto">
+      {/* Tabel */}
+      <div className={kelas.tabel}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-ink-100 text-left text-xs font-semibold uppercase tracking-wide text-ink-400">
@@ -102,7 +112,7 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-ink-50">
-            {stats.map((s) => (
+            {potongan.map((s) => (
               <tr
                 key={s.chapterId}
                 onClick={() => drill(s.chapterId)}
@@ -136,6 +146,7 @@ function ChapterStatsCard({ stats }: { stats: ChapterStat[] }) {
           </tbody>
         </table>
       </div>
+      <Pagination {...paginasi} satuan="chapter" />
     </Card>
   )
 }
