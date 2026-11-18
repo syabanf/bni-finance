@@ -22,7 +22,7 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
     !pathname.startsWith('/members')
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/95 backdrop-blur-md pb-safe lg:hidden">
+    <nav className="kaca fixed inset-x-0 bottom-0 z-40 border-x-0 border-b-0 bg-white/75 pb-safe lg:hidden">
       <div className="flex items-stretch px-1">
         <NavLink to="/dashboard" className={({ isActive }) => tab(isActive)}>
           {({ isActive }) => (

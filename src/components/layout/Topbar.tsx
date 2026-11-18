@@ -71,7 +71,7 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/90 backdrop-blur-md safe-top">
+    <header className="kaca sticky top-0 z-30 border-x-0 border-t-0 safe-top">
       <div className="flex h-16 items-center gap-2 px-4 sm:gap-3 lg:px-6">
         {/* Mobile brand (sidebar logo is hidden on mobile). Di bawah sm hanya
             logo: lebar 375px tidak cukup untuk logo, nama, lencana Data Contoh,
@@ -109,7 +109,7 @@ export function Topbar() {
           className="relative ml-auto hidden w-full min-w-0 max-w-sm sm:block"
           data-tour="topbar-search"
         >
-          <div className="flex h-9 items-center rounded-xl border border-ink-200 bg-ink-50 transition-colors focus-within:border-brand-400 focus-within:bg-white">
+          <div className="flex h-9 items-center rounded-xl border border-white/80 bg-white/50 transition-colors focus-within:border-brand-400 focus-within:bg-white">
             <select
               value={entitas}
               onChange={(e) => simpanEntitas(e.target.value as Entitas)}
@@ -194,7 +194,7 @@ export function Topbar() {
           </button>
 
           {menuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-xl border border-ink-100 bg-white py-1.5 shadow-card-hover animate-fade-in">
+            <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-xl border border-white/70 bg-white/95 py-1.5 shadow-card-hover animate-fade-in">
               <div className="border-b border-ink-100 px-4 py-3">
                 <div className="text-sm font-semibold text-ink-900">{user?.name}</div>
                 <div className="truncate text-xs text-ink-400">{user?.email}</div>

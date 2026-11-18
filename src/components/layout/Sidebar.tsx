@@ -72,7 +72,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     return !perm || can(user?.role, perm)
   })
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="kaca flex h-full flex-col border-y-0 border-l-0 bg-white/70">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5">
         <BniLogo className="h-8 w-auto" />

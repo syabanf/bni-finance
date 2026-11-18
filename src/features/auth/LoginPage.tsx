@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ArrowRight, Briefcase, Eye, EyeOff, Lock, Mail, ShieldCheck, UserCog, UserRound, Users } from 'lucide-react'
 import type { UserRole } from '@/types'
-import { BniLogo, Button, Field, Input } from '@/components/ui'
-import { IdentitasOrganisasi, ORGANISASI } from './IdentitasOrganisasi'
+import { Button, Field, Input } from '@/components/ui'
+import { AuthLayout } from './AuthLayout'
+import { ORGANISASI } from './IdentitasOrganisasi'
 import { useAuth } from './AuthContext'
 import { cn } from '@/lib/cn'
 import {
@@ -156,220 +157,198 @@ export function LoginPage() {
   const busy = loading || quickRole !== null
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-50 px-4 py-10">
-      {/* Latar dekoratif */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-brand-500/15 blur-3xl" />
-        <div className="absolute -bottom-40 -right-24 h-[26rem] w-[26rem] rounded-full bg-brand-700/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_35%,rgba(248,250,252,.9))]" />
-      </div>
-
-      <div className="relative w-full max-w-md">
-        {/* Brand */}
-        <div className="mb-6 flex flex-col items-center text-center">
-          <span className="flex items-center rounded-2xl bg-white px-4 py-2.5 shadow-card">
-            <BniLogo className="h-8 w-auto" />
-          </span>
-          <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink-900">Finance Hub</h1>
-          <p className="mt-1 text-sm text-ink-500">
-            Invoice &amp; iuran keanggotaan {ORGANISASI}
-          </p>
-        </div>
-
-        {/* Kartu form */}
-        <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-card-hover sm:p-7">
-          {emailOtp ? (
-            /* Langkah kedua MENGGANTIKAN formulirnya, bukan muncul di bawahnya.
-               Dua formulir di layar yang sama membuat orang mengetik ulang kata
-               sandi dan menekan tombol yang salah — padahal pada titik ini kata
-               sandinya sudah benar dan tidak dibutuhkan lagi. */
-            <form onSubmit={kirimOtp} className="space-y-4">
-              <div className="text-center">
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-                  <ShieldCheck className="h-6 w-6" />
-                </div>
-                <p className="text-sm leading-relaxed text-ink-700">
-                  Kode masuk dikirim ke <span className="font-medium">{emailOtp}</span>.
-                </p>
-                <p className="mt-1 text-xs text-ink-500">
-                  Berlaku 10 menit. Salah lima kali, kodenya hangus dan Anda perlu meminta yang baru.
-                </p>
-              </div>
-
-              <Field label="Kode 6 digit">
-                <Input
-                  value={kodeOtp}
-                  onChange={(ev) => setKodeOtp(ev.target.value.replace(/\D/g, '').slice(0, 6))}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  autoFocus
-                  placeholder="000000"
-                  className="text-center font-mono text-xl tracking-[0.5em]"
-                />
-              </Field>
-
-              {error && (
-                <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
-              )}
-
-              <Button
-                type="submit"
-                size="lg"
-                loading={loading}
-                disabled={kodeOtp.length !== 6}
-                className="w-full"
-              >
-                Verifikasi
-              </Button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmailOtp('')
-                  setKodeOtp('')
-                  setError(null)
-                }}
-                className="w-full text-center text-sm text-ink-500 hover:text-ink-700"
-              >
-                Masuk dengan akun lain
-              </button>
-            </form>
-          ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Email">
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nama@bni-finance.com"
-                  className="pl-10"
-                  autoComplete="email"
-                />
-              </div>
-            </Field>
-
-            <Field label="Password">
-              <div className="relative">
-                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-10 pr-10"
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </Field>
-
-            {error && (
-              <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
-            )}
-
-            <Button type="submit" size="lg" loading={loading} disabled={busy && !loading} className="w-full">
-              Masuk
-              {!loading && <ArrowRight className="h-4 w-4" />}
-            </Button>
-
-            {/* Di BAWAH tombol masuk, bukan di samping kolom kata sandi.
-                Di samping kolomnya, tautan ini bersaing perhatian dengan
-                pekerjaan utamanya — dan orang yang sekadar salah ketik akan
-                menekannya sebelum sempat mencoba lagi. */}
-            <div className="text-center">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-ink-500 transition-colors hover:text-brand-600"
-              >
-                Lupa kata sandi?
-              </Link>
+    <AuthLayout
+      judul="Masuk ke Finance Hub"
+      keterangan={<>Invoice &amp; iuran keanggotaan {ORGANISASI}.</>}
+    >
+      {emailOtp ? (
+        /* Langkah kedua MENGGANTIKAN formulirnya, bukan muncul di bawahnya.
+           Dua formulir di layar yang sama membuat orang mengetik ulang kata
+           sandi dan menekan tombol yang salah — padahal pada titik ini kata
+           sandinya sudah benar dan tidak dibutuhkan lagi. */
+        <form onSubmit={kirimOtp} className="space-y-4">
+          <div className="text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+              <ShieldCheck className="h-6 w-6" />
             </div>
-          </form>
-          )}
-
-          {/* Masuk cepat — kartu mock, atau akun yang diizinkan server. */}
-          {(useMock || apiAccounts.length > 0) && (
-            <>
-              <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
-                <span className="h-px flex-1 bg-ink-100" />
-                masuk cepat
-                <span className="h-px flex-1 bg-ink-100" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {useMock
-                  ? DEMO_ROLES.map((r) => (
-                      <QuickCard
-                        key={r.role}
-                        icon={r.icon}
-                        title={r.label}
-                        subtitle={r.desc}
-                        active={quickRole === r.role}
-                        disabled={busy}
-                        onClick={() => quickLogin(r.role, r.email, r.password)}
-                      />
-                    ))
-                  : apiAccounts.map((a) => (
-                      <QuickCard
-                        key={a.email}
-                        icon={ROLE_ICON[a.role] ?? UserRound}
-                        title={a.name}
-                        subtitle={ROLE_DESC[a.role] ?? a.email}
-                        active={quickRole === a.email}
-                        disabled={busy}
-                        onClick={() => void quickLoginApi(a)}
-                      />
-                    ))}
-              </div>
-
-              <p className="mt-4 text-center text-xs text-ink-400">
-                {useMock
-                  ? 'Mode demo — data berjalan di atas mock repository.'
-                  : 'Akun uji yang diizinkan server — kata sandinya tidak pernah dikirim ke browser.'}
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Pemilih sumber data juga ada di sini, bukan hanya di Pengaturan:
-            kalau backend mati saat mode API, halaman login adalah satu-satunya
-            layar yang bisa dijangkau — tanpa ini pengguna terkunci. Di host
-            yang sumbernya terkunci, pemilih ini tidak ada. */}
-        {!SUMBER_TERKUNCI && (
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs">
-            <span className="text-ink-400">Sumber data</span>
-            <div className="inline-flex overflow-hidden rounded-lg border border-ink-200 bg-white">
-              {(['mock', 'api'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  aria-pressed={dataSource === mode}
-                  onClick={() => dataSource !== mode && setDataSource(mode)}
-                  className={`px-2.5 py-1 transition ${
-                    dataSource === mode
-                      ? 'bg-brand-500 font-medium text-white'
-                      : 'text-ink-500 hover:bg-ink-50'
-                  }`}
-                >
-                  {DATA_SOURCE_LABEL[mode]}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm leading-relaxed text-ink-700">
+              Kode masuk dikirim ke <span className="font-medium">{emailOtp}</span>.
+            </p>
+            <p className="mt-1 text-xs text-ink-500">
+              Berlaku 10 menit. Salah lima kali, kodenya hangus dan Anda perlu meminta yang baru.
+            </p>
           </div>
+
+          <Field label="Kode 6 digit">
+            <Input
+              value={kodeOtp}
+              onChange={(ev) => setKodeOtp(ev.target.value.replace(/\D/g, '').slice(0, 6))}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              placeholder="000000"
+              className="text-center font-mono text-xl tracking-[0.5em]"
+            />
+          </Field>
+
+          {error && (
+            <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            loading={loading}
+            disabled={kodeOtp.length !== 6}
+            className="w-full"
+          >
+            Verifikasi
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEmailOtp('')
+              setKodeOtp('')
+              setError(null)
+            }}
+            className="w-full text-center text-sm text-ink-500 hover:text-ink-700"
+          >
+            Masuk dengan akun lain
+          </button>
+        </form>
+      ) : (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Email">
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="nama@bni-finance.com"
+              className="pl-10"
+              autoComplete="email"
+            />
+          </div>
+        </Field>
+
+        <Field label="Password">
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="pl-10 pr-10"
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </Field>
+
+        {error && (
+          <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
         )}
 
-        <IdentitasOrganisasi />
-      </div>
-    </div>
+        <Button type="submit" size="lg" loading={loading} disabled={busy && !loading} className="w-full">
+          Masuk
+          {!loading && <ArrowRight className="h-4 w-4" />}
+        </Button>
+
+        {/* Di BAWAH tombol masuk, bukan di samping kolom kata sandi.
+            Di samping kolomnya, tautan ini bersaing perhatian dengan
+            pekerjaan utamanya — dan orang yang sekadar salah ketik akan
+            menekannya sebelum sempat mencoba lagi. */}
+        <div className="text-center">
+          <Link
+            to="/forgot-password"
+            className="text-sm text-ink-500 transition-colors hover:text-brand-600"
+          >
+            Lupa kata sandi?
+          </Link>
+        </div>
+      </form>
+      )}
+
+      {/* Masuk cepat — kartu mock, atau akun yang diizinkan server. */}
+      {(useMock || apiAccounts.length > 0) && (
+        <>
+          <div className="my-5 flex items-center gap-3 text-xs text-ink-400">
+            <span className="h-px flex-1 bg-ink-100" />
+            masuk cepat
+            <span className="h-px flex-1 bg-ink-100" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {useMock
+              ? DEMO_ROLES.map((r) => (
+                  <QuickCard
+                    key={r.role}
+                    icon={r.icon}
+                    title={r.label}
+                    subtitle={r.desc}
+                    active={quickRole === r.role}
+                    disabled={busy}
+                    onClick={() => quickLogin(r.role, r.email, r.password)}
+                  />
+                ))
+              : apiAccounts.map((a) => (
+                  <QuickCard
+                    key={a.email}
+                    icon={ROLE_ICON[a.role] ?? UserRound}
+                    title={a.name}
+                    subtitle={ROLE_DESC[a.role] ?? a.email}
+                    active={quickRole === a.email}
+                    disabled={busy}
+                    onClick={() => void quickLoginApi(a)}
+                  />
+                ))}
+          </div>
+
+          <p className="mt-4 text-center text-xs text-ink-400">
+            {useMock
+              ? 'Mode demo — data berjalan di atas mock repository.'
+              : 'Akun uji yang diizinkan server — kata sandinya tidak pernah dikirim ke browser.'}
+          </p>
+        </>
+      )}
+
+      {/* Pemilih sumber data juga ada di sini, bukan hanya di Pengaturan:
+          kalau backend mati saat mode API, halaman login adalah satu-satunya
+          layar yang bisa dijangkau — tanpa ini pengguna terkunci. Di host
+          yang sumbernya terkunci, pemilih ini tidak ada. */}
+      {!SUMBER_TERKUNCI && (
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs">
+          <span className="text-ink-400">Sumber data</span>
+          <div className="inline-flex overflow-hidden rounded-lg border border-ink-200 bg-white">
+            {(['mock', 'api'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={dataSource === mode}
+                onClick={() => dataSource !== mode && setDataSource(mode)}
+                className={`px-2.5 py-1 transition ${
+                  dataSource === mode
+                    ? 'bg-brand-500 font-medium text-white'
+                    : 'text-ink-500 hover:bg-ink-50'
+                }`}
+              >
+                {DATA_SOURCE_LABEL[mode]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </AuthLayout>
   )
 }
 

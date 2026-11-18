@@ -20,9 +20,12 @@ export function AppLayout() {
 
   return (
     <NotificationsProvider>
-      <div className="min-h-screen bg-ink-50">
+      <div className="relative isolate min-h-screen">
+      {/* Latar diam di tempat saat halaman bergulir. Elemen fixed tersendiri,
+          bukan background-attachment: fixed, yang diabaikan Safari iOS. */}
+      <div className="kanvas-kaca pointer-events-none fixed inset-0 -z-10" aria-hidden />
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] border-r border-ink-100 lg:block">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[264px] lg:block">
         <Sidebar />
       </aside>
 
@@ -42,7 +45,7 @@ export function AppLayout() {
         />
         <aside
           className={cn(
-            'absolute inset-y-0 left-0 w-[280px] border-r border-ink-100 shadow-xl transition-transform duration-200',
+            'absolute inset-y-0 left-0 w-[280px] shadow-xl transition-transform duration-200',
             mobileOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >

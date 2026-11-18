@@ -50,9 +50,32 @@
 }
 
 @layer components {
-  /* Card surface used across the app */
+  /* Latar aplikasi: gradasi lembut supaya permukaan tembus pandang punya
+     sesuatu untuk diperlihatkan. */
+  .kanvas-kaca {
+    background:
+      radial-gradient(60rem 40rem at 0% 0%, rgb(226 35 26 / 0.14), transparent 60%),
+      radial-gradient(50rem 36rem at 100% 8%, rgb(56 189 248 / 0.16), transparent 60%),
+      radial-gradient(56rem 40rem at 60% 100%, rgb(244 114 182 / 0.13), transparent 60%),
+      theme('colors.ink.50');
+  }
+
+  /* Kartu di seluruh aplikasi.
+
+     Tembus pandang TANPA backdrop-filter, dan itu disengaja. backdrop-filter
+     membuat stacking context dan menjadi containing block bagi turunan
+     position: fixed. Akibatnya menu dropdown di dalam kartu tertutup kartu
+     berikutnya. Di atas latar yang tidak bergerak, buramnya juga nyaris tidak
+     terlihat. Buram dipakai .kaca, untuk lapisan yang isinya bergulir di
+     bawahnya. */
   .surface {
-    @apply bg-white rounded-2xl border border-ink-100 shadow-card;
+    @apply rounded-2xl border border-white/80 bg-white/65 shadow-glass;
+  }
+
+  /* Kaca buram: bilah atas, sidebar, navigasi bawah, modal, menu, dan kartu
+     login. Jangan dipakai pada pembungkus yang punya dropdown menjulur keluar. */
+  .kaca {
+    @apply border border-white/70 bg-white/65 shadow-glass backdrop-blur-2xl backdrop-saturate-150;
   }
 
   /* Focus ring used by inputs & buttons */
