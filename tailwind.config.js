@@ -38,6 +38,7 @@ export default {
         card: '0 1px 3px 0 rgb(15 23 42 / 0.04), 0 1px 2px -1px rgb(15 23 42 / 0.04)',
         'card-hover': '0 4px 16px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.05)',
         sidebar: '0 1px 2px 0 rgb(15 23 42 / 0.03)',
+        glass: 'inset 0 1px 0 0 rgb(255 255 255 / 0.9), 0 14px 36px -18px rgb(15 23 42 / 0.22)',
       },
       borderRadius: {
         xl: '0.875rem',

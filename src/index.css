@@ -50,9 +50,38 @@
 }
 
 @layer components {
-  /* Card surface used across the app */
+  /* Latar aplikasi: gradasi lembut supaya permukaan tembus pandang punya
+     sesuatu untuk diperlihatkan. */
+  .kanvas-kaca {
+    /* Ukuran dalam vmax supaya bercaknya tetap terpisah di layar ponsel.
+       Dengan rem, empat bercak menutup layar sempit dan melebur jadi satu
+       warna rata. */
+    background:
+      radial-gradient(62vmax 52vmax at -8% -10%, rgb(226 35 26 / 0.3), transparent 62%),
+      radial-gradient(54vmax 46vmax at 106% 2%, rgb(56 189 248 / 0.32), transparent 62%),
+      radial-gradient(58vmax 48vmax at 100% 100%, rgb(167 139 250 / 0.28), transparent 62%),
+      radial-gradient(50vmax 44vmax at 4% 102%, rgb(251 146 60 / 0.24), transparent 62%),
+      theme('colors.ink.50');
+  }
+
+  /* Kartu di seluruh aplikasi.
+
+     Tembus pandang TANPA backdrop-filter, dan itu disengaja. backdrop-filter
+     membuat stacking context dan menjadi containing block bagi turunan
+     position: fixed. Akibatnya menu dropdown di dalam kartu tertutup kartu
+     berikutnya. Di atas latar yang tidak bergerak, buramnya juga nyaris tidak
+     terlihat. Buram dipakai .kaca, untuk lapisan yang isinya bergulir di
+     bawahnya. */
   .surface {
-    @apply bg-white rounded-2xl border border-ink-100 shadow-card;
+    @apply rounded-2xl border border-white/70 shadow-glass;
+    /* Kilau miring: sudut kiri atas lebih pekat, kanan bawah lebih bening. */
+    background-image: linear-gradient(135deg, rgb(255 255 255 / 0.74), rgb(255 255 255 / 0.44));
+  }
+
+  /* Kaca buram: bilah atas, sidebar, navigasi bawah, modal, menu, dan kartu
+     login. Jangan dipakai pada pembungkus yang punya dropdown menjulur keluar. */
+  .kaca {
+    @apply border border-white/60 bg-white/50 shadow-glass backdrop-blur-2xl backdrop-saturate-[1.8];
   }
 
   /* Focus ring used by inputs & buttons */

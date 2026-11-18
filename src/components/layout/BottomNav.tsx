@@ -22,7 +22,7 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
     !pathname.startsWith('/members')
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/95 backdrop-blur-md pb-safe lg:hidden">
+    <nav className="kaca fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 rounded-[26px] bg-white/55 shadow-xl shadow-ink-900/10 md:inset-x-auto md:left-1/2 md:w-[30rem] md:-translate-x-1/2 lg:hidden">
       <div className="flex items-stretch px-1">
         <NavLink to="/dashboard" className={({ isActive }) => tab(isActive)}>
           {({ isActive }) => (
@@ -47,7 +47,7 @@ export function BottomNav({ onMore }: { onMore: () => void }) {
           <Link
             to="/invoices/new"
             aria-label="Buat Invoice"
-            className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/40 ring-4 ring-white transition-transform active:scale-95"
+            className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg shadow-brand-500/40 ring-4 ring-white/70 transition-transform active:scale-95"
           >
             <Plus className="h-6 w-6" strokeWidth={2.5} />
           </Link>

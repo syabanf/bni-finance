@@ -87,7 +87,7 @@ export function Modal({ open, onClose, title, description, children, footer, siz
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={cn(
-          'relative flex max-h-[90vh] w-full flex-col rounded-2xl bg-white shadow-card-hover animate-fade-in focus:outline-none',
+          'kaca relative flex max-h-[90vh] w-full flex-col rounded-2xl bg-white/80 animate-fade-in focus:outline-none',
           sizes[size],
         )}
       >

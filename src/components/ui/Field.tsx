@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAt
 import { cn } from '@/lib/cn'
 
 const base =
-  'w-full rounded-xl border border-ink-200 bg-white px-3.5 text-sm text-ink-900 placeholder:text-ink-400 transition-colors focus-ring hover:border-ink-300 focus:border-brand-400 disabled:bg-ink-50 disabled:text-ink-400'
+  'w-full rounded-xl border border-ink-200 bg-white/80 px-3.5 text-sm text-ink-900 placeholder:text-ink-400 transition-colors focus-ring hover:border-ink-300 focus:border-brand-400 disabled:bg-ink-50 disabled:text-ink-400'
 
 interface LabelWrapProps {
   label?: ReactNode
