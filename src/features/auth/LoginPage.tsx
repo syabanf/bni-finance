@@ -6,7 +6,13 @@ import { BniLogo, Button, Field, Input } from '@/components/ui'
 import { IdentitasOrganisasi, ORGANISASI } from './IdentitasOrganisasi'
 import { useAuth } from './AuthContext'
 import { cn } from '@/lib/cn'
-import { DATA_SOURCE_LABEL, getDataSource, isMockMode, setDataSource } from '@/services/dataSource'
+import {
+  DATA_SOURCE_LABEL,
+  SUMBER_TERKUNCI,
+  getDataSource,
+  isMockMode,
+  setDataSource,
+} from '@/services/dataSource'
 import { listQuickLoginAccounts, type QuickLoginAccount } from '@/services/api/quickLoginService'
 
 const useMock = isMockMode()
@@ -336,27 +342,30 @@ export function LoginPage() {
 
         {/* Pemilih sumber data juga ada di sini, bukan hanya di Pengaturan:
             kalau backend mati saat mode API, halaman login adalah satu-satunya
-            layar yang bisa dijangkau — tanpa ini pengguna terkunci. */}
-        <div className="mt-6 flex items-center justify-center gap-2 text-xs">
-          <span className="text-ink-400">Sumber data</span>
-          <div className="inline-flex overflow-hidden rounded-lg border border-ink-200 bg-white">
-            {(['mock', 'api'] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                aria-pressed={dataSource === mode}
-                onClick={() => dataSource !== mode && setDataSource(mode)}
-                className={`px-2.5 py-1 transition ${
-                  dataSource === mode
-                    ? 'bg-brand-500 font-medium text-white'
-                    : 'text-ink-500 hover:bg-ink-50'
-                }`}
-              >
-                {DATA_SOURCE_LABEL[mode]}
-              </button>
-            ))}
+            layar yang bisa dijangkau — tanpa ini pengguna terkunci. Di host
+            yang sumbernya terkunci, pemilih ini tidak ada. */}
+        {!SUMBER_TERKUNCI && (
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs">
+            <span className="text-ink-400">Sumber data</span>
+            <div className="inline-flex overflow-hidden rounded-lg border border-ink-200 bg-white">
+              {(['mock', 'api'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={dataSource === mode}
+                  onClick={() => dataSource !== mode && setDataSource(mode)}
+                  className={`px-2.5 py-1 transition ${
+                    dataSource === mode
+                      ? 'bg-brand-500 font-medium text-white'
+                      : 'text-ink-500 hover:bg-ink-50'
+                  }`}
+                >
+                  {DATA_SOURCE_LABEL[mode]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <IdentitasOrganisasi />
       </div>

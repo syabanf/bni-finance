@@ -40,6 +40,10 @@ login.
 Pilihan tersimpan di browser, jadi berpindah tidak perlu menjalankan ulang dev server.
 `VITE_USE_MOCK` hanya menentukan nilai **awal** untuk browser yang belum pernah memilih.
 
+> Di host yang terdaftar di `VITE_API_HOSTS` (produksi: `bnisystem.id`) sumber datanya
+> terkunci ke Backend API. Pemilihnya tidak tampil di halaman login maupun di halaman
+> Integrasi, dan pilihan Data Contoh yang tersimpan di browser diabaikan.
+
 > Pemilih itu sengaja juga ada di halaman login. Kalau backend mati saat mode API, login
 > adalah satu-satunya layar yang bisa dijangkau — tanpa tombol di sana Anda terkunci.
 

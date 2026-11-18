@@ -13,6 +13,7 @@ import {
   BookOpen,
   type LucideIcon,
 } from 'lucide-react'
+import { SUMBER_TERKUNCI } from '@/services/dataSource'
 import type { Permission } from '@/lib/rbac'
 
 export interface NavLeaf {
@@ -79,7 +80,7 @@ export const NAV: NavNode[] = [
     icon: TerminalSquare,
     permission: 'settings:manage',
     children: [
-      { to: '/integrasi', label: 'Integrasi & Sumber Data' },
+      { to: '/integrasi', label: SUMBER_TERKUNCI ? 'Integrasi' : 'Integrasi & Sumber Data' },
       { to: '/api-console', label: 'Konsol API' },
       { to: '/blackbox', label: 'Blackbox Integrasi' },
     ],
