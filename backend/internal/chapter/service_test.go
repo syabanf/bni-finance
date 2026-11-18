@@ -92,3 +92,39 @@ func TestCacheDaftarGugurSetelahChapterDibuat(t *testing.T) {
 		t.Errorf("chapter baru tidak muncul, cache basi: %d chapter", len(items))
 	}
 }
+
+func (s *storePalsu) Counts(ctx context.Context) ([]domain.ChapterCounts, error) {
+	s.tanya++
+	if lim := scope.Chapter(ctx); lim.Terbatas {
+		return []domain.ChapterCounts{{ChapterID: lim.ChapterID, MemberCount: 3}}, nil
+	}
+	return []domain.ChapterCounts{{ChapterID: "a", MemberCount: 5}, {ChapterID: "b", MemberCount: 3}}, nil
+}
+
+// Jumlah per chapter milik admin TIDAK boleh disajikan ke ST, dan gugur saat
+// invoice atau pembayaran ditulis.
+func TestCacheJumlahPerChapter(t *testing.T) {
+	svc, store := layananLive(t)
+	svc.KedaluwarsakanAngka(context.Background()) // sisa tes sebelumnya
+	admin := scope.WithoutLimit(context.Background())
+	st := scope.WithChapter(context.Background(), "b")
+	store.tanya = 0
+
+	if items, err := svc.Counts(admin); err != nil || len(items) != 2 {
+		t.Fatalf("admin melihat %d chapter (galat %v), ingin 2", len(items), err)
+	}
+	if items, err := svc.Counts(st); err != nil || len(items) != 1 || items[0].ChapterID != "b" {
+		t.Fatalf("ST melihat %v, ingin hanya chapter b", items)
+	}
+	_, _ = svc.Counts(admin)
+	_, _ = svc.Counts(st)
+	if store.tanya != 2 {
+		t.Errorf("repository ditanya %d kali, ingin 2", store.tanya)
+	}
+
+	svc.KedaluwarsakanAngka(admin)
+	_, _ = svc.Counts(admin)
+	if store.tanya != 3 {
+		t.Errorf("setelah digugurkan repository ditanya %d kali, ingin 3", store.tanya)
+	}
+}
