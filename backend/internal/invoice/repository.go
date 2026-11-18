@@ -145,6 +145,12 @@ func klausaFilter(ctx context.Context, f domain.InvoiceFilter) (string, []any) {
 	if f.MemberID != "" {
 		add("member_id = $%d", f.MemberID)
 	}
+	if len(f.IDs) > 0 {
+		add("id = ANY($%d::uuid[])", f.IDs)
+	}
+	if len(f.MemberIDs) > 0 {
+		add("member_id = ANY($%d)", f.MemberIDs)
+	}
 	if f.Search != "" {
 		// Mencakup NOMOR dan NAMA MEMBER. Sebelumnya server hanya mencari nomor,
 		// dan klien menyaring nama sendiri setelah menarik seluruh baris —

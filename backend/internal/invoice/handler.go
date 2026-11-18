@@ -2,6 +2,7 @@ package invoice
 
 import (
 	"net/http"
+	"regexp"
 
 	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/domain"
@@ -50,8 +51,16 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		IssuedFrom: httpx.Query(r, "issuedFrom"),
 		IssuedTo:   httpx.Query(r, "issuedTo"),
 		Aging:      httpx.Query(r, "aging"),
+		IDs:        hanyaUUID(httpx.QueryList(r, "ids", 200)),
+		MemberIDs:  httpx.QueryList(r, "memberIds", 200),
 		Limit:      httpx.QueryInt(r, "limit", 50, 1, 200),
 		Offset:     httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
+	}
+	// ?ids= yang tidak memuat satu pun UUID sah tidak boleh jatuh menjadi
+	// "tanpa saringan" dan mengembalikan seluruh invoice.
+	if httpx.Query(r, "ids") != "" && len(f.IDs) == 0 {
+		httpx.JSON(w, http.StatusOK, listResponse{Data: []domain.Invoice{}, Meta: listMeta{Limit: f.Limit, Offset: f.Offset}})
+		return
 	}
 
 	items, total, err := h.svc.List(r.Context(), f)
@@ -139,4 +148,18 @@ func (h *Handler) remove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+var polaUUID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// hanyaUUID membuang entri yang bukan UUID. Kolom id bertipe uuid, dan satu
+// nilai yang salah bentuk membuat seluruh query ditolak Postgres.
+func hanyaUUID(ids []string) []string {
+	var out []string
+	for _, id := range ids {
+		if polaUUID.MatchString(id) {
+			out = append(out, id)
+		}
+	}
+	return out
 }

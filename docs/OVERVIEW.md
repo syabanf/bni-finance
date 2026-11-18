@@ -414,6 +414,7 @@ Yang dibagi antar replika lewat Redis:
 | --- | --- |
 | Pembatas login (10 gagal per 15 menit per email) | Tanpa Redis tiap replika menghitung sendiri, dan batasnya berlipat dengan jumlah replika |
 | Cache daftar chapter (5 menit) dan biaya keanggotaan (10 menit) | Dibuang saat chapter atau biaya berubah, termasuk dari impor dan sinkronisasi |
+| Cache ringkasan dashboard (15 detik) | Dibuang saat invoice atau pembayaran ditulis lewat API. Callback Paper.id, worker pengingat, dan impor tidak membuangnya, jadi angkanya tertinggal paling lama 15 detik setelah mereka menulis |
 | Giliran worker kurs KMK | Hanya satu replika yang memeriksa dalam 20 jam |
 
 Worker pengingat tidak memakai Redis: ia sudah dijaga advisory lock Postgres. Bila Redis mati,

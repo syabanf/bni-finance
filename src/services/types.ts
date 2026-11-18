@@ -31,6 +31,10 @@ import type {
   PaymentWithInvoice,
   RenewalDueMember,
   Payment,
+  MemberFilters,
+  MemberPage,
+  PaymentFilters,
+  PaymentPage,
 } from '@/types'
 
 export interface AuthRepository {
@@ -178,7 +182,10 @@ export interface CreateChapterInput {
 }
 
 export interface MemberRepository {
-  list(params?: { chapterId?: string; search?: string }): Promise<MemberWithChapter[]>
+  /** SELURUH member yang cocok. Untuk daftar berhalaman pakai listPaged. */
+  list(params?: MemberFilters): Promise<MemberWithChapter[]>
+  /** Satu halaman, disaring dan dihitung server. */
+  listPaged(filters?: MemberFilters): Promise<MemberPage>
   getById(id: string): Promise<MemberWithChapter | null>
   /** Members eligible for a new registration invoice (no active one yet). */
   eligibleForRegistration(): Promise<MemberWithChapter[]>
@@ -281,7 +288,10 @@ export interface SettingsRepository {
 }
 
 export interface PaymentRepository {
-  list(): Promise<PaymentWithInvoice[]>
+  /** SELURUH pembayaran yang cocok. Untuk daftar berhalaman pakai listPaged. */
+  list(filters?: PaymentFilters): Promise<PaymentWithInvoice[]>
+  /** Satu halaman, disaring dan dijumlahkan server. */
+  listPaged(filters?: PaymentFilters): Promise<PaymentPage>
   getById(id: string): Promise<PaymentWithInvoice | null>
   listByInvoice(invoiceId: string): Promise<PaymentWithInvoice[]>
   /** Upload a payment-proof file, returning a URL to store with the payment. */

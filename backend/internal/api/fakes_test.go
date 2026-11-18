@@ -226,6 +226,20 @@ func (s *fakePaymentStore) List(_ context.Context, f domain.PaymentFilter) ([]do
 	return out[f.Offset:end], total, nil
 }
 
+func (s *fakePaymentStore) Summary(_ context.Context, f domain.PaymentFilter) (*domain.PaymentSummary, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := &domain.PaymentSummary{ByType: map[string]int64{}}
+	for _, p := range s.items {
+		if f.InvoiceID != "" && p.InvoiceID != f.InvoiceID {
+			continue
+		}
+		out.Count++
+		out.Amount += p.Amount
+	}
+	return out, nil
+}
+
 func (s *fakePaymentStore) GetByID(_ context.Context, id string) (*domain.Payment, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

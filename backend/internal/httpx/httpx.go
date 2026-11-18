@@ -161,6 +161,32 @@ func Query(r *http.Request, key string) string {
 	return strings.TrimSpace(r.URL.Query().Get(key))
 }
 
+// QueryList membaca nilai berpisah koma (?ids=a,b,c) menjadi daftar tanpa
+// entri kosong maupun kembar, paling banyak maks entri.
+//
+// Batasnya ada supaya satu permintaan tidak bisa menyuruh basis data
+// mencocokkan daftar sepanjang apa pun yang dikirim pemanggil.
+func QueryList(r *http.Request, key string, maks int) []string {
+	raw := Query(r, key)
+	if raw == "" {
+		return nil
+	}
+	lihat := map[string]bool{}
+	var out []string
+	for _, v := range strings.Split(raw, ",") {
+		v = strings.TrimSpace(v)
+		if v == "" || lihat[v] {
+			continue
+		}
+		lihat[v] = true
+		out = append(out, v)
+		if len(out) == maks {
+			break
+		}
+	}
+	return out
+}
+
 // QueryInt returns the query value as an int, or fallback when absent/invalid.
 // The result is clamped to [min, max].
 func QueryInt(r *http.Request, key string, fallback, min, max int) int {

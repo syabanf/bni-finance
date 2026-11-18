@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowRight, Eye, Search, Upload, UserPlus, Users } from 'lucide-react'
-import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
+import type { Chapter, MemberFilters, MemberStatus } from '@/types'
 import {
   Avatar,
   Button,
@@ -35,9 +35,9 @@ import { can } from '@/lib/rbac'
 import { chapterService, memberService } from '@/services'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
-import { usePaginasi } from '@/hooks/usePaginasi'
 import { useTampilan } from '@/hooks/useTampilan'
 import { cn } from '@/lib/cn'
+import { useHalamanServer, useTertunda } from '@/hooks/useHalamanServer'
 
 /** Kelengkapan kontak — menentukan siapa yang bisa dijangkau Paper.id. */
 type ContactFilter = 'all' | 'no-phone' | 'no-email' | 'no-contact'
@@ -68,8 +68,6 @@ const KEANGGOTAAN_OPTIONS: { value: Keanggotaan; label: string }[] = [
   { value: 'visitor', label: 'Visitor' },
 ]
 
-const STATUS_VISITOR: MemberStatus[] = ['pending', 'visitor']
-
 const MEMBER_STATUS_LABEL: Record<string, string> = {
   active: 'Aktif',
   pending: 'Pending',
@@ -83,9 +81,6 @@ export function MemberListPage() {
   // Impor dijaga settings:manage di router dan admin-saja di server.
   const bolehImpor = can(user?.role, 'settings:manage')
   const { toast } = useToast()
-  const { data: members, loading, error, reload } = useAsync<MemberWithChapter[]>(() =>
-    memberService.list(),
-  )
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
 
   const [searchParams] = useSearchParams()
@@ -105,79 +100,83 @@ export function MemberListPage() {
   const [keanggotaan, setKeanggotaan] = useState<Keanggotaan>('all')
   const [tambahBuka, setTambahBuka] = useState(false)
 
-  // Everything except the status filter — drives the summary cards so they
-  // reflect chapter/due-date/search while still showing the status breakdown.
-  const baseFiltered = useMemo(() => {
-    if (!members) return []
-    const q = search.trim().toLowerCase()
-    return members.filter((m) => {
-      if (chapterId !== 'all' && m.chapterId !== chapterId) return false
-      if (keanggotaan !== 'all' && STATUS_VISITOR.includes(m.status) !== (keanggotaan === 'visitor')) return false
-      if (hideNoDueDate && !m.renewalDate) return false
-      if (dueFrom && (!m.renewalDate || m.renewalDate < dueFrom)) return false
-      if (dueTo && (!m.renewalDate || m.renewalDate > dueTo)) return false
-      if (q && !m.name.toLowerCase().includes(q) && !m.id.toLowerCase().includes(q) && !(m.email ?? '').toLowerCase().includes(q))
-        return false
-      // Kelengkapan kontak. Paper.id MEWAJIBKAN nomor telepon: member tanpa
-      // nomor ditolak saat penerbitan invoice, dan member tanpa email hanya
-      // menerima WhatsApp. Filter ini yang membuat mereka bisa ditemukan
-      // sebelum batch penagihan berjalan, bukan sesudahnya.
-      const hasPhone = Boolean(m.phone?.trim())
-      const hasEmail = Boolean(m.email?.trim())
-      if (contact === 'no-phone' && hasPhone) return false
-      if (contact === 'no-email' && hasEmail) return false
-      if (contact === 'no-contact' && (hasPhone || hasEmail)) return false
-      return true
-    })
-  }, [members, search, chapterId, keanggotaan, hideNoDueDate, dueFrom, dueTo, contact])
+  // Seluruh saringan dijalankan server. Sebelumnya 200 member pertama ditarik
+  // lalu disaring di sini, jadi member ke-201 tidak pernah tampil dan hitungan
+  // di kartu berhenti tumbuh di angka itu.
+  const searchTertunda = useTertunda(search)
+  const filterAktif = useMemo<MemberFilters>(
+    () => ({
+      search: searchTertunda,
+      chapterId,
+      status: memberStatus,
+      kelompok: keanggotaan,
+      kontak: contact,
+      punyaJatuhTempo: hideNoDueDate,
+      dueFrom,
+      dueTo,
+      summary: true,
+    }),
+    [searchTertunda, chapterId, memberStatus, keanggotaan, contact, hideNoDueDate, dueFrom, dueTo],
+  )
+  const { halaman, loading, error, reload, paginasi } = useHalamanServer(
+    (f: MemberFilters) => memberService.listPaged(f),
+    filterAktif,
+  )
+  const paginated = halaman?.rows ?? []
+  const totalBaris = halaman?.total ?? 0
 
-  const statusCounts = useMemo(() => {
-    const list = baseFiltered
-    return {
-      all: list.length,
-      active: list.filter((m) => m.status === 'active').length,
-      new_member: list.filter((m) => m.status === 'new_member').length,
-      pending: list.filter((m) => m.status === 'pending').length,
-      inactive: list.filter((m) => m.status === 'inactive').length,
-      visitor: list.filter((m) => m.status === 'visitor').length,
-    }
-  }, [baseFiltered])
+  // Hitungan per status untuk seluruh hasil saringan, tanpa saringan statusnya.
+  const perStatus = halaman?.summary?.byStatus ?? {}
+  const hitung = (s: MemberStatus) => perStatus[s] ?? 0
+  const statusCounts = {
+    all: Object.values(perStatus).reduce((a, n) => a + (n ?? 0), 0),
+    active: hitung('active'),
+    new_member: hitung('new_member'),
+    pending: hitung('pending'),
+    inactive: hitung('inactive'),
+    visitor: hitung('visitor'),
+  }
 
-  const filtered = useMemo(() => {
-    if (memberStatus === 'all') return baseFiltered
-    return baseFiltered.filter((m) => m.status === memberStatus)
-  }, [baseFiltered, memberStatus])
-
-  const { potongan: paginated, paginasi } = usePaginasi(filtered)
   const [tampilan, setTampilan] = useTampilan('member')
   const kelas = kelasTampilan(tampilan)
 
-  // Exports always reflect the active filters (not just the visible page).
-  const exportHandlers = makeExportHandlers({
-    filename: 'member',
-    title: 'Daftar Member',
-    subtitle: `Status: ${memberStatus === 'all' ? 'Semua' : (MEMBER_STATUS_LABEL[memberStatus] ?? memberStatus)}`,
-    meta: [`${filtered.length} member`, `Dibuat ${formatDateTime(new Date())}`],
-    columns: [
-      { label: 'Nama' },
-      { label: 'ID' },
-      { label: 'Chapter' },
-      { label: 'Email' },
-      { label: 'Telepon' },
-      { label: 'Status' },
-      { label: 'Jatuh Tempo' },
-    ],
-    rows: filtered.map((m) => [
-      m.name,
-      m.id,
-      m.chapter?.displayName ?? '',
-      m.email ?? '',
-      m.phone ?? '',
-      MEMBER_STATUS_LABEL[m.status] ?? m.status,
-      m.renewalDate ? formatDate(m.renewalDate) : '',
-    ]),
-    onPopupBlocked: () => toast('Izinkan popup di browser untuk mengekspor PDF.', 'error'),
-  })
+  // Ekspor memuat SELURUH hasil saringan, bukan halaman yang sedang tampil.
+  const [mengekspor, setMengekspor] = useState(false)
+  const ekspor = async (jenis: 'onExcel' | 'onPdf') => {
+    setMengekspor(true)
+    try {
+      const semua = await memberService.list(filterAktif)
+      makeExportHandlers({
+        filename: 'member',
+        title: 'Daftar Member',
+        subtitle: `Status: ${memberStatus === 'all' ? 'Semua' : (MEMBER_STATUS_LABEL[memberStatus] ?? memberStatus)}`,
+        meta: [`${semua.length} member`, `Dibuat ${formatDateTime(new Date())}`],
+        columns: [
+          { label: 'Nama' },
+          { label: 'ID' },
+          { label: 'Chapter' },
+          { label: 'Email' },
+          { label: 'Telepon' },
+          { label: 'Status' },
+          { label: 'Jatuh Tempo' },
+        ],
+        rows: semua.map((m) => [
+          m.name,
+          m.id,
+          m.chapter?.displayName ?? '',
+          m.email ?? '',
+          m.phone ?? '',
+          MEMBER_STATUS_LABEL[m.status] ?? m.status,
+          m.renewalDate ? formatDate(m.renewalDate) : '',
+        ]),
+        onPopupBlocked: () => toast('Izinkan popup di browser untuk mengekspor PDF.', 'error'),
+      })[jenis]()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengekspor member.', 'error')
+    } finally {
+      setMengekspor(false)
+    }
+  }
 
   return (
     <div>
@@ -227,7 +226,11 @@ export function MemberListPage() {
               </Button>
             )}
             <SyncButton jenis="member" onSelesai={reload} />
-            <ExportMenu {...exportHandlers} disabled={filtered.length === 0} />
+            <ExportMenu
+              onExcel={() => void ekspor('onExcel')}
+              onPdf={() => void ekspor('onPdf')}
+              disabled={totalBaris === 0 || mengekspor}
+            />
           </div>
         }
       />
@@ -349,9 +352,9 @@ export function MemberListPage() {
 
         {error ? (
           <ErrorState message={error} onRetry={reload} />
-        ) : loading ? (
+        ) : loading && !halaman ? (
           <TableSkeleton rows={8} cols={5} />
-        ) : filtered.length === 0 ? (
+        ) : totalBaris === 0 ? (
           <EmptyState icon={Users} title="Tidak ada member" description="Tidak ada member yang cocok dengan filter." />
         ) : (
           <>

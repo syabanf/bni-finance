@@ -530,6 +530,17 @@ paths:
         - name: memberId
           in: query
           schema: { type: string }
+        - name: ids
+          in: query
+          description: >
+            Id invoice berpisah koma, paling banyak 200. Dipakai halaman
+            pembayaran untuk mengambil invoice milik baris yang sedang tampil.
+            Entri yang bukan UUID diabaikan.
+          schema: { type: string }
+        - name: memberIds
+          in: query
+          description: Id member berpisah koma, paling banyak 200.
+          schema: { type: string }
         - name: q
           in: query
           description: >
@@ -775,6 +786,25 @@ paths:
           in: query
           description: Inklusif — mencakup seluruh hari itu.
           schema: { type: string, format: date }
+        - name: q
+          in: query
+          description: Pencarian pada nomor invoice atau nama member pembayarnya.
+          schema: { type: string }
+        - name: chapterId
+          in: query
+          description: Chapter invoice yang dibayar.
+          schema: { type: string }
+        - name: type
+          in: query
+          description: Tipe invoice yang dibayar.
+          schema: { type: string, enum: [registration, renewal] }
+        - name: summary
+          in: query
+          description: >
+            `true` menambahkan `meta.summary` untuk **seluruh hasil filter**:
+            `count`, `amount`, `byType` (jumlah per tipe invoice), dan `methods`
+            (metode yang ada tanpa saringan metodenya).
+          schema: { type: string, enum: ["true"] }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
       responses:
@@ -895,7 +925,7 @@ paths:
           schema: { $ref: "#/components/schemas/MemberStatus" }
         - name: q
           in: query
-          description: Pencarian pada nama, email, atau perusahaan.
+          description: Pencarian pada nama, id, email, atau perusahaan.
           schema: { type: string }
         - name: renewalFrom
           in: query
@@ -903,6 +933,33 @@ paths:
         - name: renewalTo
           in: query
           schema: { type: string, format: date }
+        - name: ids
+          in: query
+          description: >
+            Id member berpisah koma, paling banyak 200. Dipakai halaman invoice
+            dan pembayaran untuk mengambil member milik baris yang sedang
+            tampil, bukan seluruh direktori.
+          schema: { type: string }
+        - name: kelompok
+          in: query
+          description: >
+            `visitor` mencakup status `visitor` dan `pending`; `member`
+            mencakup sisanya, termasuk `inactive`.
+          schema: { type: string, enum: [member, visitor] }
+        - name: kontak
+          in: query
+          description: Kelengkapan kontak. Nilai yang hanya berisi spasi dihitung kosong.
+          schema: { type: string, enum: [no-phone, no-email, no-contact] }
+        - name: punyaJatuhTempo
+          in: query
+          description: "`true` menyisakan member yang tanggal jatuh temponya terisi."
+          schema: { type: string, enum: ["true"] }
+        - name: summary
+          in: query
+          description: >
+            `true` menambahkan `meta.summary.byStatus`: jumlah member per status
+            untuk seluruh hasil filter, **tanpa** saringan `status`.
+          schema: { type: string, enum: ["true"] }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
       responses:

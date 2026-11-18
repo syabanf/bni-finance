@@ -32,8 +32,13 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		Search:      httpx.Query(r, "q"),
 		RenewalFrom: httpx.Query(r, "renewalFrom"),
 		RenewalTo:   httpx.Query(r, "renewalTo"),
-		Limit:       httpx.QueryInt(r, "limit", 50, 1, 200),
-		Offset:      httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
+		IDs:         httpx.QueryList(r, "ids", 200),
+		Kelompok:    httpx.Query(r, "kelompok"),
+		Kontak:      httpx.Query(r, "kontak"),
+		// Hanya "true" yang menyalakan, sama seperti ?summary.
+		PunyaJatuhTempo: httpx.Query(r, "punyaJatuhTempo") == "true",
+		Limit:           httpx.QueryInt(r, "limit", 50, 1, 200),
+		Offset:          httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
 	}
 
 	items, total, err := h.svc.List(r.Context(), f)
@@ -41,7 +46,38 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Fail(w, err)
 		return
 	}
-	httpx.JSON(w, http.StatusOK, httpx.List(items, total, f.Limit, f.Offset))
+	if items == nil {
+		items = []domain.Member{}
+	}
+	meta := listMeta{Total: total, Limit: f.Limit, Offset: f.Offset}
+
+	// Satu query agregat tambahan, jadi hanya dihitung bila diminta.
+	if httpx.Query(r, "summary") == "true" {
+		perStatus, err := h.svc.Summary(r.Context(), f)
+		if err != nil {
+			httpx.Fail(w, err)
+			return
+		}
+		meta.Summary = &memberSummary{ByStatus: perStatus}
+	}
+	httpx.JSON(w, http.StatusOK, listResponse{Data: items, Meta: meta})
+}
+
+type memberSummary struct {
+	// ByStatus menghitung seluruh hasil filter TANPA saringan statusnya.
+	ByStatus map[string]int `json:"byStatus"`
+}
+
+type listMeta struct {
+	Total   int            `json:"total"`
+	Limit   int            `json:"limit"`
+	Offset  int            `json:"offset"`
+	Summary *memberSummary `json:"summary,omitempty"`
+}
+
+type listResponse struct {
+	Data []domain.Member `json:"data"`
+	Meta listMeta        `json:"meta"`
 }
 
 func (h *Handler) renewalDue(w http.ResponseWriter, r *http.Request) {

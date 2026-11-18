@@ -11,6 +11,7 @@ import (
 type Store interface {
 	List(ctx context.Context, f domain.MemberFilter) ([]domain.Member, int, error)
 	GetByID(ctx context.Context, id string) (*domain.Member, error)
+	Summary(ctx context.Context, f domain.MemberFilter) (map[string]int, error)
 	RenewalDue(ctx context.Context, days, limit int) ([]domain.RenewalDueMember, error)
 	Create(ctx context.Context, in domain.CreateMemberInput) (*domain.Member, error)
 	Update(ctx context.Context, id string, in domain.UpdateMemberInput) (*domain.Member, error)
@@ -27,10 +28,31 @@ type Service struct {
 func NewService(repo Store) *Service { return &Service{repo: repo} }
 
 func (s *Service) List(ctx context.Context, f domain.MemberFilter) ([]domain.Member, int, error) {
-	if f.Status != "" && !domain.MemberStatus(f.Status).Valid() {
-		return nil, 0, httpx.BadRequest("status harus 'active', 'inactive', atau 'pending'")
+	if err := validasiFilter(f); err != nil {
+		return nil, 0, err
 	}
 	return s.repo.List(ctx, f)
+}
+
+// Summary menghitung member per status untuk seluruh hasil filter.
+func (s *Service) Summary(ctx context.Context, f domain.MemberFilter) (map[string]int, error) {
+	if err := validasiFilter(f); err != nil {
+		return nil, err
+	}
+	return s.repo.Summary(ctx, f)
+}
+
+func validasiFilter(f domain.MemberFilter) error {
+	if f.Status != "" && !domain.MemberStatus(f.Status).Valid() {
+		return httpx.BadRequest("status harus 'active', 'inactive', atau 'pending'")
+	}
+	if !domain.KelompokMemberValid(f.Kelompok) {
+		return httpx.BadRequest("kelompok harus 'member' atau 'visitor'")
+	}
+	if !domain.KontakMemberValid(f.Kontak) {
+		return httpx.BadRequest("kontak harus 'no-phone', 'no-email', atau 'no-contact'")
+	}
+	return nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*domain.Member, error) {

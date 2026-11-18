@@ -12,97 +12,82 @@ import type {
   RenewalDueMember,
 } from '@/types'
 import { isNotFound } from './chapterRepository'
+import { MAKS_PER_HALAMAN, ambilPerId, tarikSemua, tarikUntuk } from './kumpulan'
 
 /**
- * The API returns bare invoices; the UI wants member and chapter attached.
- * Rather than a join per invoice, the reference tables are fetched once per
- * call and indexed — they are small (hundreds of rows) and change rarely.
- */
-/**
- * Menarik SELURUH baris sebuah daftar, bukan hanya halaman pertama.
+ * Daftar chapter disimpan sebentar.
  *
- * Versi sebelumnya meminta satu halaman berisi 200 baris dan memperlakukannya
- * sebagai keseluruhan. Untuk member, akibatnya tidak terlihat sebagai galat:
- * invoice milik member ke-201 ke atas tetap tampil, hanya saja kolom namanya
- * jadi "—" — dan itu terbaca sebagai data member yang rusak, bukan sebagai
- * daftar yang terpotong.
+ * Chapter sedikit dan jarang berubah, sementara tiap halaman invoice
+ * membutuhkannya untuk menampilkan nama chapter. Umurnya pendek supaya chapter
+ * yang baru dibuat muncul tanpa memuat ulang halaman.
  */
-async function tarikSemua<T>(jalur: string, batasAman = 5000): Promise<T[]> {
-  const kumpulan: T[] = []
-  for (;;) {
-    const res = await api.get<ListResponse<T>>(`${jalur}${query({ limit: 200, offset: kumpulan.length })}`)
-    if (res.data.length === 0) break
-    kumpulan.push(...res.data)
-    if (kumpulan.length >= res.meta.total || kumpulan.length >= batasAman) break
-  }
-  return kumpulan
-}
+const UMUR_CHAPTER = 60_000
+let chapterTersimpan: { pada: number; isi: Promise<Map<string, Chapter>> } | null = null
 
-interface Direktori {
-  members: Map<string, MemberWithChapter>
-  chapters: Map<string, Chapter>
-}
-
-/**
- * Tabel rujukan disimpan sebentar.
- *
- * Sebelumnya member dan chapter ditarik ulang pada SETIAP panggilan invoice.
- * Itu masih tertutupi ketika halaman hanya memuat sekali; dengan paginasi di
- * server, tiap pindah halaman dan tiap potongan ekspor membayar dua permintaan
- * tambahan untuk data yang praktis tidak berubah.
- *
- * Umurnya pendek dengan sengaja — member yang baru dibuat harus muncul tanpa
- * perlu memuat ulang halaman.
- */
-const UMUR_DIREKTORI = 60_000
-let direktori: { pada: number; isi: Promise<Direktori> } | null = null
-
-async function loadDirectory(): Promise<Direktori> {
+function daftarChapter(): Promise<Map<string, Chapter>> {
   const sekarang = Date.now()
   // Menyimpan PROMISE-nya, bukan hasilnya: tanpa itu, dua panggilan yang
   // berbarengan sama-sama melihat cache kosong dan sama-sama menembak jaringan.
-  if (direktori && sekarang - direktori.pada < UMUR_DIREKTORI) return direktori.isi
+  if (chapterTersimpan && sekarang - chapterTersimpan.pada < UMUR_CHAPTER) return chapterTersimpan.isi
 
-  const isi = (async () => {
-    const [members, chapters] = await Promise.all([
-      tarikSemua<MemberWithChapter>('/members'),
-      tarikSemua<Chapter>('/chapters'),
-    ])
-    return {
-      members: new Map(members.map((m) => [m.id, m])),
-      chapters: new Map(chapters.map((c) => [c.id, c])),
-    }
-  })()
-
+  const isi = tarikSemua<Chapter>('/chapters').then((c) => new Map(c.map((x) => [x.id, x])))
   // Kegagalan tidak boleh mengendap di cache dan membuat halaman rusak selama
   // semenit penuh; permintaan berikutnya harus boleh mencoba lagi.
   isi.catch(() => {
-    if (direktori?.isi === isi) direktori = null
+    if (chapterTersimpan?.isi === isi) chapterTersimpan = null
   })
-
-  direktori = { pada: sekarang, isi }
+  chapterTersimpan = { pada: sekarang, isi }
   return isi
 }
 
-function attach(
-  invoice: Invoice,
-  members: Map<string, MemberWithChapter>,
-  chapters: Map<string, Chapter>,
-): InvoiceWithRelations {
-  return {
+/**
+ * Menempelkan member dan chapter ke invoice.
+ *
+ * API mengembalikan invoice tanpa relasinya. Member diminta hanya untuk
+ * invoice yang sedang dipegang: satu halaman berisi 25 invoice berarti satu
+ * permintaan berisi paling banyak 25 id. Sebelumnya SELURUH member ditarik
+ * untuk keperluan ini, pada setiap pemuatan halaman invoice.
+ */
+async function lampirkan(invoices: Invoice[]): Promise<InvoiceWithRelations[]> {
+  if (invoices.length === 0) return []
+  const [members, chapters] = await Promise.all([
+    ambilPerId<MemberWithChapter>(
+      '/members',
+      invoices.map((i) => i.memberId),
+    ),
+    daftarChapter(),
+  ])
+  return invoices.map((invoice) => ({
     ...invoice,
     // Path /uploads/... milik backend; diberi alamatnya supaya tautan faktur
     // tetap benar saat backend berada di origin lain (sama seperti bukti bayar).
     taxInvoiceUrl: fileUrl(invoice.taxInvoiceUrl),
     member: members.get(invoice.memberId) ?? null,
     chapter: chapters.get(invoice.chapterId) ?? null,
-  }
+  }))
+}
+
+/** Invoice terkirim yang sudah lewat jatuh tempo, tetapi statusnya belum overdue. */
+function yangTelat(invoices: Invoice[]): Invoice[] {
+  const today = todayISO()
+  return invoices.filter((i) => i.status === 'sent' && i.dueDate < today)
+}
+
+/**
+ * Menampilkan invoice telat sebagai overdue TANPA menulisnya ke server.
+ *
+ * Untuk daftar lengkap. Di sana syncOverdue berarti satu PATCH per invoice
+ * telat, sekaligus: diukur pada 2.143 invoice telat, peramban menolak ribuan
+ * permintaan dengan ERR_INSUFFICIENT_RESOURCES. Statusnya tetap ditulis saat
+ * invoice itu tampil di daftar berhalaman, paling banyak satu halaman sekali.
+ */
+function tampilkanOverdue(invoices: Invoice[]): void {
+  for (const invoice of yangTelat(invoices)) invoice.status = 'overdue'
 }
 
 /** Marks sent invoices past their due date as overdue, matching the UI's view. */
 async function syncOverdue(invoices: Invoice[]): Promise<void> {
-  const today = todayISO()
-  const stale = invoices.filter((i) => i.status === 'sent' && i.dueDate < today)
+  const stale = yangTelat(invoices)
   await Promise.all(
     stale.map((i) =>
       api.patch<Invoice>(`/invoices/${i.id}`, { status: 'overdue' }).catch(() => {
@@ -172,14 +157,6 @@ function paramFilter(f: InvoiceFilters | undefined) {
   }
 }
 
-/**
- * Batas per permintaan yang diterima server.
- *
- * Bukan angka pilihan klien: server menolak limit di atas 200, jadi menaikkannya
- * di sini hanya menghasilkan permintaan yang ditolak diam-diam.
- */
-const MAKS_PER_HALAMAN = 200
-
 export const apiInvoiceRepository: InvoiceRepository = {
   async listPaged(filters) {
     const res = await api.get<ListResponse<Invoice> & { meta: { summary?: InvoiceSummary } }>(
@@ -192,24 +169,19 @@ export const apiInvoiceRepository: InvoiceRepository = {
     )
     await syncOverdue(res.data)
 
-    const { members, chapters } = await loadDirectory()
     return {
-      rows: res.data.map((i) => attach(i, members, chapters)),
+      rows: await lampirkan(res.data),
       total: res.meta.total,
       summary: res.meta.summary,
     }
   },
 
   async list(filters) {
-    const res = await api.get<ListResponse<Invoice>>(
-      `/invoices${query({ ...paramFilter(filters), limit: MAKS_PER_HALAMAN })}`,
-    )
-    await syncOverdue(res.data)
-
-    const { members, chapters } = await loadDirectory()
-    const rows = res.data.map((i) => attach(i, members, chapters))
-
-    return rows
+    // SELURUH hasil filter, bukan 200 baris pertama: pemanggilnya (laporan,
+    // ekspor) menjumlahkan uang dari daftar ini.
+    const semua = await tarikSemua<Invoice>('/invoices', paramFilter(filters))
+    tampilkanOverdue(semua)
+    return lampirkan(semua)
   },
 
   async getById(id) {
@@ -220,15 +192,12 @@ export const apiInvoiceRepository: InvoiceRepository = {
       if (isNotFound(err)) return null
       throw err
     }
-    const { members, chapters } = await loadDirectory()
-    return attach(invoice, members, chapters)
+    const [lengkap] = await lampirkan([invoice])
+    return lengkap
   },
 
   async listByMember(memberId) {
-    const res = await api.get<ListResponse<Invoice>>(
-      `/invoices${query({ memberId, limit: 200 })}`,
-    )
-    return res.data
+    return tarikSemua<Invoice>('/invoices', { memberId })
   },
 
   async create(input: CreateInvoiceInput) {
@@ -367,16 +336,22 @@ export const apiInvoiceRepository: InvoiceRepository = {
   },
 
   async renewalDue(withinDays = 30) {
-    const [due, invoices] = await Promise.all([
-      api.get<ListResponse<MemberWithChapter & { daysUntilDue: number }>>(
-        `/members/renewal-due${query({ days: withinDays, limit: 200 })}`,
-      ),
-      api.get<ListResponse<Invoice>>(`/invoices${query({ limit: 200 })}`),
-    ])
+    // 500 adalah batas atas endpoint ini di server.
+    const due = await api.get<ListResponse<MemberWithChapter & { daysUntilDue: number }>>(
+      `/members/renewal-due${query({ days: withinDays, limit: 500 })}`,
+    )
+    // Invoice diminta hanya untuk member yang jatuh tempo. Sebelumnya 200
+    // invoice terbaru dianggap seluruhnya, jadi member yang invoice
+    // terakhirnya di luar 200 itu hilang dari daftar ini.
+    const invoices = await tarikUntuk<Invoice>(
+      '/invoices',
+      'memberIds',
+      due.data.map((m) => m.id),
+    )
 
     // Newest invoice per member — the one whose period is ending.
     const latest = new Map<string, Invoice>()
-    for (const invoice of invoices.data) {
+    for (const invoice of invoices) {
       const existing = latest.get(invoice.memberId)
       if (!existing || invoice.periodEnd > existing.periodEnd) latest.set(invoice.memberId, invoice)
     }

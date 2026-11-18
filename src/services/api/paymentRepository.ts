@@ -1,17 +1,34 @@
 import { ApiError, api, fileUrl, query, type ListResponse } from '@/lib/apiClient'
 import type { PaymentRepository } from '@/services/types'
-import type { Invoice, MemberWithChapter, Payment, PaymentWithInvoice } from '@/types'
+import type {
+  Invoice,
+  MemberWithChapter,
+  Payment,
+  PaymentFilters,
+  PaymentSummary,
+  PaymentWithInvoice,
+} from '@/types'
+import { MAKS_PER_HALAMAN, ambilPerId, tarikSemua } from './kumpulan'
 
-/** Attaches the invoice and its member, which the payments table doesn't carry. */
+/**
+ * Menempelkan invoice dan membernya, yang tidak dibawa tabel payments.
+ *
+ * Hanya invoice dan member yang disebut baris-baris ini yang diminta.
+ * Sebelumnya 200 invoice dan 200 member pertama ditarik pada setiap panggilan,
+ * termasuk saat membuka satu pembayaran, dan pembayaran untuk invoice ke-201
+ * tampil tanpa nama member.
+ */
 async function withRelations(payments: Payment[]): Promise<PaymentWithInvoice[]> {
   if (payments.length === 0) return []
 
-  const [invoiceRes, memberRes] = await Promise.all([
-    api.get<ListResponse<Invoice>>(`/invoices${query({ limit: 200 })}`),
-    api.get<ListResponse<MemberWithChapter>>(`/members${query({ limit: 200 })}`),
-  ])
-  const invoices = new Map(invoiceRes.data.map((i) => [i.id, i]))
-  const members = new Map(memberRes.data.map((m) => [m.id, m]))
+  const invoices = await ambilPerId<Invoice>(
+    '/invoices',
+    payments.map((p) => p.invoiceId),
+  )
+  const members = await ambilPerId<MemberWithChapter>(
+    '/members',
+    [...invoices.values()].map((i) => i.memberId),
+  )
 
   return payments.map((p) => {
     const invoice = invoices.get(p.invoiceId) ?? null
@@ -25,10 +42,38 @@ async function withRelations(payments: Payment[]): Promise<PaymentWithInvoice[]>
   })
 }
 
+/** Menyusun query dari filter UI; "all" berarti tidak menyaring. */
+function paramFilter(f: PaymentFilters | undefined) {
+  const nilai = (v?: string) => (v && v !== 'all' ? v : undefined)
+  return {
+    q: f?.search?.trim() || undefined,
+    method: nilai(f?.method),
+    chapterId: nilai(f?.chapterId),
+    type: nilai(f?.type),
+    paidFrom: f?.paidFrom || undefined,
+    paidTo: f?.paidTo || undefined,
+  }
+}
+
 export const apiPaymentRepository: PaymentRepository = {
-  async list() {
-    const res = await api.get<ListResponse<Payment>>(`/payments${query({ limit: 200 })}`)
-    return withRelations(res.data)
+  async list(filters) {
+    return withRelations(await tarikSemua<Payment>('/payments', paramFilter(filters)))
+  },
+
+  async listPaged(filters) {
+    const res = await api.get<ListResponse<Payment> & { meta: { summary?: PaymentSummary } }>(
+      `/payments${query({
+        ...paramFilter(filters),
+        summary: filters?.summary ? 'true' : undefined,
+        limit: Math.min(filters?.limit ?? 25, MAKS_PER_HALAMAN),
+        offset: filters?.offset ?? 0,
+      })}`,
+    )
+    return {
+      rows: await withRelations(res.data),
+      total: res.meta.total,
+      summary: res.meta.summary,
+    }
   },
 
   async getById(id) {
@@ -46,10 +91,7 @@ export const apiPaymentRepository: PaymentRepository = {
   },
 
   async listByInvoice(invoiceId) {
-    const res = await api.get<ListResponse<Payment>>(
-      `/payments${query({ invoiceId, limit: 200 })}`,
-    )
-    return withRelations(res.data)
+    return withRelations(await tarikSemua<Payment>('/payments', { invoiceId }))
   },
 
   async update(id, input) {

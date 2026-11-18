@@ -246,9 +246,13 @@ type InvoiceFilter struct {
 	// Hanya invoice yang belum dibayar punya umur, jadi filter ini otomatis
 	// membatasi ke sent dan overdue. Dihitung dari due_date terhadap hari ini,
 	// bukan disimpan — umur yang tersimpan basi keesokan harinya.
-	Aging  string
-	Limit  int
-	Offset int
+	Aging string
+	// IDs dan MemberIDs membatasi ke invoice atau member tertentu, untuk
+	// halaman yang hanya butuh invoice milik baris yang sedang tampil.
+	IDs       []string
+	MemberIDs []string
+	Limit     int
+	Offset    int
 }
 
 // InvoiceSummary adalah agregat untuk SELURUH hasil filter, bukan halaman yang

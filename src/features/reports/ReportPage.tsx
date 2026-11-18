@@ -22,7 +22,7 @@ import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService, paymentService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
-import { todayISO } from '@/lib/date'
+import { addDays, todayISO } from '@/lib/date'
 import { downloadXlsxSheets } from '@/lib/xlsx'
 import { LaporanPengirimanCard } from './components/LaporanPengirimanCard'
 import { printTableReport } from '@/lib/pdfReport'
@@ -109,14 +109,7 @@ export function ReportPage() {
   const { toast } = useToast()
   const { data: invoices, loading: invLoading, error: invError, reload: reloadInv } =
     useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
-  const { data: payments, loading: payLoading, error: payError, reload: reloadPay } =
-    useAsync<PaymentWithInvoice[]>(() => paymentService.list())
   const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
-  const error = invError || payError
-  const reloadAll = () => {
-    reloadInv()
-    reloadPay()
-  }
 
   const [preset, setPreset] = useState<Preset>('this-year')
   const [tipe, setTipe] = useState<InvoiceTypeFilterValue>('all')
@@ -124,6 +117,25 @@ export function ReportPage() {
   const [customTo, setCustomTo] = useState('')
 
   const range = preset === 'custom' ? { from: customFrom, to: customTo } : presetRange(preset)
+
+  // Pembayaran diminta untuk periodenya saja, dengan kelonggaran sehari di
+  // tiap ujung. Server memotong menurut zona waktunya sendiri, sedangkan
+  // inRange di bawah memotong menurut tanggal UTC; kelonggaran itu memastikan
+  // selisih keduanya tidak membuang pembayaran di tepi periode.
+  const { data: payments, loading: payLoading, error: payError, reload: reloadPay } =
+    useAsync<PaymentWithInvoice[]>(
+      () =>
+        paymentService.list({
+          paidFrom: range.from ? addDays(range.from, -1) : undefined,
+          paidTo: range.to ? addDays(range.to, 1) : undefined,
+        }),
+      [range.from, range.to],
+    )
+  const error = invError || payError
+  const reloadAll = () => {
+    reloadInv()
+    reloadPay()
+  }
 
   const inRange = useMemo(() => {
     const { from, to } = range

@@ -22,6 +22,13 @@ import (
 // menyediakan tuasnya dan menunjukkan kapan perlu diputar.
 const DefaultMaxConns = 10
 
+// BatasQuery adalah statement_timeout tiap koneksi, dalam milidetik.
+//
+// 30 detik jauh di atas query terlama aplikasi ini (agregat laporan dan
+// dashboard berjalan dalam milidetik), jadi yang terkena hanya query yang
+// memang salah. Migrasi tidak lewat pool ini.
+const BatasQuery = "30000"
+
 // NewPool opens a pgx pool and verifies the connection so startup fails fast
 // on a bad DATABASE_URL rather than on the first request.
 //
@@ -38,6 +45,15 @@ func NewPool(ctx context.Context, url string, maxConns int) (*pgxpool.Pool, erro
 	cfg.MinConns = 1
 	cfg.MaxConnLifetime = time.Hour
 	cfg.MaxConnIdleTime = 5 * time.Minute
+
+	// Tanpa batas ini, satu query yang macet menahan satu koneksi sampai
+	// selesai sendiri, dan pool-nya hanya DefaultMaxConns. Beberapa query
+	// seperti itu membuat seluruh API mengantre padahal basis datanya sehat.
+	//
+	// Nilai dari DATABASE_URL (?options=-c statement_timeout=...) menang.
+	if _, ada := cfg.ConnConfig.RuntimeParams["statement_timeout"]; !ada {
+		cfg.ConnConfig.RuntimeParams["statement_timeout"] = BatasQuery
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

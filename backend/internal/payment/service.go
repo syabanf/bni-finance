@@ -11,6 +11,7 @@ import (
 // Store is the persistence contract for payments (see invoice.Store).
 type Store interface {
 	List(ctx context.Context, f domain.PaymentFilter) ([]domain.Payment, int, error)
+	Summary(ctx context.Context, f domain.PaymentFilter) (*domain.PaymentSummary, error)
 	GetByID(ctx context.Context, id string) (*domain.Payment, error)
 	CreateAndSettle(ctx context.Context, in domain.CreatePaymentInput, paidAt time.Time, settle bool) (*domain.Payment, error)
 	Update(ctx context.Context, id string, in domain.UpdatePaymentInput) (*domain.Payment, error)
@@ -20,13 +21,45 @@ type Store interface {
 var _ Store = (*Repository)(nil)
 
 type Service struct {
-	repo Store
+	repo         Store
+	setelahTulis func(context.Context)
 }
 
 func NewService(repo Store) *Service { return &Service{repo: repo} }
 
+// SetelahTulis mendaftarkan fungsi yang dipanggil setiap kali layanan ini
+// berhasil menulis. Dipakai untuk menggugurkan cache ringkasan dashboard.
+func (s *Service) SetelahTulis(fn func(context.Context)) *Service {
+	s.setelahTulis = fn
+	return s
+}
+
+func (s *Service) kabari(ctx context.Context, err error) {
+	if err == nil && s.setelahTulis != nil {
+		s.setelahTulis(ctx)
+	}
+}
+
 func (s *Service) List(ctx context.Context, f domain.PaymentFilter) ([]domain.Payment, int, error) {
+	if err := validasiFilter(f); err != nil {
+		return nil, 0, err
+	}
 	return s.repo.List(ctx, f)
+}
+
+// Summary menjumlahkan seluruh hasil filter, untuk kartu ringkasan.
+func (s *Service) Summary(ctx context.Context, f domain.PaymentFilter) (*domain.PaymentSummary, error) {
+	if err := validasiFilter(f); err != nil {
+		return nil, err
+	}
+	return s.repo.Summary(ctx, f)
+}
+
+func validasiFilter(f domain.PaymentFilter) error {
+	if f.Type != "" && !domain.InvoiceType(f.Type).Valid() {
+		return httpx.BadRequest("type harus 'registration' atau 'renewal'")
+	}
+	return nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*domain.Payment, error) {
@@ -48,7 +81,9 @@ func (s *Service) Create(ctx context.Context, in domain.CreatePaymentInput) (*do
 		return nil, httpx.BadRequest("paidAt tidak boleh di masa depan")
 	}
 
-	return s.repo.CreateAndSettle(ctx, in, paidAt, in.ShouldSettle())
+	p, err := s.repo.CreateAndSettle(ctx, in, paidAt, in.ShouldSettle())
+	s.kabari(ctx, err)
+	return p, err
 }
 
 func (s *Service) Update(ctx context.Context, id string, in domain.UpdatePaymentInput) (*domain.Payment, error) {
@@ -58,12 +93,16 @@ func (s *Service) Update(ctx context.Context, id string, in domain.UpdatePayment
 	if _, err := s.repo.GetByID(ctx, id); err != nil {
 		return nil, err
 	}
-	return s.repo.Update(ctx, id, in)
+	p, err := s.repo.Update(ctx, id, in)
+	s.kabari(ctx, err)
+	return p, err
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
 	if _, err := s.repo.GetByID(ctx, id); err != nil {
 		return err
 	}
-	return s.repo.Delete(ctx, id)
+	err := s.repo.Delete(ctx, id)
+	s.kabari(ctx, err)
+	return err
 }

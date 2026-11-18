@@ -156,6 +156,21 @@ func (s *fakeMemberStore) List(_ context.Context, f domain.MemberFilter) ([]doma
 	return out, len(out), nil
 }
 
+// Summary menghitung per status tanpa saringan statusnya, sama seperti
+// repository yang sungguhan.
+func (s *fakeMemberStore) Summary(_ context.Context, f domain.MemberFilter) (map[string]int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := map[string]int{}
+	for _, m := range s.items {
+		if f.ChapterID != "" && m.ChapterID != f.ChapterID {
+			continue
+		}
+		out[string(m.Status)]++
+	}
+	return out, nil
+}
+
 func (s *fakeMemberStore) GetByID(_ context.Context, id string) (*domain.Member, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
