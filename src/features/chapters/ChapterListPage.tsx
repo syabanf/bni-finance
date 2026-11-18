@@ -142,7 +142,7 @@ export function ChapterListPage() {
     <div>
       <PageHeader
         title="Chapter"
-        description="Daftar chapter hasil sinkronisasi dari Business Network International Visitor Management."
+        description="Daftar chapter beserta jumlah member dan tagihannya."
         action={
           <div className="flex flex-wrap items-center gap-2">
             {bolehImpor && (

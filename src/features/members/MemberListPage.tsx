@@ -181,7 +181,7 @@ export function MemberListPage() {
     <div>
       <PageHeader
         title="Member"
-        description="Data member dari impor laporan Business Network International Connect, Tambah Member, dan sinkronisasi Business Network International Visitor Management."
+        description="Data member dari impor laporan Business Network International Connect dan Tambah Member."
         action={
           <div className="flex flex-wrap items-center gap-2">
             {/*
