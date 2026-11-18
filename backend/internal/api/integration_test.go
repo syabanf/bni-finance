@@ -25,6 +25,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
+	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 
 	"github.com/syabanf/bni-finance/backend/internal/testdb"
@@ -129,6 +130,7 @@ func newLiveServer(t *testing.T) *liveStack {
 		Settings:  settings.NewService(settings.NewRepository(pool)),
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
+		Report:    report.NewService(report.NewRepository(pool)),
 		Renewal:   renewal.NewService(renewal.NewRepository(pool), suratMati{}, ""),
 	}, pool.Ping)
 

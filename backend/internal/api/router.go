@@ -24,6 +24,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
+	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
@@ -43,6 +44,7 @@ type Services struct {
 	Settings  *settings.Service
 	Audit     *audit.Service
 	Dashboard *dashboard.Service
+	Report    *report.Service
 	Upload    *upload.Store
 	Sync      *sync.Service
 	Importer  *importer.Service
@@ -159,6 +161,7 @@ func registerProtected(mux *http.ServeMux, svc Services) {
 	}
 	if svc.Dashboard != nil {
 		dashboard.NewHandler(svc.Dashboard).Register(mux)
+		report.NewHandler(svc.Report).Register(mux)
 	}
 	if svc.Upload != nil {
 		upload.NewHandler(svc.Upload).Register(mux)

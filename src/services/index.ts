@@ -12,6 +12,7 @@ import type {
   AuthRepository,
   ChapterRepository,
   DashboardRepository,
+  ReportRepository,
   InvoiceRepository,
   MemberRepository,
   PaymentRepository,
@@ -33,6 +34,7 @@ import { mockPaymentRepository } from './mock/paymentRepository'
 import { mockSettingsRepository } from './mock/settingsRepository'
 import { mockImportRepository } from './mock/importRepository'
 import { mockRenewalRepository } from './mock/renewalRepository'
+import { mockReportRepository } from './mock/reportRepository'
 import { mockUserRepository } from './mock/userRepository'
 
 import { apiAuthRepository } from './api/authRepository'
@@ -44,6 +46,7 @@ import { apiPaymentRepository } from './api/paymentRepository'
 import { apiSettingsRepository } from './api/settingsRepository'
 import { apiImportRepository } from './api/importRepository'
 import { apiRenewalRepository } from './api/renewalRepository'
+import { apiReportRepository } from './api/reportRepository'
 import { apiUserRepository } from './api/userRepository'
 
 const useMock = isMockMode()
@@ -56,6 +59,7 @@ interface Services {
   settings: SettingsRepository
   payments: PaymentRepository
   dashboard: DashboardRepository
+  reports: ReportRepository
   users: UserRepository
   renewals: RenewalRepository
   imports: ImportRepository
@@ -69,6 +73,7 @@ const mockServices: Services = {
   settings: mockSettingsRepository,
   payments: mockPaymentRepository,
   dashboard: mockDashboardRepository,
+  reports: mockReportRepository,
   users: mockUserRepository,
   renewals: mockRenewalRepository,
   imports: mockImportRepository,
@@ -82,6 +87,7 @@ const apiServices: Services = {
   settings: apiSettingsRepository,
   payments: apiPaymentRepository,
   dashboard: apiDashboardRepository,
+  reports: apiReportRepository,
   users: apiUserRepository,
   renewals: apiRenewalRepository,
   imports: apiImportRepository,
@@ -118,6 +124,7 @@ export const {
   settings: settingsService,
   payments: paymentService,
   dashboard: dashboardService,
+  reports: reportService,
   users: userService,
   renewals: renewalService,
   imports: importService,

@@ -244,6 +244,13 @@ export interface InvoiceFilters {
   dueTo?: string
   issuedFrom?: string
   issuedTo?: string
+  /** Tanggal dikirim ke Paper.id. Mengisinya membuang invoice yang belum dikirim. */
+  sentFrom?: string
+  sentTo?: string
+  /** `sent` mengurutkan menurut tanggal kirim, terbaru dulu. */
+  sort?: 'sent'
+  /** Hanya invoice milik member-member ini. */
+  memberIds?: string[]
   limit?: number
   offset?: number
   /**
@@ -343,6 +350,59 @@ export interface PaymentPage {
   rows: PaymentWithInvoice[]
   total: number
   summary?: PaymentSummary
+}
+
+/** Periode dan tipe laporan. `from` dan `to` inklusif, berformat YYYY-MM-DD. */
+export interface ReportFilters {
+  from?: string
+  to?: string
+  type?: InvoiceType | 'all'
+  limit?: number
+  offset?: number
+}
+
+export interface ReportChapterRow {
+  id: string
+  name: string
+  count: number
+  ditagih: number
+  /** Ditagih, dipecah per tipe. renewal + pendaftaran === ditagih. */
+  renewal: number
+  pendaftaran: number
+  diterima: number
+  outstanding: number
+  rate: number
+}
+
+/** Seluruh angka halaman Laporan selain tabel detail. */
+export interface ReportSummary {
+  count: number
+  ditagih: number
+  diterima: number
+  outstanding: number
+  rate: number
+  /** Setiap chapter, termasuk yang tanpa invoice. Urutannya tidak dijamin. */
+  chapters: ReportChapterRow[]
+  types: Record<InvoiceType, number>
+  monthly: { month: string; issued: number; paid: number }[]
+  methods: { method: string; count: number; amount: number }[]
+  /** Jumlah kolom diterima di SELURUH baris detail. */
+  detailDiterima: number
+}
+
+/** Satu baris tabel detail: satu invoice yang terbit pada periode. */
+export interface ReportDetailRow {
+  id: string
+  number: string
+  member: string | null
+  chapter: string | null
+  type: InvoiceType
+  terbit: string
+  jatuhTempo: string
+  status: InvoiceStatus
+  ditagih: number
+  /** Pembayaran yang DITERIMA pada periode untuk invoice ini. */
+  diterima: number
 }
 
 export interface RenewalDueMember extends MemberWithChapter {

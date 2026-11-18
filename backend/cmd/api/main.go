@@ -32,6 +32,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/reminder"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
+	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 	"github.com/syabanf/bni-finance/backend/internal/sync"
 	"github.com/syabanf/bni-finance/backend/internal/upload"
@@ -194,6 +195,7 @@ func run(log *slog.Logger) error {
 		Settings:  settingsSvc,
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboardSvc,
+		Report:    report.NewService(report.NewRepository(pool)),
 		Upload:    uploads,
 		Sync: sync.NewService(sync.NewRepository(pool), cfg.BNIVMURL, cfg.BNIVMToken, recorder).
 			SetelahJalan(chapterSvc.Kedaluwarsakan),

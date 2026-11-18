@@ -251,8 +251,15 @@ type InvoiceFilter struct {
 	// halaman yang hanya butuh invoice milik baris yang sedang tampil.
 	IDs       []string
 	MemberIDs []string
-	Limit     int
-	Offset    int
+	// SentFrom dan SentTo menyaring tanggal invoice dikirim ke Paper.id.
+	// Mengisi salah satunya membuang invoice yang belum pernah dikirim.
+	SentFrom string
+	SentTo   string
+	// Sort "sent" mengurutkan menurut tanggal kirim, terbaru dulu. Selain itu
+	// urutannya tanggal terbit, terbaru dulu.
+	Sort   string
+	Limit  int
+	Offset int
 }
 
 // InvoiceSummary adalah agregat untuk SELURUH hasil filter, bukan halaman yang

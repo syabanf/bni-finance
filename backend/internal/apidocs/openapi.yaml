@@ -67,6 +67,8 @@ tags:
     description: Biaya keanggotaan dan konfigurasi aplikasi
   - name: Dashboard
     description: Agregat KPI, hanya baca
+  - name: Laporan
+    description: Penagihan dan penerimaan per periode, dihitung dari view basis data
   - name: Unggahan
     description: Bukti pembayaran
   - name: Sinkronisasi
@@ -541,6 +543,20 @@ paths:
           in: query
           description: Id member berpisah koma, paling banyak 200.
           schema: { type: string }
+        - name: sentFrom
+          in: query
+          description: >
+            Tanggal invoice dikirim ke Paper.id, batas awal. Mengisinya membuang
+            invoice yang belum pernah dikirim.
+          schema: { type: string, format: date }
+        - name: sentTo
+          in: query
+          description: Tanggal dikirim, batas akhir. Inklusif.
+          schema: { type: string, format: date }
+        - name: sort
+          in: query
+          description: "`sent` mengurutkan menurut tanggal kirim, terbaru dulu. Bawaannya tanggal terbit."
+          schema: { type: string, enum: [sent] }
         - name: q
           in: query
           description: >
@@ -1356,6 +1372,62 @@ paths:
         "204": { description: Terhapus }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  # ===========================================================================
+  # Laporan
+  # ===========================================================================
+  /api/v1/reports/summary:
+    get:
+      tags: [Laporan]
+      summary: Angka laporan per periode
+      description: |
+        Seluruh angka halaman Laporan selain tabel detail, dihitung dari view
+        `v_laporan_invoice` dan `v_laporan_pembayaran`.
+
+        Dua dasar waktu dipakai sekaligus dan tidak dicampur:
+
+        - **ditagih**: invoice yang terbit pada periode (`created_at`), kecuali
+          draft dan batal.
+        - **diterima**: pembayaran yang masuk pada periode (`paid_at`), apa pun
+          status invoicenya sekarang.
+
+        `chapters` memuat setiap chapter, termasuk yang tanpa invoice. Total di
+        tingkat atas adalah jumlah baris-baris itu, jadi kartu ringkasan tidak
+        bisa berbeda dari tabelnya.
+
+        **Dibatasi per chapter** untuk pengguna berlingkup (ST dan MC).
+      parameters:
+        - $ref: "#/components/parameters/LaporanFrom"
+        - $ref: "#/components/parameters/LaporanTo"
+        - $ref: "#/components/parameters/LaporanType"
+      responses:
+        "200":
+          description: Angka laporan
+        "400":
+          description: Tanggal atau tipe salah bentuk
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /api/v1/reports/detail:
+    get:
+      tags: [Laporan]
+      summary: Detail invoice per periode
+      description: |
+        Invoice yang terbit pada periode, terbaru dulu, berhalaman. Kolom
+        `diterima` menjumlahkan pembayaran invoice itu yang masuk pada periode,
+        dasar yang sama dengan `chapters` di `/reports/summary`.
+      parameters:
+        - $ref: "#/components/parameters/LaporanFrom"
+        - $ref: "#/components/parameters/LaporanTo"
+        - $ref: "#/components/parameters/LaporanType"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Halaman detail
+        "400":
+          description: Tanggal atau tipe salah bentuk
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   # ===========================================================================
   # Dashboard
@@ -2851,6 +2923,21 @@ components:
       description: Token dari `POST /api/v1/auth/login`.
 
   parameters:
+    LaporanFrom:
+      name: from
+      in: query
+      description: Awal periode, inklusif. Kosong = tanpa batas awal.
+      schema: { type: string, format: date }
+    LaporanTo:
+      name: to
+      in: query
+      description: Akhir periode, inklusif. Kosong = tanpa batas akhir.
+      schema: { type: string, format: date }
+    LaporanType:
+      name: type
+      in: query
+      description: Saring ke satu tipe invoice. Pembayaran ikut tersaring lewat tipe invoicenya.
+      schema: { type: string, enum: [registration, renewal] }
     Limit:
       name: limit
       in: query

@@ -388,6 +388,30 @@ membingungkan saat mengira integrasinya rusak.
 dikonfirmasi hanya berarti permintaannya diterima. Kalau pesan tidak masuk, tunjukkan
 rekaman Blackbox ke Paper.id.
 
+### Laporan dihitung dari dua view
+
+Halaman Laporan membaca `GET /api/v1/reports/summary` dan `/reports/detail`. Keduanya
+menjumlahkan dari dua view di `db/init.sql`:
+
+| View | Isi |
+| --- | --- |
+| `v_laporan_invoice` | Invoice yang terhitung ditagih: semua kecuali draft dan batal, lengkap dengan nama member dan chapter |
+| `v_laporan_pembayaran` | Pembayaran yang masuk, lengkap dengan tipe dan chapter invoicenya |
+
+Aturan "invoice mana yang terhitung" hanya ditulis di view itu, dan view-nya bisa dibuka
+langsung dari psql atau alat BI. Periode dan tipe dikirim sebagai `WHERE`, karena view
+tidak menerima parameter. View-nya biasa, bukan materialized, supaya angkanya selalu segar.
+
+Dua jebakan saat mengubah skema di dekatnya:
+
+- `create or replace view` hanya menerima kolom baru di **akhir**.
+- `ALTER ... TYPE` pada kolom yang dibaca view ditolak Postgres walau tipenya tidak
+  berubah. `db/init.sql` diterapkan ulang tiap deploy, jadi pelebaran kolom uang ke
+  `bigint` dijalankan hanya bila tipenya belum `bigint`.
+
+Mode Data Contoh menghitung angka yang sama di browser lewat
+`src/features/reports/lib/hitungLaporan.ts`. Aturannya harus tetap sama dengan kedua view.
+
 ---
 
 ## 10. Deploy
