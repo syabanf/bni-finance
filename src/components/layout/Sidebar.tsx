@@ -1,23 +1,19 @@
 import { useEffect, useState } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Avatar, BniLogo } from '@/components/ui'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useUrgentCount } from '@/hooks/useUrgentCount'
-import { NAV, type NavLeaf } from './nav'
+import { NAV, tujuanAktif } from './nav'
 import { can, ROLE_LABEL } from '@/lib/rbac'
 
 const itemBase =
   'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors'
 
-function leafIsActive(pathname: string, leaf: NavLeaf) {
-  return leaf.end ? pathname === leaf.to : pathname.startsWith(leaf.to)
-}
-
 function NavGroup({ label, icon: Icon, children }: Extract<(typeof NAV)[number], { kind: 'group' }>) {
-  const { pathname } = useLocation()
-  const groupActive = children.some((c) => leafIsActive(pathname, c))
+  const aktif = tujuanAktif(useLocation().pathname)
+  const groupActive = children.some((c) => c.to === aktif)
   const [open, setOpen] = useState(groupActive)
   // Membuka grup juga saat orang TIBA di halamannya lewat tombol di halaman
   // lain (Impor dari Member atau Chapter), bukan hanya saat halaman dimuat.
@@ -41,21 +37,19 @@ function NavGroup({ label, icon: Icon, children }: Extract<(typeof NAV)[number],
       {open && (
         <div className="mt-1 space-y-0.5 pl-[34px]">
           {children.map((leaf) => (
-            <NavLink
+            <Link
               key={leaf.to}
               to={leaf.to}
-              end={leaf.end}
-              className={({ isActive }) =>
-                cn(
-                  'block rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
-                  isActive
-                    ? 'bg-brand-50 text-brand-600'
-                    : 'text-ink-500 hover:bg-ink-100 hover:text-ink-800',
-                )
-              }
+              aria-current={leaf.to === aktif ? 'page' : undefined}
+              className={cn(
+                'block rounded-lg px-3 py-2 text-[13px] font-medium transition-colors',
+                leaf.to === aktif
+                  ? 'bg-brand-50 text-brand-600'
+                  : 'text-ink-500 hover:bg-ink-100 hover:text-ink-800',
+              )}
             >
               {leaf.label}
-            </NavLink>
+            </Link>
           ))}
         </div>
       )}
@@ -66,6 +60,7 @@ function NavGroup({ label, icon: Icon, children }: Extract<(typeof NAV)[number],
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { user } = useAuth()
   const urgentCount = useUrgentCount()
+  const aktif = tujuanAktif(useLocation().pathname)
   // Sembunyikan menu yang tidak boleh diakses peran ini (mis. Sistem untuk User).
   const visibleNav = NAV.filter((node) => {
     const perm = 'permission' in node ? node.permission : undefined
@@ -105,18 +100,16 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           const Icon = node.icon
           if (node.urgent) {
             return (
-              <NavLink
+              <Link
                 key={node.to}
                 to={node.to}
-                end={node.end}
-                className={({ isActive }) =>
-                  cn(
-                    itemBase,
-                    isActive
-                      ? 'bg-red-500 text-white shadow-sm shadow-red-500/30'
-                      : 'bg-red-50 text-red-600 hover:bg-red-100',
-                  )
-                }
+                aria-current={node.to === aktif ? 'page' : undefined}
+                className={cn(
+                  itemBase,
+                  node.to === aktif
+                    ? 'bg-red-500 text-white shadow-sm shadow-red-500/30'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100',
+                )}
               >
                 <Icon className="h-[18px] w-[18px]" />
                 <span className="flex-1">{node.label}</span>
@@ -125,26 +118,24 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                     {urgentCount.total}
                   </span>
                 )}
-              </NavLink>
+              </Link>
             )
           }
           return (
-            <NavLink
+            <Link
               key={node.to}
               to={node.to}
-              end={node.end}
-              className={({ isActive }) =>
-                cn(
-                  itemBase,
-                  isActive
-                    ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
-                    : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
-                )
-              }
+              aria-current={node.to === aktif ? 'page' : undefined}
+              className={cn(
+                itemBase,
+                node.to === aktif
+                  ? 'bg-brand-500 text-white shadow-sm shadow-brand-500/30'
+                  : 'text-ink-600 hover:bg-ink-100 hover:text-ink-900',
+              )}
             >
               <Icon className="h-[18px] w-[18px]" />
               {node.label}
-            </NavLink>
+            </Link>
           )
         })}
       </nav>
