@@ -195,6 +195,30 @@ func klausaFilter(ctx context.Context, f domain.InvoiceFilter) (string, []any) {
 	return strings.Join(where, " AND "), args
 }
 
+// TandaiOverdue mengubah invoice `sent` yang lewat jatuh tempo menjadi
+// `overdue` dan mencatat tiap perubahan di audit log, dalam satu pernyataan.
+//
+// "Hari ini" adalah current_date basis data, sama dengan yang dipakai saringan
+// umur tunggakan dan worker pengingat. Tiga tempat dengan tiga pengertian hari
+// ini akan membuat invoice yang sama terhitung telat di satu layar dan belum
+// di layar lain.
+//
+// Pernyataannya aman dijalankan bersamaan dengan pelunasan: UPDATE menunggu
+// kunci barisnya, lalu memeriksa ulang status = 'sent' sebelum menulis.
+func (r *Repository) TandaiOverdue(ctx context.Context) (int, error) {
+	tag, err := r.db.Exec(ctx, `
+		WITH telat AS (
+			UPDATE invoices SET status = 'overdue', updated_at = now()
+			WHERE status = 'sent' AND due_date < current_date
+			RETURNING id)
+		INSERT INTO invoice_audit_log (invoice_id, action, old_status, new_status, actor_name, notes)
+		SELECT id, 'overdue', 'sent', 'overdue', 'Sistem', 'Lewat jatuh tempo' FROM telat`)
+	if err != nil {
+		return 0, fmt.Errorf("tandai overdue: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
+
 // List returns a filtered page plus the total row count for that filter.
 func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain.Invoice, int, error) {
 	clause, args := klausaFilter(ctx, f)

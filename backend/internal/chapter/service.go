@@ -77,6 +77,8 @@ func (s *Service) List(ctx context.Context, f domain.ChapterFilter) ([]domain.Ch
 // tabel chapters: layanan ini, impor laporan, dan sinkronisasi BNI VM.
 func (s *Service) Kedaluwarsakan(ctx context.Context) {
 	s.cache.NaikkanGenerasi(ctx, kunciGenerasi)
+	// Impor dan sinkronisasi juga mengubah jumlah member per chapter.
+	s.KedaluwarsakanAngka(ctx)
 }
 
 func (s *Service) Get(ctx context.Context, id string) (*domain.Chapter, error) {
@@ -128,7 +130,35 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// Counts meneruskan agregat per chapter; pembatasan lingkupnya ada di repository.
+// kunciGenerasiAngka menamai versi jumlah per chapter. Terpisah dari daftar
+// chapter karena penulisnya lain: invoice dan pembayaran mengubah tunggakan
+// tanpa menyentuh tabel chapters.
+const kunciGenerasiAngka = "chapters:angka:gen"
+
+// ttlAngka adalah batas atas angka basi. Menambah atau menghapus member tidak
+// menggugurkan cache ini, jadi jumlah member tertinggal paling lama selama ini.
+const ttlAngka = 15 * time.Second
+
+// Counts mengembalikan jumlah member dan tunggakan per chapter, lewat cache
+// bila ada. Pembatasan lingkupnya ada di repository, dan kuncinya memuat
+// lingkup itu supaya angka seluruh chapter tidak tersaji ke ST.
 func (s *Service) Counts(ctx context.Context) ([]domain.ChapterCounts, error) {
-	return s.repo.Counts(ctx)
+	lim := scope.Chapter(ctx)
+	if s.cache == nil || lim.Buntu {
+		return s.repo.Counts(ctx)
+	}
+	lingkup := "semua"
+	if lim.Terbatas {
+		lingkup = "chapter=" + lim.ChapterID
+	}
+	key := fmt.Sprintf("chapters:angka:%d:%s", s.cache.Generasi(ctx, kunciGenerasiAngka), lingkup)
+	return cache.Ingat(ctx, s.cache, key, ttlAngka, func() ([]domain.ChapterCounts, error) {
+		return s.repo.Counts(ctx)
+	})
+}
+
+// KedaluwarsakanAngka menggugurkan cache jumlah per chapter. Dipanggil setelah
+// invoice atau pembayaran ditulis.
+func (s *Service) KedaluwarsakanAngka(ctx context.Context) {
+	s.cache.NaikkanGenerasi(ctx, kunciGenerasiAngka)
 }

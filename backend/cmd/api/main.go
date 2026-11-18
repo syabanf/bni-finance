@@ -178,11 +178,17 @@ func run(log *slog.Logger) error {
 	settingsSvc := settings.NewService(settings.NewRepository(pool)).PakaiCache(rdb)
 	chapterSvc := chapter.NewService(chapter.NewRepository(pool)).PakaiCache(rdb)
 	dashboardSvc := dashboard.NewService(dashboard.NewRepository(pool)).PakaiCache(rdb)
+	// Invoice dan pembayaran mengubah dua angka tersimpan sekaligus: ringkasan
+	// dashboard dan tunggakan per chapter.
+	angkaBerubah := func(ctx context.Context) {
+		dashboardSvc.Kedaluwarsakan(ctx)
+		chapterSvc.KedaluwarsakanAngka(ctx)
+	}
 
 	handler := api.NewHandler(log, cfg, signer, api.Services{
 		Auth:      authSvc,
-		Invoice:   invoice.NewService(invoice.NewRepository(pool)).SetelahTulis(dashboardSvc.Kedaluwarsakan),
-		Payment:   payment.NewService(payment.NewRepository(pool)).SetelahTulis(dashboardSvc.Kedaluwarsakan),
+		Invoice:   invoice.NewService(invoice.NewRepository(pool)).SetelahTulis(angkaBerubah),
+		Payment:   payment.NewService(payment.NewRepository(pool)).SetelahTulis(angkaBerubah),
 		Member:    member.NewService(member.NewRepository(pool)),
 		Chapter:   chapterSvc,
 		Settings:  settingsSvc,
@@ -221,6 +227,12 @@ func run(log *slog.Logger) error {
 		reminder.NewPaperPengirim(paperSvc),
 		log,
 	).Jalankan(workerCtx)
+
+	// Invoice terkirim yang lewat jatuh tempo ditandai overdue saat start, lalu
+	// tiap 15 menit. Sebelumnya hanya browser yang menulis status itu.
+	go invoice.NewWorker(invoice.NewRepository(pool), log).
+		SetelahMenandai(angkaBerubah).
+		Jalankan(workerCtx)
 
 	// Kurs pajak KMK diperiksa saat start lalu sekali sehari; kurs USD di
 	// fee_settings mengikutinya kecuali app_settings.kurs_kmk_otomatis = false.

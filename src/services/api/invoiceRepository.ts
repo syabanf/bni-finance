@@ -67,36 +67,23 @@ async function lampirkan(invoices: Invoice[]): Promise<InvoiceWithRelations[]> {
   }))
 }
 
-/** Invoice terkirim yang sudah lewat jatuh tempo, tetapi statusnya belum overdue. */
-function yangTelat(invoices: Invoice[]): Invoice[] {
-  const today = todayISO()
-  return invoices.filter((i) => i.status === 'sent' && i.dueDate < today)
-}
-
 /**
  * Menampilkan invoice telat sebagai overdue TANPA menulisnya ke server.
  *
- * Untuk daftar lengkap. Di sana syncOverdue berarti satu PATCH per invoice
- * telat, sekaligus: diukur pada 2.143 invoice telat, peramban menolak ribuan
- * permintaan dengan ERR_INSUFFICIENT_RESOURCES. Statusnya tetap ditulis saat
- * invoice itu tampil di daftar berhalaman, paling banyak satu halaman sekali.
+ * Status itu ditulis server sendiri, lewat penyapu yang berjalan tiap 15
+ * menit. Yang dikerjakan di sini hanya menutup selisihnya: invoice yang jatuh
+ * temponya baru lewat tengah malam tampil sebagai overdue tanpa menunggu
+ * sapuan berikutnya.
+ *
+ * Dulu klien yang menulisnya, satu PATCH per invoice telat pada setiap
+ * pemuatan daftar. Diukur pada 2.143 invoice telat, peramban menolak ribuan
+ * permintaan dengan ERR_INSUFFICIENT_RESOURCES.
  */
 function tampilkanOverdue(invoices: Invoice[]): void {
-  for (const invoice of yangTelat(invoices)) invoice.status = 'overdue'
-}
-
-/** Marks sent invoices past their due date as overdue, matching the UI's view. */
-async function syncOverdue(invoices: Invoice[]): Promise<void> {
-  const stale = yangTelat(invoices)
-  await Promise.all(
-    stale.map((i) =>
-      api.patch<Invoice>(`/invoices/${i.id}`, { status: 'overdue' }).catch(() => {
-        // A failed sweep must not break the list the user asked for; the next
-        // load tries again.
-      }),
-    ),
-  )
-  for (const invoice of stale) invoice.status = 'overdue'
+  const today = todayISO()
+  for (const invoice of invoices) {
+    if (invoice.status === 'sent' && invoice.dueDate < today) invoice.status = 'overdue'
+  }
 }
 
 /**
@@ -167,7 +154,7 @@ export const apiInvoiceRepository: InvoiceRepository = {
         offset: filters?.offset ?? 0,
       })}`,
     )
-    await syncOverdue(res.data)
+    tampilkanOverdue(res.data)
 
     return {
       rows: await lampirkan(res.data),
