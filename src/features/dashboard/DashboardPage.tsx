@@ -189,7 +189,7 @@ export function DashboardPage() {
       {summary && (summary.overdue.count > 0 || summary.renewalDue.count > 0) && (
         <button
           onClick={() => navigate('/urgent')}
-          className="mb-4 flex w-full items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-left transition-colors hover:bg-red-100"
+          className="mb-4 flex w-full items-center gap-3 rounded-xl border border-red-300/50 bg-red-500/10 px-4 py-3 text-left shadow-glass transition-colors hover:bg-red-500/15"
         >
           <AlertTriangle className="h-5 w-5 shrink-0 text-red-500" />
           <div className="flex-1 text-sm">

@@ -5,11 +5,11 @@ import { cn } from '@/lib/cn'
 type IconTone = 'brand' | 'amber' | 'blue' | 'green' | 'red'
 
 const iconTones: Record<IconTone, string> = {
-  brand: 'bg-brand-50 text-brand-500',
-  amber: 'bg-amber-50 text-amber-500',
-  blue: 'bg-blue-50 text-blue-500',
-  green: 'bg-emerald-50 text-emerald-500',
-  red: 'bg-red-50 text-red-500',
+  brand: 'bg-brand-500/10 text-brand-500',
+  amber: 'bg-amber-500/15 text-amber-600',
+  blue: 'bg-blue-500/10 text-blue-500',
+  green: 'bg-emerald-500/10 text-emerald-600',
+  red: 'bg-red-500/10 text-red-500',
 }
 
 interface StatCardProps {
@@ -33,7 +33,7 @@ export function StatCard({ icon: Icon, iconTone = 'brand', value, label, hint, o
       )}
     >
       <div className="flex items-start justify-between">
-        <div className={cn('flex h-11 w-11 items-center justify-center rounded-xl', iconTones[iconTone])}>
+        <div className={cn('flex h-11 w-11 items-center justify-center rounded-xl ring-1 ring-inset ring-white/70', iconTones[iconTone])}>
           <Icon className="h-[22px] w-[22px]" strokeWidth={2} />
         </div>
       </div>
