@@ -18,6 +18,7 @@ import {
   PageHeader,
   Skeleton,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { isMockMode } from '@/services/dataSource'
@@ -30,6 +31,7 @@ import {
 } from '@/services/api/blackboxService'
 import { formatDateTime } from '@/lib/format'
 import { TARIK_VM_TAMPIL } from '@/lib/fitur'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 const useMock = isMockMode()
 
@@ -73,6 +75,7 @@ export function BlackboxPage() {
 
   const fetcher = useCallback(() => listBlackbox(filters), [filters])
   const { data: entries, loading, error, reload } = useAsync<BlackboxEntry[]>(fetcher, [filters])
+  const { potongan, paginasi } = usePaginasi(entries)
 
   const stats = useMemo(() => {
     const list = entries ?? []
@@ -170,7 +173,7 @@ export function BlackboxPage() {
       )}
 
       <div data-tour="blackbox-list" className="space-y-2">
-        {entries?.map((entry) => (
+        {potongan.map((entry) => (
           <EntryRow
             key={entry.id}
             entry={entry}
@@ -179,6 +182,12 @@ export function BlackboxPage() {
           />
         ))}
       </div>
+
+      {entries && entries.length > 0 && (
+        <Card className="mt-3">
+          <Pagination {...paginasi} satuan="panggilan" className="border-t-0" />
+        </Card>
+      )}
 
       {entries && entries.length > 0 && (
         <p className="mt-5 text-xs text-ink-400">

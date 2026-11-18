@@ -2,10 +2,11 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send } from 'lucide-react'
 import type { InvoiceWithRelations } from '@/types'
-import { Card, CardHeader, EmptyState, ExportMenu, InvoiceStatusBadge, TableSkeleton } from '@/components/ui'
+import { Card, CardHeader, EmptyState, ExportMenu, InvoiceStatusBadge, TableSkeleton, Pagination } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 import { downloadXlsx } from '@/lib/xlsx'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 /**
  * Invoice yang dikirim ke Paper.id pada periode laporan, dihitung dari tanggal
@@ -32,6 +33,7 @@ export function LaporanPengirimanCard({
     [invoices, inRange],
   )
   const lunas = baris.filter((i) => i.status === 'paid').length
+  const { potongan, paginasi } = usePaginasi(baris)
 
   const ekspor = () =>
     downloadXlsx(
@@ -77,7 +79,7 @@ export function LaporanPengirimanCard({
               </tr>
             </thead>
             <tbody className="divide-y divide-ink-50">
-              {baris.map((i) => (
+              {potongan.map((i) => (
                 <tr key={i.id} onClick={() => navigate(`/invoices/${i.id}`)} className="cursor-pointer hover:bg-ink-50/50">
                   <td className="whitespace-nowrap px-5 py-3 font-medium text-ink-900">{i.number}</td>
                   <td className="px-3 py-3 text-ink-700">
@@ -97,6 +99,7 @@ export function LaporanPengirimanCard({
           </table>
         </div>
       )}
+      {!loading && <Pagination {...paginasi} satuan="invoice" />}
     </Card>
   )
 }

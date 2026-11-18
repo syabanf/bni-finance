@@ -18,12 +18,14 @@ import {
   Th,
   Tr,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { chapterService, importService, memberService } from '@/services'
 import type { ImportOpsi } from '@/services/types'
 import { downloadXlsx } from '@/lib/xlsx'
 import { isMockMode, setDataSource } from '@/services/dataSource'
 import { cn } from '@/lib/cn'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 /**
  * Impor data sebagai wizard.
@@ -630,6 +632,7 @@ function TombolTemplate({
 
 /** Ringkasan, status tulis, peringatan, dan tabel baris satu berkas. */
 function HasilImpor({ hasil }: { hasil: ImportHasil }) {
+  const { potongan, paginasi } = usePaginasi(hasil.baris, 50)
   return (
     <Card>
       <CardHeader
@@ -681,7 +684,7 @@ function HasilImpor({ hasil }: { hasil: ImportHasil }) {
               </Tr>
             </THead>
             <TBody>
-              {hasil.baris.map((b) => (
+              {potongan.map((b) => (
                 <Tr key={`${b.nomor}-${b.id}`}>
                   {/* Nomor mengikuti Excel, supaya barisnya bisa dicari di berkas aslinya. */}
                   <Td className="tabular-nums text-ink-500">{b.nomor}</Td>
@@ -695,6 +698,7 @@ function HasilImpor({ hasil }: { hasil: ImportHasil }) {
               ))}
             </TBody>
           </Table>
+          <Pagination {...paginasi} satuan="baris" className="px-0" />
         </div>
       </CardBody>
     </Card>

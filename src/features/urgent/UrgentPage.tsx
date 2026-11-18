@@ -30,6 +30,9 @@ import {
   Tr,
   TableSkeleton,
   useToast,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
@@ -43,6 +46,11 @@ import { buatMassal, pesanMassal } from '@/features/invoices/lib/buatMassal'
 import { KonfirmasiBadge } from '@/features/renewal/components/KonfirmasiBadge'
 import { bolehDitagih, type StatusRenewal } from '@/lib/status'
 import { muatStatusRenewal } from '@/features/renewal/statusRenewal'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan, type Tampilan } from '@/hooks/useTampilan'
+
+/** Tiga daftar berbagi satu halaman, jadi tiap daftar dipotong lebih pendek. */
+const PER_SEKSI = 10
 
 function DaysOverdueBadge({ dueDate }: { dueDate: string }) {
   const days = Math.floor((Date.now() - new Date(dueDate).getTime()) / 86400000)
@@ -95,7 +103,17 @@ function RemindButton({ invoice, className }: { invoice: InvoiceWithRelations; c
   )
 }
 
-function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[] | null; loading: boolean }) {
+function OverdueSection({
+  invoices,
+  loading,
+  tampilan,
+}: {
+  invoices: InvoiceWithRelations[] | null
+  loading: boolean
+  tampilan: Tampilan
+}) {
+  const kelas = kelasTampilan(tampilan)
+  const { potongan, paginasi } = usePaginasi(invoices, PER_SEKSI)
   const navigate = useNavigate()
 
   return (
@@ -130,9 +148,9 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
         />
       ) : (
         <>
-          {/* Mobile cards */}
-          <div className="divide-y divide-ink-100 lg:hidden">
-            {invoices.map((inv) => (
+          {/* Kartu */}
+          <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
+            {potongan.map((inv) => (
               <div
                 key={inv.id}
                 className="flex items-center gap-3 px-4 py-3.5"
@@ -173,8 +191,8 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
               </div>
             ))}
           </div>
-          {/* Desktop table */}
-          <div className="hidden lg:block">
+          {/* Tabel */}
+          <div className={kelas.tabel}>
             <Table>
               <THead>
                 <Tr>
@@ -186,7 +204,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
                 </Tr>
               </THead>
               <TBody>
-                {invoices.map((inv) => (
+                {potongan.map((inv) => (
                   <Tr key={inv.id}>
                     <Td>
                       <div className="flex items-center gap-3">
@@ -230,6 +248,7 @@ function OverdueSection({ invoices, loading }: { invoices: InvoiceWithRelations[
               </TBody>
             </Table>
           </div>
+          <Pagination {...paginasi} satuan="invoice" />
         </>
       )}
     </Card>
@@ -246,6 +265,7 @@ function RenewalSection({
   fees,
   jawaban,
   onGenerated,
+  tampilan,
 }: {
   members: RenewalDueMember[] | null
   loading: boolean
@@ -253,7 +273,9 @@ function RenewalSection({
   /** Jawaban MC terakhir per member; hanya yang "Diterima" boleh dicentang. */
   jawaban: Map<string, StatusRenewal> | null
   onGenerated: () => void
+  tampilan: Tampilan
 }) {
+  const kelas = kelasTampilan(tampilan)
   const navigate = useNavigate()
   const { toast } = useToast()
   const canCreate = useCan('invoice:create')
@@ -262,6 +284,14 @@ function RenewalSection({
 
   const urgent = useMemo(() => members?.filter((m) => m.daysUntilDue <= 7) ?? [], [members])
   const upcoming = useMemo(() => members?.filter((m) => m.daysUntilDue > 7) ?? [], [members])
+  const berurut = useMemo(() => [...urgent, ...upcoming], [urgent, upcoming])
+  const { potongan, paginasi } = usePaginasi(berurut, PER_SEKSI)
+  // Judul kelompok mengikuti isi halaman yang tampil, bukan seluruh daftar:
+  // halaman kedua yang seluruhnya "Dalam 30 Hari" tidak boleh berjudul
+  // "Sangat Mendesak".
+  const halamanMulaiMendesak = potongan.length > 0 && potongan[0].daysUntilDue <= 7
+  const awalKelompokKedua = (m: RenewalDueMember, idx: number) =>
+    urgent.length > 0 && m.daysUntilDue > 7 && (idx === 0 || potongan[idx - 1].daysUntilDue <= 7)
   const boleh = (id: string) => jawaban?.get(id) === 'will_renew'
   const allIds = useMemo(
     () => members?.filter((m) => jawaban?.get(m.id) === 'will_renew').map((m) => m.id) ?? [],
@@ -369,16 +399,16 @@ function RenewalSection({
         />
       ) : (
         <>
-          {/* Mobile cards */}
-          <div className="lg:hidden">
-            {urgent.length > 0 && (
+          {/* Kartu */}
+          <div className={kelas.kartu}>
+            {halamanMulaiMendesak && (
               <div className="border-b border-red-100 bg-red-50/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-red-600">
                 Sangat Mendesak (≤ 7 hari)
               </div>
             )}
             <div className="divide-y divide-ink-100">
-              {[...urgent, ...upcoming].map((m, idx) => {
-                const isFirstUpcoming = idx === urgent.length && urgent.length > 0
+              {potongan.map((m, idx) => {
+                const isFirstUpcoming = awalKelompokKedua(m, idx)
                 return (
                   <Fragment key={m.id}>
                     {isFirstUpcoming && (
@@ -422,9 +452,9 @@ function RenewalSection({
             </div>
           </div>
 
-          {/* Desktop table */}
-          <div className="hidden lg:block">
-            {urgent.length > 0 && (
+          {/* Tabel */}
+          <div className={kelas.tabel}>
+            {halamanMulaiMendesak && (
               <div className="border-b border-red-100 bg-red-50/40 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-red-600">
                 Sangat Mendesak (≤ 7 hari)
               </div>
@@ -450,8 +480,8 @@ function RenewalSection({
                 </Tr>
               </THead>
               <TBody>
-                {[...urgent, ...upcoming].map((m, idx) => {
-                  const isFirstUpcoming = idx === urgent.length && urgent.length > 0
+                {potongan.map((m, idx) => {
+                  const isFirstUpcoming = awalKelompokKedua(m, idx)
                   return (
                     <Fragment key={m.id}>
                       {isFirstUpcoming && (
@@ -504,6 +534,7 @@ function RenewalSection({
               </TBody>
             </Table>
           </div>
+          <Pagination {...paginasi} satuan="member" />
         </>
       )}
     </Card>
@@ -518,11 +549,15 @@ function RegistrationSection({
   members,
   loading,
   fees,
+  tampilan,
 }: {
   members: MemberWithChapter[] | null
   loading: boolean
   fees: FeeSettings | null
+  tampilan: Tampilan
 }) {
+  const kelas = kelasTampilan(tampilan)
+  const { potongan, paginasi } = usePaginasi(members, PER_SEKSI)
   const navigate = useNavigate()
   const { toast } = useToast()
   const canCreate = useCan('invoice:create')
@@ -613,9 +648,9 @@ function RegistrationSection({
         />
       ) : (
         <>
-          {/* Mobile cards */}
-          <div className="divide-y divide-ink-100 lg:hidden">
-            {members.map((m) => (
+          {/* Kartu */}
+          <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
+            {potongan.map((m) => (
               <div
                 key={m.id}
                 onClick={() => toggle(m.id)}
@@ -645,8 +680,8 @@ function RegistrationSection({
             ))}
           </div>
 
-          {/* Desktop table */}
-          <div className="hidden lg:block">
+          {/* Tabel */}
+          <div className={kelas.tabel}>
             <Table>
               <THead>
                 <Tr>
@@ -665,7 +700,7 @@ function RegistrationSection({
                 </Tr>
               </THead>
               <TBody>
-                {members.map((m) => (
+                {potongan.map((m) => (
                   <Tr key={m.id} onClick={() => toggle(m.id)} className={cn(selected.has(m.id) && 'bg-brand-50/40')}>
                     <Td>
                       <input
@@ -700,6 +735,7 @@ function RegistrationSection({
               </TBody>
             </Table>
           </div>
+          <Pagination {...paginasi} satuan="member" />
         </>
       )}
     </Card>
@@ -711,6 +747,7 @@ function RegistrationSection({
 // ---------------------------------------------------------------------------
 
 export function UrgentPage() {
+  const [tampilan, setTampilan] = useTampilan('perlu-tindakan')
   const { toast } = useToast()
   const [chapterId, setChapterId] = useState<string>('all')
   const [search, setSearch] = useState('')
@@ -847,30 +884,34 @@ export function UrgentPage() {
 
       {/* Pencarian lintas-seksi */}
       <Card className="mb-5">
-        <div className="relative p-4">
-          <Search className="pointer-events-none absolute left-7 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari nama member atau nomor invoice…"
-            className="pl-10"
-          />
+        <div className="flex flex-wrap items-center gap-3 p-4">
+          <div className="relative min-w-0 flex-1 basis-56">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cari nama member atau nomor invoice…"
+              className="pl-10"
+            />
+          </div>
+          <TampilanToggle value={tampilan} onChange={setTampilan} />
         </div>
       </Card>
 
       <div className="space-y-5">
-        <OverdueSection invoices={filteredOverdue} loading={loadingOverdue} />
+        <OverdueSection invoices={filteredOverdue} loading={loadingOverdue} tampilan={tampilan} />
         <RenewalSection
           members={filteredRenewal}
           loading={loadingRenewal}
           fees={fees}
           jawaban={jawaban}
+          tampilan={tampilan}
           onGenerated={() => {
             reloadRenewal()
             reloadJawaban()
           }}
         />
-        <RegistrationSection members={filteredEligible} loading={loadingEligible} fees={fees} />
+        <RegistrationSection members={filteredEligible} loading={loadingEligible} fees={fees} tampilan={tampilan} />
       </div>
     </div>
   )

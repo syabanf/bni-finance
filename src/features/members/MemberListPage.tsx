@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, ChevronLeft, ChevronRight, Eye, Search, Upload, UserPlus, Users } from 'lucide-react'
+import { ArrowRight, Eye, Search, Upload, UserPlus, Users } from 'lucide-react'
 import type { Chapter, MemberStatus, MemberWithChapter } from '@/types'
 import {
   Avatar,
@@ -23,6 +23,9 @@ import {
   Th,
   Tr,
   useToast,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
@@ -32,6 +35,9 @@ import { can } from '@/lib/rbac'
 import { chapterService, memberService } from '@/services'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan } from '@/hooks/useTampilan'
+import { cn } from '@/lib/cn'
 
 /** Kelengkapan kontak — menentukan siapa yang bisa dijangkau Paper.id. */
 type ContactFilter = 'all' | 'no-phone' | 'no-email' | 'no-contact'
@@ -97,9 +103,7 @@ export function MemberListPage() {
   const [memberStatus, setMemberStatus] = useState<MemberStatus | 'all'>('all')
   const [contact, setContact] = useState<ContactFilter>('all')
   const [keanggotaan, setKeanggotaan] = useState<Keanggotaan>('all')
-  const [page, setPage] = useState(1)
   const [tambahBuka, setTambahBuka] = useState(false)
-  const PAGE_SIZE = 25
 
   // Everything except the status filter — drives the summary cards so they
   // reflect chapter/due-date/search while still showing the status breakdown.
@@ -144,11 +148,9 @@ export function MemberListPage() {
     return baseFiltered.filter((m) => m.status === memberStatus)
   }, [baseFiltered, memberStatus])
 
-  // Reset ke halaman 1 setiap kali filter berubah
-  useEffect(() => { setPage(1) }, [filtered])
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const { potongan: paginated, paginasi } = usePaginasi(filtered)
+  const [tampilan, setTampilan] = useTampilan('member')
+  const kelas = kelasTampilan(tampilan)
 
   // Exports always reflect the active filters (not just the visible page).
   const exportHandlers = makeExportHandlers({
@@ -288,6 +290,7 @@ export function MemberListPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <TampilanToggle value={tampilan} onChange={setTampilan} />
             <Select
               aria-label="Filter keanggotaan"
               value={keanggotaan}
@@ -352,8 +355,8 @@ export function MemberListPage() {
           <EmptyState icon={Users} title="Tidak ada member" description="Tidak ada member yang cocok dengan filter." />
         ) : (
           <>
-            {/* Mobile card list */}
-            <div className="divide-y divide-ink-100 lg:hidden">
+            {/* Kartu */}
+            <div className={cn('divide-y divide-ink-100', kelas.kartu)}>
               {paginated.map((m) => (
                 <div
                   key={m.id}
@@ -387,8 +390,8 @@ export function MemberListPage() {
               ))}
             </div>
 
-            {/* Desktop table */}
-            <div className="hidden lg:block">
+            {/* Tabel */}
+            <div className={kelas.tabel}>
               <Table>
                 <THead>
                   <Tr>
@@ -441,58 +444,7 @@ export function MemberListPage() {
                 </TBody>
               </Table>
             </div>
-            {/* Footer: info + pagination */}
-            <div className="flex items-center justify-between gap-4 border-t border-ink-100 px-5 py-3">
-              <span className="text-xs text-ink-400">
-                {filtered.length === 0
-                  ? 'Tidak ada member'
-                  : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filtered.length)} dari ${filtered.length} member`}
-              </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Halaman sebelumnya"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
-                      acc.push(p)
-                      return acc
-                    }, [])
-                    .map((item, idx) =>
-                      item === 'ellipsis' ? (
-                        <span key={`e${idx}`} className="px-1 text-xs text-ink-400">…</span>
-                      ) : (
-                        <button
-                          key={item}
-                          onClick={() => setPage(item as number)}
-                          className={`inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors ${
-                            page === item
-                              ? 'bg-brand-500 text-white'
-                              : 'text-ink-600 hover:bg-ink-100'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      ),
-                    )}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Halaman berikutnya"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
+            <Pagination {...paginasi} satuan="member" />
           </>
         )}
       </Card>

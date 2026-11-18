@@ -9,12 +9,14 @@ import {
   PageHeader,
   TableSkeleton,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { useNotifications, type AppNotification, type NotificationType } from './NotificationsContext'
 import { cn } from '@/lib/cn'
 import { daysUntil } from '@/lib/date'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 const STYLE: Record<NotificationType, { icon: typeof Bell; wrap: string; fg: string }> = {
   overdue: { icon: AlertTriangle, wrap: 'bg-red-50', fg: 'text-red-600' },
@@ -82,6 +84,7 @@ export function NotificationsPage() {
       return true
     })
   }, [items, type, search])
+  const { potongan, paginasi } = usePaginasi(filtered)
 
   // Exports reflect the active filters.
   const exportHandlers = makeExportHandlers({
@@ -178,7 +181,7 @@ export function NotificationsPage() {
               description="Tidak ada notifikasi yang cocok dengan filter saat ini."
             />
           ) : (
-            filtered.map((n) => {
+            potongan.map((n) => {
               const s = STYLE[n.type]
               const Icon = s.icon
               const unread = highlight?.has(n.id)
@@ -206,6 +209,7 @@ export function NotificationsPage() {
               )
             })
           )}
+          <Pagination {...paginasi} satuan="notifikasi" />
         </Card>
       )}
     </div>

@@ -22,10 +22,12 @@ import {
   Th,
   Tr,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { authService, chapterService, memberService, userService } from '@/services'
 import { ROLE_LABEL } from '@/lib/rbac'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 /**
  * Pengelolaan akun: peran menentukan APA yang boleh dilakukan, lingkup
@@ -56,6 +58,7 @@ const WARNA_PERAN: Record<UserRole, 'red' | 'amber' | 'green' | 'gray'> = {
 export function UsersPage() {
   const { toast } = useToast()
   const users = useAsync(() => userService.list(), [])
+  const { potongan, paginasi } = usePaginasi(users.data)
   const chapters = useAsync(() => chapterService.list(), [])
   const [bukaForm, setBukaForm] = useState(false)
   const [diubah, setDiubah] = useState<ManagedUser | null>(null)
@@ -129,7 +132,7 @@ export function UsersPage() {
                 </Tr>
               </THead>
               <TBody>
-                {users.data.map((u) => (
+                {potongan.map((u) => (
                   <Tr key={u.id}>
                     <Td className="whitespace-nowrap">
                       <div className="font-medium text-ink-900">{u.name}</div>
@@ -179,6 +182,7 @@ export function UsersPage() {
             </Table>
           )}
         </CardBody>
+        <Pagination {...paginasi} satuan="akun" />
       </Card>
 
       <FormTambah

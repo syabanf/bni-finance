@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Ban, ChevronLeft, ChevronRight, FileText, Plus, Search, Send, X } from 'lucide-react'
+import { Ban, FileText, Plus, Search, Send, X } from 'lucide-react'
 import type {
   Chapter,
   InvoicePage,
@@ -24,6 +24,8 @@ import {
   TableSkeleton,
   Textarea,
   useToast,
+  Pagination,
+  TampilanToggle,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { useCan } from '@/features/auth/usePermission'
@@ -34,6 +36,7 @@ import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } fro
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 import { downloadXlsx } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
+import { useTampilan } from '@/hooks/useTampilan'
 
 type StatusFilter = InvoiceStatus | 'all' | 'outstanding'
 
@@ -121,6 +124,7 @@ export function InvoiceListPage() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 25
+  const [tampilan, setTampilan] = useTampilan('invoice')
 
   /**
    * Pencarian ditunda sebelum dikirim.
@@ -337,8 +341,6 @@ export function InvoiceListPage() {
     )
   }
 
-
-  const totalPages = Math.max(1, Math.ceil(totalBaris / PAGE_SIZE))
 
   const EXPORT_HEADERS = ['No. Invoice', 'Member', 'Chapter', 'Tipe', 'Nominal', 'Status', 'Jatuh Tempo']
 
@@ -595,6 +597,7 @@ export function InvoiceListPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <TampilanToggle value={tampilan} onChange={setTampilan} />
             <Select value={type} onChange={(e) => setType(e.target.value as InvoiceType | 'all')} className="w-full sm:w-40" aria-label="Filter tipe invoice">
               {TYPE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -706,58 +709,9 @@ export function InvoiceListPage() {
               invoices={paginated}
               selected={canManage ? selected : undefined}
               onSelectChange={canManage ? setSelected : undefined}
+              tampilan={tampilan}
             />
-            <div className="flex items-center justify-between gap-4 border-t border-ink-100 px-5 py-3">
-              <span className="text-xs text-ink-400">
-                {totalBaris === 0
-                  ? 'Tidak ada invoice'
-                  : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, totalBaris)} dari ${totalBaris.toLocaleString('id-ID')} invoice`}
-              </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Halaman sebelumnya"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
-                    .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
-                    .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
-                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis')
-                      acc.push(p)
-                      return acc
-                    }, [])
-                    .map((item, idx) =>
-                      item === 'ellipsis' ? (
-                        <span key={`e${idx}`} className="px-1 text-xs text-ink-400">…</span>
-                      ) : (
-                        <button
-                          key={item}
-                          onClick={() => setPage(item as number)}
-                          className={`inline-flex h-8 min-w-[2rem] items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors ${
-                            page === item
-                              ? 'bg-brand-500 text-white'
-                              : 'text-ink-600 hover:bg-ink-100'
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      ),
-                    )}
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-500 transition-colors hover:bg-ink-100 disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Halaman berikutnya"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
+            <Pagination page={page} pageSize={PAGE_SIZE} total={totalBaris} onChange={setPage} satuan="invoice" />
           </>
         )}
       </Card>

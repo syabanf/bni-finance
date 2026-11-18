@@ -12,6 +12,7 @@ import {
   Select,
   TableSkeleton,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { invoiceService, renewalService } from '@/services'
@@ -19,6 +20,7 @@ import { formatDate, formatDateTime } from '@/lib/format'
 import { downloadXlsxSheets } from '@/lib/xlsx'
 import { printTableReport } from '@/lib/pdfReport'
 import { cn } from '@/lib/cn'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 /**
  * Member yang konfirmasi renewal-nya dijawab MC "Diterima", dan sudah sejauh
@@ -128,6 +130,8 @@ export function KonfirmasiPembayaranCard() {
   }, [baris])
 
   const terlihat = tahap === 'semua' ? baris : baris.filter((b) => b.tahap === tahap)
+  const rekapHal = usePaginasi(rekap, 10)
+  const barisHal = usePaginasi(terlihat)
   const jumlah = (t: Tahap) => baris.filter((b) => b.tahap === t).length
 
   const KOLOM = ['Member', 'Chapter', 'Periode', 'Dijawab MC', 'Invoice', 'Status', 'Diingatkan', 'Jatuh Tempo']
@@ -215,7 +219,7 @@ export function KonfirmasiPembayaranCard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-50">
-                {rekap.map(([c, r]) => (
+                {rekapHal.potongan.map(([c, r]) => (
                   <tr key={c}>
                     <td className="px-5 py-2.5 font-medium text-ink-900">{c}</td>
                     <td className="px-3 py-2.5 text-right text-ink-700">{r.total}</td>
@@ -228,6 +232,7 @@ export function KonfirmasiPembayaranCard() {
               </tbody>
             </table>
           </div>
+          <Pagination {...rekapHal.paginasi} satuan="chapter" />
 
           <div className="flex flex-wrap gap-1.5 border-t border-ink-100 px-5 py-3">
             {TAHAP.map((t) => (
@@ -263,7 +268,7 @@ export function KonfirmasiPembayaranCard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-50">
-                  {terlihat.map((b) => (
+                  {barisHal.potongan.map((b) => (
                     <tr
                       key={b.request.id}
                       onClick={b.invoice ? () => navigate(`/invoices/${b.invoice!.id}`) : undefined}
@@ -295,6 +300,7 @@ export function KonfirmasiPembayaranCard() {
               </table>
             </div>
           )}
+          <Pagination {...barisHal.paginasi} satuan="member" />
         </div>
       )}
     </Card>

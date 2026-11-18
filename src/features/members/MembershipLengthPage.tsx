@@ -15,10 +15,12 @@ import {
   THead,
   Th,
   Tr,
+  Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, memberService } from '@/services'
 import { formatDate } from '@/lib/format'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 /**
  * Lama keanggotaan tiap member, meniru laporan "Membership Length" BNI Connect.
@@ -69,6 +71,7 @@ export function MembershipLengthPage() {
       // merekalah yang paling perlu dilengkapi lewat impor laporan Length.
       .sort((a, b) => (b.bulan ?? -1) - (a.bulan ?? -1) || a.m.name.localeCompare(b.m.name))
   }, [members, chapterId, search])
+  const { potongan, paginasi } = usePaginasi(rows)
 
   const tanpaTanggal = rows.filter((r) => r.bulan === null).length
 
@@ -123,7 +126,7 @@ export function MembershipLengthPage() {
               </Tr>
             </THead>
             <TBody>
-              {rows.map(({ m, bulan }) => (
+              {potongan.map(({ m, bulan }) => (
                 <Tr key={m.id}>
                   <Td className="font-medium text-ink-900">{m.name}</Td>
                   <Td className="text-ink-600">{m.chapter?.displayName ?? '—'}</Td>
@@ -138,6 +141,7 @@ export function MembershipLengthPage() {
             </TBody>
           </Table>
         )}
+        <Pagination {...paginasi} satuan="member" />
       </Card>
     </div>
   )

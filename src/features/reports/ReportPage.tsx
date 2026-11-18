@@ -16,6 +16,7 @@ import {
   TableSkeleton,
   type DonutSegment,
   useToast,
+  Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { chapterService, invoiceService, paymentService } from '@/services'
@@ -29,6 +30,7 @@ import { cn } from '@/lib/cn'
 import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoices/components/InvoiceTypeFilter'
 import { KonfirmasiPembayaranCard } from './components/KonfirmasiPembayaranCard'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
+import { usePaginasi } from '@/hooks/usePaginasi'
 
 type Preset = 'this-month' | 'last-month' | 'this-year' | 'all' | 'custom'
 
@@ -263,6 +265,8 @@ export function ReportPage() {
 
     return { ditagih, diterima, outstanding, rate, count: invs.length, chapterRows, typeData, monthly, methods, detail }
   }, [invoices, payments, chapters, inRange, tipe])
+  const chapterHal = usePaginasi(report.chapterRows, 10)
+  const detailHal = usePaginasi(report.detail)
 
   const loading = invLoading || payLoading
 
@@ -530,7 +534,7 @@ export function ReportPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-50">
-                  {report.chapterRows.map((r) => (
+                  {chapterHal.potongan.map((r) => (
                     <tr
                       key={r.id}
                       onClick={() => navigate(`/invoices?chapter=${r.id}`)}
@@ -566,6 +570,7 @@ export function ReportPage() {
               </table>
             </div>
           )}
+          {!loading && <Pagination {...chapterHal.paginasi} satuan="chapter" />}
         </Card>
 
         <div className="space-y-5">
@@ -636,7 +641,7 @@ export function ReportPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-50">
-                {report.detail.map((d) => (
+                {detailHal.potongan.map((d) => (
                   <tr
                     key={d.id}
                     onClick={() => navigate(`/invoices/${d.id}`)}
@@ -672,6 +677,7 @@ export function ReportPage() {
             </table>
           </div>
         )}
+        {!loading && <Pagination {...detailHal.paginasi} satuan="invoice" />}
       </Card>
 
       <LaporanPengirimanCard

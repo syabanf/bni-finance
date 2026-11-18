@@ -13,6 +13,15 @@ import {
   PageHeader,
   Select,
   useToast,
+  Pagination,
+  TampilanToggle,
+  kelasTampilan,
+  Table,
+  THead,
+  TBody,
+  Th,
+  Tr,
+  Td,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { SyncButton } from '@/features/sync/SyncButton'
@@ -23,6 +32,9 @@ import { can } from '@/lib/rbac'
 import { chapterService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDateTime } from '@/lib/format'
 import { makeExportHandlers } from '@/lib/exporters'
+import { usePaginasi } from '@/hooks/usePaginasi'
+import { useTampilan } from '@/hooks/useTampilan'
+import { cn } from '@/lib/cn'
 
 export function ChapterListPage() {
   const navigate = useNavigate()
@@ -107,6 +119,61 @@ export function ChapterListPage() {
   // Outstanding = invoice yang sudah diterbitkan tapi belum dibayar (sent + overdue).
   const outstanding = (chapterId: string) => perChapter.get(chapterId)?.outstanding ?? 0
 
+  // 24 habis dibagi 2 dan 3, jadi baris kartu terakhir tidak ompong di halaman penuh.
+  const { potongan, paginasi } = usePaginasi(filteredChapters, 24)
+  const [tampilan, setTampilan] = useTampilan('chapter', 'kartu')
+  const kelas = kelasTampilan(tampilan)
+
+  /** Tombol per chapter, dipakai kartu dan baris tabel. */
+  const aksi = (c: Chapter) => (
+    <>
+      {bolehImpor && (
+        <button
+          type="button"
+          onClick={() => navigate(`/settings/import?chapter=${c.id}`)}
+          title={`Impor member ke ${c.displayName}`}
+          className="-my-1.5 flex items-center gap-1 py-1.5 text-xs font-medium text-ink-500 hover:text-ink-800"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          Impor
+        </button>
+      )}
+      {bolehImpor && (
+        <button
+          type="button"
+          onClick={() => setAkanDiubah(c)}
+          aria-label={`Ubah ${c.displayName}`}
+          title={`Ubah ${c.displayName}`}
+          className="-m-1.5 p-1.5 text-ink-400 hover:text-ink-800"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {bolehImpor && (
+        <button
+          type="button"
+          onClick={() => setAkanDihapus(c)}
+          disabled={memberCount(c.id) > 0}
+          aria-label={`Hapus ${c.displayName}`}
+          title={
+            memberCount(c.id) > 0
+              ? 'Chapter yang masih punya member tidak bisa dihapus.'
+              : `Hapus ${c.displayName}`
+          }
+          className="-m-1.5 p-1.5 text-ink-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-400"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <button
+        onClick={() => navigate(`/members?chapter=${c.id}`)}
+        className="-my-1.5 py-1.5 text-xs font-medium text-brand-500 hover:text-brand-600"
+      >
+        Lihat member
+      </button>
+    </>
+  )
+
   const totalMembers = filteredChapters.reduce((a, c) => a + memberCount(c.id), 0)
   const totalOutstanding = filteredChapters.reduce((a, c) => a + outstanding(c.id), 0)
 
@@ -174,6 +241,7 @@ export function ChapterListPage() {
                 />
               </div>
               <div className="flex flex-wrap items-center gap-3">
+                <TampilanToggle value={tampilan} onChange={setTampilan} />
                 <span className="text-[13px] text-ink-500">Kota</span>
                 <Select value={city} onChange={(e) => setCity(e.target.value)} className="w-full sm:w-56" aria-label="Filter kota">
                   <option value="all">Semua Kota</option>
@@ -212,58 +280,15 @@ export function ChapterListPage() {
               />
             </Card>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredChapters.map((c) => (
+            <div className={cn('grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3', kelas.kartu)}>
+              {potongan.map((c) => (
                 <Card key={c.id} className="p-5 transition-shadow hover:shadow-card-hover">
                   <div className="flex items-start justify-between">
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-500">
                       <Building2 className="h-[22px] w-[22px]" />
                     </div>
                     <div className="flex items-center gap-3">
-                      {bolehImpor && (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/settings/import?chapter=${c.id}`)}
-                          title={`Impor member ke ${c.displayName}`}
-                          className="-my-1.5 flex items-center gap-1 py-1.5 text-xs font-medium text-ink-500 hover:text-ink-800"
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          Impor
-                        </button>
-                      )}
-                      {bolehImpor && (
-                        <button
-                          type="button"
-                          onClick={() => setAkanDiubah(c)}
-                          aria-label={`Ubah ${c.displayName}`}
-                          title={`Ubah ${c.displayName}`}
-                          className="-m-1.5 p-1.5 text-ink-400 hover:text-ink-800"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      {bolehImpor && (
-                        <button
-                          type="button"
-                          onClick={() => setAkanDihapus(c)}
-                          disabled={memberCount(c.id) > 0}
-                          aria-label={`Hapus ${c.displayName}`}
-                          title={
-                            memberCount(c.id) > 0
-                              ? 'Chapter yang masih punya member tidak bisa dihapus.'
-                              : `Hapus ${c.displayName}`
-                          }
-                          className="-m-1.5 p-1.5 text-ink-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-400"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => navigate(`/members?chapter=${c.id}`)}
-                        className="-my-1.5 py-1.5 text-xs font-medium text-brand-500 hover:text-brand-600"
-                      >
-                        Lihat member
-                      </button>
+                      {aksi(c)}
                     </div>
                   </div>
                   <h3 className="mt-4 text-lg font-bold text-ink-900">{c.displayName}</h3>
@@ -293,6 +318,50 @@ export function ChapterListPage() {
                 </Card>
               ))}
             </div>
+          )}
+
+          {filteredChapters.length > 0 && (
+            <Card className={cn(tampilan === 'kartu' && 'mt-4')}>
+              <div className={kelas.tabel}>
+                <Table>
+                  <THead>
+                    <Tr>
+                      <Th>Chapter</Th>
+                      <Th>Area</Th>
+                      <Th className="text-right">Member</Th>
+                      <Th className="text-right">Outstanding</Th>
+                      <Th className="text-right">Aksi</Th>
+                    </Tr>
+                  </THead>
+                  <TBody>
+                    {potongan.map((c) => (
+                      <Tr key={c.id}>
+                        <Td className="font-medium text-ink-900">{c.displayName}</Td>
+                        <Td className="text-ink-600">{c.areaName ?? c.cityName ?? '—'}</Td>
+                        <Td className="text-right text-ink-900">{memberCount(c.id)}</Td>
+                        <Td className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/invoices?chapter=${c.id}&status=outstanding`)}
+                            className="font-semibold text-amber-600 hover:underline"
+                          >
+                            {formatCurrencyCompact(outstanding(c.id))}
+                          </button>
+                        </Td>
+                        <Td>
+                          <div className="flex items-center justify-end gap-3 whitespace-nowrap">{aksi(c)}</div>
+                        </Td>
+                      </Tr>
+                    ))}
+                  </TBody>
+                </Table>
+              </div>
+              <Pagination
+                {...paginasi}
+                satuan="chapter"
+                className={cn(tampilan === 'kartu' && 'border-t-0')}
+              />
+            </Card>
           )}
         </>
       )}
