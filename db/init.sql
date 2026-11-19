@@ -729,6 +729,31 @@ alter table fee_settings add column if not exists registration_fee_usd numeric(1
 alter table fee_settings add column if not exists renewal_fee_usd      numeric(12,2) not null default 793.75;
 alter table fee_settings add column if not exists usd_rate             bigint        not null default 16000;
 
+-- ---------------------------------------------------------------------------
+-- Rincian biaya per komponen
+--
+--   Pendaftaran  Registration Fee + Membership Fee + VAT + Online Training
+--   Renewal      Membership Fee + VAT
+--
+-- Nilai bawaannya dari lembar klien 19 November 2026, tetapi rincian_aktif
+-- bawaannya FALSE: sampai admin menyimpan rincian dari halaman Pengaturan,
+-- harga tetap dihitung dari satu harga Dollar per tipe seperti sebelumnya.
+-- Menambah kolom ini lewat deploy tidak boleh mengubah harga yang ditagihkan.
+--
+-- biaya_training dalam Rupiah dan tidak kena VAT.
+-- ---------------------------------------------------------------------------
+alter table fee_settings add column if not exists rincian_aktif            boolean       not null default false;
+alter table fee_settings add column if not exists komponen_pendaftaran_usd numeric(12,2) not null default 180.00;
+alter table fee_settings add column if not exists komponen_keanggotaan_usd numeric(12,2) not null default 648.83;
+alter table fee_settings add column if not exists ppn_persen               numeric(5,2)  not null default 11.00;
+alter table fee_settings add column if not exists biaya_training           bigint        not null default 500000;
+
+-- Rincian yang berlaku SAAT invoice dibuat, sebagai larik {kode, nama, jumlah}.
+-- Disimpan per invoice supaya perubahan harga sesudahnya tidak mengubah
+-- tagihan yang sudah ada. NULL berarti invoice satu baris: dibuat sebelum
+-- rincian aktif, atau nominalnya diketik sendiri.
+alter table invoices add column if not exists rincian jsonb;
+
 
 create table if not exists integration_calls (
   id          bigserial   primary key,

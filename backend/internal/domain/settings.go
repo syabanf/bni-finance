@@ -24,6 +24,10 @@ type FeeSettings struct {
 	RenewalFeeUSD      float64 `json:"renewalFeeUsd"`
 	UsdRate            int64   `json:"usdRate"`
 
+	// Rincian memecah harga menjadi komponennya. Selama Rincian.Aktif, kedua
+	// harga Dollar dan kedua harga Rupiah di atas DITURUNKAN darinya.
+	Rincian RincianBiaya `json:"rincian"`
+
 	Notes     *string   `json:"notes,omitempty"`
 	UpdatedBy *string   `json:"updatedBy,omitempty"`
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -31,20 +35,21 @@ type FeeSettings struct {
 }
 
 type UpdateFeeSettingsInput struct {
-	RegistrationFee    *int64   `json:"registrationFee"`
-	RenewalFee         *int64   `json:"renewalFee"`
-	RegistrationFeeUSD *float64 `json:"registrationFeeUsd"`
-	RenewalFeeUSD      *float64 `json:"renewalFeeUsd"`
-	UsdRate            *int64   `json:"usdRate"`
-	Currency           *string  `json:"currency"`
-	Notes              *string  `json:"notes"`
-	UpdatedBy          *string  `json:"updatedBy"`
+	RegistrationFee    *int64        `json:"registrationFee"`
+	RenewalFee         *int64        `json:"renewalFee"`
+	RegistrationFeeUSD *float64      `json:"registrationFeeUsd"`
+	RenewalFeeUSD      *float64      `json:"renewalFeeUsd"`
+	UsdRate            *int64        `json:"usdRate"`
+	Rincian            *RincianBiaya `json:"rincian"`
+	Currency           *string       `json:"currency"`
+	Notes              *string       `json:"notes"`
+	UpdatedBy          *string       `json:"updatedBy"`
 }
 
 // MenyentuhDollar melaporkan permintaan ini mengubah USD atau kurs, yang
 // berarti Rupiahnya harus dihitung ulang.
 func (in UpdateFeeSettingsInput) MenyentuhDollar() bool {
-	return in.RegistrationFeeUSD != nil || in.RenewalFeeUSD != nil || in.UsdRate != nil
+	return in.RegistrationFeeUSD != nil || in.RenewalFeeUSD != nil || in.UsdRate != nil || in.Rincian != nil
 }
 
 func (in UpdateFeeSettingsInput) Validate() error {
@@ -62,6 +67,9 @@ func (in UpdateFeeSettingsInput) Validate() error {
 	case in.Currency != nil && *in.Currency == "":
 		return fmt.Errorf("currency tidak boleh kosong")
 	}
+	if in.Rincian != nil {
+		return in.Rincian.Validate()
+	}
 	return nil
 }
 
@@ -73,6 +81,15 @@ func (in UpdateFeeSettingsInput) Validate() error {
 // yang sama. Hasilnya adalah angka yang tercetak di invoice member.
 func TurunkanRupiah(usd float64, rate int64) int64 {
 	return int64(math.Round(usd * float64(rate)))
+}
+
+// BarisFor mengembalikan rincian harga satu tipe invoice pada kurs yang
+// berlaku, atau nil bila rincian tidak aktif.
+func (f FeeSettings) BarisFor(t InvoiceType) []BarisBiaya {
+	if !f.Rincian.Aktif {
+		return nil
+	}
+	return f.Rincian.Baris(t, f.UsdRate)
 }
 
 // FeeFor returns the fee that applies to an invoice type.

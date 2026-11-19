@@ -2308,6 +2308,13 @@
           "complex": false
         },
         {
+          "name": "rincian",
+          "type": "string",
+          "required": false,
+          "description": "Rincian harga per komponen. Mengirimnya dengan aktif: true membuat kedua harga Dollar dan kedua harga Rupiah diturunkan dari komponen, dan harga Dollar yang dikirim bersama permintaan ini ditimpa.",
+          "complex": false
+        },
+        {
           "name": "currency",
           "label": "Mata Uang",
           "type": "string",

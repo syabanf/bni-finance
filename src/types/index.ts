@@ -60,6 +60,29 @@ export interface MemberWithChapter extends Member {
 // Fee configuration
 // ---------------------------------------------------------------------------
 
+/** Satu komponen harga dalam Rupiah, satu baris di invoice. */
+export interface BarisBiaya {
+  /** `registration`, `membership`, `vat`, atau `training`. */
+  kode: string
+  nama: string
+  jumlah: number
+}
+
+/**
+ * Harga dipecah menjadi komponennya. `aktif: false` berarti harga dihitung
+ * dari satu harga Dollar per tipe, dan komponen di sini belum berlaku.
+ */
+export interface RincianBiaya {
+  aktif: boolean
+  /** Registration Fee, hanya untuk pendaftaran. */
+  pendaftaranUsd: number
+  /** Membership Fee, untuk pendaftaran dan renewal. */
+  keanggotaanUsd: number
+  ppnPersen: number
+  /** Online Training dalam Rupiah, hanya untuk pendaftaran, tidak kena VAT. */
+  training: number
+}
+
 export interface FeeSettings {
   id: string
   /** Rupiah yang ditagihkan. Diturunkan server dari USD × kurs. */
@@ -70,6 +93,8 @@ export interface FeeSettings {
   registrationFeeUsd: number
   renewalFeeUsd: number
   usdRate: number
+  /** Selama `rincian.aktif`, keempat harga di atas diturunkan darinya. */
+  rincian: RincianBiaya
   notes?: string
   updatedBy?: string
   updatedAt: string
@@ -110,6 +135,11 @@ export interface Invoice {
   /** Faktur pajak, dilampirkan setelah invoice lunas. */
   taxInvoiceUrl?: string
   taxInvoiceAt?: string
+  /**
+   * Komponen harga yang berlaku saat invoice dibuat; jumlahnya sama dengan
+   * `amount`. Tidak ada bila invoice satu baris.
+   */
+  rincian?: BarisBiaya[]
 
   /**
    * Selalu 'paper_id' sejak pembayaran mandiri dihapus.

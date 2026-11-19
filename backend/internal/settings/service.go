@@ -74,7 +74,7 @@ func (s *Service) UpdateFees(ctx context.Context, in domain.UpdateFeeSettingsInp
 		if err != nil {
 			return nil, err
 		}
-		usdReg, usdRen, rate := cur.RegistrationFeeUSD, cur.RenewalFeeUSD, cur.UsdRate
+		usdReg, usdRen, rate, rincian := cur.RegistrationFeeUSD, cur.RenewalFeeUSD, cur.UsdRate, cur.Rincian
 		if in.RegistrationFeeUSD != nil {
 			usdReg = *in.RegistrationFeeUSD
 		}
@@ -84,7 +84,21 @@ func (s *Service) UpdateFees(ctx context.Context, in domain.UpdateFeeSettingsInp
 		if in.UsdRate != nil {
 			rate = *in.UsdRate
 		}
+		if in.Rincian != nil {
+			rincian = *in.Rincian
+		}
+
 		reg, ren := domain.TurunkanRupiah(usdReg, rate), domain.TurunkanRupiah(usdRen, rate)
+		if rincian.Aktif {
+			// Dengan rincian aktif, komponenlah sumbernya. Harga Dollar per
+			// tipe ikut diturunkan supaya tidak ada dua angka yang bisa
+			// berbeda, dan Rupiahnya adalah JUMLAH BARIS, bukan Dollar × kurs:
+			// lihat RincianBiaya.Baris.
+			usdReg, usdRen = rincian.TotalUSD(domain.TypeRegistration), rincian.TotalUSD(domain.TypeRenewal)
+			in.RegistrationFeeUSD, in.RenewalFeeUSD = &usdReg, &usdRen
+			reg = domain.JumlahBaris(rincian.Baris(domain.TypeRegistration, rate))
+			ren = domain.JumlahBaris(rincian.Baris(domain.TypeRenewal, rate))
+		}
 		in.RegistrationFee, in.RenewalFee = &reg, &ren
 	}
 	fees, err := s.repo.UpdateFees(ctx, in)

@@ -1,5 +1,6 @@
 import type { CreateInvoiceInput, InvoiceRepository } from '@/services/types'
 import { alasanBelumKonfirmasi, bolehDitagih } from '@/lib/status'
+import { rincianInvoice } from '@/lib/rincianBiaya'
 import { konfirmasiTerakhir } from './renewalRepository'
 import type {
   AuditLogEntry,
@@ -258,6 +259,8 @@ export const mockInvoiceRepository: InvoiceRepository = {
       chapterId: member.chapterId,
       type: input.type,
       amount: input.amount,
+      // Rincian yang berlaku saat dibuat, sama seperti server.
+      rincian: rincianInvoice(store.feeSettings, input.type, input.amount),
       currency: 'IDR',
       dueDate: input.dueDate,
       periodStart: input.periodStart,

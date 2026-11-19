@@ -104,6 +104,10 @@ type Invoice struct {
 	TaxInvoiceURL *string    `json:"taxInvoiceUrl,omitempty"`
 	TaxInvoiceAt  *time.Time `json:"taxInvoiceAt,omitempty"`
 
+	// Rincian adalah komponen harga yang berlaku SAAT invoice dibuat, dan
+	// jumlahnya selalu sama dengan Amount. Kosong berarti invoice satu baris.
+	Rincian []BarisBiaya `json:"rincian,omitempty"`
+
 	// Xendit (self-payment)
 	PaymentProvider     *string    `json:"paymentProvider,omitempty"`
 	XenditExternalID    *string    `json:"xenditExternalId,omitempty"`

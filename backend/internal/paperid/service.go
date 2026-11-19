@@ -268,6 +268,7 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 		Amount:        inv.Amount,
 		ItemName:      namaProduk,
 		ItemDesc:      descProduk,
+		Items:         barisItem(inv, descProduk),
 		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,
@@ -496,6 +497,28 @@ func (s *Service) produk(ctx context.Context, t domain.InvoiceType) (nama, desc 
 	return nama, desc
 }
 
+// barisItem mengubah rincian yang tersimpan di invoice menjadi baris Paper.id,
+// satu per komponen. Tiap baris memakai deskripsi produk tipe invoicenya,
+// karena Paper.id mewajibkan deskripsi dan nama barisnya sudah menyebut
+// komponennya.
+//
+// Mengembalikan nil, yang berarti satu baris berisi total, bila invoice tidak
+// punya rincian atau rinciannya tidak berjumlah sama dengan nominalnya.
+// Pemeriksaan kedua seharusnya tidak pernah kena: rincian ditulis bersama
+// nominalnya. Tetapi baris yang tidak berjumlah sama akan membuat Paper.id
+// menagih angka yang berbeda dari yang tercatat di sini, dan itu lebih mahal
+// daripada satu perbandingan.
+func barisItem(inv *Sendable, deskripsi string) []ItemInput {
+	if len(inv.Rincian) == 0 || domain.JumlahBaris(inv.Rincian) != inv.Amount {
+		return nil
+	}
+	items := make([]ItemInput, len(inv.Rincian))
+	for i, b := range inv.Rincian {
+		items[i] = ItemInput{Name: b.Nama, Desc: deskripsi, Price: b.Jumlah}
+	}
+	return items
+}
+
 // catatan membaca dua teks bebas yang dicetak Paper.id di invoice: catatan
 // (tempat detail rekening untuk member yang ingin transfer) serta syarat dan
 // ketentuan. Keduanya tidak punya bawaan: kosong berarti kolomnya tidak
@@ -662,6 +685,7 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 		Amount:        inv.Amount,
 		ItemName:      namaProduk,
 		ItemDesc:      descProduk,
+		Items:         barisItem(inv, descProduk),
 		CustomerID:    customerRef(inv),
 		CustomerName:  inv.Name,
 		CustomerEmail: inv.Email,

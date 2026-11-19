@@ -344,6 +344,18 @@ export function InvoiceDetailPage() {
                     Dibayar {formatDateTime(invoice.paidAt)}
                   </div>
                 )}
+                {/* Komponen harga yang berlaku saat invoice dibuat, sama dengan
+                    baris yang tercetak di invoice Paper.id. */}
+                {invoice.rincian && invoice.rincian.length > 0 && (
+                  <dl data-testid="rincian-invoice" className="mt-3 space-y-0.5 text-sm">
+                    {invoice.rincian.map((b) => (
+                      <div key={b.kode} className="flex justify-between gap-8">
+                        <dt className="text-ink-500">{b.nama}</dt>
+                        <dd className="whitespace-nowrap text-ink-800">{formatCurrency(b.jumlah)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </div>
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-500">
                 <CreditCard className="h-7 w-7" />

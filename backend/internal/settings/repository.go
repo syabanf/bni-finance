@@ -20,6 +20,7 @@ const FeeSettingsID = "default"
 
 const feeColumns = `id, registration_fee, renewal_fee, currency,
 	registration_fee_usd, renewal_fee_usd, usd_rate,
+	rincian_aktif, komponen_pendaftaran_usd, komponen_keanggotaan_usd, ppn_persen, biaya_training,
 	notes, updated_by, updated_at, created_at`
 
 type Repository struct {
@@ -36,6 +37,8 @@ func scanFees(row scannable) (*domain.FeeSettings, error) {
 	var f domain.FeeSettings
 	err := row.Scan(&f.ID, &f.RegistrationFee, &f.RenewalFee, &f.Currency,
 		&f.RegistrationFeeUSD, &f.RenewalFeeUSD, &f.UsdRate,
+		&f.Rincian.Aktif, &f.Rincian.PendaftaranUSD, &f.Rincian.KeanggotaanUSD,
+		&f.Rincian.PPNPersen, &f.Rincian.Training,
 		&f.Notes, &f.UpdatedBy, &f.UpdatedAt, &f.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -73,6 +76,13 @@ func (r *Repository) UpdateFees(ctx context.Context, in domain.UpdateFeeSettings
 	}
 	if in.UsdRate != nil {
 		set("usd_rate", *in.UsdRate)
+	}
+	if in.Rincian != nil {
+		set("rincian_aktif", in.Rincian.Aktif)
+		set("komponen_pendaftaran_usd", in.Rincian.PendaftaranUSD)
+		set("komponen_keanggotaan_usd", in.Rincian.KeanggotaanUSD)
+		set("ppn_persen", in.Rincian.PPNPersen)
+		set("biaya_training", in.Rincian.Training)
 	}
 	if in.Currency != nil {
 		set("currency", *in.Currency)

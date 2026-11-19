@@ -25,20 +25,22 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 
 Sumber: lembar feedback klien dan penjelasan lanjutan lewat pesan pada hari yang sama.
 
+Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.com/syabanf/bni-finance/pull/112).
+
 ### Ringkasan
 
 | No | Masukan | Status |
 | --- | --- | --- |
 | F-01 | Mengubah atau menambah keterangan produk di invoice | `sudah ada` |
 | F-02 | Mengubah atau menambah keterangan deskripsi di invoice | `sudah ada` |
-| F-03 | Detail rekening bila member ingin transfer | `dikerjakan` |
-| F-04 | Syarat dan ketentuan di invoice | `dikerjakan` |
-| F-05 | Hapus invoice yang overdue | `menunggu keputusan` |
+| F-03 | Detail rekening bila member ingin transfer | `selesai` |
+| F-04 | Syarat dan ketentuan di invoice | `selesai` |
+| F-05 | Hapus invoice yang overdue | `tidak dikerjakan` |
 | F-06 | Apakah invoice mengikuti format Paper.id | `sudah ada` |
-| F-07 | Rincian pengaturan biaya per komponen | `menunggu keputusan` |
+| F-07 | Rincian pengaturan biaya per komponen | `dikerjakan` |
 | F-08 | Bila MC tidak menyetujui renewal, apakah memilih "dibatalkan" | `sudah ada` |
-| F-09 | Menambah periode di Konfirmasi Renewal | `dikerjakan` |
-| F-10 | Kolom Ditugaskan menampilkan ID, seharusnya nama MC | `dikerjakan` |
+| F-09 | Menambah periode di Konfirmasi Renewal | `selesai` |
+| F-10 | Kolom Ditugaskan menampilkan ID, seharusnya nama MC | `selesai` |
 
 ### Invoice
 
@@ -53,7 +55,7 @@ Perbaikan yang ikut masuk: pratinjau dan unduhan invoice di aplikasi dulu menuli
 produknya sendiri, jadi teks yang diubah admin tampil di invoice Paper.id tetapi tidak di
 salinan yang diunduh pengurus. Sekarang keduanya membaca pengaturan yang sama.
 
-**F-03. Detail rekening untuk transfer.** `dikerjakan`
+**F-03. Detail rekening untuk transfer.** `selesai`
 
 Kolom baru **Catatan invoice** di kartu yang sama. Isinya dikirim ke kolom `notes` invoice
 Paper.id dan ikut tercetak di invoice, pengingat, pratinjau, dan unduhan.
@@ -62,25 +64,24 @@ Yang perlu disampaikan ke klien: pembayaran lewat transfer langsung tidak melewa
 Paper.id, jadi invoicenya tidak lunas otomatis. Pengurus mencatatnya lewat tombol
 **Catat Pembayaran Manual** di halaman detail invoice.
 
-**F-04. Syarat dan ketentuan.** `dikerjakan`
+**F-04. Syarat dan ketentuan.** `selesai`
 
 Kolom baru **Syarat dan ketentuan** di kartu yang sama, dikirim ke kolom `terms_condition`
 invoice Paper.id. Bila dikosongkan, bagian itu tidak tampil di invoice Paper.id.
 
-**F-05. Hapus invoice yang overdue.** `menunggu keputusan`
+**F-05. Hapus invoice yang overdue.** `tidak dikerjakan`
 
-Keadaan sekarang: hanya invoice **draft** yang bisa dihapus. Invoice yang sudah terkirim,
-termasuk yang overdue, bisa **Dibatalkan** dengan alasan, atau **Diputus** bila
-keanggotaannya berakhir. Keduanya tetap tersimpan sebagai riwayat.
+Keputusan 19 November 2026: **Batalkan sudah cukup.** Penghapusan invoice terkirim tidak
+dibuat.
+
+Hanya invoice **draft** yang bisa dihapus. Invoice yang sudah terkirim, termasuk yang
+overdue, bisa **Dibatalkan** dengan alasan, atau **Diputus** bila keanggotaannya berakhir.
+Keduanya tetap tersimpan sebagai riwayat.
 
 Alasannya: invoice yang sudah terkirim punya tautan pembayaran Paper.id yang tetap hidup.
 Kalau barisnya dihapus dari sistem lalu member membayar lewat tautan itu, uangnya masuk
 tanpa invoice yang bisa dicocokkan. Invoice yang dibatalkan juga keluar dari hitungan
 ditagih dan outstanding di Laporan, jadi untuk angka, membatalkan sama dengan menghapus.
-
-Pertanyaan untuk klien: apakah **Batalkan** sudah memenuhi kebutuhannya, atau invoicenya
-memang harus hilang dari daftar? Kalau harus hilang, pilihan yang aman adalah
-menyembunyikan invoice batal dari daftar bawaan, bukan menghapus barisnya.
 
 **F-06. Apakah mengikuti format Paper.id.** `sudah ada`
 
@@ -92,14 +93,14 @@ mengisi kolom yang disediakan Paper.id:
 | Produk dan deskripsi | Pengaturan (F-01, F-02) |
 | Catatan (`notes`) | Pengaturan (F-03) |
 | Syarat dan ketentuan (`terms_condition`) | Pengaturan (F-04) |
-| Baris item | Sekarang satu baris berisi total. Paper.id menerima beberapa baris (lihat F-07) |
+| Baris item | Satu baris per komponen harga bila rincian aktif (F-07). Tanpa rincian, satu baris berisi total |
 | Pajak per baris (`tax_id`) | Belum dipakai. Butuh pajak yang didaftarkan di dasbor Paper.id |
 
 Logo, warna, dan tata letak invoice diatur di dasbor Paper.id, bukan dari sistem ini.
 
 ### Pengaturan biaya
 
-**F-07. Rincian biaya per komponen.** `menunggu keputusan`
+**F-07. Rincian biaya per komponen.** `dikerjakan`
 
 Rincian yang diminta klien:
 
@@ -111,30 +112,49 @@ Rincian yang diminta klien:
 | Online Training Investment Bundling | Rp 500.000 | tidak ada |
 | **Jumlah** | **$920,00 + Rp 500.000** | **$720,20** |
 
-VAT di lembar itu dihitung dari jumlah Dollar sebelum pajak: 11% × ($180,00 + $648,83)
-untuk pendaftaran dan 11% × $648,83 untuk renewal. Biaya training tidak ikut dikenai VAT.
+Keputusan 19 November 2026, mengikuti usulan:
 
-Keadaan sekarang: pengaturan menyimpan **satu** harga Dollar per tipe invoice, dikalikan
-kurs menjadi Rupiah. Invoice menyimpan satu nominal dan dikirim ke Paper.id sebagai satu
-baris.
-
-Rancangan yang diusulkan:
-
-1. Pengaturan menyimpan empat angka: Registration Fee (USD), Membership Fee (USD), persen
-   VAT, dan biaya training (Rupiah). Total per tipe dihitung dari keempatnya.
-2. Tiap invoice menyimpan rinciannya sendiri saat dibuat. Perubahan harga sesudahnya tidak
-   mengubah invoice yang sudah ada.
-3. Invoice dikirim ke Paper.id sebagai beberapa baris, satu per komponen, dengan VAT
-   sebagai baris tersendiri.
-
-Empat hal yang harus diputuskan klien sebelum ini dikerjakan:
-
-| | Pertanyaan | Usulan |
+| | Pertanyaan | Keputusan |
 | --- | --- | --- |
-| a | Apakah invoice yang diterima member menampilkan tiap komponen sebagai baris terpisah, atau tetap satu baris berisi total? | Baris terpisah, karena itu maksud rinciannya |
-| b | Apakah biaya training Rp 500.000 kena VAT? | Tidak, mengikuti lembar klien |
-| c | Kapan harga baru berlaku? Total sekarang berbeda dari jumlah rincian di atas | Saat admin menyimpan rincian di Pengaturan, bukan saat deploy. Deploy tidak boleh mengubah harga |
-| d | Pembulatan ke Rupiah: tiap baris dibulatkan lalu dijumlah, atau total Dollar dikalikan kurs? Selisihnya bisa beberapa rupiah | Tiap baris dibulatkan lalu dijumlah, supaya baris di invoice selalu sama dengan totalnya |
+| a | Baris terpisah atau satu baris total di invoice member? | Baris terpisah, satu per komponen |
+| b | Apakah biaya training kena VAT? | Tidak |
+| c | Kapan harga baru berlaku? | Saat admin menyimpan rincian di Pengaturan. Deploy tidak mengubah harga |
+| d | Pembulatan ke Rupiah | Tiap baris dibulatkan, lalu dijumlah |
+
+Yang dibuat:
+
+1. **Pengaturan → Biaya Keanggotaan → Nominal Biaya** punya bagian **Rinci harga per
+   komponen**. Admin mengisi Registration Fee, Membership Fee, persen VAT, dan biaya
+   training, lalu melihat baris dan totalnya sebelum menyimpan.
+2. VAT dihitung dari komponen Dollar sebelum pajak dan dibulatkan ke sen, sama dengan
+   lembar klien. Tiap baris lalu dikalikan kurs dan dibulatkan ke rupiah. Harga per tipe
+   adalah jumlah baris-barisnya.
+3. Sebelum Simpan ditekan, halaman menyebut harga lama dan harga baru bila keduanya berbeda.
+4. Tiap invoice menyimpan rinciannya sendiri saat dibuat. Perubahan harga atau kurs
+   sesudahnya tidak mengubah invoice yang sudah ada.
+5. Invoice dikirim ke Paper.id sebagai satu baris per komponen. Pratinjau, unduhan, dan
+   halaman detail invoice menampilkan baris yang sama.
+
+Diuji ke Paper.id staging pada 19 November 2026 dengan satu invoice pendaftaran. Paper.id
+menerima keempat baris, dan invoice PDF-nya menampilkan tiap baris, total yang sama dengan
+jumlah barisnya, catatan tiga baris di bagian Keterangan, dan Syarat & Ketentuan.
+
+Dua hal yang terlihat di invoice Paper.id itu dan belum diputuskan:
+
+- **Baris "Pajak" di bagian total berisi Rp 0.** VAT dikirim sebagai baris item biasa, jadi
+  kolom pajak milik Paper.id tidak terisi. Supaya VAT tampil di kolom itu, pajaknya harus
+  didaftarkan di dasbor Paper.id dan id-nya dikirim sebagai `tax_id` per baris.
+- **Deskripsi tiap baris sama.** Keempat baris memakai deskripsi produk tipe invoicenya,
+  termasuk baris VAT dan training.
+
+Tiga hal yang perlu disampaikan ke klien:
+
+- **Rincian belum aktif setelah deploy.** Kolomnya sudah terisi angka dari lembar klien,
+  tetapi harga tetap seperti sekarang sampai admin mencentang rincian dan menyimpannya.
+- **Mengaktifkannya mengubah harga.** Pada kurs 16.000, pendaftaran menjadi Rp 15.220.000
+  dan renewal Rp 11.523.200. Angka pastinya mengikuti kurs yang berlaku saat disimpan.
+- **Nominal yang diketik sendiri tetap satu baris.** Invoice yang nominalnya berbeda dari
+  harga berlaku tidak punya rincian, karena baris pengaturan tidak berjumlah sama dengannya.
 
 ### Konfirmasi renewal
 
@@ -153,7 +173,7 @@ invoice yang terbentuk.
 Bila invoice renewal sudah terlanjur terbit sebelum MC menjawab Tolak, invoice itu
 dibatalkan dari halaman detailnya (lihat F-05).
 
-**F-09. Menambah periode.** `dikerjakan`
+**F-09. Menambah periode.** `selesai`
 
 Penjelasan klien: daftar periode berhenti di 2029 · Jan–Jun, dan periode sesudahnya tidak
 bisa dipilih.
@@ -162,7 +182,7 @@ Sebabnya: daftar itu hanya memuat enam semester dari semester berjalan. Sekarang
 terakhir di daftar, **Tampilkan periode berikutnya…**, menambahkan empat semester setiap
 kali dipilih, tanpa memindahkan periode yang sedang dilihat.
 
-**F-10. Kolom Ditugaskan menampilkan ID.** `dikerjakan`
+**F-10. Kolom Ditugaskan menampilkan ID.** `selesai`
 
 Kolom itu menampilkan deretan huruf dan angka, yaitu id akun MC, bila namanya tidak
 ditemukan. Halaman mencari nama itu dari daftar akun yang dimuat terpisah. Daftar itu hanya
