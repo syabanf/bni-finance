@@ -56,14 +56,18 @@ interface Baris {
   tahap: Tahap
 }
 
-/** Semua invoice renewal, dibaca per 200 sampai habis supaya rekapnya tidak terpotong. */
-async function semuaInvoiceRenewal(): Promise<Invoice[]> {
-  const out: Invoice[] = []
-  for (;;) {
-    const halaman = await invoiceService.listPaged({ type: 'renewal', limit: 200, offset: out.length })
-    out.push(...halaman.rows)
-    if (halaman.rows.length === 0 || out.length >= halaman.total) return out
-  }
+/**
+ * Permintaan konfirmasi beserta invoice renewal milik membernya.
+ *
+ * Invoice diminta hanya untuk member yang punya permintaan konfirmasi.
+ * Sebelumnya SELURUH invoice renewal ditarik, padahal yang dicocokkan hanya
+ * milik segelintir member itu.
+ */
+async function muat(): Promise<{ requests: RenewalRequest[]; invoices: Invoice[] }> {
+  const requests = await renewalService.list()
+  const memberIds = [...new Set(requests.map((r) => r.memberId))]
+  const invoices = memberIds.length ? await invoiceService.list({ type: 'renewal', memberIds }) : []
+  return { requests, invoices }
 }
 
 function tahapDari(inv: Invoice | null): Tahap {
@@ -76,10 +80,7 @@ function tahapDari(inv: Invoice | null): Tahap {
 export function KonfirmasiPembayaranCard() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const data = useAsync(
-    () => Promise.all([renewalService.list(), semuaInvoiceRenewal()]).then(([r, i]) => ({ requests: r, invoices: i })),
-    [],
-  )
+  const data = useAsync(muat, [])
   const [periode, setPeriode] = useState('semua')
   const [tahap, setTahap] = useState<Tahap | 'semua'>('belum_bayar')
 

@@ -35,6 +35,9 @@ import type {
   MemberPage,
   PaymentFilters,
   PaymentPage,
+  ReportDetailRow,
+  ReportFilters,
+  ReportSummary,
 } from '@/types'
 
 export interface AuthRepository {
@@ -304,6 +307,14 @@ export interface UrgentCount {
   overdue: number
   renewalDue: number
   total: number
+}
+
+export interface ReportRepository {
+  summary(filters?: ReportFilters): Promise<ReportSummary>
+  /** Satu halaman detail invoice. */
+  detailPaged(filters?: ReportFilters): Promise<{ rows: ReportDetailRow[]; total: number }>
+  /** SELURUH detail invoice pada periode, untuk ekspor. */
+  detail(filters?: ReportFilters): Promise<ReportDetailRow[]>
 }
 
 export interface DashboardRepository {

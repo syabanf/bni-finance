@@ -391,6 +391,19 @@ func (s *fakeAuditStore) InvoiceExists(_ context.Context, invoiceID string) erro
 
 // --- dashboard --------------------------------------------------------------
 
+type fakeReportStore struct{}
+
+func (fakeReportStore) Summary(context.Context, domain.ReportFilter) (*domain.ReportSummary, error) {
+	return &domain.ReportSummary{
+		Chapters: []domain.ReportChapterRow{}, Types: map[domain.InvoiceType]int{},
+		Monthly: []domain.ReportMonthly{}, Methods: []domain.ReportMethod{},
+	}, nil
+}
+
+func (fakeReportStore) Detail(context.Context, domain.ReportFilter, int, int) ([]domain.ReportDetailRow, int, error) {
+	return nil, 0, nil
+}
+
 type fakeDashboardStore struct{}
 
 func (fakeDashboardStore) Summary(_ context.Context, months int, _ domain.InvoiceType) (*domain.DashboardSummary, error) {

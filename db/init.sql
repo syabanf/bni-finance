@@ -687,11 +687,31 @@ on conflict (key) do nothing;
 -- mencari kerusakan server yang tidak pernah ada. Kedua sisi disamakan di sini,
 -- ke tipe yang memang dipakai kodenya.
 -- ---------------------------------------------------------------------------
-alter table invoices      alter column amount           type bigint;
-alter table invoices      alter column paid_amount      type bigint;
-alter table payments      alter column amount           type bigint;
-alter table fee_settings  alter column registration_fee type bigint;
-alter table fee_settings  alter column renewal_fee      type bigint;
+--
+-- Hanya dijalankan bila tipenya belum bigint. Berkas ini diterapkan ulang pada
+-- setiap deploy, dan ALTER ... TYPE ditolak Postgres begitu ada view yang
+-- membaca kolomnya, walau tipenya tidak berubah:
+--
+--   cannot alter type of a column used by a view or rule
+--
+-- View laporan di akhir berkas membaca invoices.amount dan payments.amount.
+-- Tanpa syarat ini, deploy kedua setelah view itu ada akan berhenti di sini.
+do $$
+declare
+  k record;
+begin
+  for k in
+    select * from (values
+      ('invoices', 'amount'), ('invoices', 'paid_amount'), ('payments', 'amount'),
+      ('fee_settings', 'registration_fee'), ('fee_settings', 'renewal_fee')
+    ) as t(tabel, kolom)
+  loop
+    if (select data_type from information_schema.columns
+        where table_schema = current_schema() and table_name = k.tabel and column_name = k.kolom) <> 'bigint' then
+      execute format('alter table %I alter column %I type bigint', k.tabel, k.kolom);
+    end if;
+  end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Harga dasar dalam Dollar
@@ -825,3 +845,57 @@ begin
   where not exists (select 1 from invoice_audit_log a where a.invoice_id = i.id);
 end
 $$;
+
+-- ---------------------------------------------------------------------------
+-- View laporan
+--
+-- Dua "saved query" yang dibaca endpoint /api/v1/reports/* dan bisa dibuka
+-- langsung dari psql atau alat BI. Aturan laporan ditulis di sini SATU kali:
+--
+--   ditagih   invoice yang terbit, kecuali draft dan batal. Draft belum
+--             pernah dikirim ke member, jadi belum ditagih.
+--   diterima  pembayaran yang masuk, apa pun status invoicenya sekarang.
+--
+-- View biasa, bukan materialized: hasilnya selalu segar. Angka uang yang
+-- tertinggal sampai penyegaran berikutnya adalah kesalahan yang paling mahal
+-- di aplikasi ini.
+--
+-- Periode TIDAK disaring di sini. View tidak menerima parameter, jadi rentang
+-- tanggal dan tipe dikirim pemanggilnya sebagai WHERE.
+--
+-- Kolom baru hanya boleh ditambah di AKHIR: create or replace view menolak
+-- kolom yang digeser atau diganti tipenya.
+-- ---------------------------------------------------------------------------
+create or replace view v_laporan_invoice as
+select i.id,
+       i.number,
+       i.member_id,
+       m.name          as member_name,
+       i.chapter_id,
+       c.display_name  as chapter_name,
+       i.type,
+       i.status,
+       i.amount,
+       i.due_date,
+       i.created_at,
+       -- Tanggal terbit menurut zona waktu sesi, untuk dibaca manusia. Endpoint
+       -- menyaring lewat created_at supaya indeksnya terpakai.
+       i.created_at::date as tanggal_terbit
+from invoices i
+left join members  m on m.id = i.member_id
+left join chapters c on c.id = i.chapter_id
+where i.status not in ('draft', 'cancelled');
+
+create or replace view v_laporan_pembayaran as
+select p.id,
+       p.invoice_id,
+       p.amount,
+       p.paid_at,
+       p.paid_at::date as tanggal_bayar,
+       -- Metode kosong dikelompokkan sebagai "other", sama dengan tampilannya.
+       coalesce(nullif(p.payment_method, ''), 'other') as metode,
+       i.type,
+       i.chapter_id,
+       i.member_id
+from payments p
+join invoices i on i.id = p.invoice_id;

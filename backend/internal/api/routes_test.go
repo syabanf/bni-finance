@@ -21,6 +21,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 )
 
@@ -63,6 +64,7 @@ func newFullServer(t *testing.T) *fullStack {
 		Settings:  settings.NewService(stack.settings),
 		Audit:     audit.NewService(stack.audits),
 		Dashboard: dashboard.NewService(fakeDashboardStore{}),
+		Report:    report.NewService(fakeReportStore{}),
 	}, nil)
 
 	stack.srv = httptest.NewServer(h)

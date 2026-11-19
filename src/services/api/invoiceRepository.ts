@@ -141,6 +141,9 @@ function paramFilter(f: InvoiceFilters | undefined) {
     dueTo: f?.dueTo || undefined,
     issuedFrom: f?.issuedFrom || undefined,
     issuedTo: f?.issuedTo || undefined,
+    sentFrom: f?.sentFrom || undefined,
+    sentTo: f?.sentTo || undefined,
+    sort: f?.sort,
   }
 }
 
@@ -166,7 +169,10 @@ export const apiInvoiceRepository: InvoiceRepository = {
   async list(filters) {
     // SELURUH hasil filter, bukan 200 baris pertama: pemanggilnya (laporan,
     // ekspor) menjumlahkan uang dari daftar ini.
-    const semua = await tarikSemua<Invoice>('/invoices', paramFilter(filters))
+    // Daftar id member dipecah ke beberapa permintaan supaya URL-nya pendek.
+    const semua = filters?.memberIds
+      ? await tarikUntuk<Invoice>('/invoices', 'memberIds', filters.memberIds, paramFilter(filters))
+      : await tarikSemua<Invoice>('/invoices', paramFilter(filters))
     tampilkanOverdue(semua)
     return lampirkan(semua)
   },

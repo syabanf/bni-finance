@@ -1,12 +1,16 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send } from 'lucide-react'
-import type { InvoiceWithRelations } from '@/types'
-import { Card, CardHeader, EmptyState, ExportMenu, InvoiceStatusBadge, TableSkeleton, Pagination } from '@/components/ui'
+import type { InvoiceFilters, InvoiceType } from '@/types'
+import { Card, CardHeader, EmptyState, ExportMenu, InvoiceStatusBadge, TableSkeleton, Pagination, useToast } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 import { downloadXlsx } from '@/lib/xlsx'
-import { usePaginasi } from '@/hooks/usePaginasi'
+import { useHalamanServer } from '@/hooks/useHalamanServer'
+import { invoiceService } from '@/services'
+
+/** Batas awal untuk "semua periode" pada saringan tanggal kirim. */
+const AWAL_WAKTU = '1970-01-01'
 
 /**
  * Invoice yang dikirim ke Paper.id pada periode laporan, dihitung dari tanggal
@@ -14,55 +18,69 @@ import { usePaginasi } from '@/hooks/usePaginasi'
  * menyebut kapan invoice dikirim dan diingatkan, lalu apakah sudah dibayar.
  */
 export function LaporanPengirimanCard({
-  invoices,
-  inRange,
-  loading,
+  dari,
+  sampai,
+  tipe,
   namaBerkas,
 }: {
-  invoices: InvoiceWithRelations[]
-  inRange: (iso?: string) => boolean
-  loading: boolean
+  /** Batas periode, YYYY-MM-DD. Kosong berarti tanpa batas di sisi itu. */
+  dari: string
+  sampai: string
+  tipe: InvoiceType | 'all'
   namaBerkas: string
 }) {
   const navigate = useNavigate()
-  const baris = useMemo(
-    () =>
-      invoices
-        .filter((i) => inRange(i.paperIdSentAt))
-        .sort((a, b) => (b.paperIdSentAt ?? '').localeCompare(a.paperIdSentAt ?? '')),
-    [invoices, inRange],
-  )
-  const lunas = baris.filter((i) => i.status === 'paid').length
-  const { potongan, paginasi } = usePaginasi(baris)
+  const { toast } = useToast()
 
-  const ekspor = () =>
-    downloadXlsx(
-      `${namaBerkas}-pengiriman`,
-      'Pengiriman',
-      ['Nomor', 'Member', 'Chapter', 'Dikirim', 'Pengingat', 'Jatuh Tempo', 'Status', 'Dibayar', 'Nominal'],
-      baris.map((i) => [
-        i.number,
-        i.member?.name ?? '',
-        i.chapter?.displayName ?? '',
-        (i.paperIdSentAt ?? '').slice(0, 10),
-        i.paperIdReminderCount ?? 0,
-        i.dueDate.slice(0, 10),
-        INVOICE_STATUS_LABEL[i.status],
-        (i.paidAt ?? '').slice(0, 10),
-        i.amount,
-      ]),
-    )
+  // Batas awal selalu diisi: saringan tanggal kirim yang terisi membuang
+  // invoice yang belum pernah dikirim, dan hanya yang terkirim yang dilaporkan.
+  const filter = useMemo<InvoiceFilters>(
+    () => ({ type: tipe, sentFrom: dari || AWAL_WAKTU, sentTo: sampai, sort: 'sent', summary: true }),
+    [dari, sampai, tipe],
+  )
+  const { halaman, loading, paginasi } = useHalamanServer(
+    (f: InvoiceFilters) => invoiceService.listPaged(f),
+    filter,
+  )
+  const potongan = halaman?.rows ?? []
+  const total = halaman?.total ?? 0
+  const lunas = halaman?.summary?.byStatus.paid?.count ?? 0
+
+  // Ekspor memuat seluruh invoice terkirim pada periode, bukan satu halaman.
+  const ekspor = async () => {
+    try {
+      const semua = await invoiceService.list(filter)
+      downloadXlsx(
+        `${namaBerkas}-pengiriman`,
+        'Pengiriman',
+        ['Nomor', 'Member', 'Chapter', 'Dikirim', 'Pengingat', 'Jatuh Tempo', 'Status', 'Dibayar', 'Nominal'],
+        semua.map((i) => [
+          i.number,
+          i.member?.name ?? '',
+          i.chapter?.displayName ?? '',
+          (i.paperIdSentAt ?? '').slice(0, 10),
+          i.paperIdReminderCount ?? 0,
+          i.dueDate.slice(0, 10),
+          INVOICE_STATUS_LABEL[i.status],
+          (i.paidAt ?? '').slice(0, 10),
+          i.amount,
+        ]),
+      )
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengekspor pengiriman.', 'error')
+    }
+  }
 
   return (
     <Card className="mt-5">
       <CardHeader
         title="Laporan Pengiriman"
-        subtitle={`Invoice yang dikirim ke Paper.id pada periode ini · ${lunas} dari ${baris.length} sudah dibayar.`}
-        action={<ExportMenu onExcel={ekspor} disabled={baris.length === 0} />}
+        subtitle={`Invoice yang dikirim ke Paper.id pada periode ini · ${lunas} dari ${total.toLocaleString('id-ID')} sudah dibayar.`}
+        action={<ExportMenu onExcel={() => void ekspor()} disabled={total === 0} />}
       />
-      {loading ? (
+      {loading && !halaman ? (
         <TableSkeleton rows={4} cols={6} />
-      ) : baris.length === 0 ? (
+      ) : total === 0 ? (
         <EmptyState icon={Send} title="Belum ada pengiriman" description="Tidak ada invoice yang dikirim pada periode ini." />
       ) : (
         <div className="overflow-x-auto">
@@ -99,7 +117,7 @@ export function LaporanPengirimanCard({
           </table>
         </div>
       )}
-      {!loading && <Pagination {...paginasi} satuan="invoice" />}
+      <Pagination {...paginasi} satuan="invoice" />
     </Card>
   )
 }

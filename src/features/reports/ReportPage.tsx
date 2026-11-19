@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle2, CreditCard, Percent, Wallet } from 'lucide-react'
-import type { Chapter, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
+import type { ReportDetailRow, ReportFilters, ReportSummary } from '@/types'
 import {
   Card,
   CardHeader,
@@ -19,10 +19,10 @@ import {
   Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { chapterService, invoiceService, paymentService } from '@/services'
+import { reportService } from '@/services'
 import { formatCurrency, formatCurrencyCompact, formatDate, formatDateTime } from '@/lib/format'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
-import { addDays, todayISO } from '@/lib/date'
+import { todayISO } from '@/lib/date'
 import { downloadXlsxSheets } from '@/lib/xlsx'
 import { LaporanPengirimanCard } from './components/LaporanPengirimanCard'
 import { printTableReport } from '@/lib/pdfReport'
@@ -31,6 +31,7 @@ import { InvoiceTypeFilter, type InvoiceTypeFilterValue } from '@/features/invoi
 import { KonfirmasiPembayaranCard } from './components/KonfirmasiPembayaranCard'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
 import { usePaginasi } from '@/hooks/usePaginasi'
+import { useHalamanServer } from '@/hooks/useHalamanServer'
 
 type Preset = 'this-month' | 'last-month' | 'this-year' | 'all' | 'custom'
 
@@ -72,34 +73,10 @@ function monthLabel(key: string): string {
   return `${name} ${y.slice(2)}`
 }
 
-const sum = (ns: number[]) => ns.reduce((a, n) => a + n, 0)
-
-interface ChapterRow {
-  id: string
-  name: string
-  count: number
-  ditagih: number
-  /** Ditagih, dipecah per tipe. renewal + pendaftaran === ditagih. */
-  renewal: number
-  pendaftaran: number
-  diterima: number
-  outstanding: number
-  rate: number
-}
-
-/** Satu baris tabel detail: satu invoice yang terbit pada periode. */
-interface DetailRow {
-  id: string
-  number: string
-  member: string
-  chapter: string
-  type: InvoiceWithRelations['type']
-  terbit: string
-  jatuhTempo: string
-  status: InvoiceWithRelations['status']
-  ditagih: number
-  /** Pembayaran yang DITERIMA pada periode untuk invoice ini. */
-  diterima: number
+/** Angka sebelum jawaban server tiba. */
+const KOSONG: ReportSummary = {
+  count: 0, ditagih: 0, diterima: 0, outstanding: 0, rate: 0,
+  chapters: [], types: { registration: 0, renewal: 0 }, monthly: [], methods: [], detailDiterima: 0,
 }
 
 const TIPE_LABEL = { registration: 'Pendaftaran', renewal: 'Renewal' } as const
@@ -107,10 +84,6 @@ const TIPE_LABEL = { registration: 'Pendaftaran', renewal: 'Renewal' } as const
 export function ReportPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const { data: invoices, loading: invLoading, error: invError, reload: reloadInv } =
-    useAsync<InvoiceWithRelations[]>(() => invoiceService.list())
-  const { data: chapters } = useAsync<Chapter[]>(() => chapterService.list())
-
   const [preset, setPreset] = useState<Preset>('this-year')
   const [tipe, setTipe] = useState<InvoiceTypeFilterValue>('all')
   const [customFrom, setCustomFrom] = useState('')
@@ -118,169 +91,45 @@ export function ReportPage() {
 
   const range = preset === 'custom' ? { from: customFrom, to: customTo } : presetRange(preset)
 
-  // Pembayaran diminta untuk periodenya saja, dengan kelonggaran sehari di
-  // tiap ujung. Server memotong menurut zona waktunya sendiri, sedangkan
-  // inRange di bawah memotong menurut tanggal UTC; kelonggaran itu memastikan
-  // selisih keduanya tidak membuang pembayaran di tepi periode.
-  const { data: payments, loading: payLoading, error: payError, reload: reloadPay } =
-    useAsync<PaymentWithInvoice[]>(
-      () =>
-        paymentService.list({
-          paidFrom: range.from ? addDays(range.from, -1) : undefined,
-          paidTo: range.to ? addDays(range.to, 1) : undefined,
-        }),
-      [range.from, range.to],
-    )
-  const error = invError || payError
+  // Stabil antar-render: useHalamanServer membaca identitas baru sebagai
+  // saringan baru dan mengembalikan tabel detail ke halaman satu.
+  const filter = useMemo<ReportFilters>(
+    () => ({ from: range.from, to: range.to, type: tipe }),
+    [range.from, range.to, tipe],
+  )
+
+  // Seluruh angka dihitung server dari view v_laporan_invoice dan
+  // v_laporan_pembayaran. Sebelumnya seluruh invoice dan pembayaran ditarik ke
+  // browser untuk dijumlahkan di sini, satu permintaan per 200 baris.
+  const {
+    data: ringkas,
+    loading,
+    error: galatRingkas,
+    reload: muatRingkas,
+  } = useAsync<ReportSummary>(() => reportService.summary(filter), [filter])
+  const detailHal = useHalamanServer((f: ReportFilters) => reportService.detailPaged(f), filter)
+  const error = galatRingkas || detailHal.error
   const reloadAll = () => {
-    reloadInv()
-    reloadPay()
+    muatRingkas()
+    detailHal.reload()
   }
 
-  const inRange = useMemo(() => {
-    const { from, to } = range
-    return (iso?: string) => {
-      if (!iso) return false
-      const day = iso.slice(0, 10)
-      if (from && day < from) return false
-      if (to && day > to) return false
-      return true
-    }
-  }, [range.from, range.to])
-
   const report = useMemo(() => {
-    // Billing basis: invoices ISSUED in the period (by createdAt).
-    // Saringan tipe berlaku untuk dua dasar sekaligus: invoice yang terbit
-    // dan pembayaran yang diterima (lewat tipe invoice induknya), supaya
-    // "Diterima" tetap bisa dibandingkan dengan "Ditagih" pada tipe yang sama.
-    // Draft dikeluarkan: belum pernah dikirim ke member, jadi belum ditagih,
-    // dan menghitungnya menurunkan Collection Rate tanpa ada yang terlambat bayar.
-    const cocokTipe = (t: string | undefined) => tipe === 'all' || t === tipe
-    const invs = (invoices ?? []).filter(
-      (i) => i.status !== 'cancelled' && i.status !== 'draft' && inRange(i.createdAt) && cocokTipe(i.type),
-    )
-    const outstandingInvs = invs.filter((i) => i.status === 'sent' || i.status === 'overdue')
-    // Cash basis: payments RECEIVED in the period (by paidAt). "Diterima", the
-    // method breakdown, and the monthly "paid" bars all use this set, so they
-    // reconcile with one another instead of mixing bases.
-    const pays = (payments ?? []).filter((p) => inRange(p.paidAt) && cocokTipe(p.invoice?.type))
-
-    const ditagih = sum(invs.map((i) => i.amount))
-    const diterima = sum(pays.map((p) => p.amount))
-    const outstanding = sum(outstandingInvs.map((i) => i.amount))
-    const rate = ditagih > 0 ? Math.round((diterima / ditagih) * 100) : 0
-
-    // Per chapter — ditagih/outstanding from invoices issued, diterima from
-    // payments received (keyed by the paid invoice's chapter).
-    const chapMap = new Map<string, ChapterRow>()
-    const chapterName = (id: string) => chapters?.find((c) => c.id === id)?.displayName ?? '—'
-    const ensureRow = (id: string, name: string): ChapterRow => {
-      let row: ChapterRow | undefined = chapMap.get(id)
-      if (!row) {
-        row = {
-          id, name, count: 0, ditagih: 0, diterima: 0, outstanding: 0, rate: 0,
-          // Dipecah per tipe sejak di sumbernya, bukan dihitung ulang di
-          // tampilan: MOM meminta "setiap yang berbau data payment dan
-          // outstanding terbagi dua", dan angka yang dipecah di dua tempat
-          // adalah angka yang bisa berbeda di dua tempat.
-          renewal: 0, pendaftaran: 0,
-        }
-        chapMap.set(id, row)
-      }
-      return row
-    }
-    // SETIAP chapter disiapkan lebih dulu, termasuk yang tanpa invoice.
-    //
-    // Sebelumnya baris hanya lahir dari invoice yang ada, sehingga chapter yang
-    // belum ditagih sama sekali HILANG dari laporan. Itu justru membuang
-    // informasi yang paling perlu dilihat: chapter dengan nol tagihan bukan
-    // chapter yang baik-baik saja, ia chapter yang belum disentuh — dan
-    // ketiadaannya di tabel terbaca seperti ia tidak ada.
-    //
-    // Dashboard sudah melakukan ini (LEFT JOIN di sisi server); laporan yang
-    // tidak melakukannya membuat dua halaman menjawab pertanyaan sama dengan
-    // daftar chapter yang berbeda.
-    for (const c of chapters ?? []) ensureRow(c.id, c.displayName)
-
-    for (const i of invs) {
-      const row = ensureRow(i.chapterId, i.chapter?.displayName ?? chapterName(i.chapterId))
-      row.count += 1
-      row.ditagih += i.amount
-      if (i.type === 'renewal') row.renewal += i.amount
-      else row.pendaftaran += i.amount
-      if (i.status === 'sent' || i.status === 'overdue') row.outstanding += i.amount
-    }
-    for (const p of pays) {
-      const chId = p.invoice?.chapterId
-      if (chId) ensureRow(chId, chapterName(chId)).diterima += p.amount
-    }
-    const chapterRows = [...chapMap.values()]
-      .map((r) => ({ ...r, rate: r.ditagih > 0 ? Math.round((r.diterima / r.ditagih) * 100) : 0 }))
+    const r = ringkas ?? KOSONG
+    return {
+      ...r,
       // Nilai turun dulu, lalu abjad. Tanpa pengurutan kedua, chapter yang
       // sama-sama nol muncul dalam urutan acak yang berubah tiap muat.
-      .sort((a, b) => b.ditagih - a.ditagih || a.name.localeCompare(b.name))
-
-    // Per type (invoices issued)
-    const reg = invs.filter((i) => i.type === 'registration')
-    const ren = invs.filter((i) => i.type === 'renewal')
-    const typeData: DonutSegment[] = [
-      { label: 'Pendaftaran', value: reg.length, color: '#ef4444' },
-      { label: 'Renewal', value: ren.length, color: '#3b82f6' },
-    ]
-
-    // Monthly: issued (by createdAt) vs received (by paidAt)
-    const monthMap = new Map<string, { issued: number; paid: number }>()
-    const bump = (key: string, field: 'issued' | 'paid', amt: number) => {
-      const m = monthMap.get(key) ?? { issued: 0, paid: 0 }
-      m[field] += amt
-      monthMap.set(key, m)
+      chapterRows: [...r.chapters].sort((a, b) => b.ditagih - a.ditagih || a.name.localeCompare(b.name)),
+      typeData: [
+        { label: 'Pendaftaran', value: r.types.registration, color: '#ef4444' },
+        { label: 'Renewal', value: r.types.renewal, color: '#3b82f6' },
+      ] satisfies DonutSegment[],
     }
-    for (const i of invs) bump(i.createdAt.slice(0, 7), 'issued', i.amount)
-    for (const p of pays) bump(p.paidAt.slice(0, 7), 'paid', p.amount)
-    const monthly = [...monthMap.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-12)
-      .map(([month, v]) => ({ month, ...v }))
-
-    // Payment methods (cash received in period)
-    const methodMap = new Map<string, { count: number; amount: number }>()
-    for (const p of pays) {
-      const key = p.paymentMethod || 'other'
-      const m = methodMap.get(key) ?? { count: 0, amount: 0 }
-      m.count += 1
-      m.amount += p.amount
-      methodMap.set(key, m)
-    }
-    const methods = [...methodMap.entries()]
-      .map(([method, v]) => ({ method, ...v }))
-      .sort((a, b) => b.amount - a.amount)
-
-    // Detail per invoice, dasar yang sama dengan tabel chapter: invoice yang
-    // terbit pada periode, dan penerimaan yang masuk pada periode. Angka di
-    // baris-baris ini harus bisa dijumlahkan kembali ke baris chapternya.
-    const diterimaPerInvoice = new Map<string, number>()
-    for (const p of pays) diterimaPerInvoice.set(p.invoiceId, (diterimaPerInvoice.get(p.invoiceId) ?? 0) + p.amount)
-    const detail: DetailRow[] = invs
-      .map((i) => ({
-        id: i.id,
-        number: i.number,
-        member: i.member?.name ?? '—',
-        chapter: i.chapter?.displayName ?? chapterName(i.chapterId),
-        type: i.type,
-        terbit: i.createdAt,
-        jatuhTempo: i.dueDate,
-        status: i.status,
-        ditagih: i.amount,
-        diterima: diterimaPerInvoice.get(i.id) ?? 0,
-      }))
-      .sort((a, b) => b.terbit.localeCompare(a.terbit) || a.number.localeCompare(b.number))
-
-    return { ditagih, diterima, outstanding, rate, count: invs.length, chapterRows, typeData, monthly, methods, detail }
-  }, [invoices, payments, chapters, inRange, tipe])
+  }, [ringkas])
   const chapterHal = usePaginasi(report.chapterRows, 10)
-  const detailHal = usePaginasi(report.detail)
-
-  const loading = invLoading || payLoading
+  const detail = detailHal.halaman?.rows ?? []
+  const totalDetail = detailHal.halaman?.total ?? 0
 
   const periodLabel = PRESETS.find((p) => p.value === preset)?.label ?? 'Semua'
   const tipeLabel = tipe === 'all' ? '' : tipe === 'renewal' ? ' · Renewal' : ' · Pendaftaran'
@@ -304,11 +153,11 @@ export function ReportPage() {
   const exportBase = `laporan${tipe === 'all' ? '' : `-${tipe}`}-${range.from || 'awal'}_${range.to || todayISO()}`
 
   const DETAIL_HEADERS = ['Nomor', 'Member', 'Chapter', 'Tipe', 'Terbit', 'Jatuh Tempo', 'Status', 'Ditagih', 'Diterima']
-  const detailRows = (uang: (n: number) => string | number = (n) => n) =>
-    report.detail.map((d) => [
+  const detailRows = (semua: ReportDetailRow[], uang: (n: number) => string | number = (n) => n) =>
+    semua.map((d) => [
       d.number,
-      d.member,
-      d.chapter,
+      d.member ?? '—',
+      d.chapter ?? '—',
       TIPE_LABEL[d.type],
       formatDate(d.terbit),
       formatDate(d.jatuhTempo),
@@ -319,13 +168,28 @@ export function ReportPage() {
 
   // Dua lembar: rekap per chapter dan detail per invoice. Detail di lembar
   // sendiri supaya rekapnya tetap bisa dijumlahkan tanpa tercampur.
-  const exportExcel = () =>
+  // Tabel detail di layar berhalaman, jadi ekspor meminta seluruh barisnya.
+  const [mengekspor, setMengekspor] = useState(false)
+  const ekspor = async (jenis: 'excel' | 'pdf') => {
+    setMengekspor(true)
+    try {
+      const semua = await reportService.detail(filter)
+      if (jenis === 'excel') exportExcel(semua)
+      else exportPdf(semua)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal mengekspor laporan.', 'error')
+    } finally {
+      setMengekspor(false)
+    }
+  }
+
+  const exportExcel = (semua: ReportDetailRow[]) =>
     downloadXlsxSheets(exportBase, [
       { name: 'Per Chapter', headers: EXPORT_HEADERS, rows: exportRows() },
-      { name: 'Detail Invoice', headers: DETAIL_HEADERS, rows: detailRows() },
+      { name: 'Detail Invoice', headers: DETAIL_HEADERS, rows: detailRows(semua) },
     ])
 
-  const exportPdf = () => {
+  const exportPdf = (semua: ReportDetailRow[]) => {
     const ok = printTableReport({
       title: 'Laporan Keuangan',
       subtitle: `${periodLabel}${tipeLabel} · ${periodRange}`,
@@ -381,7 +245,7 @@ export function ReportPage() {
             { label: 'Ditagih', align: 'right' },
             { label: 'Diterima', align: 'right' },
           ],
-          rows: detailRows(formatCurrency),
+          rows: detailRows(semua, formatCurrency),
         },
         {
           heading: 'Per Tipe Invoice',
@@ -428,7 +292,11 @@ export function ReportPage() {
         description="Ringkasan penagihan dan penerimaan per periode."
         action={
           <span data-tour="report-export">
-            <ExportMenu onExcel={exportExcel} onPdf={exportPdf} disabled={report.chapterRows.length === 0} />
+            <ExportMenu
+              onExcel={() => void ekspor('excel')}
+              onPdf={() => void ekspor('pdf')}
+              disabled={report.chapterRows.length === 0 || mengekspor}
+            />
           </span>
         }
       />
@@ -632,9 +500,9 @@ export function ReportPage() {
           title="Detail Invoice"
           subtitle="Setiap invoice yang terbit pada periode, berikut penerimaannya. Klik baris untuk membukanya."
         />
-        {loading ? (
+        {detailHal.loading && !detailHal.halaman ? (
           <TableSkeleton rows={6} cols={6} />
-        ) : report.detail.length === 0 ? (
+        ) : totalDetail === 0 ? (
           <EmptyState icon={CreditCard} title="Tidak ada data" description="Tidak ada invoice pada periode ini." />
         ) : (
           <div className="overflow-x-auto">
@@ -653,15 +521,15 @@ export function ReportPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-50">
-                {detailHal.potongan.map((d) => (
+                {detail.map((d) => (
                   <tr
                     key={d.id}
                     onClick={() => navigate(`/invoices/${d.id}`)}
                     className="cursor-pointer hover:bg-ink-50/50"
                   >
                     <td className="px-5 py-3 font-medium text-ink-900">{d.number}</td>
-                    <td className="px-3 py-3 text-ink-700">{d.member}</td>
-                    <td className="px-3 py-3 text-ink-600">{d.chapter}</td>
+                    <td className="px-3 py-3 text-ink-700">{d.member ?? '—'}</td>
+                    <td className="px-3 py-3 text-ink-600">{d.chapter ?? '—'}</td>
                     <td className="px-3 py-3 text-ink-600">{TIPE_LABEL[d.type]}</td>
                     <td className="px-3 py-3 text-ink-600">{formatDate(d.terbit)}</td>
                     <td className="px-3 py-3 text-ink-600">{formatDate(d.jatuhTempo)}</td>
@@ -678,26 +546,21 @@ export function ReportPage() {
               <tfoot>
                 <tr className="border-t border-ink-100 bg-ink-50/50 text-sm font-semibold text-ink-900">
                   <td className="px-5 py-3" colSpan={7}>
-                    Total · {report.detail.length} invoice
+                    Total · {totalDetail.toLocaleString('id-ID')} invoice
                   </td>
                   <td className="px-3 py-3 text-right">{formatCurrency(report.ditagih)}</td>
                   <td className="px-5 py-3 text-right text-emerald-600">
-                    {formatCurrency(report.detail.reduce((a, d) => a + d.diterima, 0))}
+                    {formatCurrency(report.detailDiterima)}
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
         )}
-        {!loading && <Pagination {...detailHal.paginasi} satuan="invoice" />}
+        <Pagination {...detailHal.paginasi} satuan="invoice" />
       </Card>
 
-      <LaporanPengirimanCard
-        invoices={(invoices ?? []).filter((i) => tipe === 'all' || i.type === tipe)}
-        inRange={inRange}
-        loading={invLoading}
-        namaBerkas={exportBase}
-      />
+      <LaporanPengirimanCard dari={range.from} sampai={range.to} tipe={tipe} namaBerkas={exportBase} />
     </div>
   )
 }

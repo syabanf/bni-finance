@@ -27,6 +27,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
 )
 
@@ -97,6 +98,7 @@ func newE2EStack(t *testing.T) *e2eStack {
 		Settings:  settings.NewService(settings.NewRepository(pool)),
 		Audit:     audit.NewService(audit.NewRepository(pool)),
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
+		Report:    report.NewService(report.NewRepository(pool)),
 		PaperID:   paperSvc,
 		Blackbox:  recorder,
 	}, pool.Ping)

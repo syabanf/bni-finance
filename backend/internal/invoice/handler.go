@@ -53,6 +53,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		Aging:      httpx.Query(r, "aging"),
 		IDs:        hanyaUUID(httpx.QueryList(r, "ids", 200)),
 		MemberIDs:  httpx.QueryList(r, "memberIds", 200),
+		SentFrom:   httpx.Query(r, "sentFrom"),
+		SentTo:     httpx.Query(r, "sentTo"),
+		Sort:       httpx.Query(r, "sort"),
 		Limit:      httpx.QueryInt(r, "limit", 50, 1, 200),
 		Offset:     httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
 	}

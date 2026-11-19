@@ -31,6 +31,10 @@
       "description": "Agregat KPI, hanya baca"
     },
     {
+      "name": "Laporan",
+      "description": "Penagihan dan penerimaan per periode, dihitung dari view basis data"
+    },
+    {
       "name": "Unggahan",
       "description": "Bukti pembayaran"
     },
@@ -533,6 +537,30 @@
           "required": false,
           "type": "string",
           "description": "Id member berpisah koma, paling banyak 200."
+        },
+        {
+          "name": "sentFrom",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Tanggal invoice dikirim ke Paper.id, batas awal. Mengisinya membuang invoice yang belum pernah dikirim."
+        },
+        {
+          "name": "sentTo",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Tanggal dikirim, batas akhir. Inklusif."
+        },
+        {
+          "name": "sort",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "sent"
+          ],
+          "description": "sent mengurutkan menurut tanggal kirim, terbaru dulu. Bawaannya tanggal terbit."
         },
         {
           "name": "q",
@@ -2335,6 +2363,100 @@
             "registration"
           ],
           "description": "Saring seluruh angka invoice ke satu tipe. Kosong = semua."
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/reports/detail",
+      "method": "GET",
+      "path": "/api/v1/reports/detail",
+      "tag": "Laporan",
+      "summary": "Detail invoice per periode",
+      "description": "Invoice yang terbit pada periode, terbaru dulu, berhalaman. Kolom\n`diterima` menjumlahkan pembayaran invoice itu yang masuk pada periode,\ndasar yang sama dengan `chapters` di `/reports/summary`.\n",
+      "params": [
+        {
+          "name": "from",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Awal periode, inklusif. Kosong = tanpa batas awal."
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Akhir periode, inklusif. Kosong = tanpa batas akhir."
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "registration",
+            "renewal"
+          ],
+          "description": "Saring ke satu tipe invoice. Pembayaran ikut tersaring lewat tipe invoicenya."
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 50,
+          "description": ""
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 0,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/reports/summary",
+      "method": "GET",
+      "path": "/api/v1/reports/summary",
+      "tag": "Laporan",
+      "summary": "Angka laporan per periode",
+      "description": "Seluruh angka halaman Laporan selain tabel detail, dihitung dari view\n`v_laporan_invoice` dan `v_laporan_pembayaran`.\n\nDua dasar waktu dipakai sekaligus dan tidak dicampur:\n\n- **ditagih**: invoice yang terbit pada periode (`created_at`), kecuali\n  draft dan batal.\n- **diterima**: pembayaran yang masuk pada periode (`paid_at`), apa pun\n  status invoicenya sekarang.\n\n`chapters` memuat setiap chapter, termasuk yang tanpa invoice. Total di\ntingkat atas adalah jumlah baris-baris itu, jadi kartu ringkasan tidak\nbisa berbeda dari tabelnya.\n\n**Dibatasi per chapter** untuk pengguna berlingkup (ST dan MC).\n",
+      "params": [
+        {
+          "name": "from",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Awal periode, inklusif. Kosong = tanpa batas awal."
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": "Akhir periode, inklusif. Kosong = tanpa batas akhir."
+        },
+        {
+          "name": "type",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "registration",
+            "renewal"
+          ],
+          "description": "Saring ke satu tipe invoice. Pembayaran ikut tersaring lewat tipe invoicenya."
         }
       ],
       "bodyRequired": false,

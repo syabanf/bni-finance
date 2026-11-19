@@ -96,6 +96,11 @@ function saring(semua: InvoiceWithRelations[], filters?: InvoiceFilters) {
   // rentang tanggal memilih baris yang berbeda antara mock dan produksi.
   if (filters?.issuedFrom) hasil = hasil.filter((i) => i.createdAt.slice(0, 10) >= filters.issuedFrom!)
   if (filters?.issuedTo) hasil = hasil.filter((i) => i.createdAt.slice(0, 10) <= filters.issuedTo!)
+  // Sama dengan server: mengisi salah satunya membuang yang belum dikirim.
+  if (filters?.sentFrom)
+    hasil = hasil.filter((i) => !!i.paperIdSentAt && i.paperIdSentAt.slice(0, 10) >= filters.sentFrom!)
+  if (filters?.sentTo)
+    hasil = hasil.filter((i) => !!i.paperIdSentAt && i.paperIdSentAt.slice(0, 10) <= filters.sentTo!)
 
   if (filters?.aging && filters.aging !== 'all') {
     const hariIni = todayISO()
@@ -108,7 +113,16 @@ function saring(semua: InvoiceWithRelations[], filters?: InvoiceFilters) {
     })
   }
 
-  return hasil.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  if (filters?.memberIds) {
+    const milik = new Set(filters.memberIds)
+    hasil = hasil.filter((i) => milik.has(i.memberId))
+  }
+
+  const terbit = (a: InvoiceWithRelations, b: InvoiceWithRelations) => b.createdAt.localeCompare(a.createdAt)
+  if (filters?.sort === 'sent') {
+    return hasil.sort((a, b) => (b.paperIdSentAt ?? '').localeCompare(a.paperIdSentAt ?? '') || terbit(a, b))
+  }
+  return hasil.sort(terbit)
 }
 
 /**

@@ -151,6 +151,12 @@ func klausaFilter(ctx context.Context, f domain.InvoiceFilter) (string, []any) {
 	if len(f.MemberIDs) > 0 {
 		add("member_id = ANY($%d)", f.MemberIDs)
 	}
+	if f.SentFrom != "" {
+		add("paper_id_sent_at >= $%d", f.SentFrom)
+	}
+	if f.SentTo != "" {
+		add("paper_id_sent_at < ($%d::date + interval '1 day')", f.SentTo)
+	}
 	if f.Search != "" {
 		// Mencakup NOMOR dan NAMA MEMBER. Sebelumnya server hanya mencari nomor,
 		// dan klien menyaring nama sendiri setelah menarik seluruh baris —
@@ -228,9 +234,15 @@ func (r *Repository) List(ctx context.Context, f domain.InvoiceFilter) ([]domain
 		return nil, 0, fmt.Errorf("hitung invoice: %w", err)
 	}
 
+	// Nilai urutan dipilih dari daftar tetap, tidak pernah dirakit dari masukan.
+	urutan := "created_at DESC"
+	if f.Sort == "sent" {
+		urutan = "paper_id_sent_at DESC NULLS LAST, created_at DESC"
+	}
+
 	args = append(args, f.Limit, f.Offset)
 	query := fmt.Sprintf(
-		"SELECT %s FROM invoices WHERE %s ORDER BY created_at DESC LIMIT $%d OFFSET $%d",
+		"SELECT %s FROM invoices WHERE %s ORDER BY "+urutan+" LIMIT $%d OFFSET $%d",
 		columns, clause, len(args)-1, len(args),
 	)
 
