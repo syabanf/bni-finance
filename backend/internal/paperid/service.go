@@ -260,6 +260,7 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 	}
 
 	namaProduk, descProduk := s.produk(ctx, inv.Type)
+	catatan, syarat := s.catatan(ctx)
 	res, err := s.gateway.CreateInvoice(ctx, CreateInput{
 		Number:        inv.Number,
 		InvoiceDate:   now,
@@ -273,6 +274,8 @@ func (s *Service) Send(ctx context.Context, invoiceID string, opts SendOptions) 
 		CustomerPhone: normalizePhone(inv.Phone),
 		SendEmail:     sendEmail,
 		SendWhatsApp:  sendWhatsApp,
+		Notes:         catatan,
+		Terms:         syarat,
 	})
 	if err != nil {
 		return nil, gatewayError(err)
@@ -493,6 +496,22 @@ func (s *Service) produk(ctx context.Context, t domain.InvoiceType) (nama, desc 
 	return nama, desc
 }
 
+// catatan membaca dua teks bebas yang dicetak Paper.id di invoice: catatan
+// (tempat detail rekening untuk member yang ingin transfer) serta syarat dan
+// ketentuan. Keduanya tidak punya bawaan: kosong berarti kolomnya tidak
+// dikirim, dan invoice tampil tanpa bagian itu.
+//
+// Galat pembacaan diabaikan dengan alasan yang sama seperti produk().
+func (s *Service) catatan(ctx context.Context) (notes, terms string) {
+	if v, err := s.repo.GetSetting(ctx, "paper_catatan"); err == nil {
+		notes = strings.TrimSpace(v)
+	}
+	if v, err := s.repo.GetSetting(ctx, "paper_syarat"); err == nil {
+		terms = strings.TrimSpace(v)
+	}
+	return notes, terms
+}
+
 // gatewayError maps an upstream failure to a status code, keeping Paper.id's
 // own message so a rejection isn't mistaken for a bug on our side.
 //
@@ -629,6 +648,13 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 	// yang sudah lewat jatuh tempo harus tetap menampilkan tanggal aslinya —
 	// memundurkannya akan membuat tunggakan tampak belum jatuh tempo.
 	namaProduk, descProduk := s.produk(ctx, inv.Type)
+	// Pengingat membawa catatan dan syarat yang sama dengan invoicenya: member
+	// yang membayar dari pesan pengingat butuh detail rekening yang sama.
+	catatan, syarat := s.catatan(ctx)
+	pengingat := "Pengingat pembayaran untuk invoice " + inv.Number
+	if catatan != "" {
+		pengingat += "\n\n" + catatan
+	}
 	res, err := s.gateway.CreateInvoice(ctx, CreateInput{
 		Number:        reminderNumber(inv.Number, seq),
 		InvoiceDate:   now,
@@ -642,7 +668,8 @@ func (s *Service) Remind(ctx context.Context, invoiceID string, opts SendOptions
 		CustomerPhone: normalizePhone(inv.Phone),
 		SendEmail:     sendEmail,
 		SendWhatsApp:  sendWhatsApp,
-		Notes:         "Pengingat pembayaran untuk invoice " + inv.Number,
+		Notes:         pengingat,
+		Terms:         syarat,
 	})
 	if err != nil {
 		return nil, gatewayError(err)

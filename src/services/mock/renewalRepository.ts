@@ -1,6 +1,7 @@
 import type { RenewalRepository } from '@/services/types'
 import type { RenewalAnswer, RenewalRequest } from '@/types'
 import { delay, nextId, nowISO, store } from './store'
+import { mockUserRepository } from './userRepository'
 
 /**
  * Konfirmasi renewal versi contoh.
@@ -42,7 +43,11 @@ export function hapusPermintaanMember(memberId: string) {
 
 export const mockRenewalRepository: RenewalRepository = {
   async list(params) {
-    let out = requests.map(isiRelasi)
+    // Server mengisi nama MC lewat join ke tabel users; mock menirunya.
+    const akun = new Map((await mockUserRepository.list()).map((u) => [u.id, u.name]))
+    let out = requests
+      .map(isiRelasi)
+      .map((r) => ({ ...r, assignedMcName: r.assignedMc ? (akun.get(r.assignedMc) ?? null) : null }))
     if (params?.answer) out = out.filter((r) => r.answer === params.answer)
     if (params?.period) out = out.filter((r) => r.period === params.period)
     // Belum dijawab lebih dulu, lalu yang jatuh temponya terdekat — sama

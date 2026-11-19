@@ -86,6 +86,8 @@ type createRequest struct {
 	Items       []item    `json:"items"`
 	Send        sendFlags `json:"send"`
 	Notes       string    `json:"notes,omitempty"`
+	// Syarat dan ketentuan, dicetak Paper.id di bagian bawah invoice.
+	TermsCondition string `json:"terms_condition,omitempty"`
 }
 
 // createResponse mirrors the real 201 body:
@@ -117,6 +119,8 @@ type CreateInput struct {
 	CustomerPhone string
 
 	Notes string
+	// Terms adalah syarat dan ketentuan. Kosong berarti tidak dikirim.
+	Terms string
 
 	SendEmail    bool
 	SendWhatsApp bool
@@ -151,8 +155,9 @@ func buildCreateRequest(in CreateInput) createRequest {
 			Quantity:    1,
 			Price:       in.Amount,
 		}},
-		Send:  sendFlags{Email: in.SendEmail, WhatsApp: in.SendWhatsApp, SMS: in.SendSMS},
-		Notes: in.Notes,
+		Send:           sendFlags{Email: in.SendEmail, WhatsApp: in.SendWhatsApp, SMS: in.SendSMS},
+		Notes:          in.Notes,
+		TermsCondition: in.Terms,
 	}
 }
 
