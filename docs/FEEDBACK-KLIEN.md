@@ -25,20 +25,22 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 
 Sumber: lembar feedback klien dan penjelasan lanjutan lewat pesan pada hari yang sama.
 
+Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.com/syabanf/bni-finance/pull/112).
+
 ### Ringkasan
 
 | No | Masukan | Status |
 | --- | --- | --- |
 | F-01 | Mengubah atau menambah keterangan produk di invoice | `sudah ada` |
 | F-02 | Mengubah atau menambah keterangan deskripsi di invoice | `sudah ada` |
-| F-03 | Detail rekening bila member ingin transfer | `dikerjakan` |
-| F-04 | Syarat dan ketentuan di invoice | `dikerjakan` |
+| F-03 | Detail rekening bila member ingin transfer | `selesai` |
+| F-04 | Syarat dan ketentuan di invoice | `selesai` |
 | F-05 | Hapus invoice yang overdue | `menunggu keputusan` |
 | F-06 | Apakah invoice mengikuti format Paper.id | `sudah ada` |
 | F-07 | Rincian pengaturan biaya per komponen | `menunggu keputusan` |
 | F-08 | Bila MC tidak menyetujui renewal, apakah memilih "dibatalkan" | `sudah ada` |
-| F-09 | Menambah periode di Konfirmasi Renewal | `dikerjakan` |
-| F-10 | Kolom Ditugaskan menampilkan ID, seharusnya nama MC | `dikerjakan` |
+| F-09 | Menambah periode di Konfirmasi Renewal | `selesai` |
+| F-10 | Kolom Ditugaskan menampilkan ID, seharusnya nama MC | `selesai` |
 
 ### Invoice
 
@@ -53,7 +55,7 @@ Perbaikan yang ikut masuk: pratinjau dan unduhan invoice di aplikasi dulu menuli
 produknya sendiri, jadi teks yang diubah admin tampil di invoice Paper.id tetapi tidak di
 salinan yang diunduh pengurus. Sekarang keduanya membaca pengaturan yang sama.
 
-**F-03. Detail rekening untuk transfer.** `dikerjakan`
+**F-03. Detail rekening untuk transfer.** `selesai`
 
 Kolom baru **Catatan invoice** di kartu yang sama. Isinya dikirim ke kolom `notes` invoice
 Paper.id dan ikut tercetak di invoice, pengingat, pratinjau, dan unduhan.
@@ -62,7 +64,7 @@ Yang perlu disampaikan ke klien: pembayaran lewat transfer langsung tidak melewa
 Paper.id, jadi invoicenya tidak lunas otomatis. Pengurus mencatatnya lewat tombol
 **Catat Pembayaran Manual** di halaman detail invoice.
 
-**F-04. Syarat dan ketentuan.** `dikerjakan`
+**F-04. Syarat dan ketentuan.** `selesai`
 
 Kolom baru **Syarat dan ketentuan** di kartu yang sama, dikirim ke kolom `terms_condition`
 invoice Paper.id. Bila dikosongkan, bagian itu tidak tampil di invoice Paper.id.
@@ -153,7 +155,7 @@ invoice yang terbentuk.
 Bila invoice renewal sudah terlanjur terbit sebelum MC menjawab Tolak, invoice itu
 dibatalkan dari halaman detailnya (lihat F-05).
 
-**F-09. Menambah periode.** `dikerjakan`
+**F-09. Menambah periode.** `selesai`
 
 Penjelasan klien: daftar periode berhenti di 2029 · Jan–Jun, dan periode sesudahnya tidak
 bisa dipilih.
@@ -162,7 +164,7 @@ Sebabnya: daftar itu hanya memuat enam semester dari semester berjalan. Sekarang
 terakhir di daftar, **Tampilkan periode berikutnya…**, menambahkan empat semester setiap
 kali dipilih, tanpa memindahkan periode yang sedang dilihat.
 
-**F-10. Kolom Ditugaskan menampilkan ID.** `dikerjakan`
+**F-10. Kolom Ditugaskan menampilkan ID.** `selesai`
 
 Kolom itu menampilkan deretan huruf dan angka, yaitu id akun MC, bila namanya tidak
 ditemukan. Halaman mencari nama itu dari daftar akun yang dimuat terpisah. Daftar itu hanya
