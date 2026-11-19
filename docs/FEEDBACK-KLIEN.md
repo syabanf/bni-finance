@@ -135,6 +135,18 @@ Yang dibuat:
 5. Invoice dikirim ke Paper.id sebagai satu baris per komponen. Pratinjau, unduhan, dan
    halaman detail invoice menampilkan baris yang sama.
 
+Diuji ke Paper.id staging pada 19 November 2026 dengan satu invoice pendaftaran. Paper.id
+menerima keempat baris, dan invoice PDF-nya menampilkan tiap baris, total yang sama dengan
+jumlah barisnya, catatan tiga baris di bagian Keterangan, dan Syarat & Ketentuan.
+
+Dua hal yang terlihat di invoice Paper.id itu dan belum diputuskan:
+
+- **Baris "Pajak" di bagian total berisi Rp 0.** VAT dikirim sebagai baris item biasa, jadi
+  kolom pajak milik Paper.id tidak terisi. Supaya VAT tampil di kolom itu, pajaknya harus
+  didaftarkan di dasbor Paper.id dan id-nya dikirim sebagai `tax_id` per baris.
+- **Deskripsi tiap baris sama.** Keempat baris memakai deskripsi produk tipe invoicenya,
+  termasuk baris VAT dan training.
+
 Tiga hal yang perlu disampaikan ke klien:
 
 - **Rincian belum aktif setelah deploy.** Kolomnya sudah terisi angka dari lembar klien,
