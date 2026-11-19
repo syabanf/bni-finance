@@ -287,7 +287,9 @@ export interface ManualPaymentInput {
 
 export interface SettingsRepository {
   getFees(): Promise<FeeSettings>
-  updateFees(input: Pick<FeeSettings, 'registrationFeeUsd' | 'renewalFeeUsd' | 'usdRate' | 'notes'>): Promise<FeeSettings>
+  updateFees(
+    input: Pick<FeeSettings, 'registrationFeeUsd' | 'renewalFeeUsd' | 'usdRate' | 'rincian' | 'notes'>,
+  ): Promise<FeeSettings>
 }
 
 export interface PaymentRepository {

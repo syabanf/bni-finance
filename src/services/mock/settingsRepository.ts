@@ -1,6 +1,6 @@
 import type { SettingsRepository } from '@/services/types'
 import { delay, nowISO, store } from './store'
-import { rupiahDari } from '@/lib/kurs'
+import { turunkanBiaya } from '@/lib/rincianBiaya'
 
 export const mockSettingsRepository: SettingsRepository = {
   async getFees() {
@@ -8,16 +8,14 @@ export const mockSettingsRepository: SettingsRepository = {
   },
 
   async updateFees(input) {
-    // Meniru server: Rupiah diturunkan dari USD × kurs, bukan diterima dari
-    // klien. Mock yang menerima Rupiah apa adanya akan membuat demo terlihat
-    // benar sementara produksi menghitung angka lain.
+    // Meniru server: harga diturunkan dari USD × kurs, atau dari rincian bila
+    // aktif, bukan diterima dari klien. Mock yang menerima Rupiah apa adanya
+    // akan membuat demo terlihat benar sementara produksi menghitung angka lain.
     store.feeSettings = {
       ...store.feeSettings,
-      registrationFeeUsd: input.registrationFeeUsd,
-      renewalFeeUsd: input.renewalFeeUsd,
       usdRate: input.usdRate,
-      registrationFee: rupiahDari(input.registrationFeeUsd, input.usdRate),
-      renewalFee: rupiahDari(input.renewalFeeUsd, input.usdRate),
+      rincian: input.rincian,
+      ...turunkanBiaya(input),
       notes: input.notes,
       updatedBy: 'admin-national',
       updatedAt: nowISO(),

@@ -37,6 +37,10 @@ type Sendable struct {
 
 	// ReminderCount menentukan sufiks nomor pengingat berikutnya.
 	ReminderCount int
+
+	// Rincian adalah komponen harga yang tersimpan bersama invoice. Kosong
+	// berarti invoice dikirim sebagai satu baris.
+	Rincian []domain.BarisBiaya
 }
 
 // GetSendable loads the invoice + member for the send path.
@@ -44,14 +48,14 @@ func (r *Repository) GetSendable(ctx context.Context, invoiceID string) (*Sendab
 	const q = `
 		SELECT i.id, i.number, i.amount, i.type, i.status, i.due_date,
 		       m.id, m.name, coalesce(m.email,''), coalesce(m.phone,''),
-		       i.paper_id_reminder_count
+		       i.paper_id_reminder_count, i.rincian
 		FROM invoices i JOIN members m ON m.id = i.member_id
 		WHERE i.id = $1`
 
 	var s Sendable
 	err := r.db.QueryRow(ctx, q, invoiceID).Scan(
 		&s.ID, &s.Number, &s.Amount, &s.Type, &s.Status, &s.DueDate,
-		&s.MemberID, &s.Name, &s.Email, &s.Phone, &s.ReminderCount,
+		&s.MemberID, &s.Name, &s.Email, &s.Phone, &s.ReminderCount, &s.Rincian,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -235,7 +239,7 @@ const invoiceColumns = `
 	payment_provider, xendit_external_id, xendit_payment_id, xendit_payment_method,
 	xendit_va_bank, xendit_va_number, xendit_qris_string, xendit_payment_status, xendit_expires_at,
 	paid_at, paid_amount, notes, created_by, cancelled_by, cancelled_at, cancel_reason,
-	created_at, updated_at`
+	created_at, updated_at, rincian`
 
 type scannable interface{ Scan(dest ...any) error }
 
@@ -250,7 +254,7 @@ func scanInvoice(row scannable) (*domain.Invoice, error) {
 		&inv.PaymentProvider, &inv.XenditExternalID, &inv.XenditPaymentID, &inv.XenditPaymentMethod,
 		&inv.XenditVaBank, &inv.XenditVaNumber, &inv.XenditQrisString, &inv.XenditPaymentStatus, &inv.XenditExpiresAt,
 		&inv.PaidAt, &inv.PaidAmount, &inv.Notes, &inv.CreatedBy, &inv.CancelledBy, &inv.CancelledAt, &inv.CancelReason,
-		&inv.CreatedAt, &inv.UpdatedAt,
+		&inv.CreatedAt, &inv.UpdatedAt, &inv.Rincian,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("scan invoice: %w", err)

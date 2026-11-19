@@ -11,6 +11,7 @@
  */
 
 import { store, nowISO } from './store'
+import { turunkanBiaya } from '@/lib/rincianBiaya'
 import { getMockAppSetting, setMockAppSetting } from './appSettings'
 import { clearMockCalls, listMockCalls, recordMockCall } from './blackboxService'
 import type { Invoice, Payment } from '@/types'
@@ -514,9 +515,8 @@ export async function mockApiFetch(
       }
       const next = { ...store.feeSettings, ...b, updatedAt: nowISO() } as typeof store.feeSettings
       // Meniru server: USD atau kurs yang berubah menurunkan ulang Rupiah.
-      if ('registrationFeeUsd' in b || 'renewalFeeUsd' in b || 'usdRate' in b) {
-        next.registrationFee = Math.round(next.registrationFeeUsd * next.usdRate)
-        next.renewalFee = Math.round(next.renewalFeeUsd * next.usdRate)
+      if ('registrationFeeUsd' in b || 'renewalFeeUsd' in b || 'usdRate' in b || 'rincian' in b) {
+        Object.assign(next, turunkanBiaya(next))
       }
       return ok(next)
     }

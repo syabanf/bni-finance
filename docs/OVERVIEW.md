@@ -388,6 +388,24 @@ membingungkan saat mengira integrasinya rusak.
 dikonfirmasi hanya berarti permintaannya diterima. Kalau pesan tidak masuk, tunjukkan
 rekaman Blackbox ke Paper.id.
 
+### Harga bisa dirinci per komponen
+
+`fee_settings` menyimpan dua bentuk harga. Bawaannya satu harga Dollar per tipe invoice,
+dikalikan kurs. Bila `rincian_aktif` menyala, harga diturunkan dari komponen: Registration
+Fee, Membership Fee, VAT, dan Online Training.
+
+- Rincian baru berlaku saat admin menyimpannya dari Pengaturan. Kolomnya ditambahkan
+  dengan `rincian_aktif = false`, supaya sebuah deploy tidak mengubah harga.
+- Harga per tipe adalah **jumlah baris** yang sudah dibulatkan ke rupiah, bukan total
+  Dollar dikalikan kurs. Keduanya bisa berbeda beberapa rupiah.
+- Tiap invoice menyimpan rinciannya di kolom `invoices.rincian` saat dibuat, dan hanya bila
+  nominalnya sama dengan harga berlaku. Invoice itu dikirim ke Paper.id satu baris per
+  komponen.
+
+Hitungannya ada di `backend/internal/domain/rincian.go`, dengan cermin di
+`src/lib/rincianBiaya.ts` untuk pratinjau di halaman Pengaturan dan mode Data Contoh.
+Keduanya harus membulatkan dengan cara yang sama.
+
 ### Laporan dihitung dari dua view
 
 Halaman Laporan membaca `GET /api/v1/reports/summary` dan `/reports/detail`. Keduanya

@@ -71,6 +71,9 @@ export function renderInvoiceBody(inv: InvoiceWithRelations, teks: TeksInvoice =
   const pendaftaran = inv.type === 'registration'
   const produk = pendaftaran ? teks.produkPendaftaran : teks.produkRenewal
   const deskripsi = pendaftaran ? teks.deskripsiPendaftaran : teks.deskripsiRenewal
+  // Satu baris per komponen bila invoice menyimpan rinciannya, sama dengan
+  // baris yang dikirim ke Paper.id. Tanpa rincian, satu baris berisi total.
+  const baris = inv.rincian?.length ? inv.rincian : [{ kode: 'total', nama: produk, jumlah: inv.amount }]
 
   const terbayar = inv.status === 'paid' ? inv.amount : 0
   const sisa = Math.max(0, inv.amount - terbayar)
@@ -177,15 +180,19 @@ export function renderInvoiceBody(inv: InvoiceWithRelations, teks: TeksInvoice =
           </tr>
         </thead>
         <tbody>
-          <tr>
-            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;vertical-align:top;">${esc(produk)}</td>
+          ${baris
+            .map(
+              (b) => `<tr>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;vertical-align:top;">${esc(b.nama)}</td>
             <td style="padding:13px 10px;border-bottom:1px solid #eceff2;vertical-align:top;">${esc(deskripsi)}</td>
             <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:center;">1</td>
-            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:right;white-space:nowrap;">${esc(formatCurrency(inv.amount))}</td>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:right;white-space:nowrap;">${esc(formatCurrency(b.jumlah))}</td>
             <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:center;">0%</td>
             <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:center;">-</td>
-            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:right;white-space:nowrap;">${esc(formatCurrency(inv.amount))}</td>
-          </tr>
+            <td style="padding:13px 10px;border-bottom:1px solid #eceff2;text-align:right;white-space:nowrap;">${esc(formatCurrency(b.jumlah))}</td>
+          </tr>`,
+            )
+            .join('')}
         </tbody>
       </table>
       </div>

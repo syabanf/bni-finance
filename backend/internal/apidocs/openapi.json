@@ -5018,6 +5018,14 @@
             "type": "string",
             "format": "date-time"
           },
+          "rincian": {
+            "title": "Rincian Harga",
+            "description": "Komponen harga yang berlaku saat invoice dibuat. Jumlahnya selalu sama dengan `amount`. Tidak ada bila invoice satu baris: dibuat sebelum rincian aktif, atau nominalnya diketik sendiri.\n",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BarisBiaya"
+            }
+          },
           "paymentProvider": {
             "type": "string",
             "example": "xendit"
@@ -5741,6 +5749,67 @@
           }
         }
       },
+      "RincianBiaya": {
+        "type": "object",
+        "description": "Harga dipecah menjadi komponennya.\n\n- Pendaftaran: Registration Fee + Membership Fee + VAT + Online Training\n- Renewal: Membership Fee + VAT\n\nVAT dihitung dari komponen Dollar sebelum pajak, dibulatkan ke sen,\nlalu dikalikan kurs. Tiap baris dibulatkan ke rupiah, dan harga per\ntipe adalah jumlah baris-barisnya. Biaya training dalam Rupiah dan\ntidak kena VAT.\n",
+        "properties": {
+          "aktif": {
+            "title": "Rincian Aktif",
+            "type": "boolean",
+            "description": "`false` berarti harga dihitung dari satu harga Dollar per tipe. Bawaannya `false`: rincian baru berlaku saat admin menyimpannya.\n"
+          },
+          "pendaftaranUsd": {
+            "title": "Registration Fee (USD)",
+            "type": "number",
+            "minimum": 0,
+            "example": 180
+          },
+          "keanggotaanUsd": {
+            "title": "Membership Fee (USD)",
+            "type": "number",
+            "minimum": 0,
+            "example": 648.83
+          },
+          "ppnPersen": {
+            "title": "VAT (%)",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "example": 11
+          },
+          "training": {
+            "title": "Online Training (Rupiah)",
+            "type": "integer",
+            "minimum": 0,
+            "example": 500000
+          }
+        }
+      },
+      "BarisBiaya": {
+        "type": "object",
+        "properties": {
+          "kode": {
+            "title": "Kode Komponen",
+            "type": "string",
+            "enum": [
+              "registration",
+              "membership",
+              "vat",
+              "training"
+            ]
+          },
+          "nama": {
+            "title": "Nama Baris",
+            "type": "string",
+            "example": "Membership Fee"
+          },
+          "jumlah": {
+            "title": "Jumlah (Rupiah)",
+            "type": "integer",
+            "example": 10381280
+          }
+        }
+      },
       "FeeSettings": {
         "type": "object",
         "required": [
@@ -5789,6 +5858,9 @@
             "description": "Rupiah per satu dolar",
             "diisi manual.": null
           },
+          "rincian": {
+            "$ref": "#/components/schemas/RincianBiaya"
+          },
           "notes": {
             "title": "Catatan",
             "type": "string"
@@ -5835,6 +5907,14 @@
             "title": "Kurs USD ke IDR",
             "type": "integer",
             "minimum": 1
+          },
+          "rincian": {
+            "description": "Rincian harga per komponen. Mengirimnya dengan `aktif: true` membuat kedua harga Dollar dan kedua harga Rupiah diturunkan dari komponen, dan harga Dollar yang dikirim bersama permintaan ini ditimpa.\n",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RincianBiaya"
+              }
+            ]
           },
           "currency": {
             "title": "Mata Uang",

@@ -112,6 +112,10 @@ type CreateInput struct {
 	Amount      int64
 	ItemName    string
 	ItemDesc    string
+	// Items menggantikan satu baris ItemName/Amount bila diisi: satu baris per
+	// komponen harga. Jumlahnya harus sama dengan Amount; pemanggil yang
+	// menjaganya.
+	Items []ItemInput
 
 	CustomerID    string
 	CustomerName  string
@@ -127,6 +131,13 @@ type CreateInput struct {
 	SendSMS      bool
 }
 
+// ItemInput adalah satu baris invoice.
+type ItemInput struct {
+	Name  string
+	Desc  string
+	Price int64
+}
+
 // CreateResult is the useful part of the response.
 type CreateResult struct {
 	PaperInvoiceID string // data.id
@@ -139,6 +150,13 @@ type CreateResult struct {
 // receives. Shared with the test console, so what the console displays is
 // byte-for-byte what a real send would transmit — not a lookalike.
 func buildCreateRequest(in CreateInput) createRequest {
+	items := []item{{Name: in.ItemName, Description: in.ItemDesc, Quantity: 1, Price: in.Amount}}
+	if len(in.Items) > 0 {
+		items = make([]item, len(in.Items))
+		for i, it := range in.Items {
+			items[i] = item{Name: it.Name, Description: it.Desc, Quantity: 1, Price: it.Price}
+		}
+	}
 	return createRequest{
 		InvoiceDate: in.InvoiceDate.Format(dateLayout),
 		DueDate:     in.DueDate.Format(dateLayout),
@@ -149,12 +167,7 @@ func buildCreateRequest(in CreateInput) createRequest {
 			Email: in.CustomerEmail,
 			Phone: in.CustomerPhone,
 		},
-		Items: []item{{
-			Name:        in.ItemName,
-			Description: in.ItemDesc,
-			Quantity:    1,
-			Price:       in.Amount,
-		}},
+		Items:          items,
 		Send:           sendFlags{Email: in.SendEmail, WhatsApp: in.SendWhatsApp, SMS: in.SendSMS},
 		Notes:          in.Notes,
 		TermsCondition: in.Terms,

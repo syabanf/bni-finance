@@ -167,6 +167,9 @@ export const seedFeeSettings: FeeSettings = {
   registrationFeeUsd: 1125,
   renewalFeeUsd: 793.75,
   usdRate: 16_000,
+  // Sama dengan nilai bawaan kolom di db/init.sql: terisi dari lembar klien,
+  // tetapi belum aktif sampai admin menyimpannya.
+  rincian: { aktif: false, pendaftaranUsd: 180, keanggotaanUsd: 648.83, ppnPersen: 11, training: 500_000 },
   notes: 'Biaya pendaftaran berlaku untuk visitor yang resmi bergabung. Renewal dibayar tahunan.',
   updatedBy: 'admin-national',
   updatedAt: '2026-01-05T03:00:00Z',

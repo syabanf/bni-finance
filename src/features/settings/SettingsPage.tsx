@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Save, UserPlus, RefreshCw, Info, Clock } from 'lucide-react'
-import type { FeeSettings } from '@/types'
+import type { FeeSettings, RincianBiaya } from '@/types'
 import {
   Button,
   Card,
@@ -16,10 +16,11 @@ import {
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
 import { settingsService } from '@/services'
-import { rupiahDari } from '@/lib/kurs'
+import { turunkanBiaya } from '@/lib/rincianBiaya'
 import { getAppSetting, setAppSetting } from '@/services/appSettings'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { PaperProdukCard } from './components/PaperProdukCard'
+import { RincianBiayaSection } from './components/RincianBiayaSection'
 import { ReminderCard } from './components/ReminderCard'
 
 
@@ -33,6 +34,9 @@ interface KursKMK {
   diterapkan: boolean
 }
 
+const RINCIAN_KOSONG: RincianBiaya = { aktif: false, pendaftaranUsd: 0, keanggotaanUsd: 0, ppnPersen: 0, training: 0 }
+const NAMA_RINCIAN = Object.keys(RINCIAN_KOSONG) as (keyof RincianBiaya)[]
+
 export function SettingsPage() {
   const { toast } = useToast()
   const { data: fees, loading, reload } = useAsync<FeeSettings>(() => settingsService.getFees())
@@ -40,12 +44,14 @@ export function SettingsPage() {
   const [registrationFeeUsd, setRegistrationFeeUsd] = useState(0)
   const [renewalFeeUsd, setRenewalFeeUsd] = useState(0)
   const [usdRate, setUsdRate] = useState(0)
+  const [rincian, setRincian] = useState<RincianBiaya>(RINCIAN_KOSONG)
   const [notes, setNotes] = useState('')
-  // Rupiah yang AKAN disimpan, dihitung dengan aturan yang sama seperti server.
+  // Harga yang AKAN disimpan, dihitung dengan aturan yang sama seperti server.
   // Ditampilkan sebelum Simpan ditekan, supaya akibat dari angka yang baru
-  // diketik terlihat lebih dulu.
-  const registrationFee = rupiahDari(registrationFeeUsd, usdRate)
-  const renewalFee = rupiahDari(renewalFeeUsd, usdRate)
+  // diketik terlihat lebih dulu. Dengan rincian aktif, harga Dollar per tipe
+  // ikut diturunkan dari komponennya.
+  const harga = turunkanBiaya({ registrationFeeUsd, renewalFeeUsd, usdRate, rincian })
+  const { registrationFee, renewalFee } = harga
   const [saving, setSaving] = useState(false)
 
   // Invoice timing
@@ -103,6 +109,7 @@ export function SettingsPage() {
       setRegistrationFeeUsd(fees.registrationFeeUsd)
       setRenewalFeeUsd(fees.renewalFeeUsd)
       setUsdRate(fees.usdRate)
+      setRincian(fees.rincian)
       setNotes(fees.notes ?? '')
     }
   }, [fees])
@@ -112,15 +119,17 @@ export function SettingsPage() {
     (registrationFeeUsd !== fees.registrationFeeUsd ||
       renewalFeeUsd !== fees.renewalFeeUsd ||
       usdRate !== fees.usdRate ||
+      NAMA_RINCIAN.some((n) => rincian[n] !== fees.rincian[n]) ||
       notes !== (fees.notes ?? ''))
 
   const handleSave = async () => {
     setSaving(true)
     try {
       await settingsService.updateFees({
-        registrationFeeUsd,
-        renewalFeeUsd,
+        registrationFeeUsd: harga.registrationFeeUsd,
+        renewalFeeUsd: harga.renewalFeeUsd,
         usdRate,
+        rincian,
         notes: notes.trim() || undefined,
       })
       toast('Pengaturan biaya berhasil disimpan.')
@@ -151,19 +160,48 @@ export function SettingsPage() {
                   icon={<UserPlus className="h-5 w-5" />}
                   label="Biaya Pendaftaran"
                   hint="Visitor → Member (berlaku 1 tahun)"
-                  usd={registrationFeeUsd}
+                  usd={harga.registrationFeeUsd}
                   onChange={setRegistrationFeeUsd}
                   rupiah={registrationFee}
+                  dariRincian={rincian.aktif}
                 />
                 <FeeInput
                   icon={<RefreshCw className="h-5 w-5" />}
                   label="Biaya Renewal"
                   hint="Perpanjangan tahunan member"
-                  usd={renewalFeeUsd}
+                  usd={harga.renewalFeeUsd}
                   onChange={setRenewalFeeUsd}
                   rupiah={renewalFee}
+                  dariRincian={rincian.aktif}
                 />
               </div>
+
+              <RincianBiayaSection rincian={rincian} onChange={setRincian} kurs={usdRate} />
+
+              {/* Menyimpan rincian mengubah harga yang ditagihkan. Selisihnya
+                  disebut sebelum Simpan ditekan, bukan ditemukan belakangan di
+                  invoice member. */}
+              {(registrationFee !== fees.registrationFee || renewalFee !== fees.renewalFee) && (
+                <div
+                  data-testid="harga-berubah"
+                  className="rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800"
+                >
+                  <div className="font-semibold">Menyimpan akan mengubah harga yang ditagihkan:</div>
+                  {registrationFee !== fees.registrationFee && (
+                    <div>
+                      Pendaftaran {formatCurrency(fees.registrationFee)} menjadi {formatCurrency(registrationFee)}
+                    </div>
+                  )}
+                  {renewalFee !== fees.renewalFee && (
+                    <div>
+                      Renewal {formatCurrency(fees.renewalFee)} menjadi {formatCurrency(renewalFee)}
+                    </div>
+                  )}
+                  <div className="mt-1">
+                    Berlaku untuk invoice yang dibuat setelah disimpan. Invoice yang sudah ada tidak berubah.
+                  </div>
+                </div>
+              )}
 
               {/* Satu kurs untuk kedua harga. Mengubahnya mengubah kedua
                   Rupiah sekaligus, dan itu memang maksudnya: BNI menetapkan
@@ -320,6 +358,7 @@ function FeeInput({
   usd,
   onChange,
   rupiah,
+  dariRincian,
 }: {
   icon: React.ReactNode
   label: string
@@ -327,6 +366,8 @@ function FeeInput({
   usd: number
   onChange: (v: number) => void
   rupiah: number
+  /** Harganya diturunkan dari rincian komponen, jadi tidak diketik di sini. */
+  dariRincian: boolean
 }) {
   return (
     <div className="rounded-xl border border-ink-200 p-4">
@@ -355,9 +396,11 @@ function FeeInput({
           step="0.01"
           value={usd}
           onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))}
+          disabled={dariRincian}
           className="pl-8 text-base font-semibold"
         />
       </div>
+      {dariRincian && <div className="mt-1 text-xs text-ink-400">Dihitung dari rincian komponen.</div>}
       <div className="mt-2 text-sm text-ink-600">
         = <span className="font-semibold text-ink-900">{formatCurrency(rupiah)}</span>
       </div>

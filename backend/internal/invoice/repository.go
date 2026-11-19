@@ -2,6 +2,7 @@ package invoice
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -24,7 +25,7 @@ const columns = `
 	payment_provider, xendit_external_id, xendit_payment_id, xendit_payment_method,
 	xendit_va_bank, xendit_va_number, xendit_qris_string, xendit_payment_status, xendit_expires_at,
 	paid_at, paid_amount, notes, created_by, cancelled_by, cancelled_at, cancel_reason,
-	created_at, updated_at`
+	created_at, updated_at, rincian`
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -84,7 +85,7 @@ func scan(row scannable) (*domain.Invoice, error) {
 		&inv.PaymentProvider, &inv.XenditExternalID, &inv.XenditPaymentID, &inv.XenditPaymentMethod,
 		&inv.XenditVaBank, &inv.XenditVaNumber, &inv.XenditQrisString, &inv.XenditPaymentStatus, &inv.XenditExpiresAt,
 		&inv.PaidAt, &inv.PaidAmount, &inv.Notes, &inv.CreatedBy, &inv.CancelledBy, &inv.CancelledAt, &inv.CancelReason,
-		&inv.CreatedAt, &inv.UpdatedAt,
+		&inv.CreatedAt, &inv.UpdatedAt, &inv.Rincian,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -223,6 +224,40 @@ func (r *Repository) TandaiOverdue(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("tandai overdue: %w", err)
 	}
 	return int(tag.RowsAffected()), nil
+}
+
+// rincianUntuk mengembalikan rincian harga yang disimpan bersama invoice,
+// sebagai JSON, atau nil bila invoicenya satu baris.
+//
+// Rincian hanya disimpan bila pengaturan rincian aktif DAN nominal invoice
+// sama dengan harga yang berlaku untuk tipenya. Nominal yang diketik sendiri
+// tidak punya rincian yang sah: memaksakan baris pengaturan ke nominal lain
+// menghasilkan invoice yang barisnya tidak berjumlah sama dengan totalnya.
+//
+// Dibaca di dalam transaksi pembuatnya, supaya harga yang dicocokkan adalah
+// harga pada saat invoice itu ditulis.
+func rincianUntuk(ctx context.Context, tx pgx.Tx, t domain.InvoiceType, amount int64) ([]byte, error) {
+	var r domain.RincianBiaya
+	var kurs int64
+	err := tx.QueryRow(ctx, `
+		SELECT usd_rate, rincian_aktif, komponen_pendaftaran_usd, komponen_keanggotaan_usd,
+		       ppn_persen, biaya_training
+		FROM fee_settings WHERE id = 'default'`).Scan(
+		&kurs, &r.Aktif, &r.PendaftaranUSD, &r.KeanggotaanUSD, &r.PPNPersen, &r.Training)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("baca rincian biaya: %w", err)
+	}
+	if !r.Aktif {
+		return nil, nil
+	}
+	baris := r.Baris(t, kurs)
+	if len(baris) == 0 || domain.JumlahBaris(baris) != amount {
+		return nil, nil
+	}
+	return json.Marshal(baris)
 }
 
 // List returns a filtered page plus the total row count for that filter.
@@ -381,15 +416,20 @@ func (r *Repository) Create(ctx context.Context, in domain.CreateInvoiceInput, n
 		}
 	}
 
+	rincian, err := rincianUntuk(ctx, tx, in.Type, in.Amount)
+	if err != nil {
+		return nil, err
+	}
+
 	const q = `
 		INSERT INTO invoices (number, member_id, chapter_id, type, amount, currency,
-		                      due_date, period_start, period_end, status, notes, created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10,$11)
+		                      due_date, period_start, period_end, status, notes, created_by, rincian)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10,$11,$12)
 		RETURNING ` + columns
 
 	inv, err := scan(tx.QueryRow(ctx, q,
 		number, in.MemberID, in.ChapterID, in.Type, in.Amount, currency,
-		in.DueDate.Time, in.PeriodStart.Time, in.PeriodEnd.Time, in.Notes, in.CreatedBy,
+		in.DueDate.Time, in.PeriodStart.Time, in.PeriodEnd.Time, in.Notes, in.CreatedBy, rincian,
 	))
 	if err != nil {
 		return nil, err
@@ -446,6 +486,12 @@ func (r *Repository) Update(ctx context.Context, id string, in domain.UpdateInvo
 	}
 
 	if in.Amount != nil {
+		// Nominal baru, rincian baru: baris lama tidak lagi berjumlah sama.
+		rincian, err := rincianUntuk(ctx, tx, lama.Type, *in.Amount)
+		if err != nil {
+			return nil, err
+		}
+		set("rincian", rincian)
 		set("amount", *in.Amount)
 	}
 	if in.DueDate != nil {
