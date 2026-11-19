@@ -1,5 +1,6 @@
 import type { InvoiceWithRelations } from '@/types'
 import { renderInvoiceBody } from '../lib/invoiceDocument'
+import { useTeksInvoice } from '../lib/teksInvoice'
 
 interface Props {
   invoice: InvoiceWithRelations
@@ -7,10 +8,11 @@ interface Props {
 
 /** On-screen invoice preview — shares the exact markup used for the PDF document. */
 export function InvoicePreview({ invoice }: Props) {
+  const teks = useTeksInvoice()
   return (
     <div
       className="invoice-preview"
-      dangerouslySetInnerHTML={{ __html: renderInvoiceBody(invoice) }}
+      dangerouslySetInnerHTML={{ __html: renderInvoiceBody(invoice, teks) }}
     />
   )
 }

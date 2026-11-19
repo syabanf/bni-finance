@@ -479,6 +479,7 @@ Halaman `/docs`, `/openapi.yaml`, dan `/openapi.json` dilayani backend, bukan Ve
 | [`backend/README.md`](../backend/README.md) | ✅ berlaku | Endpoint, aturan bisnis, keamanan, performa, hasil stress test |
 | [`db/init.sql`](../db/init.sql) | ✅ berlaku | Skema database — sumber kebenaran |
 | `/docs` di backend | ✅ berlaku | Referensi API, dibangkitkan dari `openapi.yaml` |
+| [`docs/FEEDBACK-KLIEN.md`](./FEEDBACK-KLIEN.md) | ✅ berlaku | Masukan klien per putaran: jawaban, status, dan keputusan yang masih ditunggu |
 | [`docs/SYSTEM-PLAN.md`](./SYSTEM-PLAN.md) | 📜 historis | Rencana teknis awal |
 | [`docs/BACKLOG.md`](./BACKLOG.md) · [`docs/epics/`](./epics) · [`docs/features/`](./features) | 📜 historis | User story & acceptance criteria per fitur. `EPIC-001` dan `11-public-payment` menggambarkan pembayaran mandiri Xendit yang sudah dihapus. |
 | [`docs/AGENTIC-WORKFLOW.md`](./AGENTIC-WORKFLOW.md) · [`AGENTS.md`](../AGENTS.md) | ✅ berlaku | Cara kerja agen pada repo ini |

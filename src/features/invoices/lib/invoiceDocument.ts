@@ -1,6 +1,7 @@
 import type { InvoiceWithRelations } from '@/types'
 import { formatCurrency, formatDate } from '@/lib/format'
 import { INVOICE_STATUS_LABEL } from '@/lib/status'
+import { TEKS_BAWAAN, muatTeksInvoice, type TeksInvoice } from './teksInvoice'
 
 /**
  * Invoice, dibuat menyerupai dokumen yang diterbitkan Paper.id.
@@ -65,14 +66,11 @@ function barisTotal(label: string, nilai: string, tebal = false): string {
 }
 
 /** Markup bagian dalam invoice (tanpa pembungkus <html>/<body>). */
-export function renderInvoiceBody(inv: InvoiceWithRelations): string {
+export function renderInvoiceBody(inv: InvoiceWithRelations, teks: TeksInvoice = TEKS_BAWAAN): string {
   const m = inv.member
-  const produk =
-    inv.type === 'registration' ? 'Pendaftaran Keanggotaan Business Network International' : 'Perpanjangan Keanggotaan Business Network International'
-  const deskripsi =
-    inv.type === 'registration'
-      ? 'Pendaftaran anggota baru'
-      : 'Perpanjangan keanggotaan tahunan'
+  const pendaftaran = inv.type === 'registration'
+  const produk = pendaftaran ? teks.produkPendaftaran : teks.produkRenewal
+  const deskripsi = pendaftaran ? teks.deskripsiPendaftaran : teks.deskripsiRenewal
 
   const terbayar = inv.status === 'paid' ? inv.amount : 0
   const sisa = Math.max(0, inv.amount - terbayar)
@@ -205,21 +203,24 @@ export function renderInvoiceBody(inv: InvoiceWithRelations): string {
 
       <div style="margin-top:34px;">
         <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Keterangan</h2>
-        <p style="margin:0 0 20px;color:${MUTED};">
+        <p style="margin:0 0 ${teks.catatan ? '8px' : '20px'};color:${MUTED};">
           Periode keanggotaan ${esc(formatDate(inv.periodStart))} – ${esc(formatDate(inv.periodEnd))}.
         </p>
+        ${teks.catatan ? `<p style="margin:0 0 20px;color:${MUTED};white-space:pre-line;">${esc(teks.catatan)}</p>` : ''}
         <h2 style="font-size:14px;font-weight:700;margin:0 0 8px;padding-bottom:7px;border-bottom:1px solid ${LINE};">Syarat dan Ketentuan</h2>
-        <p style="margin:0;color:${MUTED};">
-          Pembayaran dilakukan melalui tautan Paper.id yang dikirim ke email member.
-          Invoice ini diterbitkan otomatis oleh sistem dan sah tanpa tanda tangan.
-        </p>
+        <p style="margin:0;color:${MUTED};white-space:pre-line;">${
+          teks.syarat
+            ? esc(teks.syarat)
+            : `Pembayaran dilakukan melalui tautan Paper.id yang dikirim ke email member.
+          Invoice ini diterbitkan otomatis oleh sistem dan sah tanpa tanda tangan.`
+        }</p>
       </div>
     </div>
   </div>`
 }
 
 /** Dokumen HTML utuh untuk jendela cetak / Simpan sebagai PDF. */
-export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
+export function buildInvoiceDocument(inv: InvoiceWithRelations, teks: TeksInvoice = TEKS_BAWAAN): string {
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -235,20 +236,26 @@ export function buildInvoiceDocument(inv: InvoiceWithRelations): string {
     }
   </style>
 </head>
-<body>${renderInvoiceBody(inv)}</body>
+<body>${renderInvoiceBody(inv, teks)}</body>
 </html>`
 }
 
-/** Membuka invoice di jendela baru lalu memanggil dialog cetak. */
+/**
+ * Membuka invoice di jendela baru lalu memanggil dialog cetak.
+ *
+ * Jendelanya dibuka LEBIH DULU, sebelum teks pengaturan selesai dimuat.
+ * Peramban hanya mengizinkan window.open di dalam penanganan klik; membukanya
+ * setelah menunggu jaringan membuatnya diblokir sebagai popup.
+ */
 export function downloadInvoice(inv: InvoiceWithRelations): boolean {
   const win = window.open('', '_blank', 'width=900,height=1000')
   if (!win) return false
-  win.document.open()
-  win.document.write(buildInvoiceDocument(inv))
-  win.document.close()
-  win.focus()
-  const trigger = () => win.print()
-  if (win.document.readyState === 'complete') setTimeout(trigger, 400)
-  else win.onload = () => setTimeout(trigger, 300)
+  void muatTeksInvoice().then((teks) => {
+    win.document.open()
+    win.document.write(buildInvoiceDocument(inv, teks))
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 400)
+  })
   return true
 }

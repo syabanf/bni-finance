@@ -63,6 +63,10 @@ type RenewalRequest struct {
 	MemberName  *string `json:"memberName,omitempty"`
 	ChapterName *string `json:"chapterName,omitempty"`
 	RenewalDate *Date   `json:"renewalDate,omitempty"`
+	// AssignedMCName adalah nama akun MC yang ditugaskan. Diisi server karena
+	// daftar akun hanya bisa dibaca admin: ST dan MC yang membuka halaman ini
+	// tidak punya cara lain mengubah id itu menjadi nama.
+	AssignedMCName *string `json:"assignedMcName,omitempty"`
 }
 
 // CreateRenewalRequestInput adalah permintaan ST untuk sekumpulan member.

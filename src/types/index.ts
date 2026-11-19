@@ -478,6 +478,8 @@ export interface RenewalRequest {
   requestedBy: string | null
   requestedAt: string
   assignedMc: string | null
+  /** Nama akun MC yang ditugaskan, diisi server. */
+  assignedMcName?: string | null
   answer: RenewalAnswer
   answeredBy: string | null
   answeredAt: string | null

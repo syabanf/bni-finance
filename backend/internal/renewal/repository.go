@@ -20,12 +20,13 @@ const columns = `
 	r.requested_by, r.requested_at, r.assigned_mc,
 	r.answer, r.answered_by, r.answered_at, r.note,
 	r.created_at, r.updated_at,
-	m.name, c.display_name, m.renewal_date`
+	m.name, c.display_name, m.renewal_date, mc.name`
 
 const from = `
 	FROM renewal_requests r
 	JOIN members m  ON m.id = r.member_id
-	JOIN chapters c ON c.id = r.chapter_id`
+	JOIN chapters c ON c.id = r.chapter_id
+	LEFT JOIN users mc ON mc.id = r.assigned_mc`
 
 type Repository struct{ db *pgxpool.Pool }
 
@@ -43,7 +44,7 @@ func scan(row scannable) (*domain.RenewalRequest, error) {
 		&r.RequestedBy, &r.RequestedAt, &r.AssignedMC,
 		&r.Answer, &r.AnsweredBy, &r.AnsweredAt, &r.Note,
 		&r.CreatedAt, &r.UpdatedAt,
-		&r.MemberName, &r.ChapterName, &renewalDate,
+		&r.MemberName, &r.ChapterName, &renewalDate, &r.AssignedMCName,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

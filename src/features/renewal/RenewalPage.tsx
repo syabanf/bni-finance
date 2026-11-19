@@ -78,8 +78,8 @@ function periodeSemester(d: Date): string {
   return `${d.getFullYear()}-S${d.getMonth() < 6 ? 1 : 2}`
 }
 
-/** Enam pilihan ke depan, dimulai dari semester berjalan. */
-function pilihanPeriode(dari: Date, jumlah = 6): string[] {
+/** `jumlah` semester ke depan, dimulai dari semester berjalan. */
+function pilihanPeriode(dari: Date, jumlah: number): string[] {
   const out: string[] = []
   let tahun = dari.getFullYear()
   let sem = dari.getMonth() < 6 ? 1 : 2
@@ -97,12 +97,21 @@ const labelPeriode = (p: string) =>
 
 const periodeAwal = periodeSemester(new Date())
 
+/** Nilai pilihan dropdown yang memperpanjang daftar periode. */
+const PERIODE_BERIKUTNYA = '__berikutnya'
+/** Semester yang ditambahkan tiap kali daftarnya diperpanjang: dua tahun. */
+const TAMBAHAN_PERIODE = 4
+
 export function RenewalPage() {
   const { toast } = useToast()
   const { user } = useAuth()
   // Email ke MC menautkan ?periode=, supaya halaman membuka periode yang ditanyakan.
   const [params] = useSearchParams()
   const [period, setPeriod] = useState(params.get('periode') ?? periodeAwal)
+  // Daftar periode berangkat dari enam semester ke depan dan bisa diperpanjang
+  // dari dropdown-nya. Daftar yang berhenti di satu titik membuat renewal
+  // sesudah titik itu tidak bisa disiapkan sama sekali.
+  const [jumlahPeriode, setJumlahPeriode] = useState(6)
   const [chapterFilter, setChapterFilter] = useState('all')
   const permintaan = useAsync(() => renewalService.list({ period }), [period])
   const navigate = useNavigate()
@@ -311,18 +320,24 @@ export function RenewalPage() {
                   daftar kosong tanpa tahu kenapa. */}
               <Select
                 value={period}
-                onChange={(e) => setPeriod(e.target.value)}
+                onChange={(e) => {
+                  // Pilihan terakhir memperpanjang daftar, bukan berpindah
+                  // periode: periode yang sedang dilihat tetap terpilih.
+                  if (e.target.value === PERIODE_BERIKUTNYA) setJumlahPeriode((n) => n + TAMBAHAN_PERIODE)
+                  else setPeriod(e.target.value)
+                }}
                 aria-label="Periode"
-                className="w-44"
+                className="w-52"
               >
                 {/* Periode yang sedang dilihat selalu ada di daftar, walau ia
                     periode lama berbentuk tahun — kalau tidak, memilihnya dari
                     tautan akan menampilkan dropdown yang menunjuk hal lain. */}
-                {[...new Set([period, ...pilihanPeriode(new Date()), ...(periodeAda.data ?? [])])]
+                {[...new Set([period, ...pilihanPeriode(new Date(), jumlahPeriode), ...(periodeAda.data ?? [])])]
                   .sort()
                   .map((p) => (
                     <option key={p} value={p}>{labelPeriode(p)}</option>
                   ))}
+                <option value={PERIODE_BERIKUTNYA}>Tampilkan periode berikutnya…</option>
               </Select>
               <Select
                 value={chapterFilter}
@@ -446,7 +461,12 @@ export function RenewalPage() {
                     </Td>
                     <Td className="text-ink-600">
                       {r.assignedMc ? (
-                        namaMc.get(r.assignedMc) ?? r.assignedMc
+                        // Nama dari server. Id akun tidak pernah ditampilkan:
+                        // deretan huruf dan angka tidak memberi tahu siapa pun
+                        // siapa yang harus menjawab.
+                        (r.assignedMcName ?? namaMc.get(r.assignedMc) ?? (
+                          <span className="text-ink-400">MC tidak dikenal</span>
+                        ))
                       ) : (
                         // Bukan sel kosong: tidak ditugaskan ke siapa pun BUKAN
                         // berarti tidak ada yang menanganinya — permintaannya
