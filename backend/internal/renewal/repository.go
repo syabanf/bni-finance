@@ -125,6 +125,18 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*domain.RenewalReq
 	return scan(r.db.QueryRow(ctx, "SELECT "+columns+from+" WHERE r.id = $1", id))
 }
 
+func (r *Repository) NamaPeriode(ctx context.Context, id string) (string, error) {
+	var nama string
+	err := r.db.QueryRow(ctx, "SELECT name FROM renewal_periods WHERE id = $1", id).Scan(&nama)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", httpx.ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("baca periode: %w", err)
+	}
+	return nama, nil
+}
+
 // Create membuat permintaan untuk sekumpulan member, dalam SATU transaksi.
 //
 // Mengembalikan jumlah yang benar-benar dibuat dan jumlah yang dilewati karena

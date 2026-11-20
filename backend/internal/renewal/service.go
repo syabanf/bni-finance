@@ -2,6 +2,7 @@ package renewal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
@@ -21,6 +22,9 @@ import (
 type Store interface {
 	List(ctx context.Context, f domain.RenewalFilter) ([]domain.RenewalRequest, int, error)
 	GetByID(ctx context.Context, id string) (*domain.RenewalRequest, error)
+	// NamaPeriode mengembalikan nama periode di master data, atau
+	// httpx.ErrNotFound bila periodenya tidak terdaftar.
+	NamaPeriode(ctx context.Context, id string) (string, error)
 	Create(ctx context.Context, memberIDs []string, period, requestedBy string, assignedMC *string) (*HasilCreate, error)
 	PenerimaMC(ctx context.Context, chapterIDs []string) ([]PenerimaMC, error)
 	Answer(ctx context.Context, id string, in domain.AnswerRenewalInput, answeredBy string) (*domain.RenewalRequest, error)
@@ -102,6 +106,13 @@ func (s *Service) Minta(ctx context.Context, in domain.CreateRenewalRequestInput
 	}
 
 	period := strings.TrimSpace(in.Period)
+	nama, err := s.repo.NamaPeriode(ctx, period)
+	if errors.Is(err, httpx.ErrNotFound) {
+		return nil, httpx.BadRequest(fmt.Sprintf("periode %q belum terdaftar, tambahkan dulu di Kelola Periode", period))
+	}
+	if err != nil {
+		return nil, err
+	}
 	h, err := s.repo.Create(ctx, dedup(in.MemberIDs), period, user.ID, in.AssignedMC)
 	if err != nil {
 		return nil, err
@@ -109,7 +120,7 @@ func (s *Service) Minta(ctx context.Context, in domain.CreateRenewalRequestInput
 	return &HasilMinta{
 		Dibuat: h.Dibuat, Dilewati: h.Dilewati, Visitor: h.Visitor,
 		Total: h.Dibuat + h.Dilewati + h.Visitor,
-		Email: s.beritahuMC(ctx, h.BelumDijawab, period, in.AssignedMC),
+		Email: s.beritahuMC(ctx, h.BelumDijawab, period, nama, in.AssignedMC),
 	}, nil
 }
 
@@ -118,7 +129,7 @@ func (s *Service) Minta(ctx context.Context, in domain.CreateRenewalRequestInput
 // Tiap chapter diberi tahu ke MC-nya sendiri. MC yang ditugaskan menjadi
 // satu-satunya penerima di chapternya; chapter lain dalam permintaan yang sama
 // tetap diberi tahu ke seluruh MC-nya.
-func (s *Service) beritahuMC(ctx context.Context, belumDijawab map[string]int, period string, assignedMC *string) HasilEmail {
+func (s *Service) beritahuMC(ctx context.Context, belumDijawab map[string]int, period, nama string, assignedMC *string) HasilEmail {
 	hasil := HasilEmail{ChapterTanpaMC: []string{}}
 	if len(belumDijawab) == 0 {
 		return hasil
@@ -152,7 +163,7 @@ func (s *Service) beritahuMC(ctx context.Context, belumDijawab map[string]int, p
 	ctxKirim, batal := context.WithTimeout(context.WithoutCancel(ctx), batasEmail)
 	defer batal()
 	for _, p := range penerima {
-		if err := s.surat.Kirim(ctxKirim, s.pesanMC(p, belumDijawab[p.ChapterID], period)); err != nil {
+		if err := s.surat.Kirim(ctxKirim, s.pesanMC(p, belumDijawab[p.ChapterID], period, nama)); err != nil {
 			slog.Warn("email konfirmasi renewal gagal", "chapter", p.ChapterID, "error", err)
 			hasil.Gagal++
 			continue
@@ -178,20 +189,9 @@ func saringPenerima(semua []PenerimaMC, assignedMC *string) []PenerimaMC {
 	})
 }
 
-// labelPeriode menulis "2027-S2" sebagai "Jul–Des 2027". Periode lama yang
-// berupa tahun saja dibiarkan apa adanya.
-func labelPeriode(p string) string {
-	switch {
-	case strings.HasSuffix(p, "-S1"):
-		return "Jan–Jun " + strings.TrimSuffix(p, "-S1")
-	case strings.HasSuffix(p, "-S2"):
-		return "Jul–Des " + strings.TrimSuffix(p, "-S2")
-	}
-	return p
-}
-
-func (s *Service) pesanMC(p PenerimaMC, jumlah int, period string) mailer.Pesan {
-	label := labelPeriode(period)
+// pesanMC menyusun email ke satu MC. label adalah nama periode di master data,
+// dan period adalah id-nya, yang dibawa tautan supaya halaman membuka periode itu.
+func (s *Service) pesanMC(p PenerimaMC, jumlah int, period, label string) mailer.Pesan {
 	tautan := s.baseURL + "/renewal?periode=" + url.QueryEscape(period)
 	ringkas := fmt.Sprintf("%d member %s menunggu jawaban Anda untuk periode %s.", jumlah, p.NamaChapter, label)
 	return mailer.Pesan{

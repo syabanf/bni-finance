@@ -14,7 +14,9 @@ import type {
   MemberStatus,
   ManagedUser,
   RenewalAnswer,
+  RenewalPeriod,
   RenewalRequest,
+  SimpanPeriodeInput,
   UserRole,
   AuditLogEntry,
   AuthUser,
@@ -124,6 +126,18 @@ export interface ImportOpsi {
 export interface ImportRepository {
   preview(jenis: 'chapters' | 'members', file: File, opsi?: ImportOpsi): Promise<ImportHasil>
   apply(jenis: 'chapters' | 'members', file: File, opsi?: ImportOpsi): Promise<ImportHasil>
+}
+
+/**
+ * Master data periode konfirmasi renewal. Membaca terbuka untuk semua peran,
+ * menulis hanya admin.
+ */
+export interface PeriodRepository {
+  list(): Promise<RenewalPeriod[]>
+  create(input: SimpanPeriodeInput): Promise<RenewalPeriod>
+  update(id: string, input: Partial<SimpanPeriodeInput>): Promise<RenewalPeriod>
+  /** Ditolak bila periodenya sudah punya permintaan konfirmasi. */
+  remove(id: string): Promise<void>
 }
 
 export interface RenewalRepository {

@@ -41,9 +41,9 @@ type RenewalRequest struct {
 	ID        string `json:"id"`
 	MemberID  string `json:"memberId"`
 	ChapterID string `json:"chapterId"`
-	// Period adalah TAHUN keanggotaan yang ditanyakan, bukan tanggal ST
-	// menanyakannya. Itu yang membedakan satu permintaan dari permintaan tahun
-	// berikutnya.
+	// Period adalah id periode di master data (renewal_periods), bukan tanggal
+	// ST menanyakannya. Itu yang membedakan satu permintaan dari permintaan
+	// periode berikutnya.
 	Period string `json:"period"`
 
 	RequestedBy *string   `json:"requestedBy,omitempty"`

@@ -1771,6 +1771,126 @@
       "admin": false
     },
     {
+      "id": "get:/api/v1/renewal-periods",
+      "method": "GET",
+      "path": "/api/v1/renewal-periods",
+      "tag": "Member",
+      "summary": "Daftar periode konfirmasi renewal",
+      "description": "Master data periode yang dipilih di halaman Konfirmasi Renewal. Semua\nperan boleh membaca, diurutkan dari tanggal mulai paling awal.\n\n`requestCount` menghitung permintaan konfirmasi di periode itu dalam\nlingkup chapter pemanggil. Untuk ST dan MC angkanya hanya chapternya.\n",
+      "params": [],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/renewal-periods",
+      "method": "POST",
+      "path": "/api/v1/renewal-periods",
+      "tag": "Member",
+      "summary": "Tambah periode konfirmasi renewal",
+      "description": "**Admin saja.** Server memberi id dari rentang tanggalnya: `2029-S2`\nuntuk Juli sampai Desember, `2029-S1` untuk Januari sampai Juni, `2029`\nuntuk setahun penuh, dan `20290701-20290930` untuk rentang lain. Id itu\nyang disimpan di `renewal_requests.period` dan dibawa tautan email.\n\nNama yang sudah dipakai dan rentang yang beririsan dengan periode lain\ndijawab **409**. Dua periode yang beririsan membuat satu member jatuh\ntempo di keduanya dan bisa ditanyakan dua kali.\n",
+      "params": [],
+      "body": {},
+      "bodyFields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "startDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "endDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "delete:/api/v1/renewal-periods/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/renewal-periods/{id}",
+      "tag": "Member",
+      "summary": "Hapus periode konfirmasi renewal",
+      "description": "**Admin saja.** Periode yang sudah punya permintaan konfirmasi di\nchapter mana pun dijawab **409**, karena jawaban MC di periode itu\nmenjadi dasar invoice renewal.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "patch:/api/v1/renewal-periods/{id}",
+      "method": "PATCH",
+      "path": "/api/v1/renewal-periods/{id}",
+      "tag": "Member",
+      "summary": "Ubah periode konfirmasi renewal",
+      "description": "**Admin saja.** Kolom yang tidak dikirim dibiarkan. Id tidak berubah\nwalau tanggalnya diubah, supaya permintaan dan tautan email yang sudah\nada tetap menunjuk periode yang sama. Irisan rentang hanya diperiksa\nbila tanggalnya berubah.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyFields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "startDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "endDate",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
       "id": "get:/api/v1/renewal-requests",
       "method": "GET",
       "path": "/api/v1/renewal-requests",
@@ -1839,7 +1959,7 @@
         "memberIds": [
           ""
         ],
-        "period": "2027"
+        "period": "2027-S2"
       },
       "bodyFields": [
         {
@@ -1853,7 +1973,7 @@
           "name": "period",
           "type": "string",
           "required": true,
-          "description": "",
+          "description": "Id periode yang terdaftar di /renewal-periods. Periode lain dijawab 400.",
           "complex": false
         },
         {

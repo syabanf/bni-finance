@@ -30,6 +30,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/period"
 	"github.com/syabanf/bni-finance/backend/internal/reminder"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
 	"github.com/syabanf/bni-finance/backend/internal/report"
@@ -202,6 +203,7 @@ func run(log *slog.Logger) error {
 		Importer: importer.NewService(importer.NewRepository(pool)).
 			SetelahTerapkan(chapterSvc.Kedaluwarsakan),
 		Renewal:  renewal.NewService(renewal.NewRepository(pool), surat, cfg.AppBaseURL),
+		Period:   period.NewService(period.NewRepository(pool)),
 		PaperID:  paperSvc,
 		Blackbox: recorder,
 		Metrics:  reg,

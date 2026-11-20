@@ -494,11 +494,31 @@ export interface ImportHasil {
 export type RenewalAnswer = 'pending' | 'will_renew' | 'will_not' | 'unsure'
 
 /**
+ * Periode konfirmasi renewal dari master data. Admin yang menambah, mengubah,
+ * dan menghapusnya; ST dan MC memilihnya di halaman Konfirmasi Renewal.
+ */
+export interface RenewalPeriod {
+  /** Teks yang tersimpan di RenewalRequest.period, misalnya "2029-S2". */
+  id: string
+  name: string
+  startDate: string
+  endDate: string
+  /** Permintaan konfirmasi di periode ini, dalam lingkup chapter pengguna. */
+  requestCount: number
+}
+
+export interface SimpanPeriodeInput {
+  name: string
+  startDate: string
+  endDate: string
+}
+
+/**
  * Satu permintaan konfirmasi renewal.
  *
- * ST menanyakan, MC menjawab. `period` adalah TAHUN keanggotaan yang
- * ditanyakan — bukan tanggal ST menanyakannya — karena itulah yang membedakan
- * satu permintaan dari permintaan tahun berikutnya.
+ * ST menanyakan, MC menjawab. `period` adalah id periode di master data,
+ * bukan tanggal ST menanyakannya, karena itulah yang membedakan satu
+ * permintaan dari permintaan periode berikutnya.
  */
 export interface RenewalRequest {
   id: string

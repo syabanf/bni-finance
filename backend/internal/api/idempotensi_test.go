@@ -8,6 +8,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/domain"
 	"github.com/syabanf/bni-finance/backend/internal/mailer"
+	"github.com/syabanf/bni-finance/backend/internal/testdb"
 )
 
 // suratMati memenuhi renewal.Surat tanpa pernah mengirim apa pun.
@@ -81,6 +82,7 @@ func TestIdempotensiCRUD(t *testing.T) {
 		}
 	})
 
+	testdb.Periode(t, s.pool, "2099-S1", "2099-S2")
 	t.Run("permintaan konfirmasi", func(t *testing.T) {
 		minta := `{"memberIds":["` + m.ID + `"],"period":"2099-S1"}`
 		pertama := decode[struct{ Dibuat, Dilewati int }](t, s.req(t, http.MethodPost, "/api/v1/renewal-requests", minta, http.StatusCreated))

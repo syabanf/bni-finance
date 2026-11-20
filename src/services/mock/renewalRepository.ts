@@ -2,6 +2,9 @@ import type { RenewalRepository } from '@/services/types'
 import type { RenewalAnswer, RenewalRequest } from '@/types'
 import { delay, nextId, nowISO, store } from './store'
 import { mockUserRepository } from './userRepository'
+// Kedua modul saling mengimpor. Aman karena tidak ada yang memanggil fungsi
+// modul lain saat dimuat, hanya saat repository dipakai.
+import { periodeTerdaftar } from './periodRepository'
 
 /**
  * Konfirmasi renewal versi contoh.
@@ -34,6 +37,11 @@ export function konfirmasiTerakhir(memberId: string): RenewalRequest | null {
   return milik.reduce((a, b) => (b.requestedAt > a.requestedAt ? b : a))
 }
 
+/** Jumlah permintaan di satu periode. Penjaga hapus periode memakainya. */
+export function jumlahPermintaanPeriode(period: string): number {
+  return requests.filter((r) => r.period === period).length
+}
+
 /** Dipakai hapus member: permintaannya ikut terhapus, seperti di server. */
 export function hapusPermintaanMember(memberId: string) {
   for (let i = requests.length - 1; i >= 0; i--) {
@@ -60,6 +68,10 @@ export const mockRenewalRepository: RenewalRepository = {
   },
 
   async request(memberIds, period, assignedMc) {
+    // Server menolak periode yang tidak ada di master data.
+    if (!periodeTerdaftar(period)) {
+      throw new Error(`periode "${period}" belum terdaftar, tambahkan dulu di Kelola Periode`)
+    }
     let dibuat = 0
     let dilewati = 0
     let visitor = 0

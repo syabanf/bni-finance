@@ -430,6 +430,22 @@ Dua jebakan saat mengubah skema di dekatnya:
 Mode Data Contoh menghitung angka yang sama di browser lewat
 `src/features/reports/lib/hitungLaporan.ts`. Aturannya harus tetap sama dengan kedua view.
 
+### Periode konfirmasi renewal adalah master data
+
+Periode di halaman Konfirmasi Renewal dibaca dari tabel `renewal_periods`, dan admin
+mengelolanya lewat tombol **Kelola Periode** di halaman itu (`/api/v1/renewal-periods`).
+`renewal_requests.period` menunjuk ke `renewal_periods.id` lewat foreign key.
+
+- Server memberi id dari rentang tanggal: `2029-S2`, `2029-S1`, `2029` untuk setahun,
+  dan `20290701-20290930` untuk rentang lain. Id tidak berubah walau tanggal atau nama
+  diubah, supaya tautan `?periode=` di email yang sudah terkirim tetap berlaku.
+- Nama ganda dan rentang yang beririsan ditolak. Periode yang sudah punya permintaan
+  konfirmasi tidak bisa dihapus.
+- Migrasi mengisi enam semester mulai semester berjalan bila tabelnya kosong, lalu
+  memasukkan setiap periode yang sudah dipakai permintaan lama.
+- Tes yang mencatat permintaan konfirmasi harus mendaftarkan periodenya dulu dengan
+  `testdb.Periode`.
+
 ---
 
 ## 10. Deploy

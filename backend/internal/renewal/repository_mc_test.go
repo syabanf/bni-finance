@@ -67,6 +67,7 @@ func TestDaftarMembawaNamaMC(t *testing.T) {
 	}
 
 	repo := NewRepository(pool)
+	testdb.Periode(t, pool, "2031-S1")
 	if _, err := repo.Create(ctx, []string{"mem-uji-mc-ditugaskan"}, "2031-S1", "uji", &mc); err != nil {
 		t.Fatalf("minta konfirmasi dengan MC: %v", err)
 	}

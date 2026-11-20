@@ -468,9 +468,9 @@ create index if not exists idx_users_chapter on users (chapter_id);
 -- menekan tombolnya dua kali menghasilkan dua permintaan untuk orang yang sama,
 -- dan MC melihat pekerjaan ganda yang tidak bisa ia bedakan.
 --
--- Periode disimpan sebagai teks 'YYYY' dan bukan tanggal: yang membedakan satu
--- permintaan dari permintaan berikutnya adalah TAHUN keanggotaannya, bukan
--- tanggal persis kapan ST menanyakannya.
+-- Periode berisi id baris renewal_periods. Yang membedakan satu permintaan dari
+-- permintaan berikutnya adalah periode keanggotaannya, bukan tanggal persis
+-- kapan ST menanyakannya.
 -- ---------------------------------------------------------------------------
 do $$ begin
   create type renewal_answer as enum ('pending', 'will_renew', 'will_not', 'unsure');
@@ -502,6 +502,66 @@ create index if not exists idx_renewal_chapter_answer
   on renewal_requests (chapter_id, answer);
 create index if not exists idx_renewal_assigned
   on renewal_requests (assigned_mc, answer);
+
+
+-- ---------------------------------------------------------------------------
+-- renewal_periods: master data periode konfirmasi renewal
+--
+-- Periode dulu berupa teks bebas di renewal_requests.period, dan daftar
+-- pilihannya dihitung halaman dari tanggal hari ini. Akibatnya admin tidak bisa
+-- menambah periode sesudah ujung daftar itu. Sekarang tiap periode satu baris
+-- di sini, dengan nama dan rentang tanggal yang diatur admin.
+--
+-- id-nya tetap teks yang sama dengan isi renewal_requests.period, supaya baris
+-- lama dan tautan ?periode= di email yang sudah terkirim tetap berlaku.
+-- ---------------------------------------------------------------------------
+create table if not exists renewal_periods (
+  id         text primary key,
+  name       text not null,
+  start_date date not null,
+  end_date   date not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint renewal_periods_rentang check (end_date >= start_date)
+);
+
+-- Isi awal: enam semester mulai semester berjalan, sama dengan daftar yang
+-- dulu dihitung halaman. Hanya saat tabelnya kosong, supaya periode yang
+-- dihapus admin tidak muncul lagi di deploy berikutnya.
+insert into renewal_periods (id, name, start_date, end_date)
+select to_char(d, 'YYYY') || case when extract(month from d) = 1 then '-S1' else '-S2' end,
+       to_char(d, 'YYYY') || case when extract(month from d) = 1 then ' · Jan–Jun' else ' · Jul–Des' end,
+       d::date,
+       (d + interval '6 months' - interval '1 day')::date
+from (select date_trunc('year', now()::timestamp)
+             + case when extract(month from now()) > 6 then interval '6 months' else interval '0' end as awal) s,
+     generate_series(s.awal, s.awal + interval '30 months', interval '6 months') as d
+where not exists (select 1 from renewal_periods);
+
+-- Periode yang sudah dipakai permintaan lama ikut masuk. Bentuk lama berupa
+-- tahun saja ("2027") menjadi periode setahun. Teks yang bukan keduanya
+-- memakai tahun permintaan pertamanya, dan admin bisa membetulkannya.
+insert into renewal_periods (id, name, start_date, end_date)
+select p,
+       case when p ~ '^[12][0-9]{3}-S1$' then left(p, 4) || ' · Jan–Jun'
+            when p ~ '^[12][0-9]{3}-S2$' then left(p, 4) || ' · Jul–Des'
+            else p end,
+       case when p ~ '^[12][0-9]{3}-S2$'     then make_date(left(p, 4)::int, 7, 1)
+            when p ~ '^[12][0-9]{3}(-S1)?$' then make_date(left(p, 4)::int, 1, 1)
+            else date_trunc('year', awal)::date end,
+       case when p ~ '^[12][0-9]{3}-S1$'     then make_date(left(p, 4)::int, 6, 30)
+            when p ~ '^[12][0-9]{3}(-S2)?$' then make_date(left(p, 4)::int, 12, 31)
+            else (date_trunc('year', awal) + interval '1 year' - interval '1 day')::date end
+from (select period as p, min(requested_at) as awal from renewal_requests group by period) lama
+on conflict (id) do nothing;
+
+-- Dipasang sesudah isi awal, supaya baris lama sudah punya periodenya.
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'renewal_requests_period_fkey') then
+    alter table renewal_requests add constraint renewal_requests_period_fkey
+      foreign key (period) references renewal_periods(id) on update cascade;
+  end if;
+end $$;
 
 
 -- ---------------------------------------------------------------------------
