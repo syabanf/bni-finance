@@ -26,7 +26,8 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 Sumber: lembar feedback klien dan penjelasan lanjutan lewat pesan pada hari yang sama.
 
 Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.com/syabanf/bni-finance/pull/112),
-kecuali F-07 yang masuk lewat [PR #114](https://github.com/syabanf/bni-finance/pull/114).
+kecuali F-07 yang masuk lewat [PR #114](https://github.com/syabanf/bni-finance/pull/114) dan F-09
+yang diganti lewat [PR #116](https://github.com/syabanf/bni-finance/pull/116).
 
 ### Ringkasan
 
@@ -40,7 +41,7 @@ kecuali F-07 yang masuk lewat [PR #114](https://github.com/syabanf/bni-finance/p
 | F-06 | Apakah invoice mengikuti format Paper.id | `sudah ada` |
 | F-07 | Rincian pengaturan biaya per komponen | `selesai` |
 | F-08 | Bila MC tidak menyetujui renewal, apakah memilih "dibatalkan" | `sudah ada` |
-| F-09 | Menambah periode di Konfirmasi Renewal | `dikerjakan` |
+| F-09 | Menambah periode di Konfirmasi Renewal | `selesai` |
 | F-10 | Kolom Ditugaskan menampilkan ID, seharusnya nama MC | `selesai` |
 
 ### Invoice
@@ -174,7 +175,7 @@ invoice yang terbentuk.
 Bila invoice renewal sudah terlanjur terbit sebelum MC menjawab Tolak, invoice itu
 dibatalkan dari halaman detailnya (lihat F-05).
 
-**F-09. Menambah periode.** `dikerjakan`
+**F-09. Menambah periode.** `selesai`
 
 Penjelasan klien: daftar periode berhenti di 2029 · Jan–Jun, dan periode sesudahnya tidak
 bisa dipilih.
