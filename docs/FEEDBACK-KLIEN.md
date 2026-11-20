@@ -182,7 +182,7 @@ Sebabnya: daftar itu hanya memuat enam semester dari semester berjalan.
 
 Perbaikan pertama di PR #112 menambah pilihan **Tampilkan periode berikutnya…** di
 daftar itu. Pada 20 November 2026 klien mengulang pertanyaannya, dan perbaikan itu diganti
-dengan master data periode:
+dengan master data periode di [PR #116](https://github.com/syabanf/bni-finance/pull/116):
 
 - Admin membuka **Konfirmasi Renewal → Kelola Periode**. Formulirnya sudah terisi periode
   sesudah periode terakhir, jadi menambah 2029 · Jul–Des cukup satu klik **Tambah periode**.
