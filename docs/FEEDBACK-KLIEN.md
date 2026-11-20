@@ -25,7 +25,8 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 
 Sumber: lembar feedback klien dan penjelasan lanjutan lewat pesan pada hari yang sama.
 
-Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.com/syabanf/bni-finance/pull/112).
+Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.com/syabanf/bni-finance/pull/112),
+kecuali F-07 yang masuk lewat [PR #114](https://github.com/syabanf/bni-finance/pull/114).
 
 ### Ringkasan
 
@@ -37,7 +38,7 @@ Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.co
 | F-04 | Syarat dan ketentuan di invoice | `selesai` |
 | F-05 | Hapus invoice yang overdue | `tidak dikerjakan` |
 | F-06 | Apakah invoice mengikuti format Paper.id | `sudah ada` |
-| F-07 | Rincian pengaturan biaya per komponen | `dikerjakan` |
+| F-07 | Rincian pengaturan biaya per komponen | `selesai` |
 | F-08 | Bila MC tidak menyetujui renewal, apakah memilih "dibatalkan" | `sudah ada` |
 | F-09 | Menambah periode di Konfirmasi Renewal | `selesai` |
 | F-10 | Kolom Ditugaskan menampilkan ID, seharusnya nama MC | `selesai` |
@@ -100,7 +101,7 @@ Logo, warna, dan tata letak invoice diatur di dasbor Paper.id, bukan dari sistem
 
 ### Pengaturan biaya
 
-**F-07. Rincian biaya per komponen.** `dikerjakan`
+**F-07. Rincian biaya per komponen.** `selesai`
 
 Rincian yang diminta klien:
 
