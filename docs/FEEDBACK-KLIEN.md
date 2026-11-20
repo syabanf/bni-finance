@@ -26,7 +26,8 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 Sumber: lembar feedback klien dan penjelasan lanjutan lewat pesan pada hari yang sama.
 
 Butir berstatus `selesai` di putaran ini masuk lewat [PR #112](https://github.com/syabanf/bni-finance/pull/112),
-kecuali F-07 yang masuk lewat [PR #114](https://github.com/syabanf/bni-finance/pull/114).
+kecuali F-07 yang masuk lewat [PR #114](https://github.com/syabanf/bni-finance/pull/114) dan F-09
+yang diganti lewat [PR #116](https://github.com/syabanf/bni-finance/pull/116).
 
 ### Ringkasan
 
@@ -179,9 +180,22 @@ dibatalkan dari halaman detailnya (lihat F-05).
 Penjelasan klien: daftar periode berhenti di 2029 · Jan–Jun, dan periode sesudahnya tidak
 bisa dipilih.
 
-Sebabnya: daftar itu hanya memuat enam semester dari semester berjalan. Sekarang pilihan
-terakhir di daftar, **Tampilkan periode berikutnya…**, menambahkan empat semester setiap
-kali dipilih, tanpa memindahkan periode yang sedang dilihat.
+Sebabnya: daftar itu hanya memuat enam semester dari semester berjalan.
+
+Perbaikan pertama di PR #112 menambah pilihan **Tampilkan periode berikutnya…** di
+daftar itu. Pada 20 November 2026 klien mengulang pertanyaannya, dan perbaikan itu diganti
+dengan master data periode di [PR #116](https://github.com/syabanf/bni-finance/pull/116):
+
+- Admin membuka **Konfirmasi Renewal → Kelola Periode**. Formulirnya sudah terisi periode
+  sesudah periode terakhir, jadi menambah 2029 · Jul–Des cukup satu klik **Tambah periode**.
+- Periode bisa diberi nama sendiri dan rentang tanggal bebas, misalnya per kuartal.
+- Periode bisa diubah nama dan tanggalnya kapan saja. Periode yang sudah punya permintaan
+  konfirmasi tidak bisa dihapus.
+- Halaman menolak nama yang sudah dipakai dan rentang yang beririsan sebelum disimpan.
+- ST dan MC melihat daftar yang sama, tanpa tombol Kelola Periode.
+
+Jawaban untuk klien: bisa. Admin menambah periode 2029 · Jul–Des lewat tombol Kelola
+Periode di halaman Konfirmasi Renewal, dan periode itu langsung bisa dipilih semua chapter.
 
 **F-10. Kolom Ditugaskan menampilkan ID.** `selesai`
 

@@ -24,6 +24,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/invoice"
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/period"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
 	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
@@ -108,10 +109,12 @@ type liveStack struct {
 // renewal_requests.
 func konfirmasiRenewal(t *testing.T, pool *pgxpool.Pool, memberID string) {
 	t.Helper()
+	periode := fmt.Sprintf("uji-%d", time.Now().UnixNano())
+	testdb.Periode(t, pool, periode)
 	if _, err := pool.Exec(context.Background(), `
 		INSERT INTO renewal_requests (member_id, chapter_id, period, answer, answered_at)
 		SELECT id, chapter_id, $2, 'will_renew', now() FROM members WHERE id = $1`,
-		memberID, fmt.Sprintf("uji-%d", time.Now().UnixNano())); err != nil {
+		memberID, periode); err != nil {
 		t.Fatalf("konfirmasi renewal %s: %v", memberID, err)
 	}
 }
@@ -132,6 +135,7 @@ func newLiveServer(t *testing.T) *liveStack {
 		Dashboard: dashboard.NewService(dashboard.NewRepository(pool)),
 		Report:    report.NewService(report.NewRepository(pool)),
 		Renewal:   renewal.NewService(renewal.NewRepository(pool), suratMati{}, ""),
+		Period:    period.NewService(period.NewRepository(pool)),
 	}, pool.Ping)
 
 	srv := httptest.NewServer(h)

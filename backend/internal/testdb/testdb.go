@@ -18,6 +18,7 @@ package testdb
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -70,3 +71,36 @@ func Serialize(t testing.TB, pool *pgxpool.Pool) {
 		conn.Release()
 	})
 }
+
+// Periode mendaftarkan periode konfirmasi renewal untuk tes.
+//
+// renewal_requests.period menunjuk ke renewal_periods, jadi tes yang mencatat
+// permintaan konfirmasi harus mendaftarkan periodenya lebih dulu. Rentang
+// tanggalnya tidak berarti apa-apa bagi tes.
+//
+// Periode uji yang tidak lagi dipakai permintaan mana pun dihapus saat tes
+// selesai, dan sekali lagi pada panggilan pertama tiap proses tes. Yang kedua
+// menangkap sisa run sebelumnya: tes integrasi API mengosongkan permintaan
+// lewat TRUNCATE di run berikutnya, bukan di cleanup-nya sendiri.
+func Periode(t testing.TB, pool *pgxpool.Pool, ids ...string) {
+	t.Helper()
+	sisaRunLalu.Do(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM renewal_periods p
+			WHERE p.name LIKE 'uji %' AND NOT EXISTS (SELECT 1 FROM renewal_requests r WHERE r.period = p.id)`)
+	})
+	for _, id := range ids {
+		if _, err := pool.Exec(context.Background(), `
+			INSERT INTO renewal_periods (id, name, start_date, end_date)
+			VALUES ($1, 'uji ' || $1, DATE '2000-01-01', DATE '2000-01-01')
+			ON CONFLICT (id) DO NOTHING`, id); err != nil {
+			t.Fatalf("testdb: daftarkan periode %s: %v", id, err)
+		}
+	}
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(), `DELETE FROM renewal_periods p
+			WHERE p.id = ANY($1) AND p.name LIKE 'uji %'
+			  AND NOT EXISTS (SELECT 1 FROM renewal_requests r WHERE r.period = p.id)`, ids)
+	})
+}
+
+var sisaRunLalu sync.Once

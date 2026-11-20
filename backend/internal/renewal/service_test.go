@@ -46,7 +46,7 @@ var (
 
 func minta(st *storeUji, surat *suratUji, assigned *string) HasilEmail {
 	return NewService(st, surat, "https://contoh.test/").
-		beritahuMC(context.Background(), st.belumDijawab, "2027-S2", assigned)
+		beritahuMC(context.Background(), st.belumDijawab, "2027-S2", "2027 · Jul–Des", assigned)
 }
 
 func keSiapa(s *suratUji) []string {
@@ -72,7 +72,7 @@ func TestMintaMengirimEmailKeMCTiapChapter(t *testing.T) {
 	for _, p := range surat.terkirim {
 		switch p.Ke {
 		case mcB.Email:
-			if !strings.Contains(p.Teks, "2 member BNI B") || !strings.Contains(p.Teks, "Jul–Des 2027") {
+			if !strings.Contains(p.Teks, "2 member BNI B") || !strings.Contains(p.Teks, "periode 2027 · Jul–Des") {
 				t.Errorf("isi email chapter B: %q", p.Teks)
 			}
 			if !strings.Contains(p.Teks, "https://contoh.test/renewal?periode=2027-S2") {

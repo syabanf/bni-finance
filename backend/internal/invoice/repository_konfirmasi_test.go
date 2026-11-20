@@ -34,6 +34,7 @@ func TestRenewalMenungguKonfirmasi(t *testing.T) {
 
 	jawab := func(period, answer string) {
 		t.Helper()
+		testdb.Periode(t, pool, period)
 		if _, err := pool.Exec(ctx, `
 			INSERT INTO renewal_requests (member_id, chapter_id, period, answer, requested_at)
 			VALUES ($1,$2,$3,$4::renewal_answer, now())

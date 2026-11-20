@@ -2160,6 +2160,105 @@ paths:
           description: Daftar kosong atau melebihi 200
         "403":
           description: Peran tidak boleh menulis
+  /api/v1/renewal-periods:
+    get:
+      tags: [Member]
+      summary: Daftar periode konfirmasi renewal
+      description: |
+        Master data periode yang dipilih di halaman Konfirmasi Renewal. Semua
+        peran boleh membaca, diurutkan dari tanggal mulai paling awal.
+
+        `requestCount` menghitung permintaan konfirmasi di periode itu dalam
+        lingkup chapter pemanggil. Untuk ST dan MC angkanya hanya chapternya.
+      responses:
+        "200":
+          description: Seluruh periode
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/RenewalPeriod" }
+    post:
+      tags: [Member]
+      summary: Tambah periode konfirmasi renewal
+      description: |
+        **Admin saja.** Server memberi id dari rentang tanggalnya: `2029-S2`
+        untuk Juli sampai Desember, `2029-S1` untuk Januari sampai Juni, `2029`
+        untuk setahun penuh, dan `20290701-20290930` untuk rentang lain. Id itu
+        yang disimpan di `renewal_requests.period` dan dibawa tautan email.
+
+        Nama yang sudah dipakai dan rentang yang beririsan dengan periode lain
+        dijawab **409**. Dua periode yang beririsan membuat satu member jatuh
+        tempo di keduanya dan bisa ditanyakan dua kali.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveRenewalPeriod" }
+      responses:
+        "201":
+          description: Periode dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RenewalPeriod" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Nama sudah dipakai atau rentang beririsan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/renewal-periods/{id}:
+    patch:
+      tags: [Member]
+      summary: Ubah periode konfirmasi renewal
+      description: |
+        **Admin saja.** Kolom yang tidak dikirim dibiarkan. Id tidak berubah
+        walau tanggalnya diubah, supaya permintaan dan tautan email yang sudah
+        ada tetap menunjuk periode yang sama. Irisan rentang hanya diperiksa
+        bila tanggalnya berubah.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveRenewalPeriod" }
+      responses:
+        "200":
+          description: Periode diubah
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RenewalPeriod" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Nama sudah dipakai atau rentang beririsan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+    delete:
+      tags: [Member]
+      summary: Hapus periode konfirmasi renewal
+      description: |
+        **Admin saja.** Periode yang sudah punya permintaan konfirmasi di
+        chapter mana pun dijawab **409**, karena jawaban MC di periode itu
+        menjadi dasar invoice renewal.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Dihapus }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Periode sudah dipakai permintaan konfirmasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/v1/renewal-requests:
     get:
       tags: [Member]
@@ -2194,7 +2293,7 @@ paths:
                     id: { type: string, format: uuid }
                     memberId: { type: string }
                     chapterId: { type: string }
-                    period: { type: string, description: "Tahun keanggotaan yang ditanyakan" }
+                    period: { type: string, description: "Id periode di /renewal-periods" }
                     requestedBy: { type: string, nullable: true }
                     requestedAt: { type: string, format: date-time }
                     assignedMc: { type: string, nullable: true }
@@ -2253,7 +2352,10 @@ paths:
                   type: array
                   maxItems: 500
                   items: { type: string }
-                period: { type: string, example: "2027" }
+                period:
+                  type: string
+                  example: "2027-S2"
+                  description: Id periode yang terdaftar di /renewal-periods. Periode lain dijawab 400.
                 assignedMc:
                   type: string
                   nullable: true
@@ -2285,6 +2387,8 @@ paths:
                         type: array
                         description: Id chapter yang belum punya akun MC
                         items: { type: string }
+        "400":
+          description: Daftar member kosong, atau periodenya belum terdaftar
         "403":
           description: Member ada di chapter lain, atau peran tidak boleh menulis
   /api/v1/renewal-requests/{id}:
@@ -2342,7 +2446,7 @@ paths:
                   id: { type: string, format: uuid }
                   memberId: { type: string }
                   chapterId: { type: string }
-                  period: { type: string, description: "Tahun keanggotaan yang ditanyakan" }
+                  period: { type: string, description: "Id periode di /renewal-periods" }
                   requestedBy: { type: string, nullable: true }
                   requestedAt: { type: string, format: date-time }
                   assignedMc: { type: string, nullable: true }
@@ -3007,6 +3111,24 @@ components:
           example: { error: "data tidak ditemukan" }
 
   schemas:
+    RenewalPeriod:
+      type: object
+      required: [id, name, startDate, endDate, requestCount]
+      properties:
+        id: { type: string, example: "2029-S2" }
+        name: { type: string, example: "2029 · Jul–Des" }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        requestCount: { type: integer, description: Permintaan konfirmasi di periode ini, dalam lingkup pemanggil }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    SaveRenewalPeriod:
+      type: object
+      description: Saat membuat ketiganya wajib. Saat mengubah, yang tidak dikirim dibiarkan.
+      properties:
+        name: { type: string, maxLength: 60, example: "2029 · Jul–Des" }
+        startDate: { type: string, format: date, example: "2029-07-01" }
+        endDate: { type: string, format: date, example: "2029-12-31" }
     ChapterCounts:
       type: object
       required: [chapterId, memberCount, outstanding]

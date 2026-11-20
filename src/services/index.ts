@@ -19,6 +19,7 @@ import type {
   SettingsRepository,
   ImportRepository,
   RenewalRepository,
+  PeriodRepository,
   UserRepository,
 } from './types'
 
@@ -34,6 +35,7 @@ import { mockPaymentRepository } from './mock/paymentRepository'
 import { mockSettingsRepository } from './mock/settingsRepository'
 import { mockImportRepository } from './mock/importRepository'
 import { mockRenewalRepository } from './mock/renewalRepository'
+import { mockPeriodRepository } from './mock/periodRepository'
 import { mockReportRepository } from './mock/reportRepository'
 import { mockUserRepository } from './mock/userRepository'
 
@@ -46,6 +48,7 @@ import { apiPaymentRepository } from './api/paymentRepository'
 import { apiSettingsRepository } from './api/settingsRepository'
 import { apiImportRepository } from './api/importRepository'
 import { apiRenewalRepository } from './api/renewalRepository'
+import { apiPeriodRepository } from './api/periodRepository'
 import { apiReportRepository } from './api/reportRepository'
 import { apiUserRepository } from './api/userRepository'
 
@@ -62,6 +65,7 @@ interface Services {
   reports: ReportRepository
   users: UserRepository
   renewals: RenewalRepository
+  periods: PeriodRepository
   imports: ImportRepository
 }
 
@@ -76,6 +80,7 @@ const mockServices: Services = {
   reports: mockReportRepository,
   users: mockUserRepository,
   renewals: mockRenewalRepository,
+  periods: mockPeriodRepository,
   imports: mockImportRepository,
 }
 
@@ -90,6 +95,7 @@ const apiServices: Services = {
   reports: apiReportRepository,
   users: apiUserRepository,
   renewals: apiRenewalRepository,
+  periods: apiPeriodRepository,
   imports: apiImportRepository,
 }
 
@@ -127,5 +133,6 @@ export const {
   reports: reportService,
   users: userService,
   renewals: renewalService,
+  periods: periodService,
   imports: importService,
 } = services

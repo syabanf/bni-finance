@@ -89,10 +89,12 @@ func konfirmasiRenewal(t *testing.T, db *pgxpool.Pool, memberIDs ...string) {
 	t.Helper()
 	ctx := context.Background()
 	for _, m := range memberIDs {
+		periode := fmt.Sprintf("uji-%d", time.Now().UnixNano())
+		testdb.Periode(t, db, periode)
 		if _, err := db.Exec(ctx, `
 			INSERT INTO renewal_requests (member_id, chapter_id, period, answer, answered_at)
 			SELECT id, chapter_id, $2, 'will_renew', now() FROM members WHERE id = $1`,
-			m, fmt.Sprintf("uji-%d", time.Now().UnixNano())); err != nil {
+			m, periode); err != nil {
 			t.Fatalf("konfirmasi renewal %s: %v", m, err)
 		}
 	}

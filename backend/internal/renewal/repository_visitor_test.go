@@ -73,6 +73,7 @@ func TestVisitorDilewatiSaatMintaRenewal(t *testing.T) {
 	// lingkup dianggap MUSTAHIL oleh scope.Chapter, dan Create akan menolak
 	// dengan 403 alih-alih menguji apa yang dimaksud tes ini.
 	ctx = scope.WithoutLimit(ctx)
+	testdb.Periode(t, pool, "2027-H1")
 
 	h, err := repo.Create(ctx,
 		[]string{"mem-uji-anggota", "mem-uji-tamu"}, "2027-H1", "uji", nil)

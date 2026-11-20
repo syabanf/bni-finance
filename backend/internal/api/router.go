@@ -23,6 +23,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/metrics"
 	"github.com/syabanf/bni-finance/backend/internal/paperid"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
+	"github.com/syabanf/bni-finance/backend/internal/period"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
 	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
@@ -49,6 +50,7 @@ type Services struct {
 	Sync      *sync.Service
 	Importer  *importer.Service
 	Renewal   *renewal.Service
+	Period    *period.Service
 	PaperID   *paperid.Service
 	Blackbox  *blackbox.Recorder
 
@@ -174,6 +176,9 @@ func registerProtected(mux *http.ServeMux, svc Services) {
 	}
 	if svc.Renewal != nil {
 		renewal.NewHandler(svc.Renewal).Register(mux)
+	}
+	if svc.Period != nil {
+		period.NewHandler(svc.Period).Register(mux)
 	}
 	if svc.PaperID != nil {
 		paperid.NewHandler(svc.PaperID).RegisterProtected(mux)

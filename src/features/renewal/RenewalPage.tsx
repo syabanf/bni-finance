@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, FileText, FileUp, HelpCircle, Send, Trash2, XCircle } from 'lucide-react'
+import { CalendarCog, CheckCircle2, FileText, FileUp, HelpCircle, Send, Trash2, XCircle } from 'lucide-react'
 import type { MemberWithChapter, RenewalAnswer, RenewalRequest } from '@/types'
 import {
   Badge,
@@ -25,11 +25,13 @@ import {
   Pagination,
 } from '@/components/ui'
 import { useAsync } from '@/hooks/useAsync'
-import { chapterService, importService, memberService, renewalService, userService } from '@/services'
+import { chapterService, importService, memberService, periodService, renewalService, userService } from '@/services'
 import type { HasilEmailMC } from '@/services/types'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useCan } from '@/features/auth/usePermission'
 import { muatStatusRenewal } from './statusRenewal'
+import { KelolaPeriode } from './components/KelolaPeriode'
+import { periodeAwal } from '@/lib/periode'
 import { formatDate } from '@/lib/format'
 import { bolehDitagih } from '@/lib/status'
 import { cn } from '@/lib/cn'
@@ -62,74 +64,29 @@ const TONE: Record<RenewalAnswer, 'gray' | 'green' | 'red' | 'amber'> = {
   unsure: 'amber',
 }
 
-/**
- * Periode konfirmasi dihitung per ENAM BULAN, bukan per tahun.
- *
- * Keanggotaan berakhir sepanjang tahun, tidak menumpuk di Januari. Satu
- * periode setahun berarti MC menerima seluruh pertanyaan sekaligus dan
- * menjawabnya untuk member yang jatuh temponya masih sepuluh bulan lagi —
- * jawaban yang sudah usang saat tagihannya benar-benar terbit.
- *
- * Bentuknya "2027-S1" / "2027-S2". Periode lama yang berupa tahun saja tetap
- * terbaca apa adanya: nilainya cuma string pembeda, jadi baris lama tidak
- * perlu dipindahkan ke bentuk baru.
- */
-function periodeSemester(d: Date): string {
-  return `${d.getFullYear()}-S${d.getMonth() < 6 ? 1 : 2}`
-}
-
-/** `jumlah` semester ke depan, dimulai dari semester berjalan. */
-function pilihanPeriode(dari: Date, jumlah: number): string[] {
-  const out: string[] = []
-  let tahun = dari.getFullYear()
-  let sem = dari.getMonth() < 6 ? 1 : 2
-  for (let i = 0; i < jumlah; i++) {
-    out.push(`${tahun}-S${sem}`)
-    if (sem === 2) { tahun += 1; sem = 1 } else { sem = 2 }
-  }
-  return out
-}
-
-const labelPeriode = (p: string) =>
-  p.endsWith('-S1') ? `${p.slice(0, 4)} · Jan–Jun`
-  : p.endsWith('-S2') ? `${p.slice(0, 4)} · Jul–Des`
-  : p
-
-const periodeAwal = periodeSemester(new Date())
-
-/** Nilai pilihan dropdown yang memperpanjang daftar periode. */
-const PERIODE_BERIKUTNYA = '__berikutnya'
-/** Semester yang ditambahkan tiap kali daftarnya diperpanjang: dua tahun. */
-const TAMBAHAN_PERIODE = 4
-
 export function RenewalPage() {
   const { toast } = useToast()
   const { user } = useAuth()
   // Email ke MC menautkan ?periode=, supaya halaman membuka periode yang ditanyakan.
   const [params] = useSearchParams()
-  const [period, setPeriod] = useState(params.get('periode') ?? periodeAwal)
-  // Daftar periode berangkat dari enam semester ke depan dan bisa diperpanjang
-  // dari dropdown-nya. Daftar yang berhenti di satu titik membuat renewal
-  // sesudah titik itu tidak bisa disiapkan sama sekali.
-  const [jumlahPeriode, setJumlahPeriode] = useState(6)
+  const [period, setPeriod] = useState(params.get('periode') ?? '')
+  // Daftar periode datang dari master data yang dikelola admin. Tanpa tautan,
+  // halaman membuka periode yang memuat hari ini.
+  const periode = useAsync(() => periodService.list(), [])
+  const [kelolaPeriode, setKelolaPeriode] = useState(false)
+  const bolehKelolaPeriode = useCan('settings:manage')
+  useEffect(() => {
+    if (!period && periode.data) setPeriod(periodeAwal(periode.data) ?? '')
+  }, [period, periode.data])
+  const periodeIni = periode.data?.find((p) => p.id === period)
   const [chapterFilter, setChapterFilter] = useState('all')
-  const permintaan = useAsync(() => renewalService.list({ period }), [period])
+  const permintaan = useAsync(
+    () => (period ? renewalService.list({ period }) : Promise.resolve([])),
+    [period],
+  )
   const navigate = useNavigate()
   const bolehTagih = useCan('invoice:create')
   const statusRenewal = useAsync(muatStatusRenewal, [permintaan.data])
-
-  /**
-   * Periode yang BENAR-BENAR ADA datanya, ditemukan sekali di awal.
-   *
-   * Tanpa ini, mengganti bentuk periode dari tahun ke semester membuat
-   * permintaan lama tidak terjangkau: dropdown hanya menawarkan semester,
-   * sedangkan barisnya tersimpan di bawah "2027". Datanya tidak hilang — hanya
-   * tidak ada lagi cara membukanya, yang bagi yang memakainya sama saja.
-   */
-  const periodeAda = useAsync(
-    () => renewalService.list({}).then((d) => [...new Set(d.map((r) => r.period))].sort()),
-    [],
-  )
   // Daftar akun hanya bisa dibaca admin. Untuk ST dan MC panggilannya gagal,
   // dan itu tidak boleh menggagalkan halaman — kolom "Ditugaskan ke" cukup
   // menampilkan idnya. Karena itu galatnya ditelan, bukan diteruskan.
@@ -273,13 +230,26 @@ export function RenewalPage() {
 
   return (
     <div>
+      {bolehKelolaPeriode && (
+        <KelolaPeriode
+          open={kelolaPeriode}
+          onClose={() => setKelolaPeriode(false)}
+          periode={periode.data ?? []}
+          onBerubah={(pilih) => {
+            periode.reload()
+            if (pilih) setPeriod(pilih)
+          }}
+        />
+      )}
       <PageHeader
         title="Konfirmasi Renewal"
         description="Sistem menyusun daftar member yang jatuh tempo; ST menyetujui dan menanyakannya; MC menjawab per member."
         action={
-          bolehMeminta ? (
+          bolehMeminta && periodeIni ? (
             <TombolMinta
               period={period}
+              namaPeriode={periodeIni.name}
+              rentang={{ dari: periodeIni.startDate, sampai: periodeIni.endDate }}
               sudahDiminta={new Set((permintaan.data ?? []).map((r) => r.memberId))}
               lintasChapter={lintasChapter}
               chapterOptions={(chapters.data ?? []).map((c) => ({ id: c.id, displayName: c.displayName }))}
@@ -290,7 +260,10 @@ export function RenewalPage() {
                 chapterId: u.chapterId,
                 namaChapter: (u.chapterId && namaChapterDari.get(u.chapterId)) || null,
               }))}
-              onDone={permintaan.reload}
+              onDone={() => {
+                permintaan.reload()
+                periode.reload()
+              }}
             />
           ) : undefined
         }
@@ -298,7 +271,7 @@ export function RenewalPage() {
 
       <Card>
         <CardHeader
-          title={`Periode ${labelPeriode(period)}`}
+          title={period ? `Periode ${periodeIni?.name ?? period}` : 'Periode'}
           subtitle={
             permintaan.data
               ? `${ringkas.total} member — ${ringkas.belum} belum dijawab, ${ringkas.akan} akan perpanjang`
@@ -315,30 +288,29 @@ export function RenewalPage() {
                   Buat Invoice ({siapDitagih.length})
                 </Button>
               )}
-              {/* Dropdown, bukan ketik bebas: bentuk periodenya kini "2027-S1",
-                  dan kolom bebas mengundang orang mengetik "2027" lalu melihat
-                  daftar kosong tanpa tahu kenapa. */}
               <Select
                 value={period}
-                onChange={(e) => {
-                  // Pilihan terakhir memperpanjang daftar, bukan berpindah
-                  // periode: periode yang sedang dilihat tetap terpilih.
-                  if (e.target.value === PERIODE_BERIKUTNYA) setJumlahPeriode((n) => n + TAMBAHAN_PERIODE)
-                  else setPeriod(e.target.value)
-                }}
+                onChange={(e) => setPeriod(e.target.value)}
                 aria-label="Periode"
                 className="w-52"
+                disabled={!periode.data}
               >
-                {/* Periode yang sedang dilihat selalu ada di daftar, walau ia
-                    periode lama berbentuk tahun — kalau tidak, memilihnya dari
-                    tautan akan menampilkan dropdown yang menunjuk hal lain. */}
-                {[...new Set([period, ...pilihanPeriode(new Date(), jumlahPeriode), ...(periodeAda.data ?? [])])]
-                  .sort()
-                  .map((p) => (
-                    <option key={p} value={p}>{labelPeriode(p)}</option>
-                  ))}
-                <option value={PERIODE_BERIKUTNYA}>Tampilkan periode berikutnya…</option>
+                {/* Periode dari tautan yang sudah dihapus tetap tampil, supaya
+                    dropdown tidak menunjuk periode lain dari yang dibuka. */}
+                {period && periode.data && !periodeIni && <option value={period}>{period}</option>}
+                {!period && <option value="">Belum ada periode</option>}
+                {(periode.data ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
               </Select>
+              {bolehKelolaPeriode && (
+                <Button size="sm" variant="outline" onClick={() => setKelolaPeriode(true)} data-testid="kelola-periode">
+                  <CalendarCog className="h-4 w-4" />
+                  Kelola Periode
+                </Button>
+              )}
               <Select
                 value={chapterFilter}
                 onChange={(e) => setChapterFilter(e.target.value)}
@@ -392,7 +364,16 @@ export function RenewalPage() {
         )}
 
         <CardBody>
-          {permintaan.loading ? (
+          {periode.data && periode.data.length === 0 ? (
+            <EmptyState
+              title="Belum ada periode"
+              description={
+                bolehKelolaPeriode
+                  ? 'Tambahkan periode lewat tombol "Kelola Periode" sebelum meminta konfirmasi.'
+                  : 'Admin belum menambahkan periode konfirmasi renewal.'
+              }
+            />
+          ) : permintaan.loading ? (
             <LoadingState />
           ) : permintaan.error ? (
             <ErrorState message={permintaan.error} onRetry={permintaan.reload} />
@@ -556,14 +537,6 @@ function TombolJawab({
   )
 }
 
-/** Rentang tanggal sebuah periode: "2027-S1" Jan–Jun, "2027-S2" Jul–Des, "2027" setahun. */
-function rentangPeriode(p: string): { dari: string; sampai: string } | null {
-  const sem = /^(\d{4})-S([12])$/.exec(p)
-  if (sem) return sem[2] === '1' ? { dari: `${sem[1]}-01-01`, sampai: `${sem[1]}-06-30` } : { dari: `${sem[1]}-07-01`, sampai: `${sem[1]}-12-31` }
-  if (/^\d{4}$/.test(p)) return { dari: `${p}-01-01`, sampai: `${p}-12-31` }
-  return null
-}
-
 type Kelompok = 'jatuhTempo' | 'terlewat' | 'tanpaTanggal'
 
 const LABEL_KELOMPOK: Record<Kelompok, string> = {
@@ -593,6 +566,8 @@ function pesanEmail(email: HasilEmailMC | undefined, namaChapter: (id: string) =
 
 function TombolMinta({
   period,
+  namaPeriode,
+  rentang,
   sudahDiminta,
   daftarMc,
   lintasChapter,
@@ -601,6 +576,8 @@ function TombolMinta({
   onDone,
 }: {
   period: string
+  namaPeriode: string
+  rentang: { dari: string; sampai: string }
   sudahDiminta: Set<string>
   daftarMc: { id: string; nama: string; chapterId: string | null; namaChapter: string | null }[]
   lintasChapter: boolean
@@ -636,21 +613,20 @@ function TombolMinta({
    * sesudah periode ini tidak ditampilkan; belum waktunya ditanyakan.
    */
   const kandidat = useMemo(() => {
-    const rentang = rentangPeriode(period)
     const out: Record<Kelompok, MemberWithChapter[]> = { jatuhTempo: [], terlewat: [], tanpaTanggal: [] }
     for (const m of anggota ?? []) {
       if (!bolehDitagih(m.status, 'renewal')) continue
       if (chapterId !== 'all' && m.chapterId !== chapterId) continue
       const tgl = m.renewalDate?.slice(0, 10)
       if (!tgl) out.tanpaTanggal.push(m)
-      else if (!rentang || (tgl >= rentang.dari && tgl <= rentang.sampai)) out.jatuhTempo.push(m)
+      else if (tgl >= rentang.dari && tgl <= rentang.sampai) out.jatuhTempo.push(m)
       else if (tgl < rentang.dari) out.terlewat.push(m)
     }
     for (const k of Object.keys(out) as Kelompok[]) {
       out[k].sort((a, b) => (a.renewalDate ?? '').localeCompare(b.renewalDate ?? '') || a.name.localeCompare(b.name))
     }
     return out
-  }, [anggota, chapterId, period])
+  }, [anggota, chapterId, rentang.dari, rentang.sampai])
 
   useEffect(() => {
     setTerpilih(new Set(kandidat.jatuhTempo.filter((m) => !sudahDiminta.has(m.id)).map((m) => m.id)))
@@ -753,7 +729,7 @@ function TombolMinta({
         Minta Konfirmasi
       </Button>
 
-      <Modal open={buka} onClose={() => setBuka(false)} title={`Minta konfirmasi periode ${labelPeriode(period)}`}>
+      <Modal open={buka} onClose={() => setBuka(false)} title={`Minta konfirmasi periode ${namaPeriode}`}>
         <div className="space-y-4">
           <Field
             label="Chapter"
@@ -807,7 +783,7 @@ function TombolMinta({
                 <p className="rounded-xl border border-ink-200 p-4 text-sm text-ink-500">Menyusun daftar jatuh tempo…</p>
               ) : kandidat.jatuhTempo.length + kandidat.terlewat.length + kandidat.tanpaTanggal.length === 0 ? (
                 <p className="rounded-xl border border-ink-200 p-4 text-sm text-ink-500">
-                  Tidak ada member yang jatuh tempo di {labelPeriode(period)} untuk chapter ini.
+                  Tidak ada member yang jatuh tempo di {namaPeriode} untuk chapter ini.
                 </p>
               ) : (
                 <div className="max-h-72 space-y-3 overflow-y-auto rounded-xl border border-ink-200 p-3">
