@@ -11,6 +11,8 @@ import {
   BarChart3,
   TerminalSquare,
   BookOpen,
+  FileCheck2,
+  Globe2,
   type LucideIcon,
 } from 'lucide-react'
 import { JUDUL_INTEGRASI } from '@/lib/fitur'
@@ -52,6 +54,7 @@ export const NAV: NavNode[] = [
   { kind: 'section', label: 'Keuangan' },
   { kind: 'item', to: '/invoices', label: 'Semua Invoice', icon: FileText },
   { kind: 'item', to: '/payments', label: 'Pembayaran', icon: Wallet },
+  { kind: 'item', to: '/payments/proofs', label: 'Bukti Bayar', icon: FileCheck2 },
   { kind: 'item', to: '/reports', label: 'Laporan', icon: BarChart3 },
 
   { kind: 'section', label: 'Data Member' },
@@ -59,6 +62,13 @@ export const NAV: NavNode[] = [
   { kind: 'item', to: '/members/lama-keanggotaan', label: 'Lama Keanggotaan', icon: CalendarClock },
   { kind: 'item', to: '/chapters', label: 'Chapter', icon: Building2 },
   { kind: 'item', to: '/renewal', label: 'Konfirmasi Renewal', icon: CalendarCheck },
+  {
+    kind: 'item',
+    to: '/renewal/submissions',
+    label: 'Pengajuan BNI Global',
+    icon: Globe2,
+    permission: 'invoice:manage',
+  },
 
   // Sistem dikelompokkan agar sidebar tidak memanjang: menu harian di atas,
   // urusan konfigurasi dan alat teknis terlipat sampai dibutuhkan.

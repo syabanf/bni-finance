@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CalendarCog, CheckCircle2, FileText, FileUp, HelpCircle, Send, Trash2, XCircle } from 'lucide-react'
-import type { MemberWithChapter, RenewalAnswer, RenewalRequest } from '@/types'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { CalendarCog, CheckCircle2, FilePlus2, FileText, FileUp, HelpCircle, Send, Trash2, Undo2, Upload, XCircle } from 'lucide-react'
+import type { MemberWithChapter, RenewalAnswer, RenewalRequest, RenewalStage } from '@/types'
 import {
   Badge,
   Button,
@@ -29,7 +29,7 @@ import { chapterService, importService, memberService, periodService, renewalSer
 import type { HasilEmailMC } from '@/services/types'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useCan } from '@/features/auth/usePermission'
-import { muatStatusRenewal } from './statusRenewal'
+import { TAHAP, TahapBadge } from './components/TahapBadge'
 import { KelolaPeriode } from './components/KelolaPeriode'
 import { periodeAwal } from '@/lib/periode'
 import { formatDate } from '@/lib/format'
@@ -49,6 +49,8 @@ import { usePaginasi } from '@/hooks/usePaginasi'
  * ia hanya akan mencatat dugaannya sendiri sebagai jawaban orang lain. Server
  * yang menegakkannya; di sini tombolnya sekadar disembunyikan.
  */
+
+const SEMUA_PERIODE = 'semua'
 
 const LABEL: Record<RenewalAnswer, string> = {
   pending: 'Belum dijawab',
@@ -70,6 +72,8 @@ export function RenewalPage() {
   // Email ke MC menautkan ?periode=, supaya halaman membuka periode yang ditanyakan.
   const [params] = useSearchParams()
   const [period, setPeriod] = useState(params.get('periode') ?? '')
+  // Email permintaan invoice ke finance menautkan ?periode=semua&tahap=invoice_requested.
+  const [tahap, setTahap] = useState<RenewalStage | 'all'>((params.get('tahap') as RenewalStage | null) ?? 'all')
   // Daftar periode datang dari master data yang dikelola admin. Tanpa tautan,
   // halaman membuka periode yang memuat hari ini.
   const periode = useAsync(() => periodService.list(), [])
@@ -80,13 +84,17 @@ export function RenewalPage() {
   }, [period, periode.data])
   const periodeIni = periode.data?.find((p) => p.id === period)
   const [chapterFilter, setChapterFilter] = useState('all')
+  // SEMUA_PERIODE membuka antrean lintas periode, misalnya permintaan invoice
+  // yang menunggu finance.
   const permintaan = useAsync(
-    () => (period ? renewalService.list({ period }) : Promise.resolve([])),
+    () =>
+      period ? renewalService.list(period === SEMUA_PERIODE ? {} : { period }) : Promise.resolve([]),
     [period],
   )
   const navigate = useNavigate()
   const bolehTagih = useCan('invoice:create')
-  const statusRenewal = useAsync(muatStatusRenewal, [permintaan.data])
+  const bolehMintaInvoice = useCan('invoice:request')
+  const bolehKirimBukti = useCan('payment:submit')
   // Daftar akun hanya bisa dibaca admin. Untuk ST dan MC panggilannya gagal,
   // dan itu tidak boleh menggagalkan halaman — kolom "Ditugaskan ke" cukup
   // menampilkan idnya. Karena itu galatnya ditelan, bukan diteruskan.
@@ -130,10 +138,13 @@ export function RenewalPage() {
   // Daftar yang TAMPIL, sesudah filter chapter. Ringkasan dihitung dari yang
   // sama — ringkasan yang menghitung seluruh data sementara tabelnya tersaring
   // membuat dua angka di layar yang sama saling membantah.
-  const tersaring = useMemo(() => {
-    const d = permintaan.data ?? []
-    return chapterFilter === 'all' ? d : d.filter((r) => r.chapterId === chapterFilter)
-  }, [permintaan.data, chapterFilter])
+  const tersaring = useMemo(
+    () =>
+      (permintaan.data ?? []).filter(
+        (r) => (chapterFilter === 'all' || r.chapterId === chapterFilter) && (tahap === 'all' || r.stage === tahap),
+      ),
+    [permintaan.data, chapterFilter, tahap],
+  )
   const { potongan, paginasi } = usePaginasi(tersaring)
 
   const ringkas = useMemo(() => {
@@ -142,35 +153,45 @@ export function RenewalPage() {
       total: d.length,
       belum: d.filter((r) => r.answer === 'pending').length,
       akan: d.filter((r) => r.answer === 'will_renew').length,
+      lunas: d.filter((r) => r.stage === 'paid' || r.stage === 'submitted').length,
     }
   }, [tersaring])
 
   // Langkah berikutnya setelah MC menjawab: yang Diterima dan belum ditagih
   // dibawa ke Buat Invoice dalam keadaan terpilih. Tanpa ini orangnya harus
   // pindah halaman dan mencari ulang nama yang baru saja ia lihat di sini.
+  //
+  // Yang sudah diminta ST ditagih lebih dulu: ST sedang menunggunya.
   const siapDitagih = useMemo(
-    () => tersaring.filter((r) => statusRenewal.data?.get(r.memberId) === 'will_renew').map((r) => r.memberId),
-    [tersaring, statusRenewal.data],
+    () =>
+      [
+        ...tersaring.filter((r) => r.stage === 'invoice_requested'),
+        ...tersaring.filter((r) => r.stage === 'will_renew'),
+      ].map((r) => r.memberId),
+    [tersaring],
   )
 
   const [terpilih, setTerpilih] = useState<Set<string>>(new Set())
   const [massalSibuk, setMassalSibuk] = useState(false)
 
-  // Hanya yang BELUM dijawab yang bisa dipilih.
-  //
-  // Menjawab ulang yang sudah dijawab bukan hal yang dilarang — tapi memilih
+  // MC dan admin memilih yang BELUM dijawab, untuk dijawab sekaligus.
+  // Menjawab ulang yang sudah dijawab bukan hal yang dilarang, tapi memilih
   // "semua" lalu menimpa jawaban yang sudah masuk adalah cara paling mudah
   // menghapus pekerjaan MC lain tanpa sadar.
+  //
+  // ST memilih yang sudah Diterima dan belum diminta invoicenya.
+  const memilih = bolehMenjawab || bolehMintaInvoice
   const bisaDipilih = useMemo(
-    () => tersaring.filter((r) => r.answer === 'pending'),
-    [tersaring],
+    () => tersaring.filter((r) => (bolehMenjawab ? r.answer === 'pending' : r.stage === 'will_renew')),
+    [tersaring, bolehMenjawab],
   )
+  const idDipilih = useMemo(() => new Set(bisaDipilih.map((r) => r.id)), [bisaDipilih])
 
   // Pilihan dibersihkan saat daftarnya berubah. Tanpa ini, id yang sudah tidak
   // tampil tetap ikut terkirim saat tombol massal ditekan.
   useEffect(() => {
     setTerpilih(new Set())
-  }, [period, chapterFilter, permintaan.data])
+  }, [period, chapterFilter, tahap, permintaan.data])
 
   const jawabMassal = async (answer: RenewalAnswer) => {
     const daftar = bisaDipilih.filter((r) => terpilih.has(r.id))
@@ -210,6 +231,44 @@ export function RenewalPage() {
       permintaan.reload()
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Gagal membatalkan permintaan.', 'error')
+    } finally {
+      setMemproses(null)
+    }
+  }
+
+  // Langkah 3 alur renewal: ST meminta finance menerbitkan invoice.
+  const mintaInvoice = async (ids: string[]) => {
+    setMassalSibuk(true)
+    try {
+      const hasil = await renewalService.requestInvoice(ids)
+      const surel = hasil.email?.belumDikonfigurasi
+        ? ', email ke finance belum aktif di server'
+        : hasil.email?.terkirim
+          ? `, email terkirim ke ${hasil.email.terkirim} akun finance`
+          : ''
+      toast(
+        hasil.diminta > 0
+          ? `Invoice diminta untuk ${hasil.diminta} member${hasil.dilewati ? `, ${hasil.dilewati} dilewati` : ''}${surel}.`
+          : 'Tidak ada yang diminta: member itu sudah diminta atau sudah punya invoice.',
+        hasil.diminta > 0 ? 'success' : 'error',
+      )
+      setTerpilih(new Set())
+      permintaan.reload()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal meminta invoice.', 'error')
+    } finally {
+      setMassalSibuk(false)
+    }
+  }
+
+  const tarikPermintaanInvoice = async (r: RenewalRequest) => {
+    setMemproses(r.id)
+    try {
+      await renewalService.cancelInvoiceRequest(r.id)
+      toast(`Permintaan invoice ${r.memberName ?? r.memberId} ditarik.`)
+      permintaan.reload()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Gagal menarik permintaan invoice.', 'error')
     } finally {
       setMemproses(null)
     }
@@ -271,10 +330,10 @@ export function RenewalPage() {
 
       <Card>
         <CardHeader
-          title={period ? `Periode ${periodeIni?.name ?? period}` : 'Periode'}
+          title={period === SEMUA_PERIODE ? 'Semua periode' : period ? `Periode ${periodeIni?.name ?? period}` : 'Periode'}
           subtitle={
             permintaan.data
-              ? `${ringkas.total} member — ${ringkas.belum} belum dijawab, ${ringkas.akan} akan perpanjang`
+              ? `${ringkas.total} member: ${ringkas.belum} belum dijawab, ${ringkas.akan} akan perpanjang, ${ringkas.lunas} lunas`
               : undefined
           }
           action={
@@ -297,8 +356,11 @@ export function RenewalPage() {
               >
                 {/* Periode dari tautan yang sudah dihapus tetap tampil, supaya
                     dropdown tidak menunjuk periode lain dari yang dibuka. */}
-                {period && periode.data && !periodeIni && <option value={period}>{period}</option>}
+                {period && period !== SEMUA_PERIODE && periode.data && !periodeIni && (
+                  <option value={period}>{period}</option>
+                )}
                 {!period && <option value="">Belum ada periode</option>}
+                <option value={SEMUA_PERIODE}>Semua periode</option>
                 {(periode.data ?? []).map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -322,18 +384,39 @@ export function RenewalPage() {
                   <option key={c.id} value={c.id}>{c.displayName}</option>
                 ))}
               </Select>
+              <Select
+                value={tahap}
+                onChange={(e) => setTahap(e.target.value as RenewalStage | 'all')}
+                aria-label="Status renewal"
+                className="w-52"
+              >
+                <option value="all">Semua status</option>
+                {TAHAP.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
             </div>
           }
         />
         {/* Bilah aksi massal muncul HANYA saat ada yang dipilih.
             Bilah yang selalu ada dengan tombol mati sepanjang waktu mengajarkan
             orang mengabaikannya, lalu tidak terlihat justru saat menyala. */}
-        {bolehMenjawab && terpilih.size > 0 && (
+        {memilih && terpilih.size > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 bg-brand-50/40 px-5 py-3">
             <span className="text-sm font-medium text-ink-700">
               {terpilih.size} dipilih
             </span>
             <div className="flex flex-wrap items-center gap-2">
+              {bolehMintaInvoice && !bolehMenjawab && (
+                <Button size="sm" loading={massalSibuk} onClick={() => mintaInvoice([...terpilih])}>
+                  <FilePlus2 className="h-4 w-4" />
+                  Minta invoice ke finance
+                </Button>
+              )}
+              {bolehMenjawab && (
+              <>
               <Button
                 size="sm"
                 variant="outline"
@@ -352,6 +435,8 @@ export function RenewalPage() {
                 <XCircle className="h-4 w-4" />
                 Tolak
               </Button>
+              </>
+              )}
               <button
                 type="button"
                 onClick={() => setTerpilih(new Set())}
@@ -390,11 +475,11 @@ export function RenewalPage() {
             <Table>
               <THead>
                 <Tr>
-                  {bolehMenjawab && (
+                  {memilih && (
                     <Th className="w-10">
                       <input
                         type="checkbox"
-                        aria-label="Pilih semua yang belum dijawab"
+                        aria-label={bolehMenjawab ? 'Pilih semua yang belum dijawab' : 'Pilih semua yang siap diminta invoice'}
                         checked={bisaDipilih.length > 0 && terpilih.size === bisaDipilih.length}
                         onChange={(e) =>
                           setTerpilih(e.target.checked ? new Set(bisaDipilih.map((r) => r.id)) : new Set())
@@ -406,21 +491,21 @@ export function RenewalPage() {
                   )}
                   <Th>Member</Th>
                   <Th>Jatuh tempo</Th>
-                  <Th>Ditugaskan</Th>
-                  <Th>Jawaban</Th>
-                  {(bolehMenjawab || bolehTagih) && <Th className="text-right">Tindakan</Th>}
+                  <Th>Jawaban MC</Th>
+                  <Th>Status renewal</Th>
+                  {(bolehMenjawab || bolehTagih || bolehMintaInvoice) && <Th className="text-right">Tindakan</Th>}
                 </Tr>
               </THead>
               <TBody>
                 {potongan.map((r) => (
                   <Tr key={r.id}>
-                    {bolehMenjawab && (
+                    {memilih && (
                       <Td>
                         <input
                           type="checkbox"
                           aria-label={`Pilih ${r.memberName ?? r.memberId}`}
                           checked={terpilih.has(r.id)}
-                          disabled={r.answer !== 'pending'}
+                          disabled={!idDipilih.has(r.id)}
                           onChange={() =>
                             setTerpilih((lama) => {
                               const baru = new Set(lama)
@@ -440,28 +525,41 @@ export function RenewalPage() {
                     <Td className="whitespace-nowrap text-ink-600">
                       {r.renewalDate ? formatDate(r.renewalDate) : <span className="text-ink-400">—</span>}
                     </Td>
-                    <Td className="text-ink-600">
-                      {r.assignedMc ? (
-                        // Nama dari server. Id akun tidak pernah ditampilkan:
-                        // deretan huruf dan angka tidak memberi tahu siapa pun
-                        // siapa yang harus menjawab.
-                        (r.assignedMcName ?? namaMc.get(r.assignedMc) ?? (
-                          <span className="text-ink-400">MC tidak dikenal</span>
-                        ))
-                      ) : (
-                        // Bukan sel kosong: tidak ditugaskan ke siapa pun BUKAN
-                        // berarti tidak ada yang menanganinya — permintaannya
-                        // terlihat oleh seluruh MC chapter itu.
-                        <span className="text-ink-400">Semua MC</span>
-                      )}
-                    </Td>
                     <Td className="whitespace-nowrap">
                       <Badge tone={TONE[r.answer]}>{LABEL[r.answer]}</Badge>
                       {r.note && <div className="mt-1 text-xs text-ink-500">{r.note}</div>}
+                      <div className="mt-1 text-xs text-ink-400">
+                        {r.assignedMc
+                          ? // Nama dari server. Id akun tidak pernah ditampilkan:
+                            // deretan huruf dan angka tidak memberi tahu siapa pun
+                            // siapa yang harus menjawab.
+                            (r.assignedMcName ?? namaMc.get(r.assignedMc) ?? 'MC tidak dikenal')
+                          : // Tidak ditugaskan ke siapa pun BUKAN berarti tidak ada
+                            // yang menanganinya: seluruh MC chapter itu melihatnya.
+                            'Semua MC'}
+                      </div>
                     </Td>
-                    {(bolehMenjawab || bolehTagih) && (
+                    <Td className="whitespace-nowrap">
+                      <TahapBadge tahap={r.stage} />
+                      {r.invoiceId && r.invoiceNumber ? (
+                        <Link
+                          to={`/invoices/${r.invoiceId}`}
+                          className="mt-1 block text-xs font-medium text-brand-600 hover:underline"
+                        >
+                          {r.invoiceNumber}
+                        </Link>
+                      ) : (
+                        r.invoiceRequestedAt && (
+                          <div className="mt-1 text-xs text-ink-500">
+                            Diminta {formatDate(r.invoiceRequestedAt)}
+                            {r.invoiceRequestedBy ? ` oleh ${r.invoiceRequestedBy}` : ''}
+                          </div>
+                        )
+                      )}
+                    </Td>
+                    {(bolehMenjawab || bolehTagih || bolehMintaInvoice) && (
                       <Td className="text-right">
-                        <div className="inline-flex gap-1">
+                        <div className="inline-flex flex-wrap justify-end gap-1">
                           {bolehMenjawab && (
                             <>
                               <TombolJawab
@@ -487,7 +585,33 @@ export function RenewalPage() {
                               />
                             </>
                           )}
-                          {bolehTagih && r.answer === 'pending' && (
+                          {bolehMintaInvoice && r.stage === 'will_renew' && (
+                            <TombolJawab
+                              icon={FilePlus2}
+                              label="Minta invoice"
+                              tone="hover:text-brand-600"
+                              disabled={memproses === r.id || massalSibuk}
+                              onClick={() => mintaInvoice([r.id])}
+                            />
+                          )}
+                          {bolehMintaInvoice && r.stage === 'invoice_requested' && (
+                            <TombolJawab
+                              icon={Undo2}
+                              label="Tarik permintaan"
+                              tone="hover:text-red-600"
+                              disabled={memproses === r.id}
+                              onClick={() => tarikPermintaanInvoice(r)}
+                            />
+                          )}
+                          {bolehKirimBukti && r.stage === 'invoiced' && r.invoiceId && (
+                            <TombolJawab
+                              icon={Upload}
+                              label="Kirim bukti bayar"
+                              tone="hover:text-brand-600"
+                              onClick={() => navigate(`/invoices/${r.invoiceId}`)}
+                            />
+                          )}
+                          {(bolehTagih || bolehMintaInvoice) && r.answer === 'pending' && (
                             <TombolJawab
                               icon={Trash2}
                               label="Batalkan"

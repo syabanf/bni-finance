@@ -307,7 +307,7 @@ func (s *Service) beritahuFinance(ctx context.Context, perChapter map[string]int
 }
 
 func (s *Service) pesanFinance(p PenerimaMC, jumlah int, oleh string) mailer.Pesan {
-	tautan := s.baseURL + "/renewal?tahap=invoice_requested"
+	tautan := s.baseURL + "/renewal?periode=semua&tahap=invoice_requested"
 	ringkas := fmt.Sprintf("%s meminta invoice renewal untuk %d member yang sudah disetujui MC.", oleh, jumlah)
 	return mailer.Pesan{
 		Ke:     p.Email,

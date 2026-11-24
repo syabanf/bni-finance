@@ -21,6 +21,63 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 
 ---
 
+## Putaran 24 November 2026
+
+Sumber: pesan klien berisi alur renewal membership, dan pertanyaan lanjutan apakah halaman
+Konfirmasi Renewal bisa menampilkan status sampai lunas.
+
+### Ringkasan
+
+| No | Masukan | Status |
+| --- | --- | --- |
+| F-11 | Alur renewal enam langkah, dari email BNI Global sampai finance mengajukan renewal | `dikerjakan` |
+| F-12 | Status lunas atau belum ditampilkan di Konfirmasi Renewal | `dikerjakan` |
+
+**F-11. Alur renewal.** `dikerjakan`
+
+Alur dari klien:
+
+1. BNI Global mengirim email ke MC dan ST berisi member yang akan jatuh tempo.
+2. ST meminta daftar member yang sudah disetujui MC.
+3. ST meminta invoice ke finance national office.
+4. Invoice dikirim ke member berdasarkan permintaan ST.
+5. ST memberikan bukti bayar ke finance.
+6. Finance mengajukan renewal membership.
+
+Langkah 1 terjadi di luar sistem, dan langkah 2 sudah ada lewat Konfirmasi Renewal.
+Perubahan untuk langkah 3 sampai 6:
+
+- **Langkah 3.** ST mencentang member yang sudah Diterima MC lalu menekan **Minta invoice
+  ke finance**. Finance menerima email dan melihat antreannya di Konfirmasi Renewal dengan
+  saringan status **Invoice diminta**.
+- **Langkah 4.** Hanya finance (admin) yang membuat dan mengirim invoice. ST tidak lagi
+  punya tombol buat, kirim, atau tandai lunas.
+- **Langkah 5.** ST mengirim bukti transfer dari halaman detail invoice. Bukti itu berstatus
+  **Menunggu verifikasi** sampai finance menyetujuinya di halaman **Bukti Bayar**, dan baru
+  saat itu invoice menjadi lunas. Bila ditolak, finance menulis alasannya dan ST bisa mengirim
+  bukti baru. Pembayaran lewat Paper.id tetap lunas otomatis.
+- **Langkah 6.** Halaman **Pengajuan BNI Global** memuat invoice renewal yang sudah lunas.
+  Finance mencentang yang sudah diajukan, mengisi tanggalnya, lalu menandainya. Tab
+  **Belum diajukan** menjadi daftar kerja supaya tidak ada member yang terlewat.
+
+Kedua halaman baru punya pencarian nomor invoice atau nama member dan saringan chapter.
+
+Jawaban untuk klien: alur itu sudah diterapkan. ST meminta invoice dan mengirim bukti bayar,
+finance menerbitkan invoice, memverifikasi bukti, dan menandai renewal yang sudah diajukan
+ke BNI Global.
+
+**F-12. Status sampai lunas di Konfirmasi Renewal.** `dikerjakan`
+
+Kolom **Status renewal** menampilkan tahap terakhir tiap member: menunggu jawaban MC, siap
+diminta invoice, invoice diminta, belum dibayar, bukti menunggu finance, lunas, dan diajukan
+ke BNI Global. Nomor invoicenya tertaut ke halaman detail. Saringan **Semua status** memilih
+satu tahap, dan pilihan periode **Semua periode** membuka antrean lintas periode.
+
+Jawaban untuk klien: bisa. Halaman Konfirmasi Renewal menampilkan status tiap member sampai
+lunas dan sampai diajukan ke BNI Global, tanpa perlu membuka halaman invoice.
+
+---
+
 ## Putaran 19 November 2026
 
 Sumber: lembar feedback klien dan penjelasan lanjutan lewat pesan pada hari yang sama.

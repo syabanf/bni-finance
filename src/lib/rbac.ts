@@ -4,9 +4,9 @@ import type { UserRole } from '@/types'
  * RBAC berbasis kemampuan (capability), bukan cakupan data.
  *
  * - **Admin** — kontrol penuh, nasional.
- * - **ST**    — Secretary/Treasurer. Sama seperti admin untuk invoice dan
- *   pembayaran, tapi HANYA di chapternya sendiri. Tidak mengubah pengaturan
- *   dan tidak menjalankan sinkronisasi — keduanya nasional.
+ * - **ST**: Secretary/Treasurer, di chapternya sendiri. Mengikuti alur
+ *   renewal klien: meminta invoice ke finance dan mengirim bukti bayar. Finance
+ *   (admin) yang menerbitkan invoice dan menandai lunas.
  * - **MC**    — Membership Committee. Melihat dan mengekspor; menjawab
  *   permintaan konfirmasi renewal (menyusul di alur B).
  * - **User**  — hanya melihat & mengekspor, nasional.
@@ -40,6 +40,10 @@ export type Permission =
   | 'sync:run'
   /** Ekspor Excel / CSV / PDF. */
   | 'export:data'
+  /** ST meminta finance menerbitkan invoice renewal. */
+  | 'invoice:request'
+  /** ST mengirim bukti bayar ke finance untuk diverifikasi. */
+  | 'payment:submit'
 
 const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
   admin: [
@@ -50,11 +54,10 @@ const ROLE_PERMISSIONS: Record<UserRole, readonly Permission[]> = {
     'sync:run',
     'export:data',
   ],
-  // ST punya kemampuan yang sama dengan admin atas invoice dan pembayaran —
-  // yang membedakan bukan daftar ini, melainkan LINGKUPNYA di backend. Yang
-  // sengaja TIDAK diberikan: settings:manage dan sync:run, karena keduanya
-  // mengubah hal yang berlaku nasional, bukan hanya untuk satu chapter.
-  st: ['invoice:create', 'invoice:manage', 'payment:record', 'export:data'],
+  // Alur renewal klien (24 November 2026): ST meminta invoice ke finance
+  // nasional dan mengirim bukti bayar kepadanya. Menerbitkan invoice dan
+  // menandai lunas adalah pekerjaan finance, dan server menolaknya dari ST.
+  st: ['invoice:request', 'payment:submit', 'export:data'],
   mc: ['export:data'],
   user: ['export:data'],
 }

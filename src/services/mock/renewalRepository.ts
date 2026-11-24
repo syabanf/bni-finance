@@ -1,10 +1,12 @@
 import type { RenewalRepository } from '@/services/types'
-import type { RenewalAnswer, RenewalRequest } from '@/types'
+import type { RenewalAnswer, RenewalRequest, RenewalStage } from '@/types'
 import { delay, nextId, nowISO, store } from './store'
 import { mockUserRepository } from './userRepository'
 // Kedua modul saling mengimpor. Aman karena tidak ada yang memanggil fungsi
 // modul lain saat dimuat, hanya saat repository dipakai.
 import { periodeTerdaftar } from './periodRepository'
+import { buktiMenunggu } from './proofRepository'
+import { mockAuthRepository } from './authRepository'
 
 /**
  * Konfirmasi renewal versi contoh.
@@ -19,14 +21,48 @@ import { periodeTerdaftar } from './periodRepository'
  */
 const requests: RenewalRequest[] = []
 
+/**
+ * Invoice renewal untuk konfirmasi ini, dengan aturan yang sama dengan server:
+ * invoice renewal member itu yang dibuat setelah konfirmasinya diminta dan
+ * tidak dibatalkan, yang terbaru.
+ */
+function invoiceKonfirmasi(r: RenewalRequest) {
+  return store.invoices
+    .filter(
+      (i) =>
+        i.memberId === r.memberId &&
+        i.type === 'renewal' &&
+        i.status !== 'cancelled' &&
+        i.status !== 'terminated' &&
+        i.createdAt >= r.requestedAt,
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+}
+
+/** Urutan tahapnya sama dengan CASE di renewal/repository.go. */
+function tahap(r: RenewalRequest): RenewalStage {
+  const inv = invoiceKonfirmasi(r)
+  if (inv?.status === 'paid') return inv.renewalSubmittedAt ? 'submitted' : 'paid'
+  if (inv && buktiMenunggu(inv.id)) return 'proof_pending'
+  if (inv?.status === 'sent' || inv?.status === 'overdue') return 'invoiced'
+  if (inv?.status === 'draft') return 'invoice_draft'
+  if (r.answer === 'will_renew' && r.invoiceRequestedAt) return 'invoice_requested'
+  return r.answer
+}
+
 function isiRelasi(r: RenewalRequest): RenewalRequest {
   const m = store.members.find((x) => x.id === r.memberId)
   const c = store.chapters.find((x) => x.id === (m?.chapterId ?? r.chapterId))
+  const inv = invoiceKonfirmasi(r)
   return {
     ...r,
     memberName: m?.name ?? null,
     chapterName: c?.displayName ?? null,
     renewalDate: m?.renewalDate ?? null,
+    stage: tahap(r),
+    invoiceId: inv?.id ?? null,
+    invoiceNumber: inv?.number ?? null,
+    invoiceStatus: inv?.status ?? null,
   }
 }
 
@@ -107,6 +143,7 @@ export const mockRenewalRepository: RenewalRepository = {
         memberName: null,
         chapterName: null,
         renewalDate: null,
+        stage: 'pending',
         createdAt: nowISO(),
         updatedAt: nowISO(),
       })
@@ -124,6 +161,30 @@ export const mockRenewalRepository: RenewalRepository = {
     }
     requests.splice(i, 1)
     return delay(undefined, 200)
+  },
+
+  async requestInvoice(ids) {
+    let diminta = 0
+    for (const id of new Set(ids)) {
+      const r = requests.find((x) => x.id === id)
+      if (!r || r.answer !== 'will_renew' || r.invoiceRequestedAt || invoiceKonfirmasi(r)) continue
+      r.invoiceRequestedAt = nowISO()
+      r.invoiceRequestedBy = mockAuthRepository.getCurrentUser()?.name ?? 'Pengguna Demo'
+      r.updatedAt = r.invoiceRequestedAt
+      diminta++
+    }
+    return delay({ diminta, dilewati: new Set(ids).size - diminta }, 250)
+  },
+
+  async cancelInvoiceRequest(id) {
+    const r = requests.find((x) => x.id === id)
+    if (!r) throw new Error('Permintaan tidak ditemukan.')
+    if (!r.invoiceRequestedAt) throw new Error('invoice member ini belum diminta')
+    if (invoiceKonfirmasi(r)) throw new Error('finance sudah membuat invoicenya; permintaan tidak bisa ditarik')
+    r.invoiceRequestedAt = null
+    r.invoiceRequestedBy = null
+    r.updatedAt = nowISO()
+    return delay(isiRelasi(r), 200)
   },
 
   async answer(id, answer: RenewalAnswer, note) {

@@ -19,6 +19,7 @@ import { BellRing,
   Upload,
   XCircle,
   UserMinus,
+  Globe2,
 } from 'lucide-react'
 import type { AuditAction, AuditLogEntry, InvoiceWithRelations, PaymentWithInvoice } from '@/types'
 import {
@@ -48,6 +49,8 @@ import { MANUAL_METHODS, paymentMethodLabel } from '@/lib/paymentMethod'
 import { addYear, todayISO } from '@/lib/date'
 import { cn } from '@/lib/cn'
 import { InvoicePreview } from './components/InvoicePreview'
+import { BuktiBayarCard } from '@/features/payments/components/BuktiBayarCard'
+import { PengajuanCard } from '@/features/renewal/components/PengajuanCard'
 import { downloadInvoice } from './lib/invoiceDocument'
 
 const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> = {
@@ -60,6 +63,7 @@ const AUDIT_META: Record<AuditAction, { icon: typeof FilePlus2; tone: string }> 
   reminded: { icon: BellRing, tone: 'bg-brand-50 text-brand-500' },
   terminated: { icon: Ban, tone: 'bg-violet-50 text-violet-500' },
   tax_invoice: { icon: FileText, tone: 'bg-emerald-50 text-emerald-600' },
+  renewal_submitted: { icon: Globe2, tone: 'bg-emerald-50 text-emerald-600' },
 }
 
 const AUDIT_LABEL: Record<AuditAction, string> = {
@@ -72,6 +76,7 @@ const AUDIT_LABEL: Record<AuditAction, string> = {
   reminded: 'Pengingat dikirim',
   terminated: 'Keanggotaan diputus',
   tax_invoice: 'Faktur pajak dilampirkan',
+  renewal_submitted: 'Renewal diajukan ke BNI Global',
 }
 
 type DialogKind = 'send' | 'preview' | 'paid' | 'manual' | 'cancel' | 'terminate' | 'edit' | 'delete' | null
@@ -510,6 +515,9 @@ export function InvoiceDetailPage() {
               </div>
             </CardBody>
           </Card>
+
+          <BuktiBayarCard invoice={invoice} onBerubah={refresh} />
+          <PengajuanCard invoice={invoice} onBerubah={refresh} />
 
           {/* Faktur pajak terbit atas pembayaran yang sudah diterima, jadi
               kartunya baru ada setelah invoice lunas. */}

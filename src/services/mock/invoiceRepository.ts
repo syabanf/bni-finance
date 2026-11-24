@@ -114,6 +114,12 @@ function saring(semua: InvoiceWithRelations[], filters?: InvoiceFilters) {
     })
   }
 
+  // Sama dengan server: kedua nilai sekaligus membatasi ke renewal yang lunas.
+  if (filters?.submission) {
+    const sudah = filters.submission === 'done'
+    hasil = hasil.filter((i) => i.type === 'renewal' && i.status === 'paid' && !!i.renewalSubmittedAt === sudah)
+  }
+
   if (filters?.memberIds) {
     const milik = new Set(filters.memberIds)
     hasil = hasil.filter((i) => milik.has(i.memberId))
@@ -475,6 +481,45 @@ export const mockInvoiceRepository: InvoiceRepository = {
       notes: diganti ? 'faktur pajak diganti' : 'faktur pajak dilampirkan',
     })
     return delay(invoice, 400)
+  },
+
+  async markRenewalSubmitted(ids, submittedAt) {
+    if (submittedAt && submittedAt > todayISO()) throw new Error('tanggal pengajuan tidak boleh di masa depan')
+    const tanggal = submittedAt ? new Date(submittedAt).toISOString() : nowISO()
+    let ditandai = 0
+    for (const id of new Set(ids)) {
+      const inv = store.invoices.find((i) => i.id === id)
+      if (!inv || inv.type !== 'renewal' || inv.status !== 'paid' || inv.renewalSubmittedAt) continue
+      inv.renewalSubmittedAt = tanggal
+      inv.renewalSubmittedBy = 'Admin Nasional'
+      inv.updatedAt = nowISO()
+      pushAudit({
+        invoiceId: id,
+        action: 'renewal_submitted',
+        actorId: 'admin-national',
+        actorName: 'Admin Nasional',
+        notes: `renewal diajukan ke BNI Global, tanggal ${tanggal.slice(0, 10)}`,
+      })
+      ditandai++
+    }
+    return delay({ ditandai, dilewati: new Set(ids).size - ditandai }, 300)
+  },
+
+  async unmarkRenewalSubmitted(id) {
+    const inv = store.invoices.find((i) => i.id === id)
+    if (!inv) throw new Error('Invoice tidak ditemukan.')
+    if (!inv.renewalSubmittedAt) throw new Error('invoice ini belum ditandai diajukan ke BNI Global')
+    inv.renewalSubmittedAt = undefined
+    inv.renewalSubmittedBy = undefined
+    inv.updatedAt = nowISO()
+    pushAudit({
+      invoiceId: id,
+      action: 'updated',
+      actorId: 'admin-national',
+      actorName: 'Admin Nasional',
+      notes: 'tanda pengajuan renewal ke BNI Global dibatalkan',
+    })
+    return delay(inv, 200)
   },
 
   async recordManualPayment(id, input) {

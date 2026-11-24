@@ -14,12 +14,14 @@ import { MemberDetailPage } from '@/features/members/MemberDetailPage'
 import { MembershipLengthPage } from '@/features/members/MembershipLengthPage'
 import { ChapterListPage } from '@/features/chapters/ChapterListPage'
 import { PaymentDetailPage } from '@/features/payments/PaymentDetailPage'
+import { PaymentProofsPage } from '@/features/payments/PaymentProofsPage'
 import { PaymentListPage } from '@/features/payments/PaymentListPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { IntegrasiPage } from '@/features/settings/IntegrasiPage'
 import { JUDUL_INTEGRASI } from '@/lib/fitur'
 import { ImportPage } from '@/features/import/ImportPage'
 import { RenewalPage } from '@/features/renewal/RenewalPage'
+import { RenewalSubmissionPage } from '@/features/renewal/RenewalSubmissionPage'
 import { UsersPage } from '@/features/users/UsersPage'
 import { BlackboxPage } from '@/features/blackbox/BlackboxPage'
 import { ApiConsolePage } from '@/features/apiconsole/ApiConsolePage'
@@ -70,6 +72,7 @@ export const router = createBrowserRouter([
 
           { path: '/chapters', element: <ChapterListPage /> },
           { path: '/payments', element: <PaymentListPage /> },
+          { path: '/payments/proofs', element: <PaymentProofsPage /> },
           { path: '/payments/:id', element: <PaymentDetailPage /> },
           { path: '/reports', element: <ReportPage /> },
           { path: '/panduan', element: <PanduanPage /> },
@@ -88,6 +91,16 @@ export const router = createBrowserRouter([
             // yang boleh MENJAWAB diperiksa di server, bukan di rute.
             path: '/renewal',
             element: <RenewalPage />,
+          },
+          {
+            // Admin saja: menandai pengajuan ke BNI Global adalah pekerjaan
+            // finance nasional, dan server menolaknya dari peran lain.
+            path: '/renewal/submissions',
+            element: (
+              <RequirePermission permission="invoice:manage">
+                <RenewalSubmissionPage />
+              </RequirePermission>
+            ),
           },
           {
             // Admin saja. Impor menulis lintas chapter sekaligus — mengizinkan
