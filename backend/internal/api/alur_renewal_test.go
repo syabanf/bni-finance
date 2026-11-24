@@ -126,6 +126,34 @@ func TestAlurRenewalKlien(t *testing.T) {
 	var p3 domain.PaymentProof
 	mustJSON(t, s.reqAs(t, st, http.MethodPost, "/api/v1/payment-proofs", bukti, http.StatusCreated), &p3)
 
+	// Saringan dan batas chapter pada daftar bukti: ST chapter lain tidak
+	// melihat apa pun, dan tiap saringan mengembalikan himpunan yang tepat.
+	jumlahBukti := func(token, q string) int {
+		t.Helper()
+		var out struct{ Meta struct{ Total int } }
+		mustJSON(t, s.reqAs(t, token, http.MethodGet, "/api/v1/payment-proofs"+q, "", http.StatusOK), &out)
+		return out.Meta.Total
+	}
+	for _, k := range []struct {
+		nama, token, q string
+		mau            int
+	}{
+		{"ST chapter lain", stLain, "", 0},
+		{"ST chapter lain, saring chapter orang", stLain, "?chapterId=ch-alur", 0},
+		{"ST sendiri", st, "", 2},
+		{"menunggu", st, "?status=pending", 1},
+		{"ditolak", st, "?status=rejected", 1},
+		{"disetujui", st, "?status=approved", 0},
+		{"per invoice", s.token, "?invoiceId=" + inv.ID, 2},
+		{"chapter lain oleh admin", s.token, "?chapterId=ch-lain", 0},
+	} {
+		if dapat := jumlahBukti(k.token, k.q); dapat != k.mau {
+			t.Errorf("daftar bukti %s: dapat %d, mau %d", k.nama, dapat, k.mau)
+		}
+	}
+	s.req(t, http.MethodGet, "/api/v1/payment-proofs?status=ngawur", "", http.StatusBadRequest)
+	s.reqAs(t, stLain, http.MethodGet, "/api/v1/payment-proofs/"+p3.ID, "", http.StatusNotFound)
+
 	var disetujui domain.PaymentProof
 	mustJSON(t, s.req(t, http.MethodPost, "/api/v1/payment-proofs/"+p3.ID+"/approve", `{}`, http.StatusOK), &disetujui)
 	if disetujui.Status != domain.ProofApproved || disetujui.PaymentID == nil || disetujui.InvoiceStatus != domain.StatusPaid {
@@ -159,6 +187,26 @@ func TestAlurRenewalKlien(t *testing.T) {
 		t.Fatalf("pengajuan ulang: %+v", tanda)
 	}
 	tahap(domain.StageSubmitted)
+
+	// Batas chapter pada daftar konfirmasi dan saringan pengajuan.
+	for _, k := range []struct {
+		nama, token, path string
+		mau               int
+	}{
+		{"konfirmasi, ST chapter lain", stLain, "/api/v1/renewal-requests", 0},
+		{"konfirmasi, ST sendiri", st, "/api/v1/renewal-requests", 1},
+		{"tahap diajukan", st, "/api/v1/renewal-requests?stage=submitted", 1},
+		{"tahap lunas", st, "/api/v1/renewal-requests?stage=paid", 0},
+		{"sudah diajukan, ST chapter lain", stLain, "/api/v1/invoices?submission=done", 0},
+		{"sudah diajukan, ST sendiri", st, "/api/v1/invoices?submission=done", 1},
+		{"belum diajukan", s.token, "/api/v1/invoices?submission=pending", 0},
+	} {
+		var out struct{ Meta struct{ Total int } }
+		mustJSON(t, s.reqAs(t, k.token, http.MethodGet, k.path, "", http.StatusOK), &out)
+		if out.Meta.Total != k.mau {
+			t.Errorf("%s: dapat %d, mau %d", k.nama, out.Meta.Total, k.mau)
+		}
+	}
 
 	var jejak struct{ Data []domain.AuditEntry }
 	mustJSON(t, s.req(t, http.MethodGet, "/api/v1/invoices/"+inv.ID+"/audit", "", http.StatusOK), &jejak)
