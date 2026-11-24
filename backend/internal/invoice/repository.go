@@ -25,7 +25,7 @@ const columns = `
 	payment_provider, xendit_external_id, xendit_payment_id, xendit_payment_method,
 	xendit_va_bank, xendit_va_number, xendit_qris_string, xendit_payment_status, xendit_expires_at,
 	paid_at, paid_amount, notes, created_by, cancelled_by, cancelled_at, cancel_reason,
-	created_at, updated_at, rincian`
+	created_at, updated_at, rincian, renewal_submitted_at, renewal_submitted_by`
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -85,7 +85,7 @@ func scan(row scannable) (*domain.Invoice, error) {
 		&inv.PaymentProvider, &inv.XenditExternalID, &inv.XenditPaymentID, &inv.XenditPaymentMethod,
 		&inv.XenditVaBank, &inv.XenditVaNumber, &inv.XenditQrisString, &inv.XenditPaymentStatus, &inv.XenditExpiresAt,
 		&inv.PaidAt, &inv.PaidAmount, &inv.Notes, &inv.CreatedBy, &inv.CancelledBy, &inv.CancelledAt, &inv.CancelReason,
-		&inv.CreatedAt, &inv.UpdatedAt, &inv.Rincian,
+		&inv.CreatedAt, &inv.UpdatedAt, &inv.Rincian, &inv.RenewalSubmittedAt, &inv.RenewalSubmittedBy,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -190,6 +190,14 @@ func klausaFilter(ctx context.Context, f domain.InvoiceFilter) (string, []any) {
 	// tunggakan yang bergeser sehari mengubah invoice mana yang masuk laporan.
 	//
 	// Hanya sent dan overdue yang punya umur — yang lain sudah selesai urusannya.
+	// Pengajuan renewal ke BNI Global hanya berlaku untuk invoice renewal yang
+	// lunas, jadi kedua nilainya sekaligus membatasi tipe dan status.
+	switch f.Submission {
+	case "pending":
+		where = append(where, "type = 'renewal' AND status = 'paid' AND renewal_submitted_at IS NULL")
+	case "done":
+		where = append(where, "type = 'renewal' AND status = 'paid' AND renewal_submitted_at IS NOT NULL")
+	}
 	switch f.Aging {
 	case "1-30":
 		where = append(where, "status IN ('sent','overdue') AND due_date BETWEEN current_date - 30 AND current_date - 1")
@@ -956,4 +964,89 @@ func periksaKonfirmasiRenewal(ctx context.Context, tx pgx.Tx, memberID string) e
 	default:
 		return httpx.BadRequest("jawaban MC atas konfirmasi renewal member ini masih belum pasti")
 	}
+}
+
+// AjukanRenewal menandai invoice renewal yang lunas sudah diajukan finance ke
+// BNI Global, lalu mengembalikan jumlah yang benar-benar ditandai.
+//
+// Invoice yang belum lunas, bukan renewal, atau sudah diajukan dilewati oleh
+// klausa WHERE-nya, jadi menekan tombolnya dua kali tidak menggeser tanggal
+// pengajuan pertama.
+func (r *Repository) AjukanRenewal(ctx context.Context, ids []string, tanggal time.Time,
+	actorID, actorName *string) (int, error) {
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx, `
+		UPDATE invoices
+		   SET renewal_submitted_at = $2, renewal_submitted_by = $3, updated_at = now()
+		 WHERE id = ANY($1::uuid[]) AND type = 'renewal' AND status = 'paid'
+		   AND renewal_submitted_at IS NULL
+		RETURNING id::text`, ids, tanggal, actorName)
+	if err != nil {
+		return 0, fmt.Errorf("tandai pengajuan renewal: %w", err)
+	}
+	ditandai, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return 0, fmt.Errorf("baca invoice yang ditandai: %w", err)
+	}
+
+	catatan := "renewal diajukan ke BNI Global, tanggal " + tanggal.Format("2006-01-02")
+	for _, id := range ditandai {
+		if err := recordAudit(ctx, tx, auditRow{
+			InvoiceID: id, Action: domain.AuditRenewalSubmitted,
+			ActorID: actorID, ActorName: actorName, Notes: &catatan,
+		}); err != nil {
+			return 0, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("simpan pengajuan renewal: %w", err)
+	}
+	return len(ditandai), nil
+}
+
+// BatalkanPengajuan mengosongkan tanda pengajuan yang terpasang pada invoice
+// yang salah. Jejak auditnya tetap ada, ditambah satu baris pembatalan.
+func (r *Repository) BatalkanPengajuan(ctx context.Context, id string,
+	actorID, actorName *string) (*domain.Invoice, error) {
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("mulai transaksi: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var diajukan *time.Time
+	switch err := tx.QueryRow(ctx,
+		"SELECT renewal_submitted_at FROM invoices WHERE id = $1 FOR UPDATE", id).Scan(&diajukan); {
+	case errors.Is(err, pgx.ErrNoRows):
+		return nil, httpx.ErrNotFound
+	case err != nil:
+		return nil, fmt.Errorf("kunci invoice: %w", err)
+	case diajukan == nil:
+		return nil, httpx.Conflict("invoice ini belum ditandai diajukan ke BNI Global")
+	}
+
+	inv, err := scan(tx.QueryRow(ctx, `
+		UPDATE invoices SET renewal_submitted_at = NULL, renewal_submitted_by = NULL, updated_at = now()
+		WHERE id = $1 RETURNING `+columns, id))
+	if err != nil {
+		return nil, err
+	}
+	catatan := "tanda pengajuan renewal ke BNI Global dibatalkan"
+	if err := recordAudit(ctx, tx, auditRow{
+		InvoiceID: id, Action: domain.AuditUpdated,
+		ActorID: actorID, ActorName: actorName, Notes: &catatan,
+	}); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("batalkan pengajuan renewal: %w", err)
+	}
+	return inv, nil
 }

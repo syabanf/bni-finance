@@ -17,6 +17,7 @@ import (
 
 	"github.com/syabanf/bni-finance/backend/internal/api"
 	"github.com/syabanf/bni-finance/backend/internal/audit"
+	"github.com/syabanf/bni-finance/backend/internal/auth"
 	"github.com/syabanf/bni-finance/backend/internal/chapter"
 	"github.com/syabanf/bni-finance/backend/internal/config"
 	"github.com/syabanf/bni-finance/backend/internal/dashboard"
@@ -25,6 +26,7 @@ import (
 	"github.com/syabanf/bni-finance/backend/internal/member"
 	"github.com/syabanf/bni-finance/backend/internal/payment"
 	"github.com/syabanf/bni-finance/backend/internal/period"
+	"github.com/syabanf/bni-finance/backend/internal/proof"
 	"github.com/syabanf/bni-finance/backend/internal/renewal"
 	"github.com/syabanf/bni-finance/backend/internal/report"
 	"github.com/syabanf/bni-finance/backend/internal/settings"
@@ -96,9 +98,10 @@ func databaseName(url string) string {
 }
 
 type liveStack struct {
-	srv   *httptest.Server
-	token string
-	pool  *pgxpool.Pool
+	srv    *httptest.Server
+	token  string
+	pool   *pgxpool.Pool
+	signer *auth.Signer
 }
 
 // konfirmasiRenewal mencatat permintaan konfirmasi BARU yang dijawab
@@ -136,14 +139,21 @@ func newLiveServer(t *testing.T) *liveStack {
 		Report:    report.NewService(report.NewRepository(pool)),
 		Renewal:   renewal.NewService(renewal.NewRepository(pool), suratMati{}, ""),
 		Period:    period.NewService(period.NewRepository(pool)),
+		Proof:     proof.NewService(proof.NewRepository(pool)),
 	}, pool.Ping)
 
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
-	return &liveStack{srv: srv, token: tokenFor(t, signer, domain.RoleAdmin), pool: pool}
+	return &liveStack{srv: srv, token: tokenFor(t, signer, domain.RoleAdmin), pool: pool, signer: signer}
 }
 
 func (s *liveStack) req(t *testing.T, method, path, body string, want int) []byte {
+	t.Helper()
+	return s.reqAs(t, s.token, method, path, body, want)
+}
+
+// reqAs mengirim permintaan dengan token lain, misalnya ST berlingkup chapter.
+func (s *liveStack) reqAs(t *testing.T, token, method, path, body string, want int) []byte {
 	t.Helper()
 	var r io.Reader
 	if body != "" {
@@ -153,7 +163,7 @@ func (s *liveStack) req(t *testing.T, method, path, body string, want int) []byt
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Authorization", "Bearer "+s.token)
+	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)

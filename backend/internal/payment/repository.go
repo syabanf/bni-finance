@@ -208,9 +208,29 @@ func (r *Repository) CreateAndSettle(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	p, err := CatatDalamTx(ctx, tx, in, paidAt, settle)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaksi: %w", err)
+	}
+	return p, nil
+}
+
+// CatatDalamTx mencatat pembayaran di dalam transaksi pemanggil. Dipakai juga
+// saat finance menyetujui bukti bayar dari ST, supaya status bukti dan
+// pembayarannya berubah dalam satu transaksi yang sama.
+func CatatDalamTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	in domain.CreatePaymentInput,
+	paidAt time.Time,
+	settle bool,
+) (*domain.Payment, error) {
 	// Lock the invoice row so concurrent settlements can't race.
 	var status domain.InvoiceStatus
-	err = tx.QueryRow(ctx, "SELECT status FROM invoices WHERE id = $1 FOR UPDATE", in.InvoiceID).Scan(&status)
+	err := tx.QueryRow(ctx, "SELECT status FROM invoices WHERE id = $1 FOR UPDATE", in.InvoiceID).Scan(&status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, httpx.NotFound("invoice tidak ditemukan")
@@ -254,10 +274,6 @@ func (r *Repository) CreateAndSettle(
 		if err != nil {
 			return nil, fmt.Errorf("catat audit log: %w", err)
 		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit transaksi: %w", err)
 	}
 	return p, nil
 }

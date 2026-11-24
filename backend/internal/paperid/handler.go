@@ -18,10 +18,9 @@ func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
 // authenticated mux.
 func (h *Handler) RegisterProtected(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/invoices/{id}/send", auth.RequireAdmin(h.send))
-	// RequireWrite, bukan RequireAdmin: ST harus bisa mengirim invoice
-	// chapternya sendiri. Batas chapternya ditegakkan di dalam Send, lewat
-	// query yang membaca invoicenya — bukan di middleware ini.
-	mux.HandleFunc("POST /api/v1/invoices/send-bulk", auth.RequireWrite(h.sendBulk))
+	// Hanya admin: dalam alur renewal klien, finance nasional yang menerbitkan
+	// dan mengirim invoice. ST memintanya lewat Konfirmasi Renewal.
+	mux.HandleFunc("POST /api/v1/invoices/send-bulk", auth.RequireAdmin(h.sendBulk))
 	mux.HandleFunc("POST /api/v1/invoices/{id}/remind", auth.RequireAdmin(h.remind))
 	mux.HandleFunc("GET /api/v1/paperid/status", auth.RequireAdmin(h.status))
 	mux.HandleFunc("POST /api/v1/paperid/test-invoice", auth.RequireAdmin(h.testInvoice))

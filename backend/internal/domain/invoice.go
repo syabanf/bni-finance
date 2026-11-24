@@ -131,6 +131,11 @@ type Invoice struct {
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 
+	// RenewalSubmittedAt: kapan finance mengajukan renewal member ini ke BNI
+	// Global. Hanya terisi pada invoice renewal yang lunas.
+	RenewalSubmittedAt *time.Time `json:"renewalSubmittedAt,omitempty"`
+	RenewalSubmittedBy *string    `json:"renewalSubmittedBy,omitempty"`
+
 	// LateFee DIHITUNG saat dibaca, tidak pernah tersimpan. Nil bila fiturnya
 	// dimatikan atau tagihannya belum telat — lihat latefee.go.
 	//
@@ -251,6 +256,9 @@ type InvoiceFilter struct {
 	// membatasi ke sent dan overdue. Dihitung dari due_date terhadap hari ini,
 	// bukan disimpan — umur yang tersimpan basi keesokan harinya.
 	Aging string
+	// Submission menyaring invoice renewal lunas menurut pengajuannya ke BNI
+	// Global: "pending" belum diajukan, "done" sudah.
+	Submission string
 	// IDs dan MemberIDs membatasi ke invoice atau member tertentu, untuk
 	// halaman yang hanya butuh invoice milik baris yang sedang tampil.
 	IDs       []string
@@ -315,6 +323,30 @@ func (s InvoiceStatus) ValidateUpdateFrom(in UpdateInvoiceInput) error {
 		if in.Amount != nil || in.DueDate != nil || in.PeriodStart != nil || in.PeriodEnd != nil {
 			return fmt.Errorf("invoice berstatus %s tidak bisa diubah nominal/periodenya", s)
 		}
+	}
+	return nil
+}
+
+// AjukanRenewalInput adalah body POST /invoices/renewal-submissions: invoice
+// renewal lunas yang sudah diajukan finance ke BNI Global.
+type AjukanRenewalInput struct {
+	IDs []string `json:"ids"`
+	// SubmittedAt kosong berarti hari ini. Diisi bila finance mencatat
+	// pengajuan yang dilakukan pada hari sebelumnya.
+	SubmittedAt *Date `json:"submittedAt"`
+}
+
+// MaxAjukanRenewal membatasi satu permintaan, sama seperti kiriman massal.
+const MaxAjukanRenewal = 200
+
+func (in AjukanRenewalInput) Validate(hariIni time.Time) error {
+	switch {
+	case len(in.IDs) == 0:
+		return fmt.Errorf("ids wajib diisi")
+	case len(in.IDs) > MaxAjukanRenewal:
+		return fmt.Errorf("terlalu banyak invoice dalam satu permintaan (maksimal %d)", MaxAjukanRenewal)
+	case in.SubmittedAt != nil && in.SubmittedAt.After(hariIni):
+		return fmt.Errorf("tanggal pengajuan tidak boleh di masa depan")
 	}
 	return nil
 }

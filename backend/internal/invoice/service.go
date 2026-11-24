@@ -25,6 +25,8 @@ type Store interface {
 	LateFeeRule(ctx context.Context) (domain.LateFeeRule, error)
 	Summary(ctx context.Context, f domain.InvoiceFilter) (*domain.InvoiceSummary, error)
 	AttachTaxInvoice(ctx context.Context, id, url string, actorID, actorName *string) (*domain.Invoice, error)
+	AjukanRenewal(ctx context.Context, ids []string, tanggal time.Time, actorID, actorName *string) (int, error)
+	BatalkanPengajuan(ctx context.Context, id string, actorID, actorName *string) (*domain.Invoice, error)
 }
 
 // compile-time check that the Postgres repository satisfies the contract.
@@ -186,9 +188,42 @@ func (s *Service) AttachTaxInvoice(ctx context.Context, id, url string) (*domain
 	if !strings.HasPrefix(url, upload.URLPrefix) || strings.Contains(url, "..") {
 		return nil, httpx.BadRequest("url faktur pajak harus berkas yang diunggah lewat /api/v1/uploads")
 	}
-	var actorID, actorName *string
-	if u, ok := auth.UserFrom(ctx); ok {
-		actorID, actorName = &u.ID, &u.Name
-	}
+	actorID, actorName := pelaku(ctx)
 	return s.repo.AttachTaxInvoice(ctx, id, url, actorID, actorName)
+}
+
+func pelaku(ctx context.Context) (id, nama *string) {
+	if u, ok := auth.UserFrom(ctx); ok {
+		return &u.ID, &u.Name
+	}
+	return nil, nil
+}
+
+// AjukanRenewal mencatat bahwa finance sudah mengajukan renewal member ke BNI
+// Global. Langkah ini yang terakhir dalam alur renewal: sesudahnya tidak ada
+// lagi yang perlu dikerjakan di sistem ini untuk invoice itu.
+func (s *Service) AjukanRenewal(ctx context.Context, in domain.AjukanRenewalInput) (int, error) {
+	sekarang := time.Now()
+	if err := in.Validate(sekarang); err != nil {
+		return 0, httpx.BadRequest(err.Error())
+	}
+	ids := hanyaUUID(in.IDs)
+	if len(ids) == 0 {
+		return 0, httpx.BadRequest("ids tidak memuat id invoice yang sah")
+	}
+	tanggal := sekarang
+	if in.SubmittedAt != nil {
+		tanggal = in.SubmittedAt.Time
+	}
+	actorID, actorName := pelaku(ctx)
+	n, err := s.repo.AjukanRenewal(ctx, ids, tanggal, actorID, actorName)
+	s.kabari(ctx, err)
+	return n, err
+}
+
+func (s *Service) BatalkanPengajuan(ctx context.Context, id string) (*domain.Invoice, error) {
+	actorID, actorName := pelaku(ctx)
+	inv, err := s.repo.BatalkanPengajuan(ctx, id, actorID, actorName)
+	s.kabari(ctx, err)
+	return inv, err
 }

@@ -30,7 +30,7 @@
 -- lebih jujur daripada diam-diam memperluas haknya.
 delete from users where chapter_id is not null;
 
-truncate invoice_audit_log, payments, invoices, members,
+truncate payment_proofs, invoice_audit_log, payments, invoices, members,
          renewal_requests, reminder_log, fee_settings restart identity;
 
 -- DELETE, bukan TRUNCATE: selama constraint users.chapter_id ada, Postgres

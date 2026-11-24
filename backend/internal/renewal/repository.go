@@ -20,13 +20,41 @@ const columns = `
 	r.requested_by, r.requested_at, r.assigned_mc,
 	r.answer, r.answered_by, r.answered_at, r.note,
 	r.created_at, r.updated_at,
-	m.name, c.display_name, m.renewal_date, mc.name`
+	m.name, c.display_name, m.renewal_date, mc.name,
+	r.invoice_requested_at, r.invoice_requested_by, ` + tahap + `,
+	inv.id::text, inv.number, inv.status`
 
+// tahap menurunkan posisi member dalam alur renewal. Urutannya dari yang
+// paling jauh: invoice yang sudah ada menentukan tahap, apa pun jawaban MC.
+const tahap = `CASE
+		WHEN inv.status = 'paid' AND inv.renewal_submitted_at IS NOT NULL THEN 'submitted'
+		WHEN inv.status = 'paid' THEN 'paid'
+		WHEN inv.bukti_menunggu THEN 'proof_pending'
+		WHEN inv.status IN ('sent', 'overdue') THEN 'invoiced'
+		WHEN inv.status = 'draft' THEN 'invoice_draft'
+		WHEN r.answer = 'will_renew' AND r.invoice_requested_at IS NOT NULL THEN 'invoice_requested'
+		ELSE r.answer::text
+	END`
+
+// from menyertakan invoice renewal untuk konfirmasi ini, dengan aturan yang
+// sama dengan penjaga di invoice.periksaKonfirmasiRenewal: invoice renewal
+// member itu yang dibuat setelah konfirmasinya diminta dan tidak dibatalkan.
 const from = `
 	FROM renewal_requests r
 	JOIN members m  ON m.id = r.member_id
 	JOIN chapters c ON c.id = r.chapter_id
-	LEFT JOIN users mc ON mc.id = r.assigned_mc`
+	LEFT JOIN users mc ON mc.id = r.assigned_mc
+	LEFT JOIN LATERAL (
+		SELECT i.id, i.number, i.status, i.renewal_submitted_at,
+		       EXISTS (SELECT 1 FROM payment_proofs pp
+		                WHERE pp.invoice_id = i.id AND pp.status = 'pending') AS bukti_menunggu
+		  FROM invoices i
+		 WHERE i.member_id = r.member_id AND i.type = 'renewal'
+		   AND i.status NOT IN ('cancelled', 'terminated')
+		   AND i.created_at >= r.requested_at
+		 ORDER BY i.created_at DESC
+		 LIMIT 1
+	) inv ON true`
 
 type Repository struct{ db *pgxpool.Pool }
 
@@ -45,6 +73,8 @@ func scan(row scannable) (*domain.RenewalRequest, error) {
 		&r.Answer, &r.AnsweredBy, &r.AnsweredAt, &r.Note,
 		&r.CreatedAt, &r.UpdatedAt,
 		&r.MemberName, &r.ChapterName, &renewalDate, &r.AssignedMCName,
+		&r.InvoiceRequestedAt, &r.InvoiceRequestedBy, &r.Stage,
+		&r.InvoiceID, &r.InvoiceNumber, &r.InvoiceStatus,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -83,6 +113,9 @@ func (r *Repository) List(ctx context.Context, f domain.RenewalFilter) ([]domain
 	}
 	if f.Period != "" {
 		add("r.period = $%d", f.Period)
+	}
+	if f.Stage != "" {
+		add("("+tahap+") = $%d", f.Stage)
 	}
 
 	clause := strings.Join(where, " AND ")
@@ -307,4 +340,94 @@ func (r *Repository) Answer(ctx context.Context, id string, in domain.AnswerRene
 		return nil, fmt.Errorf("simpan jawaban renewal: %w", err)
 	}
 	return r.GetByID(ctx, id)
+}
+
+// tanpaInvoice adalah syarat bahwa konfirmasi r belum punya invoice renewal,
+// dengan aturan yang sama dengan lateral join di from.
+const tanpaInvoice = `NOT EXISTS (
+		SELECT 1 FROM invoices i
+		 WHERE i.member_id = r.member_id AND i.type = 'renewal'
+		   AND i.status NOT IN ('cancelled', 'terminated')
+		   AND i.created_at >= r.requested_at)`
+
+// MintaInvoice menandai konfirmasi yang Diterima MC sebagai "invoice diminta"
+// ke finance, lalu mengembalikan jumlah per chapter yang benar-benar ditandai.
+//
+// Yang belum Diterima, sudah diminta, atau sudah punya invoice dilewati oleh
+// klausa WHERE, jadi ST yang menekan tombolnya dua kali tidak menggeser
+// tanggal permintaan pertama.
+func (r *Repository) MintaInvoice(ctx context.Context, ids []string, oleh string) (map[string]int, error) {
+	lim := scope.Chapter(ctx)
+	if lim.Buntu {
+		return nil, httpx.Forbidden("tidak ada lingkup chapter pada permintaan ini")
+	}
+	args := []any{ids, oleh}
+	batas := ""
+	if lim.Terbatas {
+		args = append(args, lim.ChapterID)
+		batas = " AND r.chapter_id = $3"
+	}
+	rows, err := r.db.Query(ctx, `
+		UPDATE renewal_requests r
+		   SET invoice_requested_at = now(), invoice_requested_by = $2, updated_at = now()
+		 WHERE r.id = ANY($1::uuid[]) AND r.answer = 'will_renew'
+		   AND r.invoice_requested_at IS NULL AND `+tanpaInvoice+batas+`
+		RETURNING r.chapter_id`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("minta invoice: %w", err)
+	}
+	chapters, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("baca permintaan invoice: %w", err)
+	}
+	perChapter := map[string]int{}
+	for _, c := range chapters {
+		perChapter[c]++
+	}
+	return perChapter, nil
+}
+
+// BatalkanMintaInvoice menarik permintaan invoice yang belum dikerjakan
+// finance. Setelah invoicenya terbit, permintaan itu sudah terpenuhi.
+func (r *Repository) BatalkanMintaInvoice(ctx context.Context, id string) (*domain.RenewalRequest, error) {
+	sekarang, err := r.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case sekarang.InvoiceRequestedAt == nil:
+		return nil, httpx.Conflict("invoice member ini belum diminta")
+	case sekarang.InvoiceID != nil:
+		return nil, httpx.Conflict("finance sudah membuat invoicenya; permintaan tidak bisa ditarik")
+	}
+	tag, err := r.db.Exec(ctx, `
+		UPDATE renewal_requests r
+		   SET invoice_requested_at = NULL, invoice_requested_by = NULL, updated_at = now()
+		 WHERE r.id = $1 AND `+tanpaInvoice, id)
+	if err != nil {
+		return nil, fmt.Errorf("tarik permintaan invoice: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return nil, httpx.Conflict("finance sudah membuat invoicenya; permintaan tidak bisa ditarik")
+	}
+	return r.GetByID(ctx, id)
+}
+
+// PenerimaFinance mengambil akun admin, yaitu finance nasional yang
+// menerbitkan invoice atas permintaan ST.
+func (r *Repository) PenerimaFinance(ctx context.Context) ([]PenerimaMC, error) {
+	rows, err := r.db.Query(ctx, `SELECT id::text, email, name FROM users WHERE role = 'admin'`)
+	if err != nil {
+		return nil, fmt.Errorf("ambil akun finance: %w", err)
+	}
+	defer rows.Close()
+	var out []PenerimaMC
+	for rows.Next() {
+		var p PenerimaMC
+		if err := rows.Scan(&p.ID, &p.Email, &p.Nama); err != nil {
+			return nil, fmt.Errorf("baca akun finance: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }

@@ -815,6 +815,78 @@ alter table fee_settings add column if not exists biaya_training           bigin
 alter table invoices add column if not exists rincian jsonb;
 
 
+-- ---------------------------------------------------------------------------
+-- Alur renewal dari klien (24 November 2026)
+--
+--   1. BNI Global mengirim email ke MC dan ST berisi member yang jatuh tempo.
+--   2. ST meminta konfirmasi, MC menjawab (renewal_requests).
+--   3. ST meminta invoice ke finance nasional (invoice_requested_*).
+--   4. Finance menerbitkan invoice dan mengirimnya ke member.
+--   5. ST mengirim bukti bayar, finance memverifikasinya (payment_proofs).
+--   6. Finance mengajukan renewal ke BNI Global (renewal_submitted_*).
+--
+-- ST tidak menerbitkan invoice dan tidak menandai lunas sendiri. Kolom dan
+-- tabel di bawah mencatat serah terima antara ST dan finance.
+-- ---------------------------------------------------------------------------
+alter table renewal_requests
+  add column if not exists invoice_requested_at timestamptz,
+  add column if not exists invoice_requested_by text;
+
+-- Antrean "invoice diminta" di halaman finance hanya membaca baris yang terisi.
+create index if not exists idx_renewal_invoice_requested
+  on renewal_requests (invoice_requested_at) where invoice_requested_at is not null;
+
+alter table invoices
+  add column if not exists renewal_submitted_at timestamptz,
+  add column if not exists renewal_submitted_by text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_enum e join pg_type t on t.oid = e.enumtypid
+    where t.typname = 'audit_action' and e.enumlabel = 'renewal_submitted'
+  ) then
+    alter type audit_action add value 'renewal_submitted';
+  end if;
+end $$;
+
+-- Daftar "lunas, belum diajukan" adalah pekerjaan finance yang harus habis.
+create index if not exists idx_invoices_renewal_belum_diajukan
+  on invoices (paid_at) where type = 'renewal' and status = 'paid' and renewal_submitted_at is null;
+
+-- Bukti bayar yang dikirim ST dan menunggu verifikasi finance. Pembayaran baru
+-- tercatat di tabel payments saat finance menyetujuinya, jadi angka laporan
+-- tidak memuat bukti yang belum diperiksa.
+create table if not exists payment_proofs (
+  id                uuid primary key default gen_random_uuid(),
+  invoice_id        uuid not null references invoices(id),
+  -- Disalin dari invoicenya, supaya batas chapter ST cukup satu klausa WHERE.
+  chapter_id        text not null references chapters(id),
+  amount            bigint not null check (amount > 0),
+  paid_at           date not null,
+  payment_method    text,
+  proof_url         text not null,
+  note              text,
+  status            text not null default 'pending'
+                    check (status in ('pending', 'approved', 'rejected')),
+  submitted_by      text,
+  submitted_at      timestamptz not null default now(),
+  reviewed_by       text,
+  reviewed_at       timestamptz,
+  review_note       text,
+  payment_id        uuid references payments(id)
+);
+
+-- Satu bukti menunggu per invoice. Bukti kedua sebelum yang pertama diperiksa
+-- membuat finance memverifikasi pembayaran yang sama dua kali.
+create unique index if not exists idx_payment_proofs_satu_menunggu
+  on payment_proofs (invoice_id) where status = 'pending';
+create index if not exists idx_payment_proofs_status
+  on payment_proofs (status, submitted_at desc);
+create index if not exists idx_payment_proofs_chapter
+  on payment_proofs (chapter_id, status);
+
+
 create table if not exists integration_calls (
   id          bigserial   primary key,
   occurred_at timestamptz not null default now(),
