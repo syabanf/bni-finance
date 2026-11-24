@@ -67,6 +67,58 @@ type RenewalRequest struct {
 	// daftar akun hanya bisa dibaca admin: ST dan MC yang membuka halaman ini
 	// tidak punya cara lain mengubah id itu menjadi nama.
 	AssignedMCName *string `json:"assignedMcName,omitempty"`
+
+	// InvoiceRequestedAt: kapan ST meminta invoice ke finance (langkah 3 alur
+	// renewal klien). InvoiceRequestedBy menyimpan nama ST itu.
+	InvoiceRequestedAt *time.Time `json:"invoiceRequestedAt,omitempty"`
+	InvoiceRequestedBy *string    `json:"invoiceRequestedBy,omitempty"`
+
+	// Stage adalah tahap member ini dalam alur renewal, dihitung server dari
+	// jawaban MC, permintaan invoice, invoicenya, dan bukti bayarnya.
+	Stage RenewalStage `json:"stage"`
+	// Invoice renewal yang terbit untuk konfirmasi ini, bila ada.
+	InvoiceID     *string        `json:"invoiceId,omitempty"`
+	InvoiceNumber *string        `json:"invoiceNumber,omitempty"`
+	InvoiceStatus *InvoiceStatus `json:"invoiceStatus,omitempty"`
+}
+
+// RenewalStage adalah tahap satu member dalam alur renewal. Empat tahap awal
+// sama dengan jawaban MC; sisanya menyusul setelah MC menjawab Diterima.
+type RenewalStage string
+
+const (
+	StageInvoiceRequested RenewalStage = "invoice_requested" // ST meminta invoice ke finance
+	StageInvoiceDraft     RenewalStage = "invoice_draft"     // finance menyimpan draft
+	StageInvoiced         RenewalStage = "invoiced"          // invoice terkirim, belum lunas
+	StageProofPending     RenewalStage = "proof_pending"     // ST mengirim bukti, menunggu finance
+	StagePaid             RenewalStage = "paid"              // lunas, belum diajukan ke BNI Global
+	StageSubmitted        RenewalStage = "submitted"         // diajukan ke BNI Global
+)
+
+func (s RenewalStage) Valid() bool {
+	switch s {
+	case RenewalStage(RenewalPending), RenewalStage(RenewalWillRenew), RenewalStage(RenewalWillNot),
+		RenewalStage(RenewalUnsure), StageInvoiceRequested, StageInvoiceDraft, StageInvoiced,
+		StageProofPending, StagePaid, StageSubmitted:
+		return true
+	}
+	return false
+}
+
+// MintaInvoiceInput adalah permintaan ST ke finance untuk menerbitkan invoice
+// renewal member yang sudah Diterima MC.
+type MintaInvoiceInput struct {
+	IDs []string `json:"ids"`
+}
+
+func (in MintaInvoiceInput) Validate() error {
+	switch {
+	case len(in.IDs) == 0:
+		return fmt.Errorf("ids wajib diisi")
+	case len(in.IDs) > MaxRenewalRequestBatch:
+		return fmt.Errorf("terlalu banyak member dalam satu permintaan (maksimal %d)", MaxRenewalRequestBatch)
+	}
+	return nil
 }
 
 // CreateRenewalRequestInput adalah permintaan ST untuk sekumpulan member.
@@ -123,6 +175,7 @@ type RenewalFilter struct {
 	ChapterID string
 	Answer    string
 	Period    string
+	Stage     string
 	Limit     int
 	Offset    int
 }

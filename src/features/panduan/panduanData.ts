@@ -55,12 +55,23 @@ export const ALUR: AlurPanduan[] = [
   {
     id: 'konfirmasi-renewal',
     judul: 'Konfirmasi renewal sampai invoice',
-    ringkas: 'ST meminta konfirmasi, MC menjawab, lalu invoice dibuat sekaligus.',
+    ringkas: 'ST meminta konfirmasi, MC menjawab, ST meminta invoice, lalu finance menerbitkannya.',
     langkah: [
       'Buka Konfirmasi Renewal, pilih periode, lalu tekan Minta Konfirmasi.',
       'Pilih chapter, periksa member yang dicentang, lalu tekan Kirim permintaan. MC menerima email.',
       'MC membuka halaman yang sama, lalu menjawab Diterima, Tolak, atau Belum pasti.',
-      'Tekan Buat Invoice (N) untuk semua member yang dijawab Diterima. Invoice terbuat sebagai draft.',
+      'ST mencentang member yang Diterima, lalu tekan Minta invoice ke finance. Finance menerima email.',
+      'Finance memilih status Invoice diminta, lalu tekan Buat Invoice (N). Kolom Status renewal menunjukkan tahap tiap member sampai lunas.',
+    ],
+  },
+  {
+    id: 'bukti-bayar',
+    judul: 'Bukti bayar dan pengajuan ke BNI Global',
+    ringkas: 'ST mengirim bukti, finance memverifikasi, lalu finance mengajukan renewal.',
+    langkah: [
+      'ST membuka detail invoice yang sudah terkirim, lalu tekan Kirim bukti bayar ke finance.',
+      'Finance membuka Bukti Bayar, lalu tekan Setujui. Invoice menjadi lunas. Tolak dengan alasan bila buktinya salah.',
+      'Setelah mengajukan renewal ke BNI Global, finance membuka Pengajuan BNI Global, mencentang membernya, lalu tekan Tandai sudah diajukan.',
     ],
   },
   {

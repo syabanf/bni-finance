@@ -29,6 +29,9 @@ type Store interface {
 	PenerimaMC(ctx context.Context, chapterIDs []string) ([]PenerimaMC, error)
 	Answer(ctx context.Context, id string, in domain.AnswerRenewalInput, answeredBy string) (*domain.RenewalRequest, error)
 	Delete(ctx context.Context, id string) error
+	MintaInvoice(ctx context.Context, ids []string, oleh string) (map[string]int, error)
+	BatalkanMintaInvoice(ctx context.Context, id string) (*domain.RenewalRequest, error)
+	PenerimaFinance(ctx context.Context) ([]PenerimaMC, error)
 }
 
 var _ Store = (*Repository)(nil)
@@ -67,6 +70,9 @@ func NewService(repo Store, surat Surat, baseURL string) *Service {
 }
 
 func (s *Service) List(ctx context.Context, f domain.RenewalFilter) ([]domain.RenewalRequest, int, error) {
+	if f.Stage != "" && !domain.RenewalStage(f.Stage).Valid() {
+		return nil, 0, httpx.BadRequest(fmt.Sprintf("stage %q tidak dikenal", f.Stage))
+	}
 	return s.repo.List(ctx, f)
 }
 
@@ -229,6 +235,93 @@ func (s *Service) Jawab(ctx context.Context, id string, in domain.AnswerRenewalI
 	return s.repo.Answer(ctx, id, in, user.ID)
 }
 
+// HasilMintaInvoice melaporkan permintaan invoice ST ke finance.
+type HasilMintaInvoice struct {
+	Diminta  int        `json:"diminta"`
+	Dilewati int        `json:"dilewati"`
+	Email    HasilEmail `json:"email"`
+}
+
+// MintaInvoice adalah langkah 3 alur renewal klien: ST meminta finance
+// nasional menerbitkan invoice untuk member yang sudah Diterima MC. Finance
+// mendapat satu email per permintaan, berisi jumlah member per chapter.
+func (s *Service) MintaInvoice(ctx context.Context, in domain.MintaInvoiceInput) (*HasilMintaInvoice, error) {
+	if err := in.Validate(); err != nil {
+		return nil, httpx.BadRequest(err.Error())
+	}
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return nil, httpx.Unauthorized("token tidak disertakan")
+	}
+	ids := dedup(in.IDs)
+	perChapter, err := s.repo.MintaInvoice(ctx, ids, user.Name)
+	if err != nil {
+		return nil, err
+	}
+	diminta := 0
+	for _, n := range perChapter {
+		diminta += n
+	}
+	return &HasilMintaInvoice{
+		Diminta: diminta, Dilewati: len(ids) - diminta,
+		Email: s.beritahuFinance(ctx, perChapter, user.Name),
+	}, nil
+}
+
+func (s *Service) BatalkanMintaInvoice(ctx context.Context, id string) (*domain.RenewalRequest, error) {
+	return s.repo.BatalkanMintaInvoice(ctx, id)
+}
+
+// beritahuFinance mengirim satu email ke tiap admin. Kegagalannya dilaporkan
+// di hasil, karena permintaannya sudah tersimpan dan tetap terlihat di antrean.
+func (s *Service) beritahuFinance(ctx context.Context, perChapter map[string]int, oleh string) HasilEmail {
+	hasil := HasilEmail{ChapterTanpaMC: []string{}}
+	if len(perChapter) == 0 {
+		return hasil
+	}
+	penerima, err := s.repo.PenerimaFinance(ctx)
+	if err != nil {
+		slog.Error("akun finance tidak terbaca, email permintaan invoice tidak dikirim", "error", err)
+		hasil.Gagal = 1
+		return hasil
+	}
+	if !s.surat.Siap() {
+		hasil.BelumDikonfigurasi = true
+		return hasil
+	}
+	jumlah := 0
+	for _, n := range perChapter {
+		jumlah += n
+	}
+	ctxKirim, batal := context.WithTimeout(context.WithoutCancel(ctx), batasEmail)
+	defer batal()
+	for _, p := range penerima {
+		if err := s.surat.Kirim(ctxKirim, s.pesanFinance(p, jumlah, oleh)); err != nil {
+			slog.Warn("email permintaan invoice gagal", "error", err)
+			hasil.Gagal++
+			continue
+		}
+		hasil.Terkirim++
+	}
+	return hasil
+}
+
+func (s *Service) pesanFinance(p PenerimaMC, jumlah int, oleh string) mailer.Pesan {
+	tautan := s.baseURL + "/renewal?periode=semua&tahap=invoice_requested"
+	ringkas := fmt.Sprintf("%s meminta invoice renewal untuk %d member yang sudah disetujui MC.", oleh, jumlah)
+	return mailer.Pesan{
+		Ke:     p.Email,
+		Jenis:  "permintaan-invoice",
+		Subjek: fmt.Sprintf("Permintaan invoice renewal: %d member", jumlah),
+		Teks: "Halo " + p.Nama + ",\r\n\r\n" + ringkas + "\r\n\r\n" +
+			"Buka antrean permintaan invoice:\r\n" + tautan + "\r\n",
+		HTML: `<div style="font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a">` +
+			`<p>Halo ` + html.EscapeString(p.Nama) + `,</p>` +
+			`<p>` + html.EscapeString(ringkas) + `</p>` +
+			`<p><a href="` + html.EscapeString(tautan) + `" style="color:#c8102e">Buka permintaan invoice</a></p></div>`,
+	}
+}
+
 // Batalkan menghapus permintaan yang belum dijawab MC. Jawaban yang sudah ada
 // menjadi dasar invoice renewal, jadi tidak ikut terhapus.
 func (s *Service) Batalkan(ctx context.Context, id string) error {
@@ -264,6 +357,33 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	// lain, tapi harus boleh menjawab di sini. Perannya diperiksa di service.
 	mux.HandleFunc("PATCH /api/v1/renewal-requests/{id}", h.jawab)
 	mux.HandleFunc("DELETE /api/v1/renewal-requests/{id}", auth.RequireWrite(h.batalkan))
+	// Langkah 3 alur renewal: ST meminta invoice ke finance, dan boleh
+	// menariknya selama invoicenya belum dibuat.
+	mux.HandleFunc("POST /api/v1/renewal-requests/invoice-requests", auth.RequireWrite(h.mintaInvoice))
+	mux.HandleFunc("DELETE /api/v1/renewal-requests/{id}/invoice-request", auth.RequireWrite(h.batalkanMintaInvoice))
+}
+
+func (h *Handler) mintaInvoice(w http.ResponseWriter, r *http.Request) {
+	var in domain.MintaInvoiceInput
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	out, err := h.svc.MintaInvoice(r.Context(), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) batalkanMintaInvoice(w http.ResponseWriter, r *http.Request) {
+	out, err := h.svc.BatalkanMintaInvoice(r.Context(), r.PathValue("id"))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, out)
 }
 
 func (h *Handler) batalkan(w http.ResponseWriter, r *http.Request) {
@@ -279,6 +399,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		ChapterID: httpx.Query(r, "chapterId"),
 		Answer:    httpx.Query(r, "answer"),
 		Period:    httpx.Query(r, "period"),
+		Stage:     httpx.Query(r, "stage"),
 		Limit:     httpx.QueryInt(r, "limit", 50, 1, 200),
 		Offset:    httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
 	}

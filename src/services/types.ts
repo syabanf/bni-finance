@@ -16,6 +16,8 @@ import type {
   RenewalAnswer,
   RenewalPeriod,
   RenewalRequest,
+  PaymentProof,
+  ProofStatus,
   SimpanPeriodeInput,
   UserRole,
   AuditLogEntry,
@@ -141,6 +143,7 @@ export interface PeriodRepository {
 }
 
 export interface RenewalRepository {
+  /** `period` kosong berarti semua periode. */
   list(params?: { answer?: RenewalAnswer; period?: string }): Promise<RenewalRequest[]>
   /**
    * ST meminta konfirmasi untuk sekumpulan member.
@@ -158,6 +161,34 @@ export interface RenewalRepository {
   answer(id: string, answer: RenewalAnswer, note?: string): Promise<RenewalRequest>
   /** Batalkan permintaan yang belum dijawab (admin, ST). */
   cancel(id: string): Promise<void>
+  /**
+   * ST meminta finance menerbitkan invoice untuk konfirmasi yang Diterima MC.
+   * Yang belum Diterima, sudah diminta, atau sudah punya invoice dilewati.
+   */
+  requestInvoice(ids: string[]): Promise<{ diminta: number; dilewati: number; email?: HasilEmailMC }>
+  /** Tarik permintaan invoice selama finance belum membuat invoicenya. */
+  cancelInvoiceRequest(id: string): Promise<RenewalRequest>
+}
+
+export interface KirimBuktiInput {
+  invoiceId: string
+  amount: number
+  paidAt: string
+  paymentMethod?: string
+  note?: string
+  file: File
+}
+
+/** Bukti bayar: ST mengirim, finance menyetujui atau menolak. */
+export interface ProofRepository {
+  list(params?: { status?: ProofStatus; invoiceId?: string }): Promise<PaymentProof[]>
+  submit(input: KirimBuktiInput): Promise<PaymentProof>
+  /** Mencatat pembayaran dan menandai invoice lunas. */
+  approve(id: string, note?: string): Promise<PaymentProof>
+  /** Alasan wajib, supaya ST tahu apa yang harus diperbaiki. */
+  reject(id: string, note: string): Promise<PaymentProof>
+  /** ST menarik bukti yang belum diperiksa. */
+  withdraw(id: string): Promise<void>
 }
 
 /** Pemberitahuan ke MC setelah permintaan konfirmasi renewal dibuat. */
@@ -275,6 +306,10 @@ export interface InvoiceRepository {
   recordManualPayment(id: string, input: ManualPaymentInput): Promise<Invoice>
   /** Lampirkan atau ganti faktur pajak. Hanya untuk invoice yang sudah lunas. */
   attachTaxInvoice(id: string, file: File): Promise<Invoice>
+  /** Tandai invoice renewal lunas sudah diajukan ke BNI Global. Tanggal kosong = hari ini. */
+  markRenewalSubmitted(ids: string[], submittedAt?: string): Promise<{ ditandai: number; dilewati: number }>
+  /** Batalkan tanda pengajuan yang salah pasang. */
+  unmarkRenewalSubmitted(id: string): Promise<Invoice>
   getAuditLog(invoiceId: string): Promise<AuditLogEntry[]>
   /** Members at/near the end of their membership period. */
   renewalDue(withinDays?: number): Promise<RenewalDueMember[]>

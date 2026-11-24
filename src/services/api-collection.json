@@ -582,6 +582,17 @@
           "description": "Umur tunggakan. Dihitung dari due_date terhadap hari ini di basis data, bukan tanggal kiriman klien — jam peramban bisa salah, dan umur yang bergeser sehari memindahkan invoice antar keranjang. Otomatis membatasi ke sent dan overdue."
         },
         {
+          "name": "submission",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "pending",
+            "done"
+          ],
+          "description": "Pengajuan renewal ke BNI Global. pending = invoice renewal lunas yang belum diajukan, done = yang sudah. Keduanya otomatis membatasi ke tipe renewal dan status paid."
+        },
+        {
           "name": "summary",
           "in": "query",
           "required": false,
@@ -1049,6 +1060,27 @@
       "admin": true
     },
     {
+      "id": "delete:/api/v1/invoices/{id}/renewal-submission",
+      "method": "DELETE",
+      "path": "/api/v1/invoices/{id}/renewal-submission",
+      "tag": "Invoice",
+      "summary": "Batalkan tanda pengajuan renewal",
+      "description": "**Admin saja.** Untuk tanda yang salah pasang. Jejak auditnya tetap ada,\nditambah satu baris pembatalan. Invoice yang belum ditandai dijawab 409.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
       "id": "put:/api/v1/invoices/{id}/tax-invoice",
       "method": "PUT",
       "path": "/api/v1/invoices/{id}/tax-invoice",
@@ -1080,6 +1112,268 @@
       "multipart": false,
       "auth": true,
       "admin": false
+    },
+    {
+      "id": "post:/api/v1/invoices/renewal-submissions",
+      "method": "POST",
+      "path": "/api/v1/invoices/renewal-submissions",
+      "tag": "Invoice",
+      "summary": "Tandai renewal sudah diajukan ke BNI Global",
+      "description": "**Admin saja.** Langkah 6 alur renewal klien. Menandai invoice renewal\nyang **lunas** sebagai sudah diajukan finance ke BNI Global, dan menulis\nbaris audit `renewal_submitted`. Invoice yang belum lunas, bukan renewal,\natau sudah diajukan dilewati, jadi tanggal pengajuan pertama tidak bergeser.\n",
+      "params": [],
+      "body": {
+        "ids": [
+          ""
+        ]
+      },
+      "bodyFields": [
+        {
+          "name": "ids",
+          "type": "array",
+          "required": true,
+          "description": "",
+          "complex": true
+        },
+        {
+          "name": "submittedAt",
+          "type": "string",
+          "format": "date",
+          "required": false,
+          "description": "Kosong berarti hari ini. Tanggal di masa depan dijawab 400.",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "get:/api/v1/payment-proofs",
+      "method": "GET",
+      "path": "/api/v1/payment-proofs",
+      "tag": "Pembayaran",
+      "summary": "Daftar bukti bayar",
+      "description": "Bukti bayar yang dikirim ST ke finance (langkah 5 alur renewal).\n**Dibatasi chapter** untuk ST dan MC. Yang menunggu verifikasi di atas.\n",
+      "params": [
+        {
+          "name": "status",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "pending",
+            "approved",
+            "rejected"
+          ],
+          "description": ""
+        },
+        {
+          "name": "invoiceId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "chapterId",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "description": ""
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 50,
+          "description": ""
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "required": false,
+          "type": "integer",
+          "default": 0,
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/payment-proofs",
+      "method": "POST",
+      "path": "/api/v1/payment-proofs",
+      "tag": "Pembayaran",
+      "summary": "ST mengirim bukti bayar ke finance",
+      "description": "**Admin dan ST.** Bukti belum menjadi pembayaran: invoice baru lunas saat\nfinance menyetujuinya. Berkasnya diunggah lebih dulu lewat\n`POST /api/v1/uploads`; tautan luar ditolak 400.\n\nInvoice harus berstatus `sent` atau `overdue` (selain itu 409), dan satu\ninvoice hanya boleh punya satu bukti yang menunggu (bukti kedua 409).\nInvoice chapter lain dijawab 404.\n",
+      "params": [],
+      "body": {
+        "invoiceId": "",
+        "amount": 11523200,
+        "paidAt": "2026-01-31",
+        "proofUrl": "/uploads/20261124-3f9c2a.jpg"
+      },
+      "bodyFields": [
+        {
+          "name": "invoiceId",
+          "type": "string",
+          "format": "uuid",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "amount",
+          "type": "integer",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paidAt",
+          "type": "string",
+          "format": "date",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "paymentMethod",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "proofUrl",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        },
+        {
+          "name": "note",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "delete:/api/v1/payment-proofs/{id}",
+      "method": "DELETE",
+      "path": "/api/v1/payment-proofs/{id}",
+      "tag": "Pembayaran",
+      "summary": "Tarik bukti bayar",
+      "description": "**Admin dan ST.** Hanya bukti yang belum diperiksa finance (409 bila\nsudah). Bukti chapter lain dijawab 404.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "get:/api/v1/payment-proofs/{id}",
+      "method": "GET",
+      "path": "/api/v1/payment-proofs/{id}",
+      "tag": "Pembayaran",
+      "summary": "Detail bukti bayar",
+      "description": "",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/payment-proofs/{id}/approve",
+      "method": "POST",
+      "path": "/api/v1/payment-proofs/{id}/approve",
+      "tag": "Pembayaran",
+      "summary": "Finance menyetujui bukti bayar",
+      "description": "**Admin saja.** Mencatat pembayaran dari bukti itu dan menandai invoice\nlunas, dalam satu transaksi dengan status buktinya. Bukti yang sudah\ndiperiksa, atau invoice yang sudah lunas lewat jalur lain, dijawab 409.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {},
+      "bodyFields": [
+        {
+          "name": "note",
+          "type": "string",
+          "required": false,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
+    },
+    {
+      "id": "post:/api/v1/payment-proofs/{id}/reject",
+      "method": "POST",
+      "path": "/api/v1/payment-proofs/{id}/reject",
+      "tag": "Pembayaran",
+      "summary": "Finance menolak bukti bayar",
+      "description": "**Admin saja.** `note` wajib (400 bila kosong), karena ST perlu tahu apa\nyang harus diperbaiki. Invoicenya tidak berubah, dan ST bisa mengirim\nbukti baru.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "body": {
+        "note": ""
+      },
+      "bodyFields": [
+        {
+          "name": "note",
+          "type": "string",
+          "required": true,
+          "description": "",
+          "complex": false
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": true
     },
     {
       "id": "get:/api/v1/payments",
@@ -1926,6 +2220,25 @@
           "description": ""
         },
         {
+          "name": "stage",
+          "in": "query",
+          "required": false,
+          "type": "string",
+          "enum": [
+            "pending",
+            "will_renew",
+            "will_not",
+            "unsure",
+            "invoice_requested",
+            "invoice_draft",
+            "invoiced",
+            "proof_pending",
+            "paid",
+            "submitted"
+          ],
+          "description": "Tahap dalam alur renewal, dihitung server. Empat tahap awal sama dengan jawaban MC. Sesudah Diterima: invoice_requested (ST meminta invoice), invoice_draft, invoiced (terkirim, belum lunas), proof_pending (bukti bayar menunggu finance), paid (lunas, belum diajukan ke BNI Global), submitted. Nilai lain dijawab 400."
+        },
+        {
           "name": "limit",
           "in": "query",
           "required": false,
@@ -2054,6 +2367,54 @@
       "multipart": false,
       "auth": true,
       "admin": true
+    },
+    {
+      "id": "delete:/api/v1/renewal-requests/{id}/invoice-request",
+      "method": "DELETE",
+      "path": "/api/v1/renewal-requests/{id}/invoice-request",
+      "tag": "Member",
+      "summary": "Tarik permintaan invoice",
+      "description": "**Admin dan ST.** Hanya selama finance belum membuat invoicenya.\nSesudah invoice dibuat, atau bila invoice belum pernah diminta, dijawab 409.\n",
+      "params": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string",
+          "description": ""
+        }
+      ],
+      "bodyRequired": false,
+      "multipart": false,
+      "auth": true,
+      "admin": false
+    },
+    {
+      "id": "post:/api/v1/renewal-requests/invoice-requests",
+      "method": "POST",
+      "path": "/api/v1/renewal-requests/invoice-requests",
+      "tag": "Member",
+      "summary": "ST meminta invoice renewal ke finance",
+      "description": "**Admin dan ST.** Langkah 3 alur renewal klien. Menandai konfirmasi\nyang **Diterima** MC sebagai \"invoice diminta\", lalu mengirim satu email\nke setiap admin (finance nasional).\n\nKonfirmasi yang belum Diterima, sudah diminta, sudah punya invoice, atau\nmilik chapter lain **dilewati** dan dihitung di `dilewati`, jadi menekan\ntombolnya dua kali tidak menggeser tanggal permintaan pertama.\n",
+      "params": [],
+      "body": {
+        "ids": [
+          ""
+        ]
+      },
+      "bodyFields": [
+        {
+          "name": "ids",
+          "type": "array",
+          "required": true,
+          "description": "Id permintaan konfirmasi",
+          "complex": true
+        }
+      ],
+      "bodyRequired": true,
+      "multipart": false,
+      "auth": true,
+      "admin": false
     },
     {
       "id": "get:/api/v1/chapters",

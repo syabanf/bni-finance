@@ -135,6 +135,9 @@ export interface Invoice {
   /** Faktur pajak, dilampirkan setelah invoice lunas. */
   taxInvoiceUrl?: string
   taxInvoiceAt?: string
+  /** Kapan finance mengajukan renewal member ini ke BNI Global, dan oleh siapa. */
+  renewalSubmittedAt?: string
+  renewalSubmittedBy?: string
   /**
    * Komponen harga yang berlaku saat invoice dibuat; jumlahnya sama dengan
    * `amount`. Tidak ada bila invoice satu baris.
@@ -209,6 +212,7 @@ export type AuditAction =
   | 'reminded'
   | 'terminated'
   | 'tax_invoice'
+  | 'renewal_submitted'
 
 export interface AuditLogEntry {
   id: string
@@ -270,6 +274,8 @@ export interface InvoiceFilters {
   search?: string
   /** Umur tunggakan; dihitung server terhadap tanggal basis data. */
   aging?: '1-30' | '31-60' | '60+' | 'all'
+  /** Invoice renewal lunas yang belum (`pending`) atau sudah (`done`) diajukan ke BNI Global. */
+  submission?: 'pending' | 'done'
   dueFrom?: string
   dueTo?: string
   issuedFrom?: string
@@ -539,6 +545,54 @@ export interface RenewalRequest {
   renewalDate: string | null
   createdAt: string
   updatedAt: string
+  /** Kapan dan oleh siapa ST meminta invoice ke finance. */
+  invoiceRequestedAt?: string | null
+  invoiceRequestedBy?: string | null
+  /** Tahap member ini dalam alur renewal, dihitung server. */
+  stage: RenewalStage
+  /** Invoice renewal yang terbit untuk konfirmasi ini. */
+  invoiceId?: string | null
+  invoiceNumber?: string | null
+  invoiceStatus?: InvoiceStatus | null
+}
+
+/**
+ * Tahap dalam alur renewal klien. Empat tahap awal sama dengan jawaban MC,
+ * sisanya menyusul setelah MC menjawab Diterima.
+ */
+export type RenewalStage =
+  | RenewalAnswer
+  | 'invoice_requested'
+  | 'invoice_draft'
+  | 'invoiced'
+  | 'proof_pending'
+  | 'paid'
+  | 'submitted'
+
+export type ProofStatus = 'pending' | 'approved' | 'rejected'
+
+/** Bukti bayar yang dikirim ST dan diperiksa finance. */
+export interface PaymentProof {
+  id: string
+  invoiceId: string
+  chapterId: string
+  amount: number
+  paidAt: string
+  paymentMethod?: string | null
+  proofUrl: string
+  note?: string | null
+  status: ProofStatus
+  submittedBy?: string | null
+  submittedAt: string
+  reviewedBy?: string | null
+  reviewedAt?: string | null
+  reviewNote?: string | null
+  paymentId?: string | null
+  invoiceNumber: string
+  invoiceAmount: number
+  invoiceStatus: InvoiceStatus
+  memberName?: string | null
+  chapterName?: string | null
 }
 
 export interface ManagedUser {

@@ -158,6 +158,37 @@ func (s *fakeInvoiceStore) AttachTaxInvoice(_ context.Context, id, url string, _
 	return &inv, nil
 }
 
+func (s *fakeInvoiceStore) AjukanRenewal(_ context.Context, ids []string, tanggal time.Time, _, nama *string) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, id := range ids {
+		inv, ok := s.items[id]
+		if !ok || inv.Type != domain.TypeRenewal || inv.Status != domain.StatusPaid || inv.RenewalSubmittedAt != nil {
+			continue
+		}
+		inv.RenewalSubmittedAt, inv.RenewalSubmittedBy = &tanggal, nama
+		s.items[id] = inv
+		n++
+	}
+	return n, nil
+}
+
+func (s *fakeInvoiceStore) BatalkanPengajuan(_ context.Context, id string, _, _ *string) (*domain.Invoice, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	inv, ok := s.items[id]
+	if !ok {
+		return nil, httpx.ErrNotFound
+	}
+	if inv.RenewalSubmittedAt == nil {
+		return nil, httpx.Conflict("invoice ini belum ditandai diajukan ke BNI Global")
+	}
+	inv.RenewalSubmittedAt, inv.RenewalSubmittedBy = nil, nil
+	s.items[id] = inv
+	return &inv, nil
+}
+
 // Ringkasan dihitung dari isi stub, bukan dikembalikan kosong: tes rute yang
 // memeriksa bentuk jawabannya harus melihat angka yang benar-benar berasal dari
 // data, kalau tidak ia lulus meski agregatnya rusak.

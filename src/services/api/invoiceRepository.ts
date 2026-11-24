@@ -136,6 +136,7 @@ function paramFilter(f: InvoiceFilters | undefined) {
     type: nilai(f?.type),
     chapterId: nilai(f?.chapterId),
     aging: nilai(f?.aging),
+    submission: f?.submission,
     q: f?.search?.trim() || undefined,
     dueFrom: f?.dueFrom || undefined,
     dueTo: f?.dueTo || undefined,
@@ -319,6 +320,17 @@ export const apiInvoiceRepository: InvoiceRepository = {
     const { url } = await api.upload('/uploads', file)
     const inv = await api.put<Invoice>(`/invoices/${encodeURIComponent(id)}/tax-invoice`, { url })
     return { ...inv, taxInvoiceUrl: fileUrl(inv.taxInvoiceUrl) }
+  },
+
+  async markRenewalSubmitted(ids, submittedAt) {
+    return api.post<{ ditandai: number; dilewati: number }>('/invoices/renewal-submissions', {
+      ids,
+      submittedAt: submittedAt || null,
+    })
+  },
+
+  async unmarkRenewalSubmitted(id) {
+    return api.delete<Invoice>(`/invoices/${encodeURIComponent(id)}/renewal-submission`)
   },
 
   async getAuditLog(invoiceId) {

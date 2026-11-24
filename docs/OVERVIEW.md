@@ -446,6 +446,30 @@ mengelolanya lewat tombol **Kelola Periode** di halaman itu (`/api/v1/renewal-pe
 - Tes yang mencatat permintaan konfirmasi harus mendaftarkan periodenya dulu dengan
   `testdb.Periode`.
 
+### Alur renewal dari klien
+
+Klien menetapkan alur ini pada 24 November 2026:
+
+| # | Langkah | Di sistem |
+| --- | --- | --- |
+| 1 | BNI Global mengirim email ke MC dan ST berisi member yang jatuh tempo | Di luar sistem |
+| 2 | ST meminta daftar member yang disetujui MC | Konfirmasi Renewal: ST meminta, MC menjawab |
+| 3 | ST meminta invoice ke finance nasional | Tombol **Minta invoice** (`POST /renewal-requests/invoice-requests`), email ke semua admin |
+| 4 | Finance mengirim invoice ke member | Admin membuat dan mengirim invoice. ST tidak bisa (403) |
+| 5 | ST memberikan bukti bayar ke finance | **Kirim bukti bayar** di detail invoice (`/payment-proofs`). Admin menyetujui di **Bukti Bayar**, dan persetujuan itulah yang menandai lunas |
+| 6 | Finance mengajukan renewal ke BNI Global | Halaman **Pengajuan BNI Global** (`/invoices/renewal-submissions`) |
+
+- ST kehilangan `invoice:create`, `invoice:manage`, dan `payment:record`, dan mendapat
+  `invoice:request` serta `payment:submit`. `POST /invoices/send-bulk` kini khusus admin,
+  dan `POST /uploads` terbuka untuk ST supaya ST bisa mengunggah bukti.
+- Bukti bayar belum menjadi pembayaran. Baris `payments` baru tercatat saat admin menyetujui,
+  dalam satu transaksi dengan status buktinya (`payment.CatatDalamTx`). Satu invoice hanya
+  boleh punya satu bukti yang menunggu. Pembayaran lewat Paper.id tetap lunas otomatis.
+- Setiap baris Konfirmasi Renewal membawa `stage`, tahap yang dihitung server dari jawaban
+  MC, permintaan invoice, invoice terbaru sejak konfirmasi diminta, dan bukti yang menunggu.
+  Urutan tahapnya ada di konstanta `tahap` di `backend/internal/renewal/repository.go`, dan
+  mock menirunya di `src/services/mock/renewalRepository.ts`.
+
 ---
 
 ## 10. Deploy

@@ -574,6 +574,13 @@ paths:
             umur yang bergeser sehari memindahkan invoice antar keranjang.
             Otomatis membatasi ke `sent` dan `overdue`.
           schema: { type: string, enum: ["1-30", "31-60", "60+"] }
+        - name: submission
+          in: query
+          description: >
+            Pengajuan renewal ke BNI Global. `pending` = invoice renewal lunas
+            yang belum diajukan, `done` = yang sudah. Keduanya otomatis
+            membatasi ke tipe `renewal` dan status `paid`.
+          schema: { type: string, enum: [pending, done] }
         - name: summary
           in: query
           description: >
@@ -1505,6 +1512,66 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /api/v1/invoices/renewal-submissions:
+    post:
+      tags: [Invoice]
+      summary: Tandai renewal sudah diajukan ke BNI Global
+      description: |
+        **Admin saja.** Langkah 6 alur renewal klien. Menandai invoice renewal
+        yang **lunas** sebagai sudah diajukan finance ke BNI Global, dan menulis
+        baris audit `renewal_submitted`. Invoice yang belum lunas, bukan renewal,
+        atau sudah diajukan dilewati, jadi tanggal pengajuan pertama tidak bergeser.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  maxItems: 200
+                  items: { type: string, format: uuid }
+                submittedAt:
+                  type: string
+                  format: date
+                  nullable: true
+                  description: Kosong berarti hari ini. Tanggal di masa depan dijawab 400.
+      responses:
+        "200":
+          description: Hasil penandaan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ditandai: { type: integer }
+                  dilewati: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/invoices/{id}/renewal-submission:
+    delete:
+      tags: [Invoice]
+      summary: Batalkan tanda pengajuan renewal
+      description: |
+        **Admin saja.** Untuk tanda yang salah pasang. Jejak auditnya tetap ada,
+        ditambah satu baris pembatalan. Invoice yang belum ditandai dijawab 409.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Invoice sesudah tandanya dibatalkan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Invoice" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Invoice belum ditandai diajukan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/v1/invoices/{id}/remind:
     post:
       tags: [Paper.id]
@@ -2275,6 +2342,15 @@ paths:
           in: query
           schema: { type: string, enum: [pending, will_renew, will_not, unsure] }
         - { name: period, in: query, schema: { type: string } }
+        - name: stage
+          in: query
+          description: >
+            Tahap dalam alur renewal, dihitung server. Empat tahap awal sama
+            dengan jawaban MC. Sesudah Diterima: `invoice_requested` (ST meminta
+            invoice), `invoice_draft`, `invoiced` (terkirim, belum lunas),
+            `proof_pending` (bukti bayar menunggu finance), `paid` (lunas, belum
+            diajukan ke BNI Global), `submitted`. Nilai lain dijawab 400.
+          schema: { type: string, enum: [pending, will_renew, will_not, unsure, invoice_requested, invoice_draft, invoiced, proof_pending, paid, submitted] }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
         - { name: offset, in: query, schema: { type: integer, default: 0 } }
       responses:
@@ -2305,6 +2381,12 @@ paths:
                     chapterName: { type: string, nullable: true }
                     renewalDate: { type: string, format: date, nullable: true }
                     createdAt: { type: string, format: date-time }
+                    invoiceRequestedAt: { type: string, format: date-time, nullable: true }
+                    invoiceRequestedBy: { type: string, nullable: true, description: Nama ST yang meminta invoice }
+                    stage: { type: string, enum: [pending, will_renew, will_not, unsure, invoice_requested, invoice_draft, invoiced, proof_pending, paid, submitted] }
+                    invoiceId: { type: string, format: uuid, nullable: true }
+                    invoiceNumber: { type: string, nullable: true }
+                    invoiceStatus: { type: string, nullable: true }
                     updatedAt: { type: string, format: date-time }
                   meta:
                     type: object
@@ -2462,6 +2544,233 @@ paths:
         "400": { description: "answer tidak sah atau 'pending'" }
         "403": { description: Peran tidak boleh menjawab }
         "404": { description: Permintaan tidak ada, atau milik chapter lain }
+  /api/v1/renewal-requests/invoice-requests:
+    post:
+      tags: [Member]
+      summary: ST meminta invoice renewal ke finance
+      description: |
+        **Admin dan ST.** Langkah 3 alur renewal klien. Menandai konfirmasi
+        yang **Diterima** MC sebagai "invoice diminta", lalu mengirim satu email
+        ke setiap admin (finance nasional).
+
+        Konfirmasi yang belum Diterima, sudah diminta, sudah punya invoice, atau
+        milik chapter lain **dilewati** dan dihitung di `dilewati`, jadi menekan
+        tombolnya dua kali tidak menggeser tanggal permintaan pertama.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  maxItems: 500
+                  items: { type: string, format: uuid }
+                  description: Id permintaan konfirmasi
+      responses:
+        "200":
+          description: Permintaan tercatat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  diminta: { type: integer }
+                  dilewati: { type: integer }
+                  email:
+                    type: object
+                    description: Hasil pemberitahuan ke finance
+                    properties:
+                      terkirim: { type: integer }
+                      gagal: { type: integer }
+                      belumDikonfigurasi: { type: boolean }
+                      chapterTanpaMc: { type: array, items: { type: string } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/renewal-requests/{id}/invoice-request:
+    delete:
+      tags: [Member]
+      summary: Tarik permintaan invoice
+      description: |
+        **Admin dan ST.** Hanya selama finance belum membuat invoicenya.
+        Sesudah invoice dibuat, atau bila invoice belum pernah diminta, dijawab 409.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: Permintaan konfirmasi sesudah ditarik }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Invoice belum diminta, atau sudah dibuat
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/payment-proofs:
+    get:
+      tags: [Pembayaran]
+      summary: Daftar bukti bayar
+      description: |
+        Bukti bayar yang dikirim ST ke finance (langkah 5 alur renewal).
+        **Dibatasi chapter** untuk ST dan MC. Yang menunggu verifikasi di atas.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected] }
+        - { name: invoiceId, in: query, schema: { type: string, format: uuid } }
+        - { name: chapterId, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: Daftar bukti bayar
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/PaymentProof" } }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+                      limit: { type: integer }
+                      offset: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+    post:
+      tags: [Pembayaran]
+      summary: ST mengirim bukti bayar ke finance
+      description: |
+        **Admin dan ST.** Bukti belum menjadi pembayaran: invoice baru lunas saat
+        finance menyetujuinya. Berkasnya diunggah lebih dulu lewat
+        `POST /api/v1/uploads`; tautan luar ditolak 400.
+
+        Invoice harus berstatus `sent` atau `overdue` (selain itu 409), dan satu
+        invoice hanya boleh punya satu bukti yang menunggu (bukti kedua 409).
+        Invoice chapter lain dijawab 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoiceId, amount, paidAt, proofUrl]
+              properties:
+                invoiceId: { type: string, format: uuid }
+                amount: { type: integer, example: 11523200 }
+                paidAt: { type: string, format: date }
+                paymentMethod: { type: string, nullable: true, example: bank_transfer }
+                proofUrl: { type: string, example: "/uploads/20261124-3f9c2a.jpg" }
+                note: { type: string, nullable: true }
+      responses:
+        "201":
+          description: Bukti tersimpan, menunggu verifikasi
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentProof" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Invoice belum dikirim atau sudah lunas, atau sudah ada bukti yang menunggu
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/payment-proofs/{id}:
+    get:
+      tags: [Pembayaran]
+      summary: Detail bukti bayar
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Bukti bayar
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentProof" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Pembayaran]
+      summary: Tarik bukti bayar
+      description: |
+        **Admin dan ST.** Hanya bukti yang belum diperiksa finance (409 bila
+        sudah). Bukti chapter lain dijawab 404.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Ditarik }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Bukti sudah diperiksa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/payment-proofs/{id}/approve:
+    post:
+      tags: [Pembayaran]
+      summary: Finance menyetujui bukti bayar
+      description: |
+        **Admin saja.** Mencatat pembayaran dari bukti itu dan menandai invoice
+        lunas, dalam satu transaksi dengan status buktinya. Bukti yang sudah
+        diperiksa, atau invoice yang sudah lunas lewat jalur lain, dijawab 409.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, nullable: true }
+      responses:
+        "200":
+          description: Bukti disetujui
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentProof" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Bukti sudah diperiksa, atau invoice sudah lunas
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/v1/payment-proofs/{id}/reject:
+    post:
+      tags: [Pembayaran]
+      summary: Finance menolak bukti bayar
+      description: |
+        **Admin saja.** `note` wajib (400 bila kosong), karena ST perlu tahu apa
+        yang harus diperbaiki. Invoicenya tidak berubah, dan ST bisa mengirim
+        bukti baru.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [note]
+              properties:
+                note: { type: string }
+      responses:
+        "200":
+          description: Bukti ditolak
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaymentProof" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Bukti sudah diperiksa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /api/v1/import/{jenis}:
     post:
       tags: [Sinkronisasi]
@@ -3270,6 +3579,8 @@ components:
         paperIdSentAt: { title: Waktu Kirim ke Paper.id, type: string, format: date-time }
         taxInvoiceUrl: { title: Faktur Pajak, type: string, description: "Path berkas faktur pajak di /uploads/; hanya ada pada invoice lunas." }
         taxInvoiceAt: { title: Faktur Pajak Dilampirkan, type: string, format: date-time }
+        renewalSubmittedAt: { title: Diajukan ke BNI Global, type: string, format: date-time, nullable: true }
+        renewalSubmittedBy: { type: string, nullable: true, description: Nama admin yang menandai pengajuan }
         rincian:
           title: Rincian Harga
           description: >
@@ -3381,6 +3692,30 @@ components:
         notes: { title: Catatan, type: string, minLength: 1 }
 
     # --- Pembayaran ----------------------------------------------------------
+    PaymentProof:
+      type: object
+      description: Bukti bayar yang dikirim ST dan diperiksa finance.
+      properties:
+        id: { type: string, format: uuid }
+        invoiceId: { type: string, format: uuid }
+        chapterId: { type: string }
+        amount: { type: integer }
+        paidAt: { type: string, format: date }
+        paymentMethod: { type: string, nullable: true }
+        proofUrl: { type: string }
+        note: { type: string, nullable: true }
+        status: { type: string, enum: [pending, approved, rejected] }
+        submittedBy: { type: string, nullable: true }
+        submittedAt: { type: string, format: date-time }
+        reviewedBy: { type: string, nullable: true }
+        reviewedAt: { type: string, format: date-time, nullable: true }
+        reviewNote: { type: string, nullable: true }
+        paymentId: { type: string, format: uuid, nullable: true, description: Pembayaran yang tercatat saat disetujui }
+        invoiceNumber: { type: string }
+        invoiceAmount: { type: integer }
+        invoiceStatus: { type: string }
+        memberName: { type: string, nullable: true }
+        chapterName: { type: string, nullable: true }
     Payment:
       type: object
       required: [id, invoiceId, amount, paidAt, createdAt]

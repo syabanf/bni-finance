@@ -1,5 +1,5 @@
 import { api, query, type ListResponse } from '@/lib/apiClient'
-import type { RenewalRepository } from '@/services/types'
+import type { HasilEmailMC, RenewalRepository } from '@/services/types'
 import type { RenewalRequest } from '@/types'
 
 /**
@@ -36,6 +36,17 @@ export const apiRenewalRepository: RenewalRepository = {
 
   async cancel(id) {
     await api.delete(`/renewal-requests/${encodeURIComponent(id)}`)
+  },
+
+  async requestInvoice(ids) {
+    return api.post<{ diminta: number; dilewati: number; email?: HasilEmailMC }>(
+      '/renewal-requests/invoice-requests',
+      { ids },
+    )
+  },
+
+  async cancelInvoiceRequest(id) {
+    return api.delete<RenewalRequest>(`/renewal-requests/${encodeURIComponent(id)}/invoice-request`)
   },
 
   async answer(id, answer, note) {

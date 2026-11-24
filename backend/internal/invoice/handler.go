@@ -23,6 +23,31 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("PATCH /api/v1/invoices/{id}", auth.RequireAdmin(h.update))
 	mux.HandleFunc("DELETE /api/v1/invoices/{id}", auth.RequireAdmin(h.remove))
 	mux.HandleFunc("PUT /api/v1/invoices/{id}/tax-invoice", auth.RequireAdmin(h.taxInvoice))
+	mux.HandleFunc("POST /api/v1/invoices/renewal-submissions", auth.RequireAdmin(h.ajukanRenewal))
+	mux.HandleFunc("DELETE /api/v1/invoices/{id}/renewal-submission", auth.RequireAdmin(h.batalkanPengajuan))
+}
+
+func (h *Handler) ajukanRenewal(w http.ResponseWriter, r *http.Request) {
+	var in domain.AjukanRenewalInput
+	if err := httpx.Decode(r, &in); err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	n, err := h.svc.AjukanRenewal(r.Context(), in)
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]int{"ditandai": n, "dilewati": len(in.IDs) - n})
+}
+
+func (h *Handler) batalkanPengajuan(w http.ResponseWriter, r *http.Request) {
+	inv, err := h.svc.BatalkanPengajuan(r.Context(), r.PathValue("id"))
+	if err != nil {
+		httpx.Fail(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, inv)
 }
 
 type listMeta struct {
@@ -51,6 +76,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		IssuedFrom: httpx.Query(r, "issuedFrom"),
 		IssuedTo:   httpx.Query(r, "issuedTo"),
 		Aging:      httpx.Query(r, "aging"),
+		Submission: httpx.Query(r, "submission"),
 		IDs:        hanyaUUID(httpx.QueryList(r, "ids", 200)),
 		MemberIDs:  httpx.QueryList(r, "memberIds", 200),
 		SentFrom:   httpx.Query(r, "sentFrom"),

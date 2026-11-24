@@ -115,7 +115,8 @@ type Handler struct {
 func NewHandler(store *Store) *Handler { return &Handler{store: store} }
 
 func (h *Handler) Register(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/v1/uploads", auth.RequireAdmin(h.upload))
+	// RequireWrite: ST mengunggah bukti bayar sebelum mengirimkannya ke finance.
+	mux.HandleFunc("POST /api/v1/uploads", auth.RequireWrite(h.upload))
 }
 
 // RegisterFileServer exposes stored files. Proof URLs are unguessable rather

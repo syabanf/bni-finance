@@ -16,6 +16,9 @@ const (
 	AuditUpdated   AuditAction = "updated"
 	// AuditTaxInvoice: faktur pajak dilampirkan atau diganti.
 	AuditTaxInvoice AuditAction = "tax_invoice"
+	// AuditRenewalSubmitted: finance mengajukan renewal member ke BNI Global
+	// setelah invoice renewalnya lunas.
+	AuditRenewalSubmitted AuditAction = "renewal_submitted"
 )
 
 func (a AuditAction) Valid() bool {
