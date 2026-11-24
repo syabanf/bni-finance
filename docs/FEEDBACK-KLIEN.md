@@ -26,14 +26,16 @@ menunggu keputusan, dan menelusuri masukan mana yang menghasilkan perubahan apa.
 Sumber: pesan klien berisi alur renewal membership, dan pertanyaan lanjutan apakah halaman
 Konfirmasi Renewal bisa menampilkan status sampai lunas.
 
+Kedua butir masuk lewat [PR #117](https://github.com/syabanf/bni-finance/pull/117).
+
 ### Ringkasan
 
 | No | Masukan | Status |
 | --- | --- | --- |
-| F-11 | Alur renewal enam langkah, dari email BNI Global sampai finance mengajukan renewal | `dikerjakan` |
-| F-12 | Status lunas atau belum ditampilkan di Konfirmasi Renewal | `dikerjakan` |
+| F-11 | Alur renewal enam langkah, dari email BNI Global sampai finance mengajukan renewal | `selesai` |
+| F-12 | Status lunas atau belum ditampilkan di Konfirmasi Renewal | `selesai` |
 
-**F-11. Alur renewal.** `dikerjakan`
+**F-11. Alur renewal.** `selesai`
 
 Alur dari klien:
 
@@ -66,7 +68,7 @@ Jawaban untuk klien: alur itu sudah diterapkan. ST meminta invoice dan mengirim 
 finance menerbitkan invoice, memverifikasi bukti, dan menandai renewal yang sudah diajukan
 ke BNI Global.
 
-**F-12. Status sampai lunas di Konfirmasi Renewal.** `dikerjakan`
+**F-12. Status sampai lunas di Konfirmasi Renewal.** `selesai`
 
 Kolom **Status renewal** menampilkan tahap terakhir tiap member: menunggu jawaban MC, siap
 diminta invoice, invoice diminta, belum dibayar, bukti menunggu finance, lunas, dan diajukan
