@@ -13,6 +13,25 @@ export function todayISO(): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
+/**
+ * Tanggal lokal (yyyy-mm-dd) dari timestamp ISO, atau tanggal yyyy-mm-dd apa
+ * adanya. Saringan tanggal memakainya supaya pembayaran pukul 01.00 WIB tidak
+ * terhitung pada hari sebelumnya.
+ */
+export function tanggalLokal(iso: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
+
+/** Benar bila tanggal lokal `iso` ada di rentang [dari, sampai]. Batas kosong tidak membatasi. */
+export function dalamRentang(iso: string | null | undefined, dari: string, sampai: string): boolean {
+  if (!dari && !sampai) return true
+  if (!iso) return false
+  const t = tanggalLokal(iso)
+  return (!dari || t >= dari) && (!sampai || t <= sampai)
+}
+
 /** Add a number of days to an ISO date, returning a new ISO date string. */
 export function addDays(iso: string, days: number): string {
   const d = new Date(iso)
