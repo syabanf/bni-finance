@@ -154,6 +154,23 @@ export function RenewalSubmissionPage() {
           <TableSkeleton />
         ) : aktif.error ? (
           <ErrorState message={aktif.error} onRetry={aktif.reload} />
+        ) : daftar.length === 0 && !!aktif.data?.length ? (
+          <EmptyState
+            title="Tidak ada yang cocok dengan pencarian atau chapter"
+            description="Daftar lengkapnya tersembunyi oleh saringan."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCari('')
+                  setChapterId('all')
+                }}
+              >
+                Hapus saringan
+              </Button>
+            }
+          />
         ) : daftar.length === 0 ? (
           <EmptyState
             title={tab === 'pending' ? 'Semua renewal yang lunas sudah diajukan' : 'Belum ada renewal yang diajukan'}

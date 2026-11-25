@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ProofStatus } from '@/types'
 import {
+  Button,
   Card,
   EmptyState,
   ErrorState,
@@ -86,6 +87,23 @@ export function PaymentProofsPage() {
           <TableSkeleton />
         ) : daftar.error ? (
           <ErrorState message={daftar.error} onRetry={daftar.reload} />
+        ) : tampil.length === 0 && (daftar.data ?? []).some((b) => b.status === status) ? (
+          <EmptyState
+            title="Tidak ada yang cocok dengan pencarian atau chapter"
+            description="Daftar lengkapnya tersembunyi oleh saringan."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCari('')
+                  setChapterId('all')
+                }}
+              >
+                Hapus saringan
+              </Button>
+            }
+          />
         ) : tampil.length === 0 ? (
           <EmptyState
             title={status === 'pending' ? 'Tidak ada bukti yang menunggu' : 'Belum ada bukti di sini'}
