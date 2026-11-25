@@ -25,7 +25,7 @@ import { usePaginasi } from '@/hooks/usePaginasi'
 import { chapterService, invoiceService } from '@/services'
 import { Saringan } from '@/features/payments/components/Saringan'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { todayISO } from '@/lib/date'
+import { dalamRentang, todayISO } from '@/lib/date'
 
 type Tab = 'pending' | 'done'
 
@@ -43,16 +43,21 @@ export function RenewalSubmissionPage() {
 
   const [cari, setCari] = useState('')
   const [chapterId, setChapterId] = useState('all')
+  const [dari, setDari] = useState('')
+  const [sampai, setSampai] = useState('')
   const chapters = useAsync(() => chapterService.list().catch(() => []), [])
   const belum = useAsync(() => invoiceService.list({ submission: 'pending' }), [])
   const sudah = useAsync(() => invoiceService.list({ submission: 'done' }), [])
   const aktif = tab === 'pending' ? belum : sudah
   const cocok = useMemo(() => {
     const q = cari.trim().toLowerCase()
+    // Tab Belum diajukan menyaring tanggal lunas, tab Sudah diajukan menyaring
+    // tanggal pengajuannya.
     return (i: InvoiceWithRelations) =>
       (chapterId === 'all' || i.chapterId === chapterId) &&
+      dalamRentang(tab === 'pending' ? i.paidAt : i.renewalSubmittedAt, dari, sampai) &&
       (!q || i.number.toLowerCase().includes(q) || (i.member?.name ?? '').toLowerCase().includes(q))
-  }, [cari, chapterId])
+  }, [cari, chapterId, dari, sampai, tab])
   const daftar = useMemo(
     () =>
       (aktif.data ?? []).filter(cocok).sort((a, b) =>
@@ -64,7 +69,7 @@ export function RenewalSubmissionPage() {
   )
   const { potongan, paginasi } = usePaginasi(daftar)
 
-  useEffect(() => setTerpilih(new Set()), [tab, belum.data, cari, chapterId])
+  useEffect(() => setTerpilih(new Set()), [tab, belum.data, cari, chapterId, dari, sampai])
 
   const muatUlang = () => {
     belum.reload()
@@ -128,6 +133,13 @@ export function RenewalSubmissionPage() {
           chapterId={chapterId}
           onChapter={setChapterId}
           chapters={chapters.data ?? []}
+          tanggal={{
+            label: tab === 'pending' ? 'Tanggal lunas' : 'Tanggal diajukan',
+            dari,
+            sampai,
+            onDari: setDari,
+            onSampai: setSampai,
+          }}
         />
         {tab === 'pending' && terpilih.size > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 bg-brand-50/40 px-5 py-3">
@@ -154,6 +166,25 @@ export function RenewalSubmissionPage() {
           <TableSkeleton />
         ) : aktif.error ? (
           <ErrorState message={aktif.error} onRetry={aktif.reload} />
+        ) : daftar.length === 0 && !!aktif.data?.length ? (
+          <EmptyState
+            title="Tidak ada yang cocok dengan saringan"
+            description="Daftar lengkapnya tersembunyi oleh saringan."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCari('')
+                  setChapterId('all')
+                  setDari('')
+                  setSampai('')
+                }}
+              >
+                Hapus saringan
+              </Button>
+            }
+          />
         ) : daftar.length === 0 ? (
           <EmptyState
             title={tab === 'pending' ? 'Semua renewal yang lunas sudah diajukan' : 'Belum ada renewal yang diajukan'}

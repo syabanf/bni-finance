@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { ProofStatus } from '@/types'
 import {
+  Button,
   Card,
   EmptyState,
   ErrorState,
@@ -22,6 +23,7 @@ import { useCan } from '@/features/auth/usePermission'
 import { chapterService, proofService } from '@/services'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/format'
 import { paymentMethodLabel } from '@/lib/paymentMethod'
+import { dalamRentang } from '@/lib/date'
 import { AksiBukti, BadgeBukti } from './components/AksiBukti'
 import { Saringan } from './components/Saringan'
 
@@ -43,6 +45,8 @@ export function PaymentProofsPage() {
   const [status, setStatus] = useState<ProofStatus>('pending')
   const [cari, setCari] = useState('')
   const [chapterId, setChapterId] = useState('all')
+  const [dari, setDari] = useState('')
+  const [sampai, setSampai] = useState('')
   const daftar = useAsync(() => proofService.list(), [])
   const chapters = useAsync(() => chapterService.list().catch(() => []), [])
 
@@ -52,9 +56,10 @@ export function PaymentProofsPage() {
     return (daftar.data ?? []).filter(
       (b) =>
         (chapterId === 'all' || b.chapterId === chapterId) &&
+        dalamRentang(b.paidAt, dari, sampai) &&
         (!q || b.invoiceNumber.toLowerCase().includes(q) || (b.memberName ?? '').toLowerCase().includes(q)),
     )
-  }, [daftar.data, cari, chapterId])
+  }, [daftar.data, cari, chapterId, dari, sampai])
   const jumlah = useMemo(() => {
     const n: Record<ProofStatus, number> = { pending: 0, approved: 0, rejected: 0 }
     for (const b of tersaring) n[b.status]++
@@ -81,11 +86,31 @@ export function PaymentProofsPage() {
           chapterId={chapterId}
           onChapter={setChapterId}
           chapters={chapters.data ?? []}
+          tanggal={{ label: 'Tanggal bayar', dari, sampai, onDari: setDari, onSampai: setSampai }}
         />
         {daftar.loading ? (
           <TableSkeleton />
         ) : daftar.error ? (
           <ErrorState message={daftar.error} onRetry={daftar.reload} />
+        ) : tampil.length === 0 && (daftar.data ?? []).some((b) => b.status === status) ? (
+          <EmptyState
+            title="Tidak ada yang cocok dengan saringan"
+            description="Daftar lengkapnya tersembunyi oleh saringan."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setCari('')
+                  setChapterId('all')
+                  setDari('')
+                  setSampai('')
+                }}
+              >
+                Hapus saringan
+              </Button>
+            }
+          />
         ) : tampil.length === 0 ? (
           <EmptyState
             title={status === 'pending' ? 'Tidak ada bukti yang menunggu' : 'Belum ada bukti di sini'}

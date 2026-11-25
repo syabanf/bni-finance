@@ -462,6 +462,26 @@ export function RenewalPage() {
             <LoadingState />
           ) : permintaan.error ? (
             <ErrorState message={permintaan.error} onRetry={permintaan.reload} />
+          ) : !tersaring.length && permintaan.data?.length ? (
+            // Periode ini punya permintaan, hanya saringannya yang tidak cocok.
+            // Pesan "belum ada permintaan" di sini menyuruh ST meminta ulang
+            // konfirmasi yang sebenarnya sudah ada.
+            <EmptyState
+              title="Tidak ada yang cocok dengan saringan"
+              description={`${permintaan.data.length} permintaan di periode ini tersembunyi oleh saringan chapter atau status.`}
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setChapterFilter('all')
+                    setTahap('all')
+                  }}
+                >
+                  Hapus saringan
+                </Button>
+              }
+            />
           ) : !tersaring.length ? (
             <EmptyState
               title="Belum ada permintaan konfirmasi"
